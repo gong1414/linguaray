@@ -1,6 +1,6 @@
 # IslandPot v1 — Design Spec
 
-**Status:** Draft for user review (rev 3 — impl-level blockers: deterministic A envelope, file semantics, B vendor+sequence algorithm, request-id race, wire URL, privacy, clipboard scope) · **Date:** 2026-07-30
+**Status:** Draft for user review (rev 4 — three closing fixes: A atomic-write semantics + pre-decrypt validation, B sentinel-marker state machine, wire option-wording) · **Date:** 2026-07-30
 
 IslandPot is an open-source, cross-platform translation/OCR desktop tool — a
 maintained successor to [pot-desktop](https://github.com/pot-app/pot-desktop) and
@@ -116,13 +116,23 @@ full disk access, or full disk/system snapshots. Those are out of scope; stated 
   read-modify-write. We do **NOT** lock the `keystore.json` inode — it is replaced
   by the rename, so an inode lock would lock the soon-to-be-orphaned file.
 - **In-process:** a `parking_lot::Mutex` serializes writers within our process.
-- **Atomic replace is platform-specific:**
+- **Atomic replace is platform-specific and distinguishes first-create vs update:**
   - **macOS/Unix:** same-directory `rename(2)` over the target (atomic on the same
-    filesystem; the tmp file is in the same dir to guarantee same-fs).
-  - **Windows:** `ReplaceFileW` (or a reliable wrapper). Plain rename-over-existing
-    is unreliable on Windows; do not use it.
-- Sequence: write `keystore.json.tmp` → `fsync` → platform atomic replace → `fsync`
-  dir (macOS) for durability.
+    filesystem; the tmp file is in the same dir to guarantee same-fs). Works for
+    both first-create and update.
+  - **Windows:** `ReplaceFileW` **requires the target to already exist** — so it is
+    used **only for updates**. **First creation** uses same-dir `MoveFileExW`
+    (`MOVEFILE_REPLACE_EXISTING` is harmless if absent; it succeeds when the target
+    doesn't exist). Plain rename-over-existing is otherwise unreliable; do not use it.
+- Sequence: write `keystore.json.tmp` → `fsync` → platform atomic replace (first-create:
+  `MoveFileExW`/`rename`; update: `ReplaceFileW`/`rename`) → `fsync` dir (macOS).
+- **Stale-tmp handling (honest about crash windows):** a process killed **before**
+  the replace can leave `keystore.json.tmp` on disk. We **cannot** guarantee "no tmp
+  leak" — that was over-promised in rev-3. What we guarantee: (a) the **canonical
+  `keystore.json` stays intact** (the replace is atomic; a pre-replace crash never
+  touches it); (b) **on every launch, while holding the cross-process lock, we
+  delete any stale `keystore.json.tmp`** before any other operation; (c) **we never
+  treat a `.tmp` file as the keystore** under any code path.
 
 ### Fail-closed semantics (critical)
 
@@ -135,6 +145,24 @@ On **identity changed**, **GCM auth-tag mismatch** (tamper/wrong identity),
 - Rationale (rev-2 over-corrected): auto-moving on a transient auth failure makes
   the next launch see "no file" → misjudged as first-run → silently discards the
   user's keys. Keep-in-place is correct; only the user resets.
+
+### Pre-decrypt validation (before any crypto runs)
+
+Before deriving a key or decrypting, validate the envelope against a **fixed
+whitelist** — a tampered envelope must never drive memory allocation or KDF cost:
+
+- **`version`, `aead`, `kdf`** must be exactly the supported values (`1`,
+  `aes-256-gcm`, `argon2id`); any other value → fail closed.
+- **`kdf_params`** must equal the pinned params (`m_kib=65536, t=3, p=1,
+  output_len=32`) **exactly** — an attacker-raised `m_kib` is a DoS vector and is
+  rejected outright, never honored. We do **not** read KDF cost from the file.
+- **`identity_source`** must be a known enum (`macos_ioplatformuuid` /
+  `windows_machineguid`) AND must match the source recorded for this machine.
+- **Length checks first:** `salt` = 16 bytes, `nonce` = 12 bytes, `ciphertext` ≥ 16
+  bytes (must include the appended 16-byte GCM tag). Any mismatch → fail closed,
+  before allocation/decryption.
+
+### Plaintext-key claims (corrected)
 
 ### Plaintext-key claims (corrected)
 
@@ -170,28 +198,44 @@ unmodified outer wrapper **cannot** interpose a sequence check before restore.
 run the precise restore algorithm below. (Alternative — self-implement the clipboard
 fallback — was rejected to reuse the macOS A11y logic.)
 
-### Clipboard restore algorithm (pinned, not "best-effort hand-wave")
+### Clipboard restore algorithm (pinned state machine, with copy-success detection)
 
 The naive "if sequence advanced, don't restore" is **wrong** — setting our own
-marker and the simulated copy itself advance the sequence. The correct invariant:
+marker and the simulated copy itself advance the sequence, and a *failed* copy
+(no selection) would otherwise be mistaken for the user's old clipboard. The
+correct state machine uses a **sentinel marker** to *detect whether the copy
+actually happened*:
 
-1. **Before touching the clipboard:** read `owned_sequence = current sequence number`.
-   (Baseline; we have not written yet.)
-2. **Save** the current clipboard content (best-effort: text + image; other formats
-   — RTF/HTML/files/private — are NOT capturable on Windows and are lost; we accept
-   this, documented in privacy §).
-3. **Simulate** `Cmd+C` / `Ctrl+C` (this advances the sequence). Read the selected
-   text off the clipboard.
-4. **`owned_sequence = current sequence number` (re-read after our copy completes).**
-   This is the state *we* left the clipboard in.
-5. **Before restoring:** read `current_sequence`. **Restore ONLY IF
-   `current_sequence == owned_sequence`.** If not equal, something (the user, or
-   another app) wrote the clipboard since our copy → **do NOT restore** (we'd
-   clobber newer content).
-6. Restore the saved content (text/image) and zeroize it from our buffer.
+1. **Save** the current clipboard content (best-effort: text + image; other formats
+   — RTF/HTML/files/private — are NOT capturable on Windows and are lost; accepted,
+   documented in §Privacy).
+2. **Write a unique sentinel** (e.g. a fixed magic string + uuid) to the clipboard.
+3. **`marker_sequence = current sequence number`** (the sequence after our sentinel
+   write).
+4. **Simulate** `Cmd+C` / `Ctrl+C`, then **poll (bounded timeout)** for
+   `current_sequence != marker_sequence` — i.e. wait for *something* to overwrite
+   our sentinel, which is what a successful copy does.
+   - **Timeout while the clipboard still holds our sentinel** → the copy did not
+     happen (no selection / target ignored the keystroke). **Restore the saved
+     content, then return `NoSelection`** — we must not return the sentinel or the
+     stale clipboard as "selected text."
+5. **Copy succeeded:** the clipboard now holds the selection. Read it as the
+   selected text. **`owned_sequence = current sequence number`** (re-read now — the
+   state *we* left the clipboard in).
+6. **Before restoring:** read `current_sequence`. **Restore the saved content ONLY
+   IF `current_sequence == owned_sequence`.** If not equal, the user or another app
+   wrote the clipboard since our copy → **do NOT restore** (we'd clobber newer
+   content); the selection text we already read is still valid.
+7. Zeroize the saved content from our buffer.
 
 This is a real state machine; it is **automated-tested with a fake clipboard**
-(§I), not just manual.
+(§I), including: marker present + timeout → `NoSelection`; sentinel overwritten →
+success path; another writer advancing the sequence between copy and restore →
+no-restore.
+
+**Hard requirement (unchanged):** macOS Accessibility permission is mandatory and
+gated with first-launch onboarding (it covers both the A11y read and the simulated
+keystroke).
 
 **Hard requirement (unchanged):** macOS Accessibility permission is mandatory and
 gated with first-launch onboarding (it covers both the A11y read and the simulated
@@ -331,11 +375,16 @@ stores its complete endpoint URL.**
 
 - **App translation options** (`domain`, `formality`, `system_prompt_override`) are
   **application-layer**. They are folded into the **prompt text** by the
-  translate_service's prompt builder. They are **never placed into the HTTP body.**
-- **Wire generation parameters** (the ones that DO go in the body — `model`,
-  `temperature`, `max_tokens`, `stream`, `system` message) are a **separate,
+  translate_service's prompt builder. They are **never serialized as top-level /
+  provider-specific wire fields** — but note they DO reach the provider indirectly:
+  the resulting system/user **message content** (which they shaped) is part of the
+  request body. The guarantee is about *where* they appear (prompt content only,
+  never as sibling fields of `model`/`temperature`), not that they're absent from
+  the body entirely.
+- **Wire generation parameters** (the ones that occupy top-level body fields —
+  `model`, `temperature`, `max_tokens`, `stream`, `messages`) are a **separate,
   strong-typed `WireParams` struct** (a closed whitelist). Only fields on this struct
-  reach the body; arbitrary app options cannot be injected.
+  reach the body as wire fields; arbitrary app options cannot be injected as such.
 
 ---
 
@@ -391,16 +440,26 @@ README + product description are synced to this scope (committed).
 - **Keystore — first-class unit tests:** tamper (flip byte → tag mismatch →
   fail-closed, file in place), wrong identity (different machine id → fail-closed),
   nonce freshness (two writes differ), corrupt JSON (fail-closed, no auto-move),
-  atomic write (crash-before-replace → original intact, no `.tmp` leak),
-  concurrency (two writers serialize under lock), migration/round-trip (v1 envelope),
-  identity-source freeze (source doesn't auto-switch), Windows DACL / macOS 0600 set.
+  **crash-before-replace (canonical `keystore.json` intact; a stale `keystore.json.tmp`
+  may remain and is cleaned at next launch; never used as the keystore)**,
+  **first-create path (`MoveFileExW`/`rename`) vs update path (`ReplaceFileW`/`rename`)**,
+  **pre-decrypt validation (whitelist-exact version/aead/kdf/kdf_params/identity_source;
+  a tampered `kdf_params.m_kib` is rejected, never honored; bad salt/nonce/ciphertext
+  lengths fail closed before decryption)**, concurrency (two writers serialize under
+  lock), migration/round-trip (v1 envelope), identity-source freeze (source doesn't
+  auto-switch), Windows DACL / macOS 0600 set.
 - **Selection clipboard algorithm — fake-clipboard automated tests:** a fake
   clipboard implementing sequence-number + get/set; assert (a) restore when
   `current_sequence == owned_sequence`, (b) no-restore when another writer advanced
-  it, (c) correct handling when our own marker/copy advance the sequence.
+  it, (c) **sentinel still present at timeout → `NoSelection` + restore saved content,
+  never return sentinel/stale clipboard as selected text**, (d) sentinel overwritten
+  → success path, (e) another writer advancing the sequence between copy and restore
+  → no-restore.
 - **Engines** — request construction + response parsing via `wiremock`; assert
   outgoing endpoint/headers/body shape and parsed result; assert `WireParams`
-  whitelist (unknown keys never reach body); assert app-options → prompt conversion.
+  whitelist (unknown keys never appear as top-level wire fields — they may only be
+  present inside message content via the prompt); assert app-options → prompt
+  conversion.
 - **translate_service** — fake engine implementing the trait; test token latest-wins
   (older result discarded), error classification (`FallbackEligible` vs config),
   whole-request re-chunked fallback (no mixed outputs), no-retry.
