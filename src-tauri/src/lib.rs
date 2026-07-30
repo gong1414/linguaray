@@ -11,123 +11,123 @@
 //! - No WASM, no plugin system in v1 (deferred to post-v1).
 
 mod engines;
-mod providers;
+pub mod error;
+pub mod keystore;
+pub mod providers;
+pub mod service;
+pub mod wire;
 
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+use tauri::Manager;
 
-/// A single translation request — the universal contract every engine implements.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TranslateRequest {
     pub text: String,
-    /// Source language code; `auto` lets the engine detect.
     pub from: String,
-    /// Target language code.
     pub to: String,
-    /// Engine-specific options (domain, formality, system prompt hints, ...).
-    /// Engines MUST ignore options they don't understand.
     #[serde(default)]
     pub options: serde_json::Value,
 }
 
-/// A single translation result.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TranslateResult {
     pub text: String,
-    /// Which engine produced this (for UI fallback chains & attribution).
     pub engine: String,
 }
 
-/// Tauri command: translate via the named engine.
-///
-/// For v1 the engine registry is static (built-in). Post-v1 this is where a
-/// plugin/WASM loader would resolve the engine name.
-#[tauri::command]
-fn translate(req: TranslateRequest, engine: String) -> Result<TranslateResult, String> {
-    // AI providers are resolved by id first, then built-in traditional engines.
-    if let Some(provider) = providers::presets().into_iter().find(|p| p.id == engine) {
-        let text = provider.translate(&req).map_err(|e| e.to_string())?;
-        return Ok(TranslateResult { text, engine: provider.id });
-    }
-
-    let registry = engines::registry();
-    let selected = registry
-        .iter()
-        .find(|e| e.id() == engine)
-        .ok_or_else(|| format!("unknown engine: {engine}"))?;
-    let text = selected.translate(&req).map_err(|e| e.to_string())?;
-    Ok(TranslateResult {
-        text,
-        engine: selected.id().to_string(),
-    })
+struct AppState {
+    client: reqwest::Client,
+    keystore: keystore::Keystore,
 }
 
-/// List the available engines + their metadata (id, label, kind, needs-key).
-/// The frontend uses this to render the cc-switch-style picker.
+#[tauri::command]
+async fn translate(
+    state: tauri::State<'_, Arc<AppState>>,
+    req: TranslateRequest,
+    engine: String,
+) -> Result<TranslateResult, String> {
+    let preset = providers::presets().into_iter()
+        .find(|p| p.id == engine)
+        .ok_or_else(|| format!("unknown engine: {engine}"))?;
+    let opts = wire::AppOptions::default(); // v1: no app-options UI yet
+    let input = service::TranslateInput {
+        text: &req.text,
+        from: &req.from,
+        to: &req.to,
+        options: opts,
+    };
+    let text = service::translate(&state.client, &state.keystore, &preset, input)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(TranslateResult { text, engine: preset.id })
+}
+
 #[tauri::command]
 fn list_engines() -> Vec<EngineInfo> {
-    let mut info: Vec<EngineInfo> = providers::presets()
+    providers::presets()
         .into_iter()
         .map(EngineInfo::from_provider)
-        .collect();
-    info.extend(
-        engines::registry()
-            .iter()
-            .map(|e| EngineInfo::from_engine(e.as_ref())),
-    );
-    info
+        .collect()
+}
+
+#[tauri::command]
+fn set_key(
+    state: tauri::State<'_, Arc<AppState>>,
+    provider_id: String,
+    key: String,
+) -> Result<(), String> {
+    let mut keys = state.keystore.load().map_err(|e| e.to_string())?;
+    if !keys.is_object() {
+        keys = serde_json::json!({});
+    }
+    keys[&provider_id] = serde_json::json!(key);
+    state.keystore.store(&keys).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+fn delete_key(
+    state: tauri::State<'_, Arc<AppState>>,
+    provider_id: String,
+) -> Result<(), String> {
+    let mut keys = state.keystore.load().map_err(|e| e.to_string())?;
+    if let Some(obj) = keys.as_object_mut() {
+        obj.remove(&provider_id);
+    }
+    state.keystore.store(&keys).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+fn key_status(
+    state: tauri::State<'_, Arc<AppState>>,
+) -> Result<std::collections::HashMap<String, bool>, String> {
+    let keys = state.keystore.load().map_err(|e| e.to_string())?;
+    let mut map = std::collections::HashMap::new();
+    if let Some(obj) = keys.as_object() {
+        for (k, _v) in obj {
+            map.insert(k.clone(), true);
+        }
+    }
+    Ok(map)
 }
 
 #[derive(Debug, Clone, Serialize)]
 pub struct EngineInfo {
     pub id: String,
     pub label: String,
-    pub kind: EngineKind,
-    /// `true` if the user must supply an API key before this engine works.
+    pub kind: String,
     pub needs_key: bool,
 }
-
-#[derive(Debug, Clone, Copy, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum EngineKind {
-    /// AI provider preset (OpenAI/Anthropic/Gemini/ollama/中转站).
-    Provider,
-    /// Built-in traditional MT engine (DeepL/Google/百度/...).
-    Traditional,
-}
-
-/// Trait implemented by built-in traditional MT engines.
-pub trait Engine: Sync {
-    /// Stable id, e.g. "google", "deepl".
-    fn id(&self) -> &str;
-    /// Human label for the picker.
-    fn label(&self) -> &str;
-    /// Whether the user must supply a key/credential.
-    fn needs_key(&self) -> bool {
-        false
-    }
-    /// Perform the translation.
-    fn translate(&self, req: &TranslateRequest) -> Result<String, TranslateError>;
-}
-
-/// Error type for all engines (traditional + providers).
-pub type TranslateError = anyhow::Error;
 
 impl EngineInfo {
     fn from_provider(p: providers::ProviderPreset) -> Self {
         Self {
             id: p.id,
             label: p.label,
-            kind: EngineKind::Provider,
+            kind: "provider".into(),
             needs_key: p.needs_key,
-        }
-    }
-
-    fn from_engine(e: &dyn Engine) -> Self {
-        Self {
-            id: e.id().to_string(),
-            label: e.label().to_string(),
-            kind: EngineKind::Traditional,
-            needs_key: e.needs_key(),
         }
     }
 }
@@ -136,7 +136,34 @@ impl EngineInfo {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![translate, list_engines])
+        .setup(|app| {
+            let dir = app
+                .path()
+                .app_local_data_dir()
+                .expect("app_local_data_dir");
+            let keystore = keystore::Keystore::new(dir).expect("keystore init");
+            // Spec §Privacy: every preset endpoint must be HTTPS (loopback HTTP
+            // allowed for local engines like Ollama). Reject at config-load so an
+            // invalid/leaked preset never ships a request.
+            for p in providers::presets() {
+                providers::validate_endpoint(&p.endpoint)
+                    .expect("preset endpoint failed scheme validation");
+            }
+            // Spec §Privacy: no cross-origin redirects.
+            let client = reqwest::Client::builder()
+                .redirect(reqwest::redirect::Policy::none())
+                .build()
+                .expect("client");
+            app.manage(Arc::new(AppState { client, keystore }));
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![
+            translate,
+            list_engines,
+            set_key,
+            delete_key,
+            key_status
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
