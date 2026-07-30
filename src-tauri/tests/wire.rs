@@ -51,3 +51,23 @@ async fn http_429_is_fallback_eligible() {
     let err = call(&client, &p, "k", &params, &sys, &usr).await.unwrap_err();
     assert!(matches!(err, islandpot_lib::error::Error::FallbackEligible(_)));
 }
+
+#[tokio::test]
+async fn http_404_is_config_not_fallback() {
+    // §G: a 4xx other than 401/403 must be Config(InvalidRequest), NOT
+    // FallbackEligible — otherwise an invalid model/endpoint needlessly sends
+    // the text to a 2nd provider.
+    let server = MockServer::start().await;
+    Mock::given(wiremock::matchers::method("POST"))
+        .respond_with(ResponseTemplate::new(404))
+        .mount(&server).await;
+    let p = preset(&server.uri(), ApiKind::OpenAIChat);
+    let client = reqwest::Client::new();
+    let (sys, usr) = build_prompt("hi", "en", "zh", &Default::default());
+    let params = WireParams { model: "m".into(), temperature: None, max_tokens: None, stream: false };
+    let err = call(&client, &p, "k", &params, &sys, &usr).await.unwrap_err();
+    match err {
+        islandpot_lib::error::Error::Config(_) => { /* correct */ }
+        other => panic!("expected Config, got {:?}", other),
+    }
+}

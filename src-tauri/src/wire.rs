@@ -106,7 +106,11 @@ pub async fn call(
         return Err(Error::FallbackEligible(FallbackKind::ProviderStatus { status }));
     }
     if !resp.status().is_success() {
-        return Err(Error::FallbackEligible(FallbackKind::ProviderStatus { status }));
+        // §G: a non-2xx that isn't 401/403/429/5xx is a 4xx (400/404/422/...).
+        // Treat as Config (InvalidRequest) — NOT fallback-eligible. Retrying with a
+        // 2nd provider would needlessly send the text elsewhere for what is almost
+        // certainly a bad model/endpoint/request-shape problem.
+        return Err(Error::Config(ConfigKind::InvalidRequest { provider: preset.id.clone(), status }));
     }
     let json: serde_json::Value = resp.json().await
         .map_err(|e| Error::FallbackEligible(FallbackKind::Parse(e.to_string())))?;
