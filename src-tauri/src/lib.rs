@@ -59,6 +59,7 @@ struct Session {
 
 #[tauri::command]
 async fn translate(
+    app: tauri::AppHandle,
     state: tauri::State<'_, Arc<Session>>,
     req: TranslateRequest,
     engine: String,
@@ -74,7 +75,9 @@ async fn translate(
         to: &req.to,
         options: opts,
     };
-    let text = service::translate(&state.client, &state.keystore, &preset, input)
+    // §G: resolve the opt-in fallback engine from settings (None by default).
+    let fallback = settings::load(&app).fallback_engine.as_deref().and_then(engines::find);
+    let text = service::translate_with_fallback(&state.client, &state.keystore, &preset, input, fallback)
         .await
         .map_err(|e| e.to_string())?;
     Ok(TranslateResult {
@@ -104,13 +107,15 @@ async fn translate_default(
         .into_iter()
         .find(|p| p.id == s.default_provider)
         .ok_or_else(|| format!("default provider '{}' not found", s.default_provider))?;
+    // §G: opt-in fallback engine from settings (None by default).
+    let fallback = s.fallback_engine.as_deref().and_then(engines::find);
     let input = service::TranslateInput {
         text: &req.text,
         from: &req.from,
         to: &to,
         options: wire::AppOptions::default(),
     };
-    let text = service::translate(&state.client, &state.keystore, &preset, input)
+    let text = service::translate_with_fallback(&state.client, &state.keystore, &preset, input, fallback)
         .await
         .map_err(|e| e.to_string())?;
     Ok(TranslateResult {
@@ -140,13 +145,15 @@ async fn translate_clipboard(
         .into_iter()
         .find(|p| p.id == s.default_provider)
         .ok_or_else(|| format!("default provider '{}' not found", s.default_provider))?;
+    // §G: opt-in fallback engine from settings (None by default).
+    let fallback = s.fallback_engine.as_deref().and_then(engines::find);
     let input = service::TranslateInput {
         text: &text,
         from: "auto",
         to: &s.target_language,
         options: wire::AppOptions::default(),
     };
-    match service::translate(&state.client, &state.keystore, &preset, input).await {
+    match service::translate_with_fallback(&state.client, &state.keystore, &preset, input, fallback).await {
         Ok(out) => {
             let _ = popup::result(&app, &out, &preset.id);
         }
@@ -218,6 +225,18 @@ fn set_setting(app: tauri::AppHandle, key: String, value: String) -> Result<(), 
     match key.as_str() {
         "default_provider" => s.default_provider = value,
         "target_language" => s.target_language = value,
+        // §G: fallback_engine is opt-in. Empty string clears it (None = no
+        // fallback); a non-empty value must be a known traditional-engine id,
+        // validated against the registry so a typo can't silently disable fallback.
+        "fallback_engine" => {
+            if value.is_empty() {
+                s.fallback_engine = None;
+            } else if engines::find(&value).is_some() {
+                s.fallback_engine = Some(value);
+            } else {
+                return Err(format!("unknown fallback engine: {value}"));
+            }
+        }
         _ => return Err(format!("unknown setting: {key}")),
     }
     settings::save(&app, &s)
@@ -302,9 +321,11 @@ fn on_hotkey(app: &tauri::AppHandle, _shortcut: &tauri_plugin_global_shortcut::S
         // (4) show loading popup at the cursor.
         let _ = popup::show_at(&app2, x, y);
 
-        // (5) translate via the Phase-1 service. Default provider and target
-        //     language come from settings (Phase 2b); fall back to a provider-
-        //     not-found error popup instead of panicking.
+        // (5) translate via the §G fallback-aware service. Default provider and
+        //     target language come from settings (Phase 2b); fall back to a
+        //     provider-not-found error popup instead of panicking. The opt-in
+        //     `fallback_engine` (Phase 3 Task 3) is resolved here — None by
+        //     default, so behavior is unchanged unless the user opts in.
         let s = settings::load(&app2);
         let preset = match providers::presets().into_iter().find(|p| p.id == s.default_provider) {
             Some(p) => p,
@@ -316,13 +337,14 @@ fn on_hotkey(app: &tauri::AppHandle, _shortcut: &tauri_plugin_global_shortcut::S
                 return;
             }
         };
+        let fallback = s.fallback_engine.as_deref().and_then(engines::find);
         let input = service::TranslateInput {
             text: &text,
             from: "auto",
             to: &s.target_language,
             options: wire::AppOptions::default(),
         };
-        match service::translate(&state.client, &state.keystore, &preset, input).await {
+        match service::translate_with_fallback(&state.client, &state.keystore, &preset, input, fallback).await {
             Ok(out) => {
                 if state.gen.is_latest(gen) {
                     let _ = popup::result(&app2, &out, &preset.id);
