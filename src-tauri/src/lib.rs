@@ -14,6 +14,7 @@ pub mod engines;
 pub mod clipboard;
 pub mod concurrency;
 pub mod cursor;
+pub mod dict;
 pub mod error;
 pub mod keystore;
 pub mod popup;
@@ -242,6 +243,15 @@ fn set_setting(app: tauri::AppHandle, key: String, value: String) -> Result<(), 
     settings::save(&app, &s)
 }
 
+/// Look up a word in the macOS system dictionary (spec §E: word definitions
+/// where LLMs are weak). Returns plain text or None. On non-macOS / when no
+/// definition is found, returns None. This command just exposes the capability;
+/// wiring a UI affordance (lookup button / settings toggle) is a later UX task.
+#[tauri::command]
+fn lookup_dictionary(word: String) -> Option<String> {
+    dict::lookup(&word)
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct EngineInfo {
     pub id: String,
@@ -447,7 +457,8 @@ pub fn run() {
             delete_key,
             key_status,
             get_settings,
-            set_setting
+            set_setting,
+            lookup_dictionary
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

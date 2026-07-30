@@ -2176,6 +2176,7 @@ dependencies = [
  "argon2",
  "async-trait",
  "base64 0.22.1",
+ "core-foundation 0.10.1",
  "enigo",
  "fd-lock",
  "log",
