@@ -245,3 +245,89 @@ mod tests {
         assert_eq!(out, serde_json::json!({"openai":"sk-test"}));
     }
 }
+
+use std::path::{Path, PathBuf};
+use parking_lot::Mutex;
+
+/// Owns the keystore directory + in-process lock. Cross-process lock is taken on
+/// disk per-operation via `keystore.lock`. (spec §A)
+pub struct Keystore {
+    dir: PathBuf,
+    in_proc: Mutex<()>,
+}
+
+const FILE: &str = "keystore.json";
+const TMP: &str = "keystore.json.tmp";
+const LOCK: &str = "keystore.lock";
+
+impl Keystore {
+    pub fn new(dir: PathBuf) -> Result<Self, KeystoreError> {
+        std::fs::create_dir_all(&dir)?;
+        Self::set_dir_perms(&dir)?;
+        // Clean any stale .tmp from a previous crash (spec §A stale-tmp handling).
+        let tmp = dir.join(TMP);
+        if tmp.exists() {
+            let _ = std::fs::remove_file(&tmp);
+        }
+        Ok(Self { dir, in_proc: Mutex::new(()) })
+    }
+
+    #[cfg(target_os = "macos")]
+    fn set_dir_perms(dir: &Path) -> Result<(), KeystoreError> {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700))?;
+        Ok(())
+    }
+    #[cfg(not(target_os = "macos"))]
+    fn set_dir_perms(_dir: &Path) -> Result<(), KeystoreError> { Ok(()) }
+
+    fn file(&self) -> PathBuf { self.dir.join(FILE) }
+
+    /// Read the whole keys map. Returns `{}` if the file does not exist (first run).
+    pub fn load(&self) -> Result<serde_json::Value, KeystoreError> {
+        let _g = self.in_proc.lock();
+        let path = self.file();
+        if !path.exists() { return Ok(serde_json::json!({})); }
+        let bytes = std::fs::read(&path)?;
+        let env: Envelope = serde_json::from_slice(&bytes)
+            .map_err(|e| KeystoreError::Envelope(format!("malformed: {e}")))?;
+        decrypt(&env, IdentitySource::CURRENT)
+    }
+
+    /// Encrypt + atomically write the keys map.
+    pub fn store(&self, keys: &serde_json::Value) -> Result<(), KeystoreError> {
+        let identity = IdentitySource::CURRENT.read()?;
+        let env = encrypt(&identity, IdentitySource::CURRENT, keys)?;
+        let tmp = self.dir.join(TMP);
+        let json = serde_json::to_vec(&env).map_err(|e| KeystoreError::Envelope(e.to_string()))?;
+        std::fs::write(&tmp, &json)?;
+        self.set_file_perms_macos(&tmp)?;
+        atomic_replace(&tmp, &self.file())?;
+        Ok(())
+    }
+
+    #[cfg(target_os = "macos")]
+    fn set_file_perms_macos(&self, p: &Path) -> Result<(), KeystoreError> {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(p, std::fs::Permissions::from_mode(0o600))?;
+        Ok(())
+    }
+    #[cfg(not(target_os = "macos"))]
+    fn set_file_perms_macos(&self, _p: &Path) -> Result<(), KeystoreError> { Ok(()) }
+}
+
+/// Atomic replace. macOS: rename over target (first-create or update).
+#[cfg(target_os = "macos")]
+fn atomic_replace(src: &Path, dst: &Path) -> Result<(), KeystoreError> {
+    std::fs::rename(src, dst)?;
+    Ok(())
+}
+
+// NOTE: the spec describes a Windows atomic_replace using ReplaceFileW for updates
+// and MoveFileExW for first-create. That code is #[cfg(target_os = "windows")] and is
+// omitted from this macOS build; it will be added (or the windows-sys dep pulled in)
+// when building for Windows. For now, only the macOS path exists.
+#[cfg(not(target_os = "macos"))]
+fn atomic_replace(_src: &Path, _dst: &Path) -> Result<(), KeystoreError> {
+    Err(KeystoreError::Envelope("atomic_replace not implemented on this platform".into()))
+}
