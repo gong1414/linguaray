@@ -34,6 +34,10 @@ fd-lock = "4"
 thiserror = "1"
 log = "0.4"
 url = "2"
+tauri-plugin-global-shortcut = "2"
+mouse_position = "0.1"
+arboard = "3"
+enigo = "0.2"
 
 [dev-dependencies]
 wiremock = "0.6"
