@@ -44,3 +44,21 @@ pub fn presets() -> Vec<ProviderPreset> {
         },
     ]
 }
+
+/// Spec §Privacy: remote endpoints must be HTTPS; HTTP allowed only for loopback
+/// (Ollama). Any other scheme is rejected.
+pub fn validate_endpoint(url: &str) -> Result<(), String> {
+    let parsed = url::Url::parse(url).map_err(|e| format!("bad url: {e}"))?;
+    match parsed.scheme() {
+        "https" => Ok(()),
+        "http" => {
+            let h = parsed.host_str().unwrap_or("");
+            if h == "localhost" || h == "127.0.0.1" || h == "::1" {
+                Ok(())
+            } else {
+                Err(format!("http only allowed for loopback, got {h}"))
+            }
+        }
+        s => Err(format!("scheme {s} not allowed")),
+    }
+}
