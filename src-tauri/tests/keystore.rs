@@ -55,3 +55,30 @@ fn bad_length_fails_before_decrypt() {
     let err = decrypt_with_identity(&env, "m").unwrap_err();
     assert!(matches!(err, islandpot_lib::keystore::KeystoreError::Envelope(_)));
 }
+
+#[test]
+fn update_keys_concurrent_no_clobber() {
+    // The real Keystore uses IdentitySource::CURRENT (this machine) — deterministic
+    // on a given host, so this integration test is stable. Two concurrent
+    // update_keys calls (one adds "a", one adds "b") must both land — the old
+    // load()+store() path would interleave and clobber one.
+    use islandpot_lib::keystore::Keystore;
+    use std::sync::Arc;
+    use std::thread;
+    let dir = std::env::temp_dir().join(format!("islandpot-keystore-conc-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let ks = Arc::new(Keystore::new(dir.clone()).unwrap());
+
+    let ks1 = Arc::clone(&ks);
+    let ks2 = Arc::clone(&ks);
+    let h1 = thread::spawn(move || ks1.update_keys(|k| { k["a"] = json!("1"); }).unwrap());
+    let h2 = thread::spawn(move || ks2.update_keys(|k| { k["b"] = json!("2"); }).unwrap());
+    h1.join().unwrap();
+    h2.join().unwrap();
+
+    let loaded = ks.load().unwrap();
+    assert_eq!(loaded["a"], json!("1"), "key a survived concurrent write");
+    assert_eq!(loaded["b"], json!("2"), "key b survived concurrent write");
+
+    let _ = std::fs::remove_dir_all(&dir);
+}

@@ -190,12 +190,10 @@ fn set_key(
     provider_id: String,
     key: String,
 ) -> Result<(), String> {
-    let mut keys = state.keystore.load().map_err(|e| e.to_string())?;
-    if !keys.is_object() {
-        keys = serde_json::json!({});
-    }
-    keys[&provider_id] = serde_json::json!(key);
-    state.keystore.store(&keys).map_err(|e| e.to_string())?;
+    // Atomic read-modify-write under the lock — load()+store() would interleave.
+    state.keystore.update_keys(|keys| {
+        keys[&provider_id] = serde_json::json!(key);
+    }).map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -204,12 +202,26 @@ fn delete_key(
     state: tauri::State<'_, Arc<Session>>,
     provider_id: String,
 ) -> Result<(), String> {
-    let mut keys = state.keystore.load().map_err(|e| e.to_string())?;
-    if let Some(obj) = keys.as_object_mut() {
-        obj.remove(&provider_id);
-    }
-    state.keystore.store(&keys).map_err(|e| e.to_string())?;
+    state.keystore.update_keys(|keys| {
+        if let Some(obj) = keys.as_object_mut() {
+            obj.remove(&provider_id);
+        }
+    }).map_err(|e| e.to_string())?;
     Ok(())
+}
+
+/// User-initiated keystore recovery (§A fail-closed): archive the unreadable file
+/// to keystore.json.broken-<ts> so the user can re-enter keys.
+#[tauri::command]
+fn archive_keystore(state: tauri::State<'_, Arc<Session>>) -> Result<String, String> {
+    let dst = state.keystore.archive().map_err(|e| e.to_string())?;
+    Ok(dst.to_string_lossy().into_owned())
+}
+
+/// User-initiated: delete the keystore entirely (fresh start).
+#[tauri::command]
+fn reset_keystore(state: tauri::State<'_, Arc<Session>>) -> Result<(), String> {
+    state.keystore.reset().map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -483,7 +495,9 @@ pub fn run() {
             key_status,
             get_settings,
             set_setting,
-            lookup_dictionary
+            lookup_dictionary,
+            archive_keystore,
+            reset_keystore
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
