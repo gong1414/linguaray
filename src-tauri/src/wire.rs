@@ -53,3 +53,68 @@ pub fn build_prompt(text: &str, from: &str, to: &str, opts: &AppOptions) -> (Str
     let user = format!("Translate from {src} into {to}:\n\n{text}");
     (system, user)
 }
+
+use crate::error::{ConfigKind, Error, FallbackKind};
+
+/// Call a provider. PURE: takes preset + key + params + messages, returns text.
+/// Classifies HTTP status into FallbackEligible (429/5xx) vs Config (401/403).
+pub async fn call(
+    client: &reqwest::Client,
+    preset: &crate::providers::ProviderPreset,
+    key: &str,
+    params: &WireParams,
+    system: &str,
+    user: &str,
+) -> Result<String, Error> {
+    let resp = match preset.api_kind {
+        ApiKind::OpenAIChat => {
+            let body = serde_json::json!({
+                "model": params.model,
+                "temperature": params.temperature,
+                "max_tokens": params.max_tokens,
+                "stream": params.stream,
+                "messages": [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+            });
+            client.post(&preset.endpoint)
+                .bearer_auth(key)
+                .json(&body)
+                .send().await
+        }
+        ApiKind::Anthropic => {
+            let body = serde_json::json!({
+                "model": params.model,
+                "max_tokens": params.max_tokens.unwrap_or(1024),
+                "system": system,
+                "messages": [{"role": "user", "content": user}],
+            });
+            client.post(&preset.endpoint)
+                .header("x-api-key", key)
+                .header("anthropic-version", "2023-06-01")
+                .json(&body)
+                .send().await
+        }
+    };
+    let resp = resp.map_err(|e| Error::FallbackEligible(FallbackKind::Network(e.to_string())))?;
+    let status = resp.status().as_u16();
+    if status == 401 || status == 403 {
+        return Err(Error::Config(ConfigKind::AuthFailed { provider: preset.id.clone(), status }));
+    }
+    if status == 429 || (500..600).contains(&status) {
+        return Err(Error::FallbackEligible(FallbackKind::ProviderStatus { status }));
+    }
+    if !resp.status().is_success() {
+        return Err(Error::FallbackEligible(FallbackKind::ProviderStatus { status }));
+    }
+    let json: serde_json::Value = resp.json().await
+        .map_err(|e| Error::FallbackEligible(FallbackKind::Parse(e.to_string())))?;
+    let text = match preset.api_kind {
+        ApiKind::OpenAIChat => json["choices"][0]["message"]["content"]
+            .as_str().ok_or_else(|| Error::FallbackEligible(FallbackKind::Parse("no content".into())))?.to_string(),
+        ApiKind::Anthropic => json["content"][0]["text"]
+            .as_str().ok_or_else(|| Error::FallbackEligible(FallbackKind::Parse("no text".into())))?.to_string(),
+    };
+    Ok(text)
+}
