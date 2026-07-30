@@ -177,17 +177,17 @@ fn on_hotkey(app: &tauri::AppHandle, _shortcut: &tauri_plugin_global_shortcut::S
         // (1) latest-wins token — allocate FIRST, before any work.
         let gen = state.gen.next();
 
-        // (2) capture cursor position + selection under the selection mutex,
-        // BEFORE the popup steals focus. `selection_lock` serializes selection
-        // captures (which touch the clipboard); reading cursor position inside
-        // the same lock is harmless and keeps the pair consistent.
-        let (x, y) = {
+        // (2) capture cursor position + selection under ONE selection-mutex hold,
+        // BEFORE the popup steals focus. The lock must span BOTH reads in a single
+        // guard — splitting it into two lock acquisitions lets a second hotkey
+        // trigger run its own capture_selection in between, whose clipboard writes
+        // (sentinel/copy) would interleave with this run's restore window and
+        // reopen the clipboard-corruption race the mutex exists to close (spec §concurrency).
+        let (x, y, captured) = {
             let _g = state.gen.selection_lock();
-            cursor::position()
-        };
-        let captured = {
-            let _g = state.gen.selection_lock();
-            selection::capture_selection(800)
+            let pos = cursor::position();
+            let cap = selection::capture_selection(800);
+            (pos.0, pos.1, cap)
         };
 
         // (3) superseded by a newer trigger — drop this run silently.
