@@ -58,15 +58,15 @@ src-tauri/src/
   (planned) selection.rs  # hybrid selection capture (§B)
 ```
 
-v1 scope = **selection/input/clipboard translation + provider catalog + keystore**.
-OCR (PaddleOCR), TTS, and external invocation are v1.x — see the design spec.
+v1 scope = **selection translate · input translate · user-initiated clipboard translate · provider catalog · keystore**.
+(Passive background clipboard listening is NOT in v1.) OCR (PaddleOCR), TTS, and external invocation are v1.x — see the design spec.
 
 ## Roadmap (solo, ~1hr/day, must-ship)
 
 **v1 — translation core:**
 - **Phase 0 — foundation** ✅ Tauri 2 + SolidJS scaffold, translate contract wired
 - **Phase 1 — AI provider catalog + keystore + unified pipeline** (the headline feature)
-- **Phase 2 — selection/input/clipboard translate + cursor-anchored popup**
+- **Phase 2 — selection/input translate + user-initiated clipboard translate + cursor-anchored popup**
 - **Phase 3 — built-in traditional engines** (port from pot's `.potext` JS) + system dict + fallback chain
 - **Phase 4 — cross-platform parity + packaging, first usable cut**
 
