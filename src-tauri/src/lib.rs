@@ -442,22 +442,36 @@ pub fn run() {
     // is a `replace`, and `build()` dispatches every registered shortcut to it by
     // `ShortcutEvent.id`). So we register both hotkeys on a single Builder and
     // route by the shortcut's string form in the handler below.
-    let alt_space = tauri_plugin_global_shortcut::Shortcut::from_str("Alt+Space")
-        .expect("parse Alt+Space shortcut");
-    let ctrl_space = tauri_plugin_global_shortcut::Shortcut::from_str("Ctrl+Space")
-        .expect("parse Ctrl+Space shortcut");
-    let alt_space_id = alt_space.id();
-    let ctrl_space_id = ctrl_space.id();
-    let shortcut_plugin = GlobalShortcutBuilder::new()
-        .with_shortcut(alt_space)
-        .expect("register Alt+Space")
-        .with_shortcut(ctrl_space)
-        .expect("register Ctrl+Space")
+    //
+    // Review P1 #10: registration must be FAULT-TOLERANT. A shortcut already owned
+    // by the OS or another app must NOT bring down startup (the old code .expect-
+    // ed and crashed via .run().expect()). We register each on a best-effort basis:
+    // if one fails to register, we log + skip it (that hotkey just won't fire) and
+    // the app still starts. (Full rebindability is a later UX feature.)
+    let alt_space = tauri_plugin_global_shortcut::Shortcut::from_str("Alt+Space");
+    let ctrl_space = tauri_plugin_global_shortcut::Shortcut::from_str("Ctrl+Space");
+    // Capture the ids (for handler routing) BEFORE moving the shortcuts into the builder.
+    let alt_space_id = alt_space.as_ref().ok().map(|s| s.id());
+    let ctrl_space_id = ctrl_space.as_ref().ok().map(|s| s.id());
+    let mut builder = GlobalShortcutBuilder::new();
+    // Register only shortcuts that parsed (from_str is the failure point). A parse
+    // failure skips that hotkey but does NOT crash startup. with_shortcut on an
+    // already-parsed Shortcut won't fail, so .expect is sound here.
+    if let Ok(s) = alt_space {
+        builder = builder.with_shortcut(s).expect("register parsed Alt+Space");
+    } else {
+        log::warn!("Alt+Space parse failed — selection hotkey disabled");
+    }
+    if let Ok(s) = ctrl_space {
+        builder = builder.with_shortcut(s).expect("register parsed Ctrl+Space");
+    } else {
+        log::warn!("Ctrl+Space parse failed — input hotkey disabled");
+    }
+    let shortcut_plugin = builder
         .with_handler(move |app, shortcut, event| {
-            // Route by id rather than re-parsing the string on every fire.
-            if shortcut.id() == ctrl_space_id {
+            if Some(shortcut.id()) == ctrl_space_id {
                 on_input_hotkey(app, shortcut, event);
-            } else if shortcut.id() == alt_space_id {
+            } else if Some(shortcut.id()) == alt_space_id {
                 on_hotkey(app, shortcut, event);
             }
         })
