@@ -16,6 +16,12 @@ function App() {
   const [defaultProvider, setDefaultProvider] = createSignal("");
   const [targetLang, setTargetLang] = createSignal("zh");
   const [clipBusy, setClipBusy] = createSignal(false);
+  const [a11yOk, setA11yOk] = createSignal(true);
+
+  async function refreshA11y() {
+    try { setA11yOk(await invoke<boolean>("a11y_status")); }
+    catch { setA11yOk(true); } // non-macOS or command missing → assume ok
+  }
 
   onMount(async () => {
     const list = await invoke<EngineInfo[]>("list_engines");
@@ -26,6 +32,10 @@ function App() {
     const s = await invoke<{ default_provider: string; target_language: string }>("get_settings");
     setDefaultProvider(s.default_provider);
     setTargetLang(s.target_language);
+    refreshA11y(); // Accessibility onboarding (macOS): show banner if not granted
+    // Re-check when the window regains focus (user just granted permission).
+    const { getCurrentWindow } = await import("@tauri-apps/api/window");
+    await getCurrentWindow().onFocusChanged(({ payload: focused }) => { if (focused) refreshA11y(); });
   });
 
   async function changeDefault(v: string) {
@@ -72,6 +82,13 @@ function App() {
   return (
     <main class="container">
       <h1>IslandPot</h1>
+      <Show when={!a11yOk()}>
+        <div class="error" style={{ "margin-bottom": "0.5rem" }}>
+          Accessibility permission needed to read your selection. Grant it in System
+          Settings → Privacy → Accessibility, then re-focus this window.{" "}
+          <button onClick={refreshA11y} style={{ display: "inline" }}>Re-check</button>
+        </div>
+      </Show>
       <select value={selected()} onChange={(e) => setSelected(e.currentTarget.value)}>
         <For each={engines()}>{(e) => <option value={e.id}>{e.label}{hasKey()[e.id] ? " ✓" : ""}</option>}</For>
       </select>

@@ -11,6 +11,7 @@
 //! - No WASM, no plugin system in v1 (deferred to post-v1).
 
 pub mod engines;
+pub mod a11y;
 pub mod clipboard;
 pub mod concurrency;
 pub mod cursor;
@@ -275,6 +276,13 @@ fn lookup_dictionary(word: String) -> Option<String> {
     dict::lookup(&word)
 }
 
+/// Is Accessibility (macOS) granted? Selection capture needs it for both the AX
+/// direct-read and the simulated Cmd+C. Non-macOS: always true.
+#[tauri::command]
+fn a11y_status() -> bool {
+    a11y::enabled()
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct EngineInfo {
     pub id: String,
@@ -346,7 +354,16 @@ fn on_hotkey(app: &tauri::AppHandle, _shortcut: &tauri_plugin_global_shortcut::S
         let text = match captured {
             Ok(selection_engine::Capture::Selected(t)) => t,
             Ok(selection_engine::Capture::NoSelection) => {
-                let _ = popup::hide(&app2);
+                // Surface it visibly (review P1 #5: errors must reach the user, not
+                // vanish into a popup that's never shown). Show at cursor.
+                let _ = popup::error(
+                    &app2,
+                    if !a11y::enabled() {
+                        "No selection captured. Grant Accessibility in System Settings → Privacy → Accessibility."
+                    } else {
+                        "No text selected."
+                    },
+                );
                 return;
             }
             Err(e) => {
@@ -496,6 +513,7 @@ pub fn run() {
             get_settings,
             set_setting,
             lookup_dictionary,
+            a11y_status,
             archive_keystore,
             reset_keystore
         ])

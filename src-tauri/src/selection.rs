@@ -35,8 +35,28 @@ fn simulate_copy() -> Result<(), String> {
     Ok(())
 }
 
-/// Capture the current selection via the §B algorithm. ~timeout_ms total.
+/// Capture the current selection via the §B hybrid algorithm (spec §B):
+/// 1. Try the macOS AX direct-read FIRST (no clipboard touched — cleanest). On
+///    success, return immediately.
+/// 2. On AX failure/empty/untrusted, fall back to the sentinel simulate-copy
+///    path (selection_engine). ~timeout_ms total for the fallback.
 pub fn capture_selection(timeout_ms: u64) -> Result<Capture, String> {
+    capture_selection_with_ax(crate::a11y::read_selection, timeout_ms)
+}
+
+/// Same as capture_selection but with an injectable AX reader (for testing the
+/// AX-first → copy-fallback routing without the real AX FFI).
+pub fn capture_selection_with_ax<A: FnOnce() -> Option<String>>(
+    ax_reader: A,
+    timeout_ms: u64,
+) -> Result<Capture, String> {
+    // §B AX-first.
+    if let Some(text) = ax_reader() {
+        if !text.trim().is_empty() {
+            return Ok(Capture::Selected(text));
+        }
+    }
+    // Copy-fallback.
     let iters = (timeout_ms / 20) as usize;
     selection_engine::capture(&OsClipboard, || simulate_copy(), iters)
 }
