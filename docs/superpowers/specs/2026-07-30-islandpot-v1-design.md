@@ -1,6 +1,6 @@
 # IslandPot v1 — Design Spec
 
-**Status:** Draft for user review (rev 4 — three closing fixes: A atomic-write semantics + pre-decrypt validation, B sentinel-marker state machine, wire option-wording) · **Date:** 2026-07-30
+**Status:** Approved (rev 4 — three closing fixes: A atomic-write semantics + pre-decrypt validation, B sentinel-marker state machine, wire option-wording) · **Date:** 2026-07-30
 
 IslandPot is an open-source, cross-platform translation/OCR desktop tool — a
 maintained successor to [pot-desktop](https://github.com/pot-app/pot-desktop) and
@@ -164,8 +164,6 @@ whitelist** — a tampered envelope must never drive memory allocation or KDF co
 
 ### Plaintext-key claims (corrected)
 
-### Plaintext-key claims (corrected)
-
 - The rev-2 claim "frontend never sees plaintext" is **inaccurate and removed**.
   Reality: when the user **inputs** a key it necessarily exists in JS memory and
   traverses the IPC to Rust on submit.
@@ -232,10 +230,6 @@ This is a real state machine; it is **automated-tested with a fake clipboard**
 (§I), including: marker present + timeout → `NoSelection`; sentinel overwritten →
 success path; another writer advancing the sequence between copy and restore →
 no-restore.
-
-**Hard requirement (unchanged):** macOS Accessibility permission is mandatory and
-gated with first-launch onboarding (it covers both the A11y read and the simulated
-keystroke).
 
 **Hard requirement (unchanged):** macOS Accessibility permission is mandatory and
 gated with first-launch onboarding (it covers both the A11y read and the simulated
@@ -479,5 +473,4 @@ README + product description are synced to this scope (committed).
 
 ## Open questions
 
-None. C (cursor-anchored popup) user-confirmed. This rev-3 awaits review on the six
-impl-level blockers; once approved, transition to `writing-plans`.
+None. C (cursor-anchored popup) user-confirmed. **Spec approved (rev-4) — proceeding to `writing-plans`.**
