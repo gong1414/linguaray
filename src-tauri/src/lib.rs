@@ -11,6 +11,7 @@
 //! - No WASM, no plugin system in v1 (deferred to post-v1).
 
 mod engines;
+pub mod concurrency;
 pub mod error;
 pub mod keystore;
 pub mod providers;
