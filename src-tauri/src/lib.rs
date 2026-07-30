@@ -10,7 +10,7 @@
 //!       system-dictionary integration. Built-in Rust modules, NOT plugins.
 //! - No WASM, no plugin system in v1 (deferred to post-v1).
 
-mod engines;
+pub mod engines;
 pub mod clipboard;
 pub mod concurrency;
 pub mod cursor;
