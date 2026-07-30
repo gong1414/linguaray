@@ -293,6 +293,11 @@ impl Keystore {
     /// Read the whole keys map. Returns `{}` if the file does not exist (first run).
     pub fn load(&self) -> Result<serde_json::Value, KeystoreError> {
         let _g = self.in_proc.lock();
+        self.load_locked()
+    }
+
+    /// Locked read (caller holds the in-proc lock). Used by update_keys.
+    fn load_locked(&self) -> Result<serde_json::Value, KeystoreError> {
         let path = self.file();
         if !path.exists() { return Ok(serde_json::json!({})); }
         let bytes = std::fs::read(&path)?;
@@ -301,26 +306,78 @@ impl Keystore {
         decrypt(&env, IdentitySource::CURRENT)
     }
 
-    /// Encrypt + atomically write the keys map.
+    /// Encrypt + atomically write the keys map. Takes the in-proc lock.
     pub fn store(&self, keys: &serde_json::Value) -> Result<(), KeystoreError> {
+        let _g = self.in_proc.lock();
+        self.store_locked(keys)
+    }
+
+    /// Locked write (caller holds the in-proc lock). Used by update_keys + store.
+    fn store_locked(&self, keys: &serde_json::Value) -> Result<(), KeystoreError> {
         let identity = IdentitySource::CURRENT.read()?;
         let env = encrypt(&identity, IdentitySource::CURRENT, keys)?;
         let tmp = self.dir.join(TMP);
         let json = serde_json::to_vec(&env).map_err(|e| KeystoreError::Envelope(e.to_string()))?;
         std::fs::write(&tmp, &json)?;
-        self.set_file_perms_macos(&tmp)?;
+        self.set_file_perms(&tmp)?;
         atomic_replace(&tmp, &self.file())?;
         Ok(())
     }
 
+    /// Atomic read-modify-write under the in-proc lock + stale-tmp cleanup.
+    /// This is the ONLY sanctioned way to mutate the keystore — `set_key`/
+    /// `delete_key` that do load() then a separate store() interleave and clobber.
+    pub fn update_keys<F>(&self, mutator: F) -> Result<(), KeystoreError>
+    where
+        F: FnOnce(&mut serde_json::Value),
+    {
+        let _g = self.in_proc.lock();
+        // stale-tmp cleanup under the lock (crash-recovery).
+        let tmp = self.dir.join(TMP);
+        if tmp.exists() {
+            let _ = std::fs::remove_file(&tmp);
+        }
+        let mut keys = self.load_locked()?;
+        if !keys.is_object() {
+            keys = serde_json::json!({});
+        }
+        mutator(&mut keys);
+        self.store_locked(&keys)
+    }
+
+    /// Move keystore.json → keystore.json.broken-<ts> (user-initiated recovery).
+    /// Per §A fail-closed: only an explicit user action does this.
+    pub fn archive(&self) -> Result<std::path::PathBuf, KeystoreError> {
+        let _g = self.in_proc.lock();
+        let src = self.file();
+        if !src.exists() {
+            return Err(KeystoreError::Envelope("no keystore to archive".into()));
+        }
+        let ts = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        let dst = self.dir.join(format!("keystore.json.broken-{ts}"));
+        std::fs::rename(&src, &dst)?;
+        Ok(dst)
+    }
+
+    /// Delete the keystore entirely (fresh start). User-initiated.
+    pub fn reset(&self) -> Result<(), KeystoreError> {
+        let _g = self.in_proc.lock();
+        let _ = std::fs::remove_file(self.file());
+        let _ = std::fs::remove_file(self.dir.join(TMP));
+        Ok(())
+    }
+
     #[cfg(target_os = "macos")]
-    fn set_file_perms_macos(&self, p: &Path) -> Result<(), KeystoreError> {
+    fn set_file_perms(&self, p: &Path) -> Result<(), KeystoreError> {
         use std::os::unix::fs::PermissionsExt;
         std::fs::set_permissions(p, std::fs::Permissions::from_mode(0o600))?;
         Ok(())
     }
     #[cfg(not(target_os = "macos"))]
-    fn set_file_perms_macos(&self, _p: &Path) -> Result<(), KeystoreError> { Ok(()) }
+    fn set_file_perms(&self, _p: &Path) -> Result<(), KeystoreError> { Ok(()) }
 }
 
 /// Atomic replace. macOS: rename over target (first-create or update).
