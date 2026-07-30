@@ -65,9 +65,9 @@ v1 scope = **selection translate · input translate · user-initiated clipboard 
 
 **v1 — translation core:**
 - **Phase 0 — foundation** ✅ Tauri 2 + SolidJS scaffold, translate contract wired
-- **Phase 1 — AI provider catalog + keystore + unified pipeline** (the headline feature)
-- **Phase 2 — selection/input translate + user-initiated clipboard translate + cursor-anchored popup**
-- **Phase 3 — built-in traditional engines** (port from pot's `.potext` JS) + system dict + fallback chain
+- **Phase 1 — AI provider catalog + keystore + unified pipeline** ✅ (the headline feature)
+- **Phase 2 — selection/input translate + user-initiated clipboard translate + cursor-anchored popup** ✅
+- **Phase 3 — built-in traditional engines** (Google ✅; DeepL/百度/有道/… follow the pattern) + system dict + §G fallback chain ✅
 - **Phase 4 — cross-platform parity + packaging, first usable cut**
 
 **v1.x (before public open-source release):**
