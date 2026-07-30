@@ -12,6 +12,7 @@
 
 mod engines;
 pub mod clipboard;
+pub mod cursor;
 pub mod concurrency;
 pub mod error;
 pub mod keystore;
