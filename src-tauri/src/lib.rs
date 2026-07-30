@@ -11,6 +11,7 @@
 //! - No WASM, no plugin system in v1 (deferred to post-v1).
 
 mod engines;
+pub mod error;
 mod providers;
 
 use serde::{Deserialize, Serialize};
