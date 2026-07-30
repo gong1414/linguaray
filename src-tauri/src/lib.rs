@@ -79,12 +79,12 @@ async fn translate(
     };
     // §G: resolve the opt-in fallback engine from settings (None by default).
     let fallback = settings::load(&app).fallback_engine.as_deref().and_then(engines::find);
-    let text = service::translate_with_fallback(&state.client, &state.keystore, &preset, input, fallback)
+    let t = service::translate_with_fallback(&state.client, &state.keystore, &preset, input, fallback)
         .await
         .map_err(|e| e.to_string())?;
     Ok(TranslateResult {
-        text,
-        engine: preset.id,
+        text: t.text,
+        engine: t.engine, // actual producing engine (primary or fallback)
     })
 }
 
@@ -117,12 +117,12 @@ async fn translate_default(
         to: &to,
         options: wire::AppOptions::default(),
     };
-    let text = service::translate_with_fallback(&state.client, &state.keystore, &preset, input, fallback)
+    let t = service::translate_with_fallback(&state.client, &state.keystore, &preset, input, fallback)
         .await
         .map_err(|e| e.to_string())?;
     Ok(TranslateResult {
-        text,
-        engine: preset.id,
+        text: t.text,
+        engine: t.engine,
     })
 }
 
@@ -165,7 +165,7 @@ async fn translate_clipboard(
     match service::translate_with_fallback(&state.client, &state.keystore, &preset, input, fallback).await {
         Ok(out) => {
             if state.gen.is_latest(gen) {
-                let _ = popup::result(&app, &out, &preset.id);
+                let _ = popup::result(&app, &out.text, &out.engine);
             }
         }
         Err(e) => {
@@ -401,7 +401,7 @@ fn on_hotkey(app: &tauri::AppHandle, _shortcut: &tauri_plugin_global_shortcut::S
         match service::translate_with_fallback(&state.client, &state.keystore, &preset, input, fallback).await {
             Ok(out) => {
                 if state.gen.is_latest(gen) {
-                    let _ = popup::result(&app2, &out, &preset.id);
+                    let _ = popup::result(&app2, &out.text, &out.engine);
                 }
             }
             Err(e) => {
