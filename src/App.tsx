@@ -13,6 +13,9 @@ function App() {
   const [output, setOutput] = createSignal("");
   const [error, setError] = createSignal("");
   const [busy, setBusy] = createSignal(false);
+  const [defaultProvider, setDefaultProvider] = createSignal("");
+  const [targetLang, setTargetLang] = createSignal("zh");
+  const [clipBusy, setClipBusy] = createSignal(false);
 
   onMount(async () => {
     const list = await invoke<EngineInfo[]>("list_engines");
@@ -20,7 +23,29 @@ function App() {
     const status = await invoke<Record<string, boolean>>("key_status");
     setHasKey(status);
     setSelected(list.find((e) => e.kind === "provider")?.id ?? list[0]?.id ?? "");
+    const s = await invoke<{ default_provider: string; target_language: string }>("get_settings");
+    setDefaultProvider(s.default_provider);
+    setTargetLang(s.target_language);
   });
+
+  async function changeDefault(v: string) {
+    setDefaultProvider(v);
+    await invoke("set_setting", { key: "default_provider", value: v });
+  }
+  async function changeTarget(v: string) {
+    setTargetLang(v);
+    await invoke("set_setting", { key: "target_language", value: v });
+  }
+  async function translateClip() {
+    setClipBusy(true);
+    try {
+      await invoke("translate_clipboard");
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setClipBusy(false);
+    }
+  }
 
   async function saveKey() {
     if (!selected() || !keyInput()) return;
@@ -52,6 +77,17 @@ function App() {
       </select>
       <input type="password" placeholder="API key…" value={keyInput()} onInput={(e) => setKeyInput(e.currentTarget.value)} />
       <button onClick={saveKey} disabled={!keyInput()}>Save key</button>
+      <div class="settings-group">
+        <label>Default provider</label>
+        <select value={defaultProvider()} onChange={(e) => changeDefault(e.currentTarget.value)}>
+          <For each={engines()}>{(e) => <option value={e.id}>{e.label}</option>}</For>
+        </select>
+        <label>Target language</label>
+        <select value={targetLang()} onChange={(e) => changeTarget(e.currentTarget.value)}>
+          <For each={["zh", "en", "ja", "ko", "fr", "de", "es"]}>{(l) => <option value={l}>{l}</option>}</For>
+        </select>
+        <button onClick={translateClip} disabled={clipBusy()}>{clipBusy() ? "…" : "Translate clipboard"}</button>
+      </div>
       <textarea rows={4} placeholder="输入要翻译的文本…" value={input()} onInput={(e) => setInput(e.currentTarget.value)} />
       <button onClick={doTranslate} disabled={busy() || !input().trim()}>{busy() ? "…" : "Translate"}</button>
       <Show when={output()}><div class="result">{output()}</div></Show>
