@@ -29,4 +29,13 @@ export default defineConfig(async () => ({
       ignored: ["**/src-tauri/**"],
     },
   },
+  // Multi-page build: main app + frameless popup window.
+  build: {
+    rollupOptions: {
+      input: {
+        main: "index.html",
+        popup: "popup.html",
+      },
+    },
+  },
 }));
