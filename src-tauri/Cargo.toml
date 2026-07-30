@@ -34,6 +34,12 @@ fd-lock = "4"
 thiserror = "1"
 log = "0.4"
 url = "2"
+tauri-plugin-global-shortcut = "2"
+mouse_position = "0.1"
+arboard = "3"
+enigo = "0.2"
+objc = "0.2"
+windows-sys = { version = "0.59", features = ["Win32_System_DataExchange", "Win32_Foundation"] }
 
 [dev-dependencies]
 wiremock = "0.6"
