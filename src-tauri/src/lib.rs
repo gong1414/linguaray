@@ -16,6 +16,7 @@ pub mod cursor;
 pub mod concurrency;
 pub mod error;
 pub mod keystore;
+pub mod popup;
 pub mod providers;
 pub mod selection;
 pub mod selection_engine;
