@@ -4,6 +4,9 @@
 //!   back to another engine (network, timeout, 429, 5xx, parse failure).
 //! `Config` — a configuration/auth problem that must send the user to Settings,
 //!   never silently fall back (missing key, 401/403, bad model, keystore fault).
+//! `LocalNoFallback` — the primary failed but no fallback was attempted (§G):
+//!   either the primary was LOCAL (local-sacred forbids degrading to a remote
+//!   engine) or no `fallback_engine` is configured.
 
 use thiserror::Error;
 
@@ -17,6 +20,12 @@ pub enum Error {
 
     #[error(transparent)]
     Keystore(#[from] crate::keystore::KeystoreError),
+
+    /// §G: no fallback was attempted. Either the primary was LOCAL (loopback)
+    /// and the local-sacred rule forbids silent degradation to a remote engine,
+    /// or no `fallback_engine` was configured. Surfaced to the UI as "no fallback".
+    #[error("no fallback available (primary failed; local-primary sacred or no fallback configured)")]
+    LocalNoFallback,
 }
 
 #[derive(Debug, Error)]
