@@ -14,6 +14,7 @@ mod engines;
 pub mod error;
 pub mod keystore;
 mod providers;
+pub mod wire;
 
 use serde::{Deserialize, Serialize};
 
@@ -47,8 +48,11 @@ pub struct TranslateResult {
 fn translate(req: TranslateRequest, engine: String) -> Result<TranslateResult, String> {
     // AI providers are resolved by id first, then built-in traditional engines.
     if let Some(provider) = providers::presets().into_iter().find(|p| p.id == engine) {
-        let text = provider.translate(&req).map_err(|e| e.to_string())?;
-        return Ok(TranslateResult { text, engine: provider.id });
+        // Wire-up lives in `wire.rs` (Task 8); until then this is a stub.
+        return Err(format!(
+            "provider '{}' translate() not yet wired — see Task 8",
+            provider.id
+        ));
     }
 
     let registry = engines::registry();
