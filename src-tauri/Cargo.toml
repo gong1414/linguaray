@@ -42,11 +42,13 @@ mouse_position = "0.1"
 arboard = "3"
 enigo = "0.2"
 objc = "0.2"
+accessibility-sys = "0.1"
 windows-sys = { version = "0.59", features = ["Win32_System_DataExchange", "Win32_Foundation"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
-# macOS system dictionary lookup via DCSCopyTextDefinition (spec §E).
+# macOS system dictionary (DCSCopyTextDefinition) + Accessibility FFI (AX selection).
 core-foundation = "0.10"
+core-foundation-sys = "0.8"
 
 [dev-dependencies]
 wiremock = "0.6"

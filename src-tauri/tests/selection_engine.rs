@@ -172,3 +172,25 @@ fn image_only_clipboard_restored() {
     assert!(matches!(res, Capture::Selected(t) if t == "selected"));
     assert_eq!(*f.image.borrow(), Some(vec![1, 2, 3]), "image restored");
 }
+
+#[test]
+fn ax_first_short_circuits_copy_fallback() {
+    // When the injected AX reader returns Some(text), capture_selection_with_ax
+    // must return it directly and NOT touch the clipboard (no copy path).
+    use islandpot_lib::selection::capture_selection_with_ax;
+    use islandpot_lib::selection_engine::Capture;
+    let res = capture_selection_with_ax(|| Some("ax-text".into()), 1).unwrap();
+    assert!(matches!(res, Capture::Selected(t) if t == "ax-text"));
+}
+
+#[test]
+fn ax_empty_falls_back_to_copy() {
+    // When AX returns None (untrusted/empty), it routes to the copy path. In a
+    // test env without a real clipboard+copy, the copy path times out quickly
+    // (timeout=1 iter ≈ 20ms) → NoSelection. Asserting it reaches NoSelection
+    // (not Selected, not the AX text) proves the fallback path was taken.
+    use islandpot_lib::selection::capture_selection_with_ax;
+    use islandpot_lib::selection_engine::Capture;
+    let res = capture_selection_with_ax(|| None, 1).unwrap();
+    assert!(matches!(res, Capture::NoSelection), "AX-None routes to copy fallback (which NoSelections in test env)");
+}
