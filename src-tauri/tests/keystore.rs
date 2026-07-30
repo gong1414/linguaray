@@ -88,7 +88,6 @@ fn with_locks_same_dir_concurrent_no_clobber() {
     // Two threads, two Keystore instances, SAME dir — the fs2 flock on that dir's
     // keystore.lock must serialize them so update_keys doesn't clobber.
     use islandpot_lib::keystore::Keystore;
-    use std::sync::Arc;
     use std::thread;
     let dir = std::env::temp_dir().join(format!("islandpot-ks-samedir-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);

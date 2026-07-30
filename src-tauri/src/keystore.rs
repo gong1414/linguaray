@@ -307,6 +307,7 @@ impl Keystore {
             .create(true)
             .read(true)
             .write(true)
+            .truncate(false) // sidecar lock: never truncate (clippy + correctness)
             .open(self.dir.join(LOCK))?;
         lock_file.lock_exclusive().map_err(KeystoreError::Io)?;
         // Hold lock_file alive across the critical section.

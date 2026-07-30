@@ -10,7 +10,7 @@
 #[cfg(target_os = "macos")]
 mod imp {
     use accessibility_sys::*;
-    use core_foundation::base::{CFRelease, FromVoid, TCFType};
+    use core_foundation::base::{CFRelease, TCFType};
     use core_foundation::string::{CFString, CFStringRef};
     use core_foundation_sys::base::{CFGetTypeID, CFTypeRef};
     use core_foundation_sys::string::CFStringGetTypeID;

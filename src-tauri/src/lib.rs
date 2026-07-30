@@ -372,7 +372,9 @@ fn on_hotkey(app: &tauri::AppHandle, _shortcut: &tauri_plugin_global_shortcut::S
             Ok(selection_engine::Capture::Selected(t)) => t,
             Ok(selection_engine::Capture::NoSelection) => {
                 // Surface it visibly (review P1 #5: errors must reach the user, not
-                // vanish into a popup that's never shown). Show at cursor.
+                // vanish into a popup that's never shown). show_at reveals the window
+                // (popup::error alone only emits to a hidden window — review catch).
+                let _ = popup::show_at(&app2, x, y);
                 let _ = popup::error(
                     &app2,
                     if !a11y::enabled() {
@@ -384,6 +386,7 @@ fn on_hotkey(app: &tauri::AppHandle, _shortcut: &tauri_plugin_global_shortcut::S
                 return;
             }
             Err(e) => {
+                let _ = popup::show_at(&app2, x, y);
                 let _ = popup::error(&app2, &e);
                 return;
             }
@@ -495,9 +498,11 @@ pub fn run() {
         .build();
 
     tauri::Builder::default()
-        // single-instance MUST be first: the keystore lock model assumes one process
-        // (no cross-process lock is wired); a second instance would race on the same
-        // keystore file. This plugin focuses the existing instance instead of launching
+        // single-instance MUST be first: defense-in-depth on top of the real
+        // per-dir fs2 flock in keystore.rs (the flock is what serializes a second
+        // instance/external writer on the same dir; single-instance just avoids
+        // spawning a second process). This plugin focuses the existing instance
+        // instead of launching a second.
         // a second one.
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             if let Some(w) = app.get_webview_window("main") {
