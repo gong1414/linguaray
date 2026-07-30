@@ -21,6 +21,7 @@ pub mod providers;
 pub mod selection;
 pub mod selection_engine;
 pub mod service;
+pub mod settings;
 pub mod wire;
 
 use serde::{Deserialize, Serialize};
@@ -248,6 +249,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(shortcut_plugin)
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_store::Builder::new().build())
         .setup(|app| {
             let dir = app
                 .path()
