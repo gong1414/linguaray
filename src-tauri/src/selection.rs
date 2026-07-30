@@ -7,6 +7,10 @@ impl ClipboardLike for OsClipboard {
     fn get_text(&self) -> Result<String, String> { clipboard::get_text() }
     fn set_text(&self, s: &str) -> Result<(), String> { clipboard::set_text(s) }
     fn sequence(&self) -> u64 { clipboard::sequence() }
+    // TODO(P2): wire real arboard image get/set so image-only clipboards are
+    // restored on the OS clipboard (currently the engine's image save/restore is
+    // exercised in tests but the OS impl uses the trait's no-op default). The
+    // restore-on-every-branch guard is correct regardless.
 }
 
 /// Simulate the platform copy keystroke: Cmd+C on macOS, Ctrl+C elsewhere.
