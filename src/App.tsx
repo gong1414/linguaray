@@ -60,7 +60,7 @@ function App() {
     setBusy(true); setError(""); setOutput("");
     try {
       const res = await invoke<{ text: string; engine: string }>("translate", {
-        req: { text: input(), from: "auto", to: "zh", options: {} },
+        req: { text: input(), from: "auto", to: targetLang(), options: {} },
         engine: selected(),
       });
       setOutput(res.text);
