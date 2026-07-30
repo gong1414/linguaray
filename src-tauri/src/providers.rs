@@ -35,7 +35,7 @@ pub fn presets() -> Vec<ProviderPreset> {
             id: "gemini".into(), label: "Google Gemini".into(),
             // OpenAI-compatible path (spec §Wire): /v1beta/openai/chat/completions
             endpoint: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions".into(),
-            api_kind: ApiKind::OpenAIChat, default_model: "gemini-2.0-flash".into(), needs_key: true,
+            api_kind: ApiKind::OpenAIChat, default_model: "gemini-3.6-flash".into(), needs_key: true,
         },
         ProviderPreset {
             id: "ollama".into(), label: "Ollama (local)".into(),

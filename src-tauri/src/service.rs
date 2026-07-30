@@ -16,12 +16,21 @@ pub struct TranslateInput<'a> {
     pub options: AppOptions,
 }
 
+/// A translation result + the engine id that ACTUALLY produced it (primary on
+/// success; fallback id when the fallback fired). Review P2: callers must not tag
+/// the result with the primary preset id when the fallback produced it.
+#[derive(Debug)]
+pub struct Translation {
+    pub text: String,
+    pub engine: String,
+}
+
 pub async fn translate(
     client: &reqwest::Client,
     keystore: &Keystore,
     preset: &ProviderPreset,
     input: TranslateInput<'_>,
-) -> Result<String, Error> {
+) -> Result<Translation, Error> {
     // Spec §A "Plaintext-key claims": keep the key in memory only for the shortest
     // window between keystore-read and HTTP-send, and zeroize it after use.
     // Zeroizing<String> wipes the heap buffer on drop.
@@ -42,6 +51,7 @@ pub async fn translate(
         temperature: None, max_tokens: None, stream: false,
     };
     call(client, preset, &key, &params, &system, &user).await
+        .map(|text| Translation { text, engine: preset.id.clone() })
 }
 
 /// Translate with §G classified fallback.
@@ -66,7 +76,7 @@ pub async fn translate_with_fallback(
     primary_preset: &ProviderPreset,
     input: TranslateInput<'_>,
     fallback: Option<Box<dyn TraditionalEngine>>,
-) -> Result<String, Error> {
+) -> Result<Translation, Error> {
     // Primary attempt — clone the options because `translate` takes AppOptions by
     // value and we may still need `input`'s fields for the fallback attempt below.
     match translate(
@@ -82,7 +92,7 @@ pub async fn translate_with_fallback(
     )
     .await
     {
-        Ok(text) => Ok(text),
+        Ok(t) => Ok(t), // engine == primary preset id
         Err(Error::FallbackEligible(_)) => {
             // §G: local-primary sacred — never silently degrade a LOCAL AI engine
             // to a REMOTE fallback. Local failure = error.
@@ -92,8 +102,14 @@ pub async fn translate_with_fallback(
             match fallback {
                 // No fallback configured (opt-in default) — surface "no fallback".
                 None => Err(Error::LocalNoFallback),
-                // Single fallback attempt over the whole text.
-                Some(eng) => eng.translate(client, input.text, input.from, input.to).await,
+                // Single fallback attempt over the whole text; tag the result with
+                // the FALLBACK engine id (not the primary).
+                Some(eng) => {
+                    let fb_id = eng.id().to_string();
+                    eng.translate(client, input.text, input.from, input.to)
+                        .await
+                        .map(|text| Translation { text, engine: fb_id })
+                }
             }
         }
         // Config/Auth/Keystore → propagate, do NOT fall back.

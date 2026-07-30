@@ -11,6 +11,7 @@
 //! - No WASM, no plugin system in v1 (deferred to post-v1).
 
 pub mod engines;
+pub mod a11y;
 pub mod clipboard;
 pub mod concurrency;
 pub mod cursor;
@@ -78,12 +79,12 @@ async fn translate(
     };
     // §G: resolve the opt-in fallback engine from settings (None by default).
     let fallback = settings::load(&app).fallback_engine.as_deref().and_then(engines::find);
-    let text = service::translate_with_fallback(&state.client, &state.keystore, &preset, input, fallback)
+    let t = service::translate_with_fallback(&state.client, &state.keystore, &preset, input, fallback)
         .await
         .map_err(|e| e.to_string())?;
     Ok(TranslateResult {
-        text,
-        engine: preset.id,
+        text: t.text,
+        engine: t.engine, // actual producing engine (primary or fallback)
     })
 }
 
@@ -116,12 +117,12 @@ async fn translate_default(
         to: &to,
         options: wire::AppOptions::default(),
     };
-    let text = service::translate_with_fallback(&state.client, &state.keystore, &preset, input, fallback)
+    let t = service::translate_with_fallback(&state.client, &state.keystore, &preset, input, fallback)
         .await
         .map_err(|e| e.to_string())?;
     Ok(TranslateResult {
-        text,
-        engine: preset.id,
+        text: t.text,
+        engine: t.engine,
     })
 }
 
@@ -135,7 +136,14 @@ async fn translate_clipboard(
     app: tauri::AppHandle,
     state: tauri::State<'_, Arc<Session>>,
 ) -> Result<(), String> {
-    let text = clipboard::get_text()?;
+    // Participate in latest-wins + the selection mutex so we can't read a sentinel
+    // mid-selection-capture (which would send `__islandpot_sel_*__` to a remote
+    // provider), and so two entry points can't clobber one popup.
+    let gen = state.gen.next();
+    let text = {
+        let _g = state.gen.selection_lock();
+        clipboard::get_text()?
+    };
     if text.trim().is_empty() {
         return Err("clipboard empty".into());
     }
@@ -156,10 +164,14 @@ async fn translate_clipboard(
     };
     match service::translate_with_fallback(&state.client, &state.keystore, &preset, input, fallback).await {
         Ok(out) => {
-            let _ = popup::result(&app, &out, &preset.id);
+            if state.gen.is_latest(gen) {
+                let _ = popup::result(&app, &out.text, &out.engine);
+            }
         }
         Err(e) => {
-            let _ = popup::error(&app, &e.to_string());
+            if state.gen.is_latest(gen) {
+                let _ = popup::error(&app, &e.to_string());
+            }
         }
     }
     Ok(())
@@ -179,12 +191,10 @@ fn set_key(
     provider_id: String,
     key: String,
 ) -> Result<(), String> {
-    let mut keys = state.keystore.load().map_err(|e| e.to_string())?;
-    if !keys.is_object() {
-        keys = serde_json::json!({});
-    }
-    keys[&provider_id] = serde_json::json!(key);
-    state.keystore.store(&keys).map_err(|e| e.to_string())?;
+    // Atomic read-modify-write under the lock — load()+store() would interleave.
+    state.keystore.update_keys(|keys| {
+        keys[&provider_id] = serde_json::json!(key);
+    }).map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -193,26 +203,45 @@ fn delete_key(
     state: tauri::State<'_, Arc<Session>>,
     provider_id: String,
 ) -> Result<(), String> {
-    let mut keys = state.keystore.load().map_err(|e| e.to_string())?;
-    if let Some(obj) = keys.as_object_mut() {
-        obj.remove(&provider_id);
-    }
-    state.keystore.store(&keys).map_err(|e| e.to_string())?;
+    state.keystore.update_keys(|keys| {
+        if let Some(obj) = keys.as_object_mut() {
+            obj.remove(&provider_id);
+        }
+    }).map_err(|e| e.to_string())?;
     Ok(())
+}
+
+/// User-initiated keystore recovery (§A fail-closed): archive the unreadable file
+/// to keystore.json.broken-<ts> so the user can re-enter keys.
+#[tauri::command]
+fn archive_keystore(state: tauri::State<'_, Arc<Session>>) -> Result<String, String> {
+    let dst = state.keystore.archive().map_err(|e| e.to_string())?;
+    Ok(dst.to_string_lossy().into_owned())
+}
+
+/// User-initiated: delete the keystore entirely (fresh start).
+#[tauri::command]
+fn reset_keystore(state: tauri::State<'_, Arc<Session>>) -> Result<(), String> {
+    state.keystore.reset().map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 fn key_status(
     state: tauri::State<'_, Arc<Session>>,
-) -> Result<std::collections::HashMap<String, bool>, String> {
-    let keys = state.keystore.load().map_err(|e| e.to_string())?;
+) -> std::collections::HashMap<String, bool> {
+    // Review P1 #6: swallow the error (return empty) so frontend onMount never
+    // aborts. The recovery banner reads `keystore_health` for the reason.
+    let keys = match state.keystore.load() {
+        Ok(k) => k,
+        Err(_) => return std::collections::HashMap::new(),
+    };
     let mut map = std::collections::HashMap::new();
     if let Some(obj) = keys.as_object() {
         for (k, _v) in obj {
             map.insert(k.clone(), true);
         }
     }
-    Ok(map)
+    map
 }
 
 #[tauri::command]
@@ -250,6 +279,25 @@ fn set_setting(app: tauri::AppHandle, key: String, value: String) -> Result<(), 
 #[tauri::command]
 fn lookup_dictionary(word: String) -> Option<String> {
     dict::lookup(&word)
+}
+
+/// Is Accessibility (macOS) granted? Selection capture needs it for both the AX
+/// direct-read and the simulated Cmd+C. Non-macOS: always true.
+#[tauri::command]
+fn a11y_status() -> bool {
+    a11y::enabled()
+}
+
+/// Keystore health: Ok / the fail-closed reason (corrupt / auth / unknown).
+/// key_status swallows the error (returns empty) so onMount never aborts; this
+/// command surfaces the reason for the recovery banner. Review P1 #6.
+#[tauri::command]
+fn keystore_health(state: tauri::State<'_, Arc<Session>>) -> String {
+    // "" = healthy (or absent = first run). Non-empty = the fail-closed reason.
+    match state.keystore.load() {
+        Ok(_) => String::new(),
+        Err(e) => format!("{e}"),
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -291,12 +339,16 @@ fn on_hotkey(app: &tauri::AppHandle, _shortcut: &tauri_plugin_global_shortcut::S
         return;
     }
 
+    // (1) latest-wins token — allocate SYNCHRONOUSLY in the handler, BEFORE spawn.
+    // Doing this inside spawn let two presses' futures start out of order so the
+    // older press could grab the newer token (rev-3 race). Allocating here, in the
+    // handler thread (which is serialized per-press), guarantees strict press order.
+    let state = app.state::<Arc<Session>>().inner().clone();
+    let gen = state.gen.next();
+
     let app2 = app.clone();
     tauri::async_runtime::spawn(async move {
         let state = app2.state::<Arc<Session>>().inner().clone();
-
-        // (1) latest-wins token — allocate FIRST, before any work.
-        let gen = state.gen.next();
 
         // (2) capture cursor position + selection under ONE selection-mutex hold,
         // BEFORE the popup steals focus. The lock must span BOTH reads in a single
@@ -319,10 +371,22 @@ fn on_hotkey(app: &tauri::AppHandle, _shortcut: &tauri_plugin_global_shortcut::S
         let text = match captured {
             Ok(selection_engine::Capture::Selected(t)) => t,
             Ok(selection_engine::Capture::NoSelection) => {
-                let _ = popup::hide(&app2);
+                // Surface it visibly (review P1 #5: errors must reach the user, not
+                // vanish into a popup that's never shown). show_at reveals the window
+                // (popup::error alone only emits to a hidden window — review catch).
+                let _ = popup::show_at(&app2, x, y);
+                let _ = popup::error(
+                    &app2,
+                    if !a11y::enabled() {
+                        "No selection captured. Grant Accessibility in System Settings → Privacy → Accessibility."
+                    } else {
+                        "No text selected."
+                    },
+                );
                 return;
             }
             Err(e) => {
+                let _ = popup::show_at(&app2, x, y);
                 let _ = popup::error(&app2, &e);
                 return;
             }
@@ -357,7 +421,7 @@ fn on_hotkey(app: &tauri::AppHandle, _shortcut: &tauri_plugin_global_shortcut::S
         match service::translate_with_fallback(&state.client, &state.keystore, &preset, input, fallback).await {
             Ok(out) => {
                 if state.gen.is_latest(gen) {
-                    let _ = popup::result(&app2, &out, &preset.id);
+                    let _ = popup::result(&app2, &out.text, &out.engine);
                 }
             }
             Err(e) => {
@@ -398,28 +462,54 @@ pub fn run() {
     // is a `replace`, and `build()` dispatches every registered shortcut to it by
     // `ShortcutEvent.id`). So we register both hotkeys on a single Builder and
     // route by the shortcut's string form in the handler below.
-    let alt_space = tauri_plugin_global_shortcut::Shortcut::from_str("Alt+Space")
-        .expect("parse Alt+Space shortcut");
-    let ctrl_space = tauri_plugin_global_shortcut::Shortcut::from_str("Ctrl+Space")
-        .expect("parse Ctrl+Space shortcut");
-    let alt_space_id = alt_space.id();
-    let ctrl_space_id = ctrl_space.id();
-    let shortcut_plugin = GlobalShortcutBuilder::new()
-        .with_shortcut(alt_space)
-        .expect("register Alt+Space")
-        .with_shortcut(ctrl_space)
-        .expect("register Ctrl+Space")
+    //
+    // Review P1 #10: registration must be FAULT-TOLERANT. A shortcut already owned
+    // by the OS or another app must NOT bring down startup (the old code .expect-
+    // ed and crashed via .run().expect()). We register each on a best-effort basis:
+    // if one fails to register, we log + skip it (that hotkey just won't fire) and
+    // the app still starts. (Full rebindability is a later UX feature.)
+    let alt_space = tauri_plugin_global_shortcut::Shortcut::from_str("Alt+Space");
+    let ctrl_space = tauri_plugin_global_shortcut::Shortcut::from_str("Ctrl+Space");
+    // Capture the ids (for handler routing) BEFORE moving the shortcuts into the builder.
+    let alt_space_id = alt_space.as_ref().ok().map(|s| s.id());
+    let ctrl_space_id = ctrl_space.as_ref().ok().map(|s| s.id());
+    let mut builder = GlobalShortcutBuilder::new();
+    // Register only shortcuts that parsed (from_str is the failure point). A parse
+    // failure skips that hotkey but does NOT crash startup. with_shortcut on an
+    // already-parsed Shortcut won't fail, so .expect is sound here.
+    if let Ok(s) = alt_space {
+        builder = builder.with_shortcut(s).expect("register parsed Alt+Space");
+    } else {
+        log::warn!("Alt+Space parse failed — selection hotkey disabled");
+    }
+    if let Ok(s) = ctrl_space {
+        builder = builder.with_shortcut(s).expect("register parsed Ctrl+Space");
+    } else {
+        log::warn!("Ctrl+Space parse failed — input hotkey disabled");
+    }
+    let shortcut_plugin = builder
         .with_handler(move |app, shortcut, event| {
-            // Route by id rather than re-parsing the string on every fire.
-            if shortcut.id() == ctrl_space_id {
+            if Some(shortcut.id()) == ctrl_space_id {
                 on_input_hotkey(app, shortcut, event);
-            } else if shortcut.id() == alt_space_id {
+            } else if Some(shortcut.id()) == alt_space_id {
                 on_hotkey(app, shortcut, event);
             }
         })
         .build();
 
     tauri::Builder::default()
+        // single-instance MUST be first: defense-in-depth on top of the real
+        // per-dir fs2 flock in keystore.rs (the flock is what serializes a second
+        // instance/external writer on the same dir; single-instance just avoids
+        // spawning a second process). This plugin focuses the existing instance
+        // instead of launching a second.
+        // a second one.
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.show();
+                let _ = w.set_focus();
+            }
+        }))
         .plugin(shortcut_plugin)
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::new().build())
@@ -436,9 +526,13 @@ pub fn run() {
                 providers::validate_endpoint(&p.endpoint)
                     .expect("preset endpoint failed scheme validation");
             }
-            // Spec §Privacy: no cross-origin redirects.
+            // Spec §Privacy: no cross-origin redirects. Review P1 #7: a 30s total
+            // request timeout so a hung connection can't freeze translate + the
+            // popup indefinitely; lets wire::call classify a real Timeout.
             let client = reqwest::Client::builder()
                 .redirect(reqwest::redirect::Policy::none())
+                .timeout(std::time::Duration::from_secs(30))
+                .connect_timeout(std::time::Duration::from_secs(10))
                 .build()
                 .expect("client");
             app.manage(Arc::new(Session {
@@ -458,7 +552,11 @@ pub fn run() {
             key_status,
             get_settings,
             set_setting,
-            lookup_dictionary
+            lookup_dictionary,
+            a11y_status,
+            keystore_health,
+            archive_keystore,
+            reset_keystore
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

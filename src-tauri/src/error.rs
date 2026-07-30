@@ -48,4 +48,9 @@ pub enum ConfigKind {
     AuthFailed { provider: String, status: u16 },
     #[error("invalid model {model} for {provider}")]
     InvalidModel { provider: String, model: String },
+    /// §G: a 4xx other than 401/403 (400/404/422/...) — bad request / invalid
+    /// model / wrong endpoint. NOT fallback-eligible: retrying with a 2nd
+    /// provider would needlessly send the text elsewhere.
+    #[error("invalid request ({status}) for {provider}")]
+    InvalidRequest { provider: String, status: u16 },
 }

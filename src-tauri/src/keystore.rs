@@ -249,14 +249,14 @@ mod tests {
 use std::path::{Path, PathBuf};
 use parking_lot::Mutex;
 
-/// Owns the keystore directory + in-process lock.
+/// Owns the keystore directory + in-process lock + cross-process sidecar lock.
 ///
-/// v1 locking (deviation from spec §A, acceptable for a single-process app):
-/// only an in-process `Mutex` serializes writers. The cross-process
-/// `keystore.lock`/`fd-lock` gate from the spec is DEFERRED — it is harmless to
-/// omit because Tauri is a single process, so every concurrent writer is in-process
-/// and covered by the Mutex. (Same-user malicious processes are out of the §A
-/// threat model anyway.) To be revisited if multi-instance support is added.
+/// Per spec §A: every load-modify-store and the stale-tmp cleanup run under BOTH
+/// the in-process `Mutex` (serializes writers within this Tauri process) AND the
+/// cross-process `keystore.lock` sidecar (held via fs2 flock for the duration of the
+/// RMW). `tauri-plugin-single-instance` is defense-in-depth; it does NOT replace
+/// this sidecar — if a second instance ever starts (or an external tool touches the
+/// file), the sidecar is what serializes them.
 pub struct Keystore {
     dir: PathBuf,
     in_proc: Mutex<()>,
@@ -264,7 +264,7 @@ pub struct Keystore {
 
 const FILE: &str = "keystore.json";
 const TMP: &str = "keystore.json.tmp";
-// Reserved for the deferred cross-process lock (spec §A). Currently unused.
+// Sidecar lock file for the cross-process flock (fs2). Lives in self.dir.
 const LOCK: &str = "keystore.lock";
 
 impl Keystore {
@@ -290,9 +290,41 @@ impl Keystore {
 
     fn file(&self) -> PathBuf { self.dir.join(FILE) }
 
+    /// Run `body` under BOTH the in-proc mutex AND an exclusive flock on
+    /// self.dir/keystore.lock. The flock File is opened per-call and bound to THIS
+    /// keystore's dir (so different dirs don't share a lock path); it's held alive
+    /// for the whole critical section, then unlocked + dropped under the mutex.
+    /// Per §A this serializes a second instance or external tool on the same dir;
+    /// single-instance is only defense-in-depth.
+    fn with_locks<R, F>(&self, body: F) -> Result<R, KeystoreError>
+    where
+        F: FnOnce(&Self) -> Result<R, KeystoreError>,
+    {
+        use fs2::FileExt;
+        let _inproc = self.in_proc.lock();
+        // Open THIS dir's sidecar lock file and acquire an exclusive flock.
+        let lock_file = std::fs::OpenOptions::new()
+            .create(true)
+            .read(true)
+            .write(true)
+            .truncate(false) // sidecar lock: never truncate (clippy + correctness)
+            .open(self.dir.join(LOCK))?;
+        lock_file.lock_exclusive().map_err(KeystoreError::Io)?;
+        // Hold lock_file alive across the critical section.
+        let result = body(self);
+        // Release (unlock + drop). Errors here are not fatal to the result.
+        let _ = lock_file.unlock();
+        drop(lock_file);
+        result
+    }
+
     /// Read the whole keys map. Returns `{}` if the file does not exist (first run).
     pub fn load(&self) -> Result<serde_json::Value, KeystoreError> {
-        let _g = self.in_proc.lock();
+        self.with_locks(|ks| ks.load_locked())
+    }
+
+    /// Locked read (caller holds BOTH locks). Used by with_locks bodies.
+    fn load_locked(&self) -> Result<serde_json::Value, KeystoreError> {
         let path = self.file();
         if !path.exists() { return Ok(serde_json::json!({})); }
         let bytes = std::fs::read(&path)?;
@@ -301,26 +333,82 @@ impl Keystore {
         decrypt(&env, IdentitySource::CURRENT)
     }
 
-    /// Encrypt + atomically write the keys map.
+    /// Encrypt + atomically write the keys map. Takes both locks.
     pub fn store(&self, keys: &serde_json::Value) -> Result<(), KeystoreError> {
+        // Clone to satisfy the closure borrow (keys: &Value → owned for the body).
+        let keys = keys.clone();
+        self.with_locks(|ks| ks.store_locked(&keys))
+    }
+
+    /// Locked write (caller holds BOTH locks). Used by with_locks bodies.
+    fn store_locked(&self, keys: &serde_json::Value) -> Result<(), KeystoreError> {
         let identity = IdentitySource::CURRENT.read()?;
         let env = encrypt(&identity, IdentitySource::CURRENT, keys)?;
         let tmp = self.dir.join(TMP);
         let json = serde_json::to_vec(&env).map_err(|e| KeystoreError::Envelope(e.to_string()))?;
         std::fs::write(&tmp, &json)?;
-        self.set_file_perms_macos(&tmp)?;
+        self.set_file_perms(&tmp)?;
         atomic_replace(&tmp, &self.file())?;
         Ok(())
     }
 
+    /// Atomic read-modify-write under BOTH locks + stale-tmp cleanup.
+    /// This is the ONLY sanctioned way to mutate the keystore — `set_key`/
+    /// `delete_key` that do load() then a separate store() interleave and clobber.
+    pub fn update_keys<F>(&self, mutator: F) -> Result<(), KeystoreError>
+    where
+        F: FnOnce(&mut serde_json::Value),
+    {
+        self.with_locks(|ks| {
+            // stale-tmp cleanup under BOTH locks (crash-recovery).
+            let tmp = ks.dir.join(TMP);
+            if tmp.exists() {
+                let _ = std::fs::remove_file(&tmp);
+            }
+            let mut keys = ks.load_locked()?;
+            if !keys.is_object() {
+                keys = serde_json::json!({});
+            }
+            mutator(&mut keys);
+            ks.store_locked(&keys)
+        })
+    }
+
+    /// Move keystore.json → keystore.json.broken-<ts> (user-initiated recovery).
+    /// Per §A fail-closed: only an explicit user action does this.
+    pub fn archive(&self) -> Result<std::path::PathBuf, KeystoreError> {
+        self.with_locks(|ks| {
+            let src = ks.file();
+            if !src.exists() {
+                return Err(KeystoreError::Envelope("no keystore to archive".into()));
+            }
+            let ts = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+            let dst = ks.dir.join(format!("keystore.json.broken-{ts}"));
+            std::fs::rename(&src, &dst)?;
+            Ok(dst)
+        })
+    }
+
+    /// Delete the keystore entirely (fresh start). User-initiated.
+    pub fn reset(&self) -> Result<(), KeystoreError> {
+        self.with_locks(|ks| {
+            let _ = std::fs::remove_file(ks.file());
+            let _ = std::fs::remove_file(ks.dir.join(TMP));
+            Ok(())
+        })
+    }
+
     #[cfg(target_os = "macos")]
-    fn set_file_perms_macos(&self, p: &Path) -> Result<(), KeystoreError> {
+    fn set_file_perms(&self, p: &Path) -> Result<(), KeystoreError> {
         use std::os::unix::fs::PermissionsExt;
         std::fs::set_permissions(p, std::fs::Permissions::from_mode(0o600))?;
         Ok(())
     }
     #[cfg(not(target_os = "macos"))]
-    fn set_file_perms_macos(&self, _p: &Path) -> Result<(), KeystoreError> { Ok(()) }
+    fn set_file_perms(&self, _p: &Path) -> Result<(), KeystoreError> { Ok(()) }
 }
 
 /// Atomic replace. macOS: rename over target (first-create or update).
