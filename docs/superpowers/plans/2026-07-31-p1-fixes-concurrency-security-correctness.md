@@ -118,8 +118,6 @@ git add -A && git -c user.name=daoyu -c user.email=daoyu@local commit -m "fix(ke
 
 ## Task 3: Selection — unified cleanup guard + image save/restore
 
-**Files:** `selection_engine.rs`, `clipboard.rs`, `tests/selection_engine.rs`
-
 `copy()?` failure leaves the sentinel; `get_text()?` failure doesn't restore; image-only clipboard is lost via `unwrap_or_default()`.
 
 - [ ] **Step 1: extend `ClipboardLike`** with image: add `fn get_image(&self) -> Result<Option<Vec<u8>>, String>` and `fn set_image(&self, img: &[u8]) -> Result<(), String>`. Implement in clipboard.rs via arboard (`arboard::Image`).
@@ -131,6 +129,28 @@ git add -A && git -c user.name=daoyu -c user.email=daoyu@local commit -m "fix(ke
 - [ ] **Step 4: cargo test + commit.**
 ```bash
 git add -A && git -c user.name=daoyu -c user.email=daoyu@local commit -m "fix(selection): restore on ALL failure branches + image save/restore"
+```
+
+---
+
+## Task 3b: §B AX-first capture + Accessibility onboarding (review P1 #5)
+
+**Files:** `selection.rs`, `lib.rs`, `App.tsx`/`Popup.tsx` (+ a small onboarding affordance)
+
+Currently `selection.rs` only simulates Cmd/Ctrl+C. The spec §B (rev-4) mandates a **hybrid**: macOS AXUIElement `kAXSelectedTextAttribute` direct-read FIRST, simulated-copy fallback. Plus the Accessibility permission must be requested + user-guided on first launch, and capture errors must surface somewhere the user actually sees (not just a popup that isn't shown yet).
+
+- [ ] **Step 1: Vendor `get-selected-text`** (or re-implement the macOS AX read) into `src-tauri/src/selection.rs` / a new `src-tauri/src/a11y.rs`. The macOS AX path: get the system-wide focused UI element (`AXUIElementCopySystemSetting`/`AXUIElementCreateApplication` of the frontmost app via `NSWorkspace` → pid → `AXUIElementCreateApplication`), then `AXUIElementCopyAttributeValue` with `kAXSelectedTextAttribute`. Read the upstream `yetone/get-selected-text` macOS source for the exact calls; port to Rust (via the `accessibility` crate OR raw `objc2`/`core-foundation` FFI against the ApplicationServices framework). Prefer the `accessibility` crate if it exposes `kAXSelectedTextAttribute`; else raw FFI.
+  - `capture_selection` becomes: try AX read first → on success return it (NO clipboard touch at all — cleanest); on AX failure/empty, fall back to the existing sentinel simulate-copy path (Task 3).
+
+- [ ] **Step 2: Accessibility permission check + onboarding.** Add `a11y_enabled() -> bool` (macOS: `AXIsProcessTrusted` from ApplicationServices). In `run()` setup, if not trusted, surface an onboarding state to the main window: a banner "IslandPot needs Accessibility to read your selection — [Open System Settings]" (the button opens `x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility`). Re-check on focus. Non-macOS: always enabled (Windows uses simulate-copy only).
+
+- [ ] **Step 3: surface capture errors visibly.** When AX+copy both fail / not trusted / NoSelection, the error must go somewhere the user sees — since the popup isn't shown, either (a) show the popup with the error, or (b) a main-window status. Pick (a): popup::error shows even on NoSelection/failure (currently NoSelection just hides — change to show a brief "no selection / permission needed" popup, auto-hide after a few seconds, OR surface via the main window). Document the chosen behavior.
+
+- [ ] **Step 4: tests.** The AX path is OS-FFI (manual-only per §I), BUT the *fallback decision* (AX-empty → sentinel path) is testable: structure `capture_selection` so the AX-attempt is behind an injectable trait (like `ClipboardLike`), and test that an AX "empty/Err" result routes to the simulate-copy fallback. Add that test.
+
+- [ ] **Step 5: cargo check + test + commit.**
+```bash
+git add -A && git -c user.name=daoyu -c user.email=daoyu@local commit -m "feat(selection): macOS AX-first capture (§B hybrid) + Accessibility onboarding"
 ```
 
 ---
