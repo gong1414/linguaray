@@ -12,6 +12,7 @@
 
 mod engines;
 pub mod error;
+pub mod keystore;
 mod providers;
 
 use serde::{Deserialize, Serialize};
