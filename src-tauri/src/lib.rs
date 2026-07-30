@@ -21,9 +21,11 @@ pub mod providers;
 pub mod selection;
 pub mod selection_engine;
 pub mod service;
+pub mod settings;
 pub mod wire;
 
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 use std::sync::Arc;
 use tauri::Manager;
 use tauri_plugin_global_shortcut::{Builder as GlobalShortcutBuilder, ShortcutState};
@@ -81,6 +83,80 @@ async fn translate(
     })
 }
 
+/// Translate using the settings-configured default provider + target language.
+///
+/// `req.to == ""` is a sentinel: "use `settings.target_language`". This backs the
+/// InputPanel window, which intentionally hides the from/to/provider knobs and
+/// just hands the typed text to whatever the user configured (spec §input).
+#[tauri::command]
+async fn translate_default(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, Arc<Session>>,
+    req: TranslateRequest,
+) -> Result<TranslateResult, String> {
+    let s = settings::load(&app);
+    let to = if req.to.is_empty() {
+        s.target_language.clone()
+    } else {
+        req.to
+    };
+    let preset = providers::presets()
+        .into_iter()
+        .find(|p| p.id == s.default_provider)
+        .ok_or_else(|| format!("default provider '{}' not found", s.default_provider))?;
+    let input = service::TranslateInput {
+        text: &req.text,
+        from: &req.from,
+        to: &to,
+        options: wire::AppOptions::default(),
+    };
+    let text = service::translate(&state.client, &state.keystore, &preset, input)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(TranslateResult {
+        text,
+        engine: preset.id,
+    })
+}
+
+/// Translate the clipboard contents ONCE, on user demand.
+///
+/// Reads the clipboard exactly once and surfaces the result in the popup window at
+/// the current cursor position. Deliberately NOT a background listener — there is
+/// no clipboard-changed subscription anywhere in the app (spec §Scope: user-initiated).
+#[tauri::command]
+async fn translate_clipboard(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, Arc<Session>>,
+) -> Result<(), String> {
+    let text = clipboard::get_text()?;
+    if text.trim().is_empty() {
+        return Err("clipboard empty".into());
+    }
+    let (x, y) = cursor::position();
+    let _ = popup::show_at(&app, x, y);
+    let s = settings::load(&app);
+    let preset = providers::presets()
+        .into_iter()
+        .find(|p| p.id == s.default_provider)
+        .ok_or_else(|| format!("default provider '{}' not found", s.default_provider))?;
+    let input = service::TranslateInput {
+        text: &text,
+        from: "auto",
+        to: &s.target_language,
+        options: wire::AppOptions::default(),
+    };
+    match service::translate(&state.client, &state.keystore, &preset, input).await {
+        Ok(out) => {
+            let _ = popup::result(&app, &out, &preset.id);
+        }
+        Err(e) => {
+            let _ = popup::error(&app, &e.to_string());
+        }
+    }
+    Ok(())
+}
+
 #[tauri::command]
 fn list_engines() -> Vec<EngineInfo> {
     providers::presets()
@@ -129,6 +205,22 @@ fn key_status(
         }
     }
     Ok(map)
+}
+
+#[tauri::command]
+fn get_settings(app: tauri::AppHandle) -> settings::Settings {
+    settings::load(&app)
+}
+
+#[tauri::command]
+fn set_setting(app: tauri::AppHandle, key: String, value: String) -> Result<(), String> {
+    let mut s = settings::load(&app);
+    match key.as_str() {
+        "default_provider" => s.default_provider = value,
+        "target_language" => s.target_language = value,
+        _ => return Err(format!("unknown setting: {key}")),
+    }
+    settings::save(&app, &s)
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -210,16 +302,24 @@ fn on_hotkey(app: &tauri::AppHandle, _shortcut: &tauri_plugin_global_shortcut::S
         // (4) show loading popup at the cursor.
         let _ = popup::show_at(&app2, x, y);
 
-        // (5) translate via the Phase-1 service. Default provider is "openai"
-        //     for now; the real default-choice UX is Phase 2b.
-        let preset = providers::presets()
-            .into_iter()
-            .find(|p| p.id == "openai")
-            .expect("default preset \"openai\" must exist in providers::presets");
+        // (5) translate via the Phase-1 service. Default provider and target
+        //     language come from settings (Phase 2b); fall back to a provider-
+        //     not-found error popup instead of panicking.
+        let s = settings::load(&app2);
+        let preset = match providers::presets().into_iter().find(|p| p.id == s.default_provider) {
+            Some(p) => p,
+            None => {
+                let _ = popup::error(
+                    &app2,
+                    &format!("default provider '{}' not found", s.default_provider),
+                );
+                return;
+            }
+        };
         let input = service::TranslateInput {
             text: &text,
             from: "auto",
-            to: "zh",
+            to: &s.target_language,
             options: wire::AppOptions::default(),
         };
         match service::translate(&state.client, &state.keystore, &preset, input).await {
@@ -237,17 +337,60 @@ fn on_hotkey(app: &tauri::AppHandle, _shortcut: &tauri_plugin_global_shortcut::S
     });
 }
 
+/// Show the input-translate window (bound to `Ctrl+Space`).
+///
+/// Unlike `on_hotkey` (Alt+Space), this is a pure UI toggle — no selection capture,
+/// no translate call, no popup, no generation token. It just surfaces the
+/// pre-declared `input` webview window so the user can type text into InputPanel.
+fn on_input_hotkey(
+    app: &tauri::AppHandle,
+    _shortcut: &tauri_plugin_global_shortcut::Shortcut,
+    event: tauri_plugin_global_shortcut::ShortcutEvent,
+) {
+    // Only act on key-down; ignore release.
+    if event.state != ShortcutState::Pressed {
+        return;
+    }
+    let app2 = app.clone();
+    tauri::async_runtime::spawn(async move {
+        if let Some(win) = app2.get_webview_window("input") {
+            let _ = win.show();
+            let _ = win.set_focus();
+        }
+    });
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // The global-shortcut `Builder` holds ONE shared handler (its `with_handler`
+    // is a `replace`, and `build()` dispatches every registered shortcut to it by
+    // `ShortcutEvent.id`). So we register both hotkeys on a single Builder and
+    // route by the shortcut's string form in the handler below.
+    let alt_space = tauri_plugin_global_shortcut::Shortcut::from_str("Alt+Space")
+        .expect("parse Alt+Space shortcut");
+    let ctrl_space = tauri_plugin_global_shortcut::Shortcut::from_str("Ctrl+Space")
+        .expect("parse Ctrl+Space shortcut");
+    let alt_space_id = alt_space.id();
+    let ctrl_space_id = ctrl_space.id();
     let shortcut_plugin = GlobalShortcutBuilder::new()
-        .with_shortcut("Alt+Space")
-        .expect("parse Alt+Space shortcut")
-        .with_handler(on_hotkey)
+        .with_shortcut(alt_space)
+        .expect("register Alt+Space")
+        .with_shortcut(ctrl_space)
+        .expect("register Ctrl+Space")
+        .with_handler(move |app, shortcut, event| {
+            // Route by id rather than re-parsing the string on every fire.
+            if shortcut.id() == ctrl_space_id {
+                on_input_hotkey(app, shortcut, event);
+            } else if shortcut.id() == alt_space_id {
+                on_hotkey(app, shortcut, event);
+            }
+        })
         .build();
 
     tauri::Builder::default()
         .plugin(shortcut_plugin)
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_store::Builder::new().build())
         .setup(|app| {
             let dir = app
                 .path()
@@ -275,10 +418,14 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             translate,
+            translate_default,
+            translate_clipboard,
             list_engines,
             set_key,
             delete_key,
-            key_status
+            key_status,
+            get_settings,
+            set_setting
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
