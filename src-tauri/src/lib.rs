@@ -228,15 +228,20 @@ fn reset_keystore(state: tauri::State<'_, Arc<Session>>) -> Result<(), String> {
 #[tauri::command]
 fn key_status(
     state: tauri::State<'_, Arc<Session>>,
-) -> Result<std::collections::HashMap<String, bool>, String> {
-    let keys = state.keystore.load().map_err(|e| e.to_string())?;
+) -> std::collections::HashMap<String, bool> {
+    // Review P1 #6: swallow the error (return empty) so frontend onMount never
+    // aborts. The recovery banner reads `keystore_health` for the reason.
+    let keys = match state.keystore.load() {
+        Ok(k) => k,
+        Err(_) => return std::collections::HashMap::new(),
+    };
     let mut map = std::collections::HashMap::new();
     if let Some(obj) = keys.as_object() {
         for (k, _v) in obj {
             map.insert(k.clone(), true);
         }
     }
-    Ok(map)
+    map
 }
 
 #[tauri::command]
@@ -281,6 +286,18 @@ fn lookup_dictionary(word: String) -> Option<String> {
 #[tauri::command]
 fn a11y_status() -> bool {
     a11y::enabled()
+}
+
+/// Keystore health: Ok / the fail-closed reason (corrupt / auth / unknown).
+/// key_status swallows the error (returns empty) so onMount never aborts; this
+/// command surfaces the reason for the recovery banner. Review P1 #6.
+#[tauri::command]
+fn keystore_health(state: tauri::State<'_, Arc<Session>>) -> String {
+    // "" = healthy (or absent = first run). Non-empty = the fail-closed reason.
+    match state.keystore.load() {
+        Ok(_) => String::new(),
+        Err(e) => format!("{e}"),
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -532,6 +549,7 @@ pub fn run() {
             set_setting,
             lookup_dictionary,
             a11y_status,
+            keystore_health,
             archive_keystore,
             reset_keystore
         ])

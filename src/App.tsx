@@ -17,6 +17,7 @@ function App() {
   const [targetLang, setTargetLang] = createSignal("zh");
   const [clipBusy, setClipBusy] = createSignal(false);
   const [a11yOk, setA11yOk] = createSignal(true);
+  const [ksHealth, setKsHealth] = createSignal("");
 
   async function refreshA11y() {
     try { setA11yOk(await invoke<boolean>("a11y_status")); }
@@ -28,6 +29,9 @@ function App() {
     setEngines(list);
     const status = await invoke<Record<string, boolean>>("key_status");
     setHasKey(status);
+    // Review P1 #6: keystore fail-closed recovery — read health (does not throw),
+    // surface a banner if unreadable. onMount never aborts on a corrupt keystore.
+    setKsHealth(await invoke<string>("keystore_health"));
     setSelected(list.find((e) => e.kind === "provider")?.id ?? list[0]?.id ?? "");
     const s = await invoke<{ default_provider: string; target_language: string }>("get_settings");
     setDefaultProvider(s.default_provider);
@@ -87,6 +91,29 @@ function App() {
           Accessibility permission needed to read your selection. Grant it in System
           Settings → Privacy → Accessibility, then re-focus this window.{" "}
           <button onClick={refreshA11y} style={{ display: "inline" }}>Re-check</button>
+        </div>
+      </Show>
+      <Show when={ksHealth() !== ""}>
+        <div class="error" style={{ "margin-bottom": "0.5rem" }}>
+          Keystore unreadable: {ksHealth()}. Your keys are preserved on disk.{" "}
+          <button
+            style={{ display: "inline" }}
+            onClick={async () => {
+              if (confirm("Archive the unreadable keystore (renamed to .broken-*) so you can re-enter keys?")) {
+                await invoke("archive_keystore");
+                setKsHealth("");
+              }
+            }}
+          >Archive &amp; re-enter</button>{" "}
+          <button
+            style={{ display: "inline" }}
+            onClick={async () => {
+              if (confirm("Delete the keystore entirely? This cannot be undone.")) {
+                await invoke("reset_keystore");
+                setKsHealth("");
+              }
+            }}
+          >Reset</button>
         </div>
       </Show>
       <select value={selected()} onChange={(e) => setSelected(e.currentTarget.value)}>
