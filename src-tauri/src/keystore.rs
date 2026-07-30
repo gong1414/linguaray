@@ -99,3 +99,149 @@ fn read_windows_machine_guid() -> Result<String, KeystoreError> {
         .map(|v| v.trim().to_string())
         .ok_or_else(|| KeystoreError::Envelope("MachineGuid not found".into()))
 }
+
+use aes_gcm::{aead::{Aead, KeyInit}, Aes256Gcm, Nonce};
+use argon2::Argon2;
+use base64::{engine::general_purpose::STANDARD as B64, Engine};
+use rand::RngCore;
+use serde::{Deserialize, Serialize};
+
+const DOMAIN_SEPARATOR: &[u8] = b"islandpot-keystore-v1\0";
+const FIXED_AAD: &[u8] = b"islandpot-keystore-envelope-v1";
+const SALT_LEN: usize = 16;
+const NONCE_LEN: usize = 12;
+const VERSION: u64 = 1;
+
+/// Pinned Argon2id params (spec §A): m=64MiB, t=3, p=1, out=32.
+fn argon2() -> Argon2<'static> {
+    Argon2::new(
+        argon2::Algorithm::Argon2id,
+        argon2::Version::V0x13,
+        argon2::Params::new(65536, 3, 1, Some(32)).unwrap(),
+    )
+}
+
+/// Derive the 32-byte AES key. `salt` is used ONLY as the Argon2 salt.
+fn derive_key(identity: &str, salt: &[u8]) -> [u8; 32] {
+    let mut password = DOMAIN_SEPARATOR.to_vec();
+    password.extend_from_slice(identity.as_bytes());
+    let argon = argon2();
+    let mut out = [0u8; 32];
+    argon.hash_password_into(&password, salt, &mut out)
+        .expect("argon2 with valid params");
+    zeroize::Zeroize::zeroize(&mut password);
+    out
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct Envelope {
+    pub version: u64,
+    pub aead: String,
+    pub kdf: String,
+    pub kdf_params: KdfParams,
+    pub identity_source: IdentitySource,
+    pub salt: String,    // base64
+    pub nonce: String,   // base64
+    pub ciphertext: String, // base64 (includes appended 16-byte GCM tag)
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct KdfParams {
+    pub m_kib: u32,
+    pub t: u32,
+    pub p: u32,
+    pub output_len: u32,
+}
+
+const PINNED_KDF: KdfParams = KdfParams { m_kib: 65536, t: 3, p: 1, output_len: 32 };
+
+/// Encrypt a keys map into an envelope (fresh salt + nonce each call).
+pub fn encrypt(identity: &str, identity_source: IdentitySource, keys: &serde_json::Value) -> Result<Envelope, KeystoreError> {
+    let mut salt = [0u8; SALT_LEN];
+    let mut nonce = [0u8; NONCE_LEN];
+    rand::thread_rng().fill_bytes(&mut salt);
+    rand::thread_rng().fill_bytes(&mut nonce);
+    let key = derive_key(identity, &salt);
+    let cipher = Aes256Gcm::new_from_slice(&key)
+        .map_err(|e| KeystoreError::Crypto(e.to_string()))?;
+    let plaintext = serde_json::to_vec(keys).map_err(|e| KeystoreError::Envelope(e.to_string()))?;
+    let ct = cipher.encrypt(Nonce::from_slice(&nonce), aes_gcm::aead::Payload { msg: &plaintext, aad: FIXED_AAD })
+        .map_err(|e| KeystoreError::Crypto(e.to_string()))?;
+    Ok(Envelope {
+        version: VERSION, aead: "aes-256-gcm".into(), kdf: "argon2id".into(),
+        kdf_params: PINNED_KDF, identity_source,
+        salt: B64.encode(salt), nonce: B64.encode(nonce), ciphertext: B64.encode(ct),
+    })
+}
+
+/// Validate the envelope header against the whitelist BEFORE decryption, then
+/// decrypt. A tampered `kdf_params` is rejected outright (DoS guard) — never honored.
+pub fn decrypt(envelope: &Envelope, machine_source: IdentitySource) -> Result<serde_json::Value, KeystoreError> {
+    if envelope.version != VERSION { return Err(KeystoreError::UnsupportedVersion(envelope.version)); }
+    if envelope.aead != "aes-256-gcm" || envelope.kdf != "argon2id" { return Err(KeystoreError::Envelope("bad aead/kdf".into())); }
+    if envelope.kdf_params.m_kib != PINNED_KDF.m_kib
+        || envelope.kdf_params.t != PINNED_KDF.t
+        || envelope.kdf_params.p != PINNED_KDF.p
+        || envelope.kdf_params.output_len != PINNED_KDF.output_len {
+        return Err(KeystoreError::Envelope("kdf_params not pinned".into()));
+    }
+    if envelope.identity_source != machine_source {
+        return Err(KeystoreError::AuthFailed);
+    }
+    let salt = B64.decode(&envelope.salt).map_err(|e| KeystoreError::Envelope(e.to_string()))?;
+    let nonce = B64.decode(&envelope.nonce).map_err(|e| KeystoreError::Envelope(e.to_string()))?;
+    let ct = B64.decode(&envelope.ciphertext).map_err(|e| KeystoreError::Envelope(e.to_string()))?;
+    if salt.len() != SALT_LEN || nonce.len() != NONCE_LEN || ct.len() < 16 {
+        return Err(KeystoreError::Envelope("bad field lengths".into()));
+    }
+    let identity = machine_source.read()?;
+    let key = derive_key(&identity, &salt);
+    let cipher = Aes256Gcm::new_from_slice(&key)
+        .map_err(|e| KeystoreError::Crypto(e.to_string()))?;
+    let pt = cipher.decrypt(Nonce::from_slice(&nonce), aes_gcm::aead::Payload { msg: &ct, aad: FIXED_AAD })
+        .map_err(|_| KeystoreError::AuthFailed)?;
+    let v: serde_json::Value = serde_json::from_slice(&pt).map_err(|e| KeystoreError::Envelope(e.to_string()))?;
+    Ok(v)
+}
+
+#[doc(hidden)]
+/// Test-only: decrypt with an explicit identity string instead of reading the
+/// machine. Lets tests drive the crypto without touching real OS identity.
+pub fn decrypt_with_identity(envelope: &Envelope, identity: &str) -> Result<serde_json::Value, KeystoreError> {
+    if envelope.version != VERSION { return Err(KeystoreError::UnsupportedVersion(envelope.version)); }
+    if envelope.aead != "aes-256-gcm" || envelope.kdf != "argon2id" { return Err(KeystoreError::Envelope("bad aead/kdf".into())); }
+    if envelope.kdf_params.m_kib != PINNED_KDF.m_kib || envelope.kdf_params.t != PINNED_KDF.t
+        || envelope.kdf_params.p != PINNED_KDF.p || envelope.kdf_params.output_len != PINNED_KDF.output_len {
+        return Err(KeystoreError::Envelope("kdf_params not pinned".into()));
+    }
+    let salt = B64.decode(&envelope.salt).map_err(|e| KeystoreError::Envelope(e.to_string()))?;
+    let nonce = B64.decode(&envelope.nonce).map_err(|e| KeystoreError::Envelope(e.to_string()))?;
+    let ct = B64.decode(&envelope.ciphertext).map_err(|e| KeystoreError::Envelope(e.to_string()))?;
+    if salt.len() != SALT_LEN || nonce.len() != NONCE_LEN || ct.len() < 16 {
+        return Err(KeystoreError::Envelope("bad field lengths".into()));
+    }
+    let key = derive_key(identity, &salt);
+    let cipher = Aes256Gcm::new_from_slice(&key).map_err(|e| KeystoreError::Crypto(e.to_string()))?;
+    let pt = cipher.decrypt(Nonce::from_slice(&nonce), aes_gcm::aead::Payload { msg: &ct, aad: FIXED_AAD })
+        .map_err(|_| KeystoreError::AuthFailed)?;
+    serde_json::from_slice(&pt).map_err(|e| KeystoreError::Envelope(e.to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn encrypt_produces_pinned_envelope() {
+        let env = encrypt("test-machine-uuid", IdentitySource::MacosIoplatformuuid, &serde_json::json!({"openai":"sk-test"})).unwrap();
+        assert_eq!(env.version, 1);
+        assert_eq!(env.aead, "aes-256-gcm");
+        assert_eq!(env.kdf, "argon2id");
+        assert_eq!(env.kdf_params.m_kib, 65536);
+        assert_eq!(env.kdf_params.t, 3);
+        assert_eq!(env.kdf_params.p, 1);
+        assert_eq!(env.kdf_params.output_len, 32);
+        // round-trip via the test helper
+        let out = decrypt_with_identity(&env, "test-machine-uuid").unwrap();
+        assert_eq!(out, serde_json::json!({"openai":"sk-test"}));
+    }
+}
