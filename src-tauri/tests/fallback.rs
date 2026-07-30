@@ -132,8 +132,9 @@ async fn fallback_eligible_tries_fallback() {
         .await
         .expect("fallback should succeed");
 
-    // Fallback ran and returned its marker.
-    assert_eq!(out, "[fb]hello world");
+    // Fallback ran and returned its marker, tagged with the FALLBACK engine id.
+    assert_eq!(out.text, "[fb]hello world");
+    assert_eq!(out.engine, "fake", "result tagged with the fallback engine id, not primary");
     assert!(called.load(Ordering::SeqCst), "fallback engine must be called");
     // Whole-text fallback (no chunk mixing): it saw the entire input verbatim.
     assert_eq!(
@@ -289,7 +290,8 @@ async fn primary_success_skips_fallback() {
     let out = translate_with_fallback(&client, &keystore, &preset, input, Some(fallback))
         .await
         .expect("primary success");
-    assert_eq!(out, "你好");
+    assert_eq!(out.text, "你好");
+    assert_eq!(out.engine, preset.id, "primary success tagged with primary id");
     assert!(
         !called.load(Ordering::SeqCst),
         "fallback must not be called when the primary succeeds"
