@@ -135,7 +135,14 @@ async fn translate_clipboard(
     app: tauri::AppHandle,
     state: tauri::State<'_, Arc<Session>>,
 ) -> Result<(), String> {
-    let text = clipboard::get_text()?;
+    // Participate in latest-wins + the selection mutex so we can't read a sentinel
+    // mid-selection-capture (which would send `__islandpot_sel_*__` to a remote
+    // provider), and so two entry points can't clobber one popup.
+    let gen = state.gen.next();
+    let text = {
+        let _g = state.gen.selection_lock();
+        clipboard::get_text()?
+    };
     if text.trim().is_empty() {
         return Err("clipboard empty".into());
     }
@@ -156,10 +163,14 @@ async fn translate_clipboard(
     };
     match service::translate_with_fallback(&state.client, &state.keystore, &preset, input, fallback).await {
         Ok(out) => {
-            let _ = popup::result(&app, &out, &preset.id);
+            if state.gen.is_latest(gen) {
+                let _ = popup::result(&app, &out, &preset.id);
+            }
         }
         Err(e) => {
-            let _ = popup::error(&app, &e.to_string());
+            if state.gen.is_latest(gen) {
+                let _ = popup::error(&app, &e.to_string());
+            }
         }
     }
     Ok(())
@@ -291,12 +302,16 @@ fn on_hotkey(app: &tauri::AppHandle, _shortcut: &tauri_plugin_global_shortcut::S
         return;
     }
 
+    // (1) latest-wins token — allocate SYNCHRONOUSLY in the handler, BEFORE spawn.
+    // Doing this inside spawn let two presses' futures start out of order so the
+    // older press could grab the newer token (rev-3 race). Allocating here, in the
+    // handler thread (which is serialized per-press), guarantees strict press order.
+    let state = app.state::<Arc<Session>>().inner().clone();
+    let gen = state.gen.next();
+
     let app2 = app.clone();
     tauri::async_runtime::spawn(async move {
         let state = app2.state::<Arc<Session>>().inner().clone();
-
-        // (1) latest-wins token — allocate FIRST, before any work.
-        let gen = state.gen.next();
 
         // (2) capture cursor position + selection under ONE selection-mutex hold,
         // BEFORE the popup steals focus. The lock must span BOTH reads in a single
@@ -420,6 +435,16 @@ pub fn run() {
         .build();
 
     tauri::Builder::default()
+        // single-instance MUST be first: the keystore lock model assumes one process
+        // (no cross-process lock is wired); a second instance would race on the same
+        // keystore file. This plugin focuses the existing instance instead of launching
+        // a second one.
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.show();
+                let _ = w.set_focus();
+            }
+        }))
         .plugin(shortcut_plugin)
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::new().build())
