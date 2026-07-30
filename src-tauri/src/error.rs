@@ -1,0 +1,42 @@
+//! Translate-error classification (spec §G).
+//!
+//! `FallbackEligible` — a transient/provider error that *may* justify falling
+//!   back to another engine (network, timeout, 429, 5xx, parse failure).
+//! `Config` — a configuration/auth problem that must send the user to Settings,
+//!   never silently fall back (missing key, 401/403, bad model, keystore fault).
+
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+pub enum Error {
+    #[error("fallback-eligible: {0}")]
+    FallbackEligible(#[from] FallbackKind),
+
+    #[error("config error: {0}")]
+    Config(#[from] ConfigKind),
+
+    #[error(transparent)]
+    Keystore(#[from] crate::keystore::KeystoreError),
+}
+
+#[derive(Debug, Error)]
+pub enum FallbackKind {
+    #[error("network error: {0}")]
+    Network(String),
+    #[error("timeout")]
+    Timeout,
+    #[error("provider returned {status}")]
+    ProviderStatus { status: u16 },
+    #[error("response parse failed: {0}")]
+    Parse(String),
+}
+
+#[derive(Debug, Error)]
+pub enum ConfigKind {
+    #[error("no API key set for provider {provider}")]
+    MissingKey { provider: String },
+    #[error("auth failed ({status}) for {provider}")]
+    AuthFailed { provider: String, status: u16 },
+    #[error("invalid model {model} for {provider}")]
+    InvalidModel { provider: String, model: String },
+}
