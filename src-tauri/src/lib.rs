@@ -16,6 +16,7 @@ pub mod concurrency;
 pub mod error;
 pub mod keystore;
 pub mod providers;
+pub mod selection_engine;
 pub mod service;
 pub mod wire;
 
