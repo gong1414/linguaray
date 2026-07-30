@@ -36,7 +36,7 @@ locked and are not re-opened here; see project memory for their provenance.
 | Gap | Decision | Rationale |
 |---|---|---|
 | **B — selection capture** | Simulate-copy (`Cmd+C`/`Ctrl+C`) + read clipboard, via `yetone/get-selected-text`. | Same as pot/Easydict; mature, high coverage. |
-| **A — key storage** | System keychain (macOS Keychain / Windows Credential Manager). | Privacy is a stated leg; plaintext would self-contradict. |
+| **A — key storage** | **Self-encrypted JSON file**; AES key derived from machine/user identity (machine-bound), no master password. | Verified cc-switch actually stores keys **plaintext** in target tools' JSON — but our privacy leg forbids plaintext. Self-encrypted with machine-bound key keeps the cc-switch-style UX (fill-key-and-use, zero friction) while beating plaintext. Accepted trade-off (user-confirmed): key + ciphertext both on-device → stronger than plaintext, but NOT resistant to a local attacker. Deemed acceptable; zero UX friction preserved. |
 | **D — trigger** | Global hotkey (configurable). NOT release-to-translate. | Release-translate needs continuous selection polling (battery, false-triggers, heavier permissions); hotkey is the pot/Easydict convention users already know. |
 | **C — popup UX** | Cursor-anchored floating, frameless popup (pot/Bob/Easydict style). | De facto standard for selection-translation; context-aware, non-occluding. |
 | **E — language model** | `from=auto` relies on each engine's own detection (mostly the LLM). No self-built detector. Target = last-used + configurable. | LLMs already auto-detect well; a custom detector is unneeded solo workload. |
@@ -69,7 +69,8 @@ locked and are not re-opened here; see project memory for their provenance.
 │  └──────┬────────┘  └───────────────┘  └──────────────┘
 │         │ key read                                     │
 │  ┌──────▼──────────────────────────────────────────┐
-│  │ keystore.rs  ─► Keychain (mac) / CredManager (win)│
+│  │ keystore.rs ─► self-encrypted JSON (machine-bound │
+│  │                AES key, no master password)       │
 │  └─────────────────────────────────────────────────┘
 └────────────────────────────────────────────────────┘
 ```
@@ -82,10 +83,12 @@ locked and are not re-opened here; see project memory for their provenance.
   engines, one file each, ported from pot JS. Phase 3.
 - **`selection.rs`** (new) — wraps `get-selected-text`; **backs up the clipboard,
   triggers the copy, reads the result, restores the clipboard**. Mandatory restore.
-- **`keystore.rs`** (new) — platform abstraction: `get_key(provider_id)` /
-  `set_key(...)`. Built on the [`keyring`](https://crates.io/crates/keyring) crate,
-  which wraps macOS Keychain and Windows Credential Manager behind one API.
-  Failure modes (permission denied, keychain locked) surface to the onboarding UI.
+- **`keystore.rs`** (new) — `get_key(provider_id)` / `set_key(...)` over a
+  **self-encrypted JSON file**. The AES key is **derived from machine/user
+  identity** (machine-bound, no master password) — zero UX friction. Cross-platform
+  identical logic (no per-OS keychain binding). File sits in the app data dir.
+  Accepted limit: key + ciphertext share the device, so this beats plaintext but
+  isn't resistant to a local attacker (user-confirmed trade-off).
 - **`translate` command** (exists) — resolves engine by id (provider first, then
   built-in), calls it, applies fallback (G) on error.
 
@@ -120,8 +123,11 @@ hotkey pressed (global-shortcut)
 ## Security & privacy
 
 - **No telemetry, ever.** Stated pillar.
-- **Keys in OS keychain**, not on disk in plaintext. Only read at call time, never
-  logged, never sent anywhere except the chosen provider's endpoint.
+- **Keys in a self-encrypted file** (machine-bound AES, no master password), not
+  plaintext on disk. Only read at call time, never logged, never sent anywhere
+  except the chosen provider's endpoint. Accepted limit: this beats plaintext but
+  is not resistant to a local attacker — the user-confirmed trade-off for zero UX
+  friction.
 - **Local-first options** (Ollama, PaddleOCR) require no key and work offline.
 - The **macOS Accessibility** permission is the one OS-level ask; it's required to
   read selection and is explicitly user-granted, scoped, revocable.
