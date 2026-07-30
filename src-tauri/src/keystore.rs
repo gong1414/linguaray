@@ -249,23 +249,44 @@ mod tests {
 use std::path::{Path, PathBuf};
 use parking_lot::Mutex;
 
-/// Owns the keystore directory + in-process lock.
+/// Owns the keystore directory + in-process lock + cross-process sidecar lock.
 ///
-/// v1 locking (deviation from spec §A, acceptable for a single-process app):
-/// only an in-process `Mutex` serializes writers. The cross-process
-/// `keystore.lock`/`fd-lock` gate from the spec is DEFERRED — it is harmless to
-/// omit because Tauri is a single process, so every concurrent writer is in-process
-/// and covered by the Mutex. (Same-user malicious processes are out of the §A
-/// threat model anyway.) To be revisited if multi-instance support is added.
+/// Per spec §A: every load-modify-store and the stale-tmp cleanup run under BOTH
+/// the in-process `Mutex` (serializes writers within this Tauri process) AND the
+/// cross-process `keystore.lock` sidecar (held via fs2 flock for the duration of the
+/// RMW). `tauri-plugin-single-instance` is defense-in-depth; it does NOT replace
+/// this sidecar — if a second instance ever starts (or an external tool touches the
+/// file), the sidecar is what serializes them.
 pub struct Keystore {
     dir: PathBuf,
     in_proc: Mutex<()>,
 }
 
+// Process-global cross-process lock: an exclusive flock on keystore.lock, held for
+// the duration of each RMW/cleanup/archive/reset. fs2's lock_exclusive(&self) works
+// on a shared File handle, so no &mut gymnastics. One keystore.lock per machine;
+// a process-global is correct (acquires block a second instance's writer).
+static XPROC_FILE: std::sync::OnceLock<std::fs::File> = std::sync::OnceLock::new();
+
 const FILE: &str = "keystore.json";
 const TMP: &str = "keystore.json.tmp";
-// Reserved for the deferred cross-process lock (spec §A). Currently unused.
+// Permanent sidecar lock file for the cross-process flock (fs2).
 const LOCK: &str = "keystore.lock";
+
+/// Hold this returned guard for the whole RMW/cleanup/archive/reset scope. On Drop
+/// it releases the exclusive flock. The 'static borrow is sound because XPROC_FILE
+/// is a process-global OnceLock.
+pub struct XprocGuard {
+    _locked: bool,
+}
+impl Drop for XprocGuard {
+    fn drop(&mut self) {
+        if let Some(f) = XPROC_FILE.get() {
+            use fs2::FileExt;
+            let _ = f.unlock();
+        }
+    }
+}
 
 impl Keystore {
     pub fn new(dir: PathBuf) -> Result<Self, KeystoreError> {
@@ -275,6 +296,15 @@ impl Keystore {
         let tmp = dir.join(TMP);
         if tmp.exists() {
             let _ = std::fs::remove_file(&tmp);
+        }
+        // Initialize the process-global cross-process lock file once.
+        if XPROC_FILE.get().is_none() {
+            let lock_file = std::fs::OpenOptions::new()
+                .create(true)
+                .read(true)
+                .write(true)
+                .open(dir.join(LOCK))?;
+            let _ = XPROC_FILE.set(lock_file);
         }
         Ok(Self { dir, in_proc: Mutex::new(()) })
     }
@@ -290,13 +320,29 @@ impl Keystore {
 
     fn file(&self) -> PathBuf { self.dir.join(FILE) }
 
+    /// Acquire the cross-process sidecar write lock. Borrow is tied to &self, so the
+    /// guard lives as long as the caller's binding — bind it for the whole
+    /// load-modify-store / cleanup / archive / reset scope. Per §A this serializes a
+    /// second instance or external tool; single-instance is only defense-in-depth.
+    /// Hold this returned guard for the whole RMW/cleanup/archive/reset scope. It
+    /// holds the fs2 exclusive flock (released on Drop).
+    fn xproc_lock(&self) -> Result<XprocGuard, KeystoreError> {
+        use fs2::FileExt;
+        let f = XPROC_FILE.get().ok_or_else(|| KeystoreError::Envelope("xproc lock not initialized".into()))?;
+        // Block until we hold the exclusive flock — serializes against a second
+        // instance / external writer on this machine.
+        f.lock_exclusive().map_err(KeystoreError::Io)?;
+        Ok(XprocGuard { _locked: true })
+    }
+
     /// Read the whole keys map. Returns `{}` if the file does not exist (first run).
     pub fn load(&self) -> Result<serde_json::Value, KeystoreError> {
-        let _g = self.in_proc.lock();
+        let _inproc = self.in_proc.lock();
+        let _xproc = self.xproc_lock()?;
         self.load_locked()
     }
 
-    /// Locked read (caller holds the in-proc lock). Used by update_keys.
+    /// Locked read (caller holds BOTH locks). Used by update_keys.
     fn load_locked(&self) -> Result<serde_json::Value, KeystoreError> {
         let path = self.file();
         if !path.exists() { return Ok(serde_json::json!({})); }
@@ -306,13 +352,14 @@ impl Keystore {
         decrypt(&env, IdentitySource::CURRENT)
     }
 
-    /// Encrypt + atomically write the keys map. Takes the in-proc lock.
+    /// Encrypt + atomically write the keys map. Takes both locks.
     pub fn store(&self, keys: &serde_json::Value) -> Result<(), KeystoreError> {
-        let _g = self.in_proc.lock();
+        let _inproc = self.in_proc.lock();
+        let _xproc = self.xproc_lock()?;
         self.store_locked(keys)
     }
 
-    /// Locked write (caller holds the in-proc lock). Used by update_keys + store.
+    /// Locked write (caller holds BOTH locks). Used by update_keys + store.
     fn store_locked(&self, keys: &serde_json::Value) -> Result<(), KeystoreError> {
         let identity = IdentitySource::CURRENT.read()?;
         let env = encrypt(&identity, IdentitySource::CURRENT, keys)?;
@@ -324,15 +371,16 @@ impl Keystore {
         Ok(())
     }
 
-    /// Atomic read-modify-write under the in-proc lock + stale-tmp cleanup.
+    /// Atomic read-modify-write under BOTH locks + stale-tmp cleanup.
     /// This is the ONLY sanctioned way to mutate the keystore — `set_key`/
     /// `delete_key` that do load() then a separate store() interleave and clobber.
     pub fn update_keys<F>(&self, mutator: F) -> Result<(), KeystoreError>
     where
         F: FnOnce(&mut serde_json::Value),
     {
-        let _g = self.in_proc.lock();
-        // stale-tmp cleanup under the lock (crash-recovery).
+        let _inproc = self.in_proc.lock();
+        let _xproc = self.xproc_lock()?;
+        // stale-tmp cleanup under BOTH locks (crash-recovery).
         let tmp = self.dir.join(TMP);
         if tmp.exists() {
             let _ = std::fs::remove_file(&tmp);
@@ -348,7 +396,8 @@ impl Keystore {
     /// Move keystore.json → keystore.json.broken-<ts> (user-initiated recovery).
     /// Per §A fail-closed: only an explicit user action does this.
     pub fn archive(&self) -> Result<std::path::PathBuf, KeystoreError> {
-        let _g = self.in_proc.lock();
+        let _inproc = self.in_proc.lock();
+        let _xproc = self.xproc_lock()?;
         let src = self.file();
         if !src.exists() {
             return Err(KeystoreError::Envelope("no keystore to archive".into()));
@@ -364,7 +413,8 @@ impl Keystore {
 
     /// Delete the keystore entirely (fresh start). User-initiated.
     pub fn reset(&self) -> Result<(), KeystoreError> {
-        let _g = self.in_proc.lock();
+        let _inproc = self.in_proc.lock();
+        let _xproc = self.xproc_lock()?;
         let _ = std::fs::remove_file(self.file());
         let _ = std::fs::remove_file(self.dir.join(TMP));
         Ok(())
