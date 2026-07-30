@@ -49,22 +49,30 @@ pnpm tauri build    # production bundle
 ## Project layout
 
 ```
-src/                 # SolidJS frontend (the translation popup / settings UI)
+src/                 # SolidJS frontend (popup, settings/provider mgmt, onboarding)
 src-tauri/src/
-  lib.rs             # translate contract + Tauri commands (translate, list_engines)
-  providers.rs       # AI preset catalog (the core differentiator) + unified caller
+  lib.rs             # translate contract + Tauri commands
+  providers.rs       # AI provider catalog (the core differentiator) — pure protocol caller
   engines/mod.rs     # built-in traditional MT engines (Phase 3: port from pot .potext)
+  (planned) keystore.rs   # self-encrypted JSON, machine-bound AES-256-GCM
+  (planned) selection.rs  # hybrid selection capture (§B)
 ```
+
+v1 scope = **selection/input/clipboard translation + provider catalog + keystore**.
+OCR (PaddleOCR), TTS, and external invocation are v1.x — see the design spec.
 
 ## Roadmap (solo, ~1hr/day, must-ship)
 
+**v1 — translation core:**
 - **Phase 0 — foundation** ✅ Tauri 2 + SolidJS scaffold, translate contract wired
-- **Phase 1 — unified pipeline + AI preset catalog** (the headline feature)
-- **Phase 2 — input/clipboard UI + popup polish**
-- **Phase 3 — built-in traditional engines** (port from pot's `.potext` JS) + system dict
-- **Phase 4 — PaddleOCR screenshot translate**
-- **Phase 5 — TTS + external invocation**
-- **Phase 6 — cross-platform parity + packaging, then open-source**
+- **Phase 1 — AI provider catalog + keystore + unified pipeline** (the headline feature)
+- **Phase 2 — selection/input/clipboard translate + cursor-anchored popup**
+- **Phase 3 — built-in traditional engines** (port from pot's `.potext` JS) + system dict + fallback chain
+- **Phase 4 — cross-platform parity + packaging, first usable cut**
+
+**v1.x (before public open-source release):**
+- PaddleOCR screenshot/OCR translate · TTS · external invocation
+- polish, then open-source.
 
 ## License
 
