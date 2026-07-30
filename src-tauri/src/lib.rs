@@ -490,9 +490,13 @@ pub fn run() {
                 providers::validate_endpoint(&p.endpoint)
                     .expect("preset endpoint failed scheme validation");
             }
-            // Spec §Privacy: no cross-origin redirects.
+            // Spec §Privacy: no cross-origin redirects. Review P1 #7: a 30s total
+            // request timeout so a hung connection can't freeze translate + the
+            // popup indefinitely; lets wire::call classify a real Timeout.
             let client = reqwest::Client::builder()
                 .redirect(reqwest::redirect::Policy::none())
+                .timeout(std::time::Duration::from_secs(30))
+                .connect_timeout(std::time::Duration::from_secs(10))
                 .build()
                 .expect("client");
             app.manage(Arc::new(Session {

@@ -97,7 +97,15 @@ pub async fn call(
                 .send().await
         }
     };
-    let resp = resp.map_err(|e| Error::FallbackEligible(FallbackKind::Network(e.to_string())))?;
+    let resp = resp.map_err(|e| {
+        // §G: distinguish timeout (own variant) from generic network errors so the
+        // fallback path + UI can report it precisely. Both stay FallbackEligible.
+        if e.is_timeout() {
+            Error::FallbackEligible(FallbackKind::Timeout)
+        } else {
+            Error::FallbackEligible(FallbackKind::Network(e.to_string()))
+        }
+    })?;
     let status = resp.status().as_u16();
     if status == 401 || status == 403 {
         return Err(Error::Config(ConfigKind::AuthFailed { provider: preset.id.clone(), status }));
