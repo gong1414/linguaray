@@ -132,6 +132,22 @@ fn key_status(
     Ok(map)
 }
 
+#[tauri::command]
+fn get_settings(app: tauri::AppHandle) -> settings::Settings {
+    settings::load(&app)
+}
+
+#[tauri::command]
+fn set_setting(app: tauri::AppHandle, key: String, value: String) -> Result<(), String> {
+    let mut s = settings::load(&app);
+    match key.as_str() {
+        "default_provider" => s.default_provider = value,
+        "target_language" => s.target_language = value,
+        _ => return Err(format!("unknown setting: {key}")),
+    }
+    settings::save(&app, &s)
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct EngineInfo {
     pub id: String,
@@ -211,16 +227,24 @@ fn on_hotkey(app: &tauri::AppHandle, _shortcut: &tauri_plugin_global_shortcut::S
         // (4) show loading popup at the cursor.
         let _ = popup::show_at(&app2, x, y);
 
-        // (5) translate via the Phase-1 service. Default provider is "openai"
-        //     for now; the real default-choice UX is Phase 2b.
-        let preset = providers::presets()
-            .into_iter()
-            .find(|p| p.id == "openai")
-            .expect("default preset \"openai\" must exist in providers::presets");
+        // (5) translate via the Phase-1 service. Default provider and target
+        //     language come from settings (Phase 2b); fall back to a provider-
+        //     not-found error popup instead of panicking.
+        let s = settings::load(&app2);
+        let preset = match providers::presets().into_iter().find(|p| p.id == s.default_provider) {
+            Some(p) => p,
+            None => {
+                let _ = popup::error(
+                    &app2,
+                    &format!("default provider '{}' not found", s.default_provider),
+                );
+                return;
+            }
+        };
         let input = service::TranslateInput {
             text: &text,
             from: "auto",
-            to: "zh",
+            to: &s.target_language,
             options: wire::AppOptions::default(),
         };
         match service::translate(&state.client, &state.keystore, &preset, input).await {
@@ -280,7 +304,9 @@ pub fn run() {
             list_engines,
             set_key,
             delete_key,
-            key_status
+            key_status,
+            get_settings,
+            set_setting
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
