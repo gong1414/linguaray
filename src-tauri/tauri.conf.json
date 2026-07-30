@@ -15,6 +15,20 @@
         "title": "islandpot",
         "width": 800,
         "height": 600
+      },
+      {
+        "label": "popup",
+        "title": "",
+        "url": "popup.html",
+        "width": 360,
+        "height": 180,
+        "decorations": false,
+        "transparent": true,
+        "visible": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "focus": true
       }
     ],
     "security": {
