@@ -142,6 +142,13 @@ pub fn run() {
                 .app_local_data_dir()
                 .expect("app_local_data_dir");
             let keystore = keystore::Keystore::new(dir).expect("keystore init");
+            // Spec §Privacy: every preset endpoint must be HTTPS (loopback HTTP
+            // allowed for local engines like Ollama). Reject at config-load so an
+            // invalid/leaked preset never ships a request.
+            for p in providers::presets() {
+                providers::validate_endpoint(&p.endpoint)
+                    .expect("preset endpoint failed scheme validation");
+            }
             // Spec §Privacy: no cross-origin redirects.
             let client = reqwest::Client::builder()
                 .redirect(reqwest::redirect::Policy::none())

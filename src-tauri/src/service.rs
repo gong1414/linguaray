@@ -19,14 +19,19 @@ pub async fn translate(
     preset: &ProviderPreset,
     input: TranslateInput<'_>,
 ) -> Result<String, Error> {
+    // Spec §A "Plaintext-key claims": keep the key in memory only for the shortest
+    // window between keystore-read and HTTP-send, and zeroize it after use.
+    // Zeroizing<String> wipes the heap buffer on drop.
     let key = if preset.needs_key {
         let keys = keystore.load().map_err(Error::Keystore)?;
-        keys.get(&preset.id)
+        let k = keys
+            .get(&preset.id)
             .and_then(|v| v.as_str())
             .map(|s| s.to_string())
-            .ok_or_else(|| Error::Config(ConfigKind::MissingKey { provider: preset.id.clone() }))?
+            .ok_or_else(|| Error::Config(ConfigKind::MissingKey { provider: preset.id.clone() }))?;
+        zeroize::Zeroizing::new(k)
     } else {
-        String::new()
+        zeroize::Zeroizing::new(String::new())
     };
     let (system, user) = build_prompt(input.text, input.from, input.to, &input.options);
     let params = WireParams {

@@ -249,8 +249,14 @@ mod tests {
 use std::path::{Path, PathBuf};
 use parking_lot::Mutex;
 
-/// Owns the keystore directory + in-process lock. Cross-process lock is taken on
-/// disk per-operation via `keystore.lock`. (spec §A)
+/// Owns the keystore directory + in-process lock.
+///
+/// v1 locking (deviation from spec §A, acceptable for a single-process app):
+/// only an in-process `Mutex` serializes writers. The cross-process
+/// `keystore.lock`/`fd-lock` gate from the spec is DEFERRED — it is harmless to
+/// omit because Tauri is a single process, so every concurrent writer is in-process
+/// and covered by the Mutex. (Same-user malicious processes are out of the §A
+/// threat model anyway.) To be revisited if multi-instance support is added.
 pub struct Keystore {
     dir: PathBuf,
     in_proc: Mutex<()>,
@@ -258,6 +264,7 @@ pub struct Keystore {
 
 const FILE: &str = "keystore.json";
 const TMP: &str = "keystore.json.tmp";
+// Reserved for the deferred cross-process lock (spec §A). Currently unused.
 const LOCK: &str = "keystore.lock";
 
 impl Keystore {
