@@ -61,7 +61,7 @@ pub fn restore_snapshot(
         NSBitmapImageRep, NSPasteboard, NSPasteboardItem,
         NSPasteboardTypeString, NSPasteboardTypeTIFF,
     };
-    use objc2_foundation::{NSArray, NSData, NSString};
+    use objc2_foundation::{NSArray, NSString};
     use objc2::rc::Retained;
     use objc2::AnyThread;
 
@@ -165,13 +165,9 @@ pub fn restore_snapshot(
 /// included). macOS: NSPasteboard.changeCount; Windows: GetClipboardSequenceNumber.
 #[cfg(target_os = "macos")]
 pub fn sequence() -> u64 {
-    use objc::runtime::Object;
-    use objc::{class, msg_send, sel, sel_impl};
-    unsafe {
-        let pb: *mut Object = msg_send![class!(NSPasteboard), generalPasteboard];
-        let count: isize = msg_send![pb, changeCount];
-        count as u64
-    }
+    use objc2_app_kit::NSPasteboard;
+    let pb = NSPasteboard::generalPasteboard();
+    pb.changeCount() as u64
 }
 
 #[cfg(target_os = "windows")]
