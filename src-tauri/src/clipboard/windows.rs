@@ -86,14 +86,12 @@ fn alloc_global<M: GlobalMemOps>(m: &mut M, bytes: &[u8]) -> Result<Handle, Stri
     Ok(Handle(raw))
 }
 
-/// The Win32 clipboard adapter. Stores the owner HWND (resolved in the callchain,
-/// milestone 3); `open` passes it to `OpenClipboard`.
-#[allow(dead_code)] // wired in milestone 3
+/// The Win32 clipboard adapter. Stores the owner HWND (resolved in the callchain);
+/// `open` passes it to `OpenClipboard`.
 pub(super) struct Win32ClipOps {
     owner: windows_sys::Win32::Foundation::HWND,
 }
 
-#[allow(dead_code)] // wired in milestone 3
 impl Win32ClipOps {
     pub(super) fn new(owner: windows_sys::Win32::Foundation::HWND) -> Self {
         Win32ClipOps { owner }
@@ -162,7 +160,6 @@ impl ClipOps for Win32ClipOps {
 ///
 /// Order matters (the FSM is format-agnostic, so a swap would slip through without the
 /// `build_blobs` cardinality tests). Checked conversions mirror the macOS preflight.
-#[allow(dead_code)] // wired in milestone 3
 fn build_blobs(
     text: Option<&str>,
     image: Option<&ImageBlob>,
@@ -257,6 +254,23 @@ fn build_blobs(
     }
 
     Ok(out)
+}
+
+/// Public Windows compound-clipboard restore. NON-generic: builds the format list
+/// (0/1/2 entries), constructs the real `Win32ClipOps` adapter (storing `owner`), and
+/// runs the platform-neutral `restore_with` FSM. Re-exported from `clipboard/mod.rs`
+/// so callers use the uniform `clipboard::restore_snapshot` path. The `owner` HWND
+/// (`crate::selection::OwnerHwnd`) must belong to a thread running a message loop (the
+/// app reuses the Tauri main window's HWND; a clipboard owner receives
+/// `WM_DESTROYCLIPBOARD` even with eager rendering).
+pub fn restore_snapshot(
+    owner: crate::selection::OwnerHwnd,
+    text: Option<&str>,
+    image: Option<&crate::selection_engine::ImageBlob>,
+) -> Result<(), String> {
+    let formats = build_blobs(text, image)?;
+    let mut ops = Win32ClipOps::new(owner);
+    super::fsm::restore_with(&mut ops, &formats).map_err(|e| e.to_string())
 }
 
 #[cfg(test)]

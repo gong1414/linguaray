@@ -18,6 +18,12 @@ mod fsm;
 #[cfg(target_os = "windows")]
 mod windows;
 
+// Windows: the public compound `restore_snapshot` lives in windows.rs and is re-exported
+// here so callers use the uniform `clipboard::restore_snapshot` path. Each target has
+// exactly ONE definition (macOS above, Windows here, other below). (Phase 4 Task 2b M3.)
+#[cfg(target_os = "windows")]
+pub use windows::restore_snapshot;
+
 // arboard::Clipboard is not safe to share raw across threads; guard it.
 static CLIP: Mutex<Option<arboard::Clipboard>> = Mutex::new(None);
 
@@ -234,21 +240,19 @@ fn restore_compound_to(
     Ok(())
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 pub fn restore_snapshot(
     text: Option<&str>,
     image: Option<&crate::selection_engine::ImageBlob>,
 ) -> std::result::Result<(), String> {
-    // Non-macOS (this cfg-arm covers Windows AND any unsupported target). Windows
-    // gets its own compound impl in Phase 4 Task 2b (Win32 OpenClipboard/
-    // EmptyClipboard + SetClipboardData for CF_UNICODETEXT + CF_DIBV5). Until that
-    // task lands, Windows falls through to THIS sequential-arboard path, which
-    // loses one flavor when both text+image are present (documented limitation).
+    // Non-macOS non-Windows (unsupported targets only). Windows gets its own compound
+    // impl via `windows.rs::restore_snapshot` (re-exported below); macOS is the cfg-arm
+    // above. This sequential-arboard path loses one flavor when both text+image are
+    // present (documented limitation; no supported target hits this).
     let mut g = clip()?;
     let c = g.as_mut().unwrap();
     // (None, None): original clipboard was empty/unsupported — clear to remove the
-    // §B sentinel (round-11 review P1 #1). Task 2b's Windows FSM models this as the
-    // zero-format case (OpenClipboard → EmptyClipboard → CloseClipboard).
+    // §B sentinel (round-11 review P1 #1).
     if text.is_none() && image.is_none() {
         return c.clear().map_err(|e| e.to_string());
     }

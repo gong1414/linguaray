@@ -242,7 +242,15 @@ fn ax_first_short_circuits_copy_fallback() {
     // must return it directly and NOT touch the clipboard (no copy path).
     use linguaray_lib::selection::capture_selection_with_ax;
     use linguaray_lib::selection_engine::Capture;
-    let res = capture_selection_with_ax(|| Some("ax-text".into()), 1).unwrap();
+    // The owner value is cfg'd (Phase 4 Task 2b M3): capture_selection_with_ax takes a
+    // third `owner: OwnerHwnd` arg on ALL targets (raw HWND on Windows, () elsewhere).
+    // The AX-Some path short-circuits before the owner is used, so null_mut is safe on
+    // Windows — restore_snapshot is never reached.
+    #[cfg(target_os = "windows")]
+    let owner: linguaray_lib::selection::OwnerHwnd = std::ptr::null_mut();
+    #[cfg(not(target_os = "windows"))]
+    let owner: linguaray_lib::selection::OwnerHwnd = ();
+    let res = capture_selection_with_ax(|| Some("ax-text".into()), 1, owner).unwrap();
     assert!(matches!(res, Capture::Selected(t) if t == "ax-text"));
 }
 
