@@ -7,11 +7,16 @@
 //! `#[cfg(windows)]`, milestone 2).
 use std::sync::Mutex;
 
-// Milestone 1 (Task 2b): the FSM is complete + tested, but no caller wires it yet —
-// `windows.rs` (M2) impls `ClipOps` and calls `restore_with`. `#[allow(dead_code)]` is
-// scoped here and removed once M2 consumes these items.
+// The FSM is ALWAYS COMPILED (platform-neutral — its fake tests run on macOS dev + CI
+// + Windows). The Windows adapter (`windows.rs`) impls `ClipOps` and consumes it; that
+// module is cfg(windows). On non-Windows the FSM has no non-test caller yet (the public
+// restore_snapshot wrapper + HWND callchain land in milestone 3), so allow dead_code
+// there. Removed in milestone 3 once the macOS path also routes through it (if it does).
 #[allow(dead_code)]
 mod fsm;
+
+#[cfg(target_os = "windows")]
+mod windows;
 
 // arboard::Clipboard is not safe to share raw across threads; guard it.
 static CLIP: Mutex<Option<arboard::Clipboard>> = Mutex::new(None);
