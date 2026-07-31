@@ -176,30 +176,45 @@ fn read_unicode_text() -> Option<String> {
         if h.is_null() {
             return None;
         }
-        let (ptr, _size) = LockedClipData::lock(h)?; // _locked dropped (unlock) before _clip
+        // Lock + bound by GlobalSize. The lock is held for the ENTIRE read: we build an
+        // OWNED String (which copies the bytes) BEFORE unlocking. Unlocking a GMEM_MOVEABLE
+        // object and then reading its pointer is a use-after-unlock (the object may move).
+        // (Round-14 review P1 #2.) Construct the unlock-guard ONLY after a successful lock
+        // (otherwise its Drop would GlobalUnlock a never-locked handle).
+        let (ptr, size) = LockedClipData::lock(h)?;
         let _locked = LockedClipData { handle: h };
-        // Read until a NUL u16 (UTF-16 code unit). ptr is *const u8; step by u16.
+        // size is in BYTES (GlobalSize). UTF-16 = 2 bytes/code unit. Odd size / <2 = malformed.
+        if size < 2 || size % 2 != 0 {
+            return None;
+        }
+        let max_u16 = size / 2;
         let u16ptr = ptr as *const u16;
+        // Bounded NUL scan: stop at the first NUL u16 OR at max_u16 (no unbounded walk).
+        // SAFETY: reads ≤ max_u16 u16s within the GlobalSize'd buffer.
         let mut len = 0usize;
-        // SAFETY: u16ptr points to the locked CF_UNICODETEXT buffer; reading sequentially
-        // until a 0 u16 (the NUL terminator). The buffer is GlobalSize'd so the read stays
-        // in bounds (a well-formed CF_UNICODETEXT blob is NUL-terminated).
-        while *u16ptr.add(len) != 0 {
+        while len < max_u16 && *u16ptr.add(len) != 0 {
             len += 1;
         }
         let slice = std::slice::from_raw_parts(u16ptr, len);
-        drop(_locked); // unlock BEFORE _clip (CloseClipboard) drops
-        Some(String::from_utf16_lossy(slice))
+        let s = String::from_utf16_lossy(slice); // OWNED copy — built while locked
+        drop(_locked); // unlock the moveable object AFTER the copy is owned
+        Some(s)
     }
 }
 
 /// Read CF_DIBV5: returns (header bytes, pixel bytes) from the real clipboard. Used for
 /// the full pixel round-trip (P2 #6): assert header + the 4 BGRA pixels after the system
 /// clipboard round-trip.
+///
+/// Pixel length comes from the header's `bV5SizeImage` (NOT GlobalSize — that may exceed
+/// the requested allocation per MS docs; round-14 review P2 #3). GlobalSize is only an
+/// upper bound: we verify header + bV5SizeImage fits within it. Copies are built WHILE
+/// locked (owned Vecs), then the object is unlocked (use-after-unlock would be UB).
 fn read_dibv5() -> Option<(Vec<u8>, Vec<u8>)> {
+    use windows_sys::Win32::Graphics::Gdi::BITMAPV5HEADER;
     use windows_sys::Win32::System::DataExchange::{CloseClipboard, GetClipboardData, OpenClipboard};
     use windows_sys::Win32::System::Ole::CF_DIBV5;
-    const HDR_SIZE: usize = std::mem::size_of::<windows_sys::Win32::Graphics::Gdi::BITMAPV5HEADER>();
+    const HDR_SIZE: usize = std::mem::size_of::<BITMAPV5HEADER>();
     unsafe {
         if OpenClipboard(std::ptr::null_mut()) == 0 {
             return None;
@@ -216,16 +231,29 @@ fn read_dibv5() -> Option<(Vec<u8>, Vec<u8>)> {
         if h.is_null() {
             return None;
         }
+        // Lock for the entire read; build OWNED copies before unlocking. Construct the
+        // unlock-guard ONLY after a successful lock.
         let (ptr, size) = LockedClipData::lock(h)?;
         let _locked = LockedClipData { handle: h };
         if size < HDR_SIZE {
-            drop(_locked);
             return None;
         }
-        // Header + pixel bytes (the blob is header followed by pixel data; total = size).
+        // Parse the header via read_unaligned (ptr is u8-aligned from GlobalLock; the struct
+        // may need stricter alignment — round-14 P2 #5).
+        let hdr: BITMAPV5HEADER = std::ptr::read_unaligned(ptr as *const BITMAPV5HEADER);
+        if hdr.bV5Size as usize != HDR_SIZE {
+            return None;
+        }
+        // bV5SizeImage = exact pixel byte count. GlobalSize is only an upper bound; verify
+        // header + pixels fits within it (don't treat GlobalSize-HDR as the pixel length).
+        let pixel_bytes = usize::try_from(hdr.bV5SizeImage).ok()?;
+        if HDR_SIZE.checked_add(pixel_bytes)? > size {
+            return None; // claimed pixels exceed the allocation — malformed
+        }
+        // Build owned copies WHILE locked.
         let header = std::slice::from_raw_parts(ptr, HDR_SIZE).to_vec();
-        let pixels = std::slice::from_raw_parts(ptr.add(HDR_SIZE), size - HDR_SIZE).to_vec();
-        drop(_locked); // unlock BEFORE _clip (CloseClipboard) drops
+        let pixels = std::slice::from_raw_parts(ptr.add(HDR_SIZE), pixel_bytes).to_vec();
+        drop(_locked); // unlock the moveable object AFTER copies are owned
         Some((header, pixels))
     }
 }

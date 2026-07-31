@@ -53,25 +53,37 @@ impl GlobalMemOps for RealGlobalMem {
     }
     unsafe fn unlock(&mut self, h: *mut core::ffi::c_void) -> Result<(), String> {
         use windows_sys::Win32::Foundation::{GetLastError, SetLastError, NO_ERROR};
-        // GlobalUnlock's return is ambiguous: 0 may mean "unlocked (success)" OR "failed".
-        // Disambiguate by setting a sentinel last-error and checking it: NO_ERROR ⇒ the
-        // 0 meant a successful final unlock; anything else ⇒ failure. (Round-14 P1 #2.)
+        // GlobalUnlock's return is ambiguous; the only SUCCESS is the final-unlock case
+        // (return 0 + GetLastError==NO_ERROR). A nonzero return means the object is STILL
+        // LOCKED — for our single-lock/single-unlock usage that's a contract violation
+        // (the trait promises a final unlock), and passing a still-locked handle to
+        // SetClipboardData would be wrong → Err. (Round-14 review P1 #1.)
         // SAFETY: h is a valid HGLOBAL from GlobalAlloc+GlobalLock.
         unsafe {
             SetLastError(NO_ERROR);
             let r = windows_sys::Win32::System::Memory::GlobalUnlock(h);
-            if r != 0 {
-                return Ok(()); // still locked (lock count > 0) — can't happen for us, but ok
-            }
-            if GetLastError() == NO_ERROR {
-                Ok(()) // final unlock succeeded
-            } else {
-                Err("GlobalUnlock failed (GetLastError != NO_ERROR)".to_string())
-            }
+            classify_unlock_result(r, GetLastError())
         }
     }
     unsafe fn free(&mut self, h: *mut core::ffi::c_void) {
         unsafe { windows_sys::Win32::Foundation::GlobalFree(h) };
+    }
+}
+
+/// Pure classification of a `GlobalUnlock` outcome (round-14 review P1 #1). Per MS docs,
+/// the only SUCCESS is return 0 + GetLastError==NO_ERROR (final unlock). A nonzero return
+/// means the object is STILL LOCKED (contract violation for our single-lock/single-unlock
+/// usage; the trait promises a final unlock, and a still-locked handle is invalid for
+/// SetClipboardData). A 0 return with a nonzero last-error is a failure. Pure so all
+/// three combinations are unit-tested without FFI.
+fn classify_unlock_result(retval: i32, last_error: u32) -> Result<(), String> {
+    use windows_sys::Win32::Foundation::NO_ERROR;
+    if retval != 0 {
+        Err("GlobalUnlock returned nonzero (object still locked)".to_string())
+    } else if last_error == NO_ERROR {
+        Ok(())
+    } else {
+        Err(format!("GlobalUnlock failed (GetLastError={last_error})"))
     }
 }
 
@@ -344,6 +356,21 @@ mod tests {
     //! fake can't reach into the adapter's internals). The real Windows clipboard
     //! integration test lands in milestone 3.
     use super::*;
+
+    #[test]
+    fn classify_unlock_result_all_three_combinations() {
+        // Round-14 review P1 #1: only (0, NO_ERROR) is success. Pure fn, all 3 cases.
+        use windows_sys::Win32::Foundation::NO_ERROR;
+        // 0 + NO_ERROR ⇒ final unlock succeeded.
+        assert!(classify_unlock_result(0, NO_ERROR).is_ok());
+        // 0 + nonzero error ⇒ failure.
+        assert!(classify_unlock_result(0, 5).is_err()); // ERROR_ACCESS_DENIED (arbitrary nonzero)
+        // nonzero ⇒ still locked ⇒ failure (NOT success).
+        assert!(
+            classify_unlock_result(1, NO_ERROR).is_err(),
+            "nonzero return means still-locked — must be Err"
+        );
+    }
 
     #[test]
     fn build_blobs_empty_is_zero_entries() {
