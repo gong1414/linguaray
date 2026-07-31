@@ -1,4 +1,4 @@
-use islandpot_lib::selection_engine::{capture, Capture, ClipboardLike};
+use linguaray_lib::selection_engine::{capture, Capture, ClipboardLike};
 use std::cell::RefCell;
 
 struct Fake {
@@ -128,12 +128,12 @@ impl ClipboardLike for FakeImg {
         self.bump();
         Ok(())
     }
-    fn get_image(&self) -> Result<Option<islandpot_lib::selection_engine::ImageBlob>, String> {
-        Ok(self.image.borrow().as_ref().map(|b| islandpot_lib::selection_engine::ImageBlob {
+    fn get_image(&self) -> Result<Option<linguaray_lib::selection_engine::ImageBlob>, String> {
+        Ok(self.image.borrow().as_ref().map(|b| linguaray_lib::selection_engine::ImageBlob {
             width: b.0, height: b.1, bytes: b.2.clone(),
         }))
     }
-    fn set_image(&self, img: &islandpot_lib::selection_engine::ImageBlob) -> Result<(), String> {
+    fn set_image(&self, img: &linguaray_lib::selection_engine::ImageBlob) -> Result<(), String> {
         *self.image.borrow_mut() = Some((img.width, img.height, img.bytes.clone()));
         // Mirrors real arboard: each setter clears the other flavor.
         *self.text.borrow_mut() = String::new();
@@ -145,7 +145,7 @@ impl ClipboardLike for FakeImg {
     fn restore_snapshot(
         &self,
         text: Option<&str>,
-        image: Option<&islandpot_lib::selection_engine::ImageBlob>,
+        image: Option<&linguaray_lib::selection_engine::ImageBlob>,
     ) -> Result<(), String> {
         // Single clear, then set BOTH (no per-set clearing here).
         *self.text.borrow_mut() = String::new();
@@ -224,9 +224,9 @@ fn empty_original_clipboard_noselection_clears_sentinel() {
     let res = capture(&f, || { Ok(()) }, 50).unwrap(); // copy does nothing → NoSelection
     assert!(matches!(res, Capture::NoSelection), "nothing selected");
     // The Fake's restore_snapshot(None,None) clears BOTH fields. If restore had been a
-    // no-op (the bug), the sentinel "__islandpot_sel_*__" would still be in `text`.
+    // no-op (the bug), the sentinel "__linguaray_sel_*__" would still be in `text`.
     assert!(
-        !f.text.borrow().contains("__islandpot_sel_"),
+        !f.text.borrow().contains("__linguaray_sel_"),
         "sentinel must be cleared on empty-original restore (got {:?})",
         f.text.borrow()
     );
@@ -240,8 +240,8 @@ fn empty_original_clipboard_noselection_clears_sentinel() {
 fn ax_first_short_circuits_copy_fallback() {
     // When the injected AX reader returns Some(text), capture_selection_with_ax
     // must return it directly and NOT touch the clipboard (no copy path).
-    use islandpot_lib::selection::capture_selection_with_ax;
-    use islandpot_lib::selection_engine::Capture;
+    use linguaray_lib::selection::capture_selection_with_ax;
+    use linguaray_lib::selection_engine::Capture;
     let res = capture_selection_with_ax(|| Some("ax-text".into()), 1).unwrap();
     assert!(matches!(res, Capture::Selected(t) if t == "ax-text"));
 }

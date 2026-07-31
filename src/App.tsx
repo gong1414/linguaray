@@ -85,7 +85,7 @@ function App() {
 
   return (
     <main class="container">
-      <h1>IslandPot</h1>
+      <h1>LinguaRay</h1>
       <Show when={!a11yOk()}>
         <div class="error" style={{ "margin-bottom": "0.5rem" }}>
           Accessibility permission needed to read your selection. Grant it in System

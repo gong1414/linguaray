@@ -106,8 +106,8 @@ use base64::{engine::general_purpose::STANDARD as B64, Engine};
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
 
-const DOMAIN_SEPARATOR: &[u8] = b"islandpot-keystore-v1\0";
-const FIXED_AAD: &[u8] = b"islandpot-keystore-envelope-v1";
+const DOMAIN_SEPARATOR: &[u8] = b"linguaray-keystore-v1\0";
+const FIXED_AAD: &[u8] = b"linguaray-keystore-envelope-v1";
 const SALT_LEN: usize = 16;
 const NONCE_LEN: usize = 12;
 const VERSION: u64 = 1;

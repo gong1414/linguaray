@@ -1,5 +1,5 @@
-use islandpot_lib::wire::{call, ApiKind, WireParams, build_prompt};
-use islandpot_lib::providers::ProviderPreset;
+use linguaray_lib::wire::{call, ApiKind, WireParams, build_prompt};
+use linguaray_lib::providers::ProviderPreset;
 use wiremock::{MockServer, Mock, ResponseTemplate};
 use serde_json::json;
 
@@ -35,7 +35,7 @@ async fn http_401_is_config_error() {
     let (sys, usr) = build_prompt("hi", "en", "zh", &Default::default());
     let params = WireParams { model: "m".into(), temperature: None, max_tokens: None, stream: false };
     let err = call(&client, &p, "bad", &params, &sys, &usr).await.unwrap_err();
-    assert!(matches!(err, islandpot_lib::error::Error::Config(_)));
+    assert!(matches!(err, linguaray_lib::error::Error::Config(_)));
 }
 
 #[tokio::test]
@@ -49,7 +49,7 @@ async fn http_429_is_fallback_eligible() {
     let (sys, usr) = build_prompt("hi", "en", "zh", &Default::default());
     let params = WireParams { model: "m".into(), temperature: None, max_tokens: None, stream: false };
     let err = call(&client, &p, "k", &params, &sys, &usr).await.unwrap_err();
-    assert!(matches!(err, islandpot_lib::error::Error::FallbackEligible(_)));
+    assert!(matches!(err, linguaray_lib::error::Error::FallbackEligible(_)));
 }
 
 #[tokio::test]
@@ -67,7 +67,7 @@ async fn http_404_is_config_not_fallback() {
     let params = WireParams { model: "m".into(), temperature: None, max_tokens: None, stream: false };
     let err = call(&client, &p, "k", &params, &sys, &usr).await.unwrap_err();
     match err {
-        islandpot_lib::error::Error::Config(_) => { /* correct */ }
+        linguaray_lib::error::Error::Config(_) => { /* correct */ }
         other => panic!("expected Config, got {:?}", other),
     }
 }

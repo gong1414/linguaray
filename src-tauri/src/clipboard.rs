@@ -415,12 +415,12 @@ mod tests {
         let pb = NSPasteboard::pasteboardWithUniqueName();
         // Seed the pasteboard with a §B sentinel (what capture writes).
         pb.clearContents();
-        let sentinel = NSString::from_str("__islandpot_sel_test__");
+        let sentinel = NSString::from_str("__linguaray_sel_test__");
         pb.setString_forType(&sentinel, unsafe { NSPasteboardTypeString });
         // Confirm it's there before the restore.
         let before = pb.stringForType(unsafe { NSPasteboardTypeString })
             .expect("sentinel readable before restore");
-        assert_eq!(before.to_string(), "__islandpot_sel_test__");
+        assert_eq!(before.to_string(), "__linguaray_sel_test__");
 
         // The production (None,None) path:
         super::restore_empty_to(&pb).expect("restore_empty_to should succeed");
@@ -431,7 +431,7 @@ mod tests {
         let after = pb.stringForType(unsafe { NSPasteboardTypeString });
         match after {
             Some(s) => assert!(
-                s.to_string() != "__islandpot_sel_test__",
+                s.to_string() != "__linguaray_sel_test__",
                 "sentinel must be removed by restore_empty_to (still got {:?})",
                 s.to_string()
             ),
