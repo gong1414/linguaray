@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-translate-default"
+description = "Enables the translate_default command without any pre-configured scope."
+commands.allow = ["translate_default"]
+
+[[permission]]
+identifier = "deny-translate-default"
+description = "Denies the translate_default command without any pre-configured scope."
+commands.deny = ["translate_default"]
