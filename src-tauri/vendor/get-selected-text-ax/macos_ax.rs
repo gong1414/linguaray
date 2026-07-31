@@ -1,5 +1,6 @@
-//! Vendored AX-only selection read, adapted from yetone/get-selected-text (MIT OR
-//! Apache-2.0; see LICENSE-MIT / LICENSE-APACHE in this directory).
+//! Vendored AX-only selection read, adapted from yetone/get-selected-text (MIT;
+//! see LICENSE-MIT in this directory). Source: yetone/get-selected-text v0.1.6,
+//! macos.rs get_selected_text_by_ax function.
 #![allow(clippy::doc_lazy_continuation)]
 //!
 //! IMPORTANT: this is the AX DIRECT-READ ONLY. The upstream `get_selected_text()`

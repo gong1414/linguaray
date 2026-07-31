@@ -3,11 +3,11 @@
 //! simulate-copy path in `selection.rs` when the read returns nothing.
 //!
 //! Per the approved spec §B decision ("vendor `get-selected-text`, reject self-
-//! impl"), the selection read uses the `get-selected-text` crate (yetone/get-
-//! selected-text, MIT OR Apache-2.0) rather than raw AXUIElement FFI. That crate
-//! implements the macOS A11y-first + copy-fallback logic the spec mandates; we
-//! only call its read here and do our own sentinel-restore copy-fallback (so we
-//! control the clipboard-restore semantics §B requires).
+//! impl"), the AX read is vendored from yetone/get-selected-text (MIT, see
+//! vendor/get-selected-text-ax/LICENSE-MIT). The vendored module exposes ONLY the
+//! AX direct-read; the upstream's AppleScript copy-fallback is deliberately
+//! excluded — §B's copy-fallback (with sentinel state machine + clipboard restore)
+//! lives in selection.rs, which we own.
 //!
 //! `enabled()` (AXIsProcessTrusted) is kept for the onboarding banner — it tells
 //! the user WHY capture may be failing before they hit the copy-fallback.
