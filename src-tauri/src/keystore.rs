@@ -271,11 +271,11 @@ impl Keystore {
     pub fn new(dir: PathBuf) -> Result<Self, KeystoreError> {
         std::fs::create_dir_all(&dir)?;
         Self::set_dir_perms(&dir)?;
-        // Clean any stale .tmp from a previous crash (spec §A stale-tmp handling).
-        let tmp = dir.join(TMP);
-        if tmp.exists() {
-            let _ = std::fs::remove_file(&tmp);
-        }
+        // Round-2 review P1 #3: do NOT delete a stale .tmp here — this runs BEFORE
+        // the cross-process lock, so a second instance could remove a tmp the first
+        // is actively writing. Stale-tmp cleanup happens UNDER the lock, inside
+        // every write path (update_keys) — see with_locks/​update_keys. Construction
+        // only prepares the dir + perms.
         Ok(Self { dir, in_proc: Mutex::new(()) })
     }
 
@@ -310,6 +310,13 @@ impl Keystore {
             .truncate(false) // sidecar lock: never truncate (clippy + correctness)
             .open(self.dir.join(LOCK))?;
         lock_file.lock_exclusive().map_err(KeystoreError::Io)?;
+        // Stale-tmp cleanup UNDER the lock (round-2 review P1 #3): every write path
+        // goes through with_locks, so a stale keystore.json.tmp from a prior crash is
+        // removed here — safely, with no other instance able to touch it.
+        let tmp = self.dir.join(TMP);
+        if tmp.exists() {
+            let _ = std::fs::remove_file(&tmp);
+        }
         // Hold lock_file alive across the critical section.
         let result = body(self);
         // Release (unlock + drop). Errors here are not fatal to the result.
@@ -360,11 +367,7 @@ impl Keystore {
         F: FnOnce(&mut serde_json::Value),
     {
         self.with_locks(|ks| {
-            // stale-tmp cleanup under BOTH locks (crash-recovery).
-            let tmp = ks.dir.join(TMP);
-            if tmp.exists() {
-                let _ = std::fs::remove_file(&tmp);
-            }
+            // (stale-tmp cleanup is done once in with_locks under the lock.)
             let mut keys = ks.load_locked()?;
             if !keys.is_object() {
                 keys = serde_json::json!({});
