@@ -18,18 +18,25 @@ use std::os::windows::ffi::OsStrExt;
 
 /// A Win32 movable-memory handle owning one prepared blob. Newtype so the FSM's
 /// `type Handle` is well-defined; `.0` unwraps the raw `HGLOBAL` in `set`/`free`.
+/// `Debug` so `Result<Handle, _>::unwrap_err()` in tests can format the Ok payload.
+#[derive(Debug)]
 pub(super) struct Handle(pub windows_sys::Win32::Foundation::HGLOBAL);
 
 /// Injectable low-level Win32 memory ops, so the REAL `alloc_global` helper is unit-
-/// tested with an injected lock failure (round-13 review P1: a `ClipOps`-level fake
-/// sees `alloc` as one black box and can't catch the adapter forgetting `GlobalFree`).
+/// tested with an injected lock/unlock failure (round-13 review P1: a `ClipOps`-level
+/// fake sees `alloc` as one black box and can't catch the adapter forgetting `GlobalFree`;
+/// round-14 review P1 #2: `GlobalUnlock` returning 0 is ambiguous — success vs failure —
+/// so `unlock` returns a Result, and the real impl disambiguates via GetLastError).
 trait GlobalMemOps {
     /// `GlobalAlloc(flags, bytes)` → raw handle; null = failure.
     fn alloc(&mut self, flags: u32, bytes: usize) -> *mut core::ffi::c_void;
     /// `GlobalLock(h)` → pointer; null = failure.
     fn lock(&mut self, h: *mut core::ffi::c_void) -> *mut core::ffi::c_void;
-    /// `GlobalUnlock(h)` (best-effort).
-    unsafe fn unlock(&mut self, h: *mut core::ffi::c_void) -> i32;
+    /// `GlobalUnlock(h)`. Returns Ok(()) on a successful final unlock (lock count → 0),
+    /// Err on failure. (Win32: return 0 + GetLastError==NO_ERROR ⇒ final unlock success;
+    /// return 0 + GetLastError!=NO_ERROR ⇒ failure. A nonzero return means "still locked",
+    /// which can't happen for our single-lock/single-unlock usage.)
+    unsafe fn unlock(&mut self, h: *mut core::ffi::c_void) -> Result<(), String>;
     /// `GlobalFree(h)`.
     unsafe fn free(&mut self, h: *mut core::ffi::c_void);
 }
@@ -44,8 +51,24 @@ impl GlobalMemOps for RealGlobalMem {
     fn lock(&mut self, h: *mut core::ffi::c_void) -> *mut core::ffi::c_void {
         unsafe { windows_sys::Win32::System::Memory::GlobalLock(h) }
     }
-    unsafe fn unlock(&mut self, h: *mut core::ffi::c_void) -> i32 {
-        unsafe { windows_sys::Win32::System::Memory::GlobalUnlock(h) }
+    unsafe fn unlock(&mut self, h: *mut core::ffi::c_void) -> Result<(), String> {
+        use windows_sys::Win32::Foundation::{GetLastError, SetLastError, NO_ERROR};
+        // GlobalUnlock's return is ambiguous: 0 may mean "unlocked (success)" OR "failed".
+        // Disambiguate by setting a sentinel last-error and checking it: NO_ERROR ⇒ the
+        // 0 meant a successful final unlock; anything else ⇒ failure. (Round-14 P1 #2.)
+        // SAFETY: h is a valid HGLOBAL from GlobalAlloc+GlobalLock.
+        unsafe {
+            SetLastError(NO_ERROR);
+            let r = windows_sys::Win32::System::Memory::GlobalUnlock(h);
+            if r != 0 {
+                return Ok(()); // still locked (lock count > 0) — can't happen for us, but ok
+            }
+            if GetLastError() == NO_ERROR {
+                Ok(()) // final unlock succeeded
+            } else {
+                Err("GlobalUnlock failed (GetLastError != NO_ERROR)".to_string())
+            }
+        }
     }
     unsafe fn free(&mut self, h: *mut core::ffi::c_void) {
         unsafe { windows_sys::Win32::Foundation::GlobalFree(h) };
@@ -53,11 +76,13 @@ impl GlobalMemOps for RealGlobalMem {
 }
 
 /// Allocate a `GMEM_MOVEABLE` blob of `bytes.len()`, copy `bytes` in, return a `Handle`.
-/// Generic over `GlobalMemOps` so a Windows unit test injects a `lock_fails` fake and
-/// asserts `free` runs on the alloc'd handle (the leak the round-12 design couldn't
-/// catch). Postcondition honored: on Err, NO app-owned handle is live — the local RAII
-/// guard `GlobalGuard` owns the raw handle and `GlobalFree`s in `Drop`; it is
-/// `mem::forget`-disarmed ONLY on the success path (right before returning the Handle).
+/// Generic over `GlobalMemOps` so Windows unit tests inject lock/unlock failures and
+/// assert `free` runs (the leak the round-12 design couldn't catch). Postcondition honored:
+/// on Err, NO app-owned handle is live — the local RAII guard `GlobalGuard` owns the raw
+/// handle and `GlobalFree`s in `Drop`; it is `mem::forget`-disarmed ONLY on the success
+/// path (right before returning the Handle). Unlock-fail is treated as a failure: the
+/// handle is freed (NOT transferred to the caller), since passing a still-locked handle
+/// to SetClipboardData would be wrong.
 fn alloc_global<M: GlobalMemOps>(m: &mut M, bytes: &[u8]) -> Result<Handle, String> {
     use windows_sys::Win32::System::Memory::GMEM_MOVEABLE;
 
@@ -81,7 +106,9 @@ fn alloc_global<M: GlobalMemOps>(m: &mut M, bytes: &[u8]) -> Result<Handle, Stri
     // SAFETY: ptr is a valid locked pointer to a buffer of bytes.len(); src is a valid
     // &[u8] of the same length. Both alive for the copy.
     unsafe { std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr as *mut u8, bytes.len()) };
-    let _ = unsafe { g.0.unlock(raw) }; // best-effort
+    // Unlock MUST succeed before we hand the handle off (a still-locked handle is invalid
+    // for SetClipboardData). On unlock-fail, return Err — g.Drop frees raw (no transfer).
+    unsafe { g.0.unlock(raw) }?; // g.Drop frees raw on the Err path ✓
     std::mem::forget(g); // disarm: ownership transfers to the caller via Handle
     Ok(Handle(raw))
 }
@@ -153,6 +180,40 @@ impl ClipOps for Win32ClipOps {
     }
 }
 
+/// Normalize line endings to CR-LF for CF_UNICODETEXT (round-14 P2 #4). Rules: a lone
+/// `\n` (not preceded by `\r`) becomes `\r\n`; a lone `\r` (not followed by `\n`) becomes
+/// `\r\n`; an existing `\r\n` is preserved as-is (not doubled). Returns a new String.
+fn normalize_crlf(s: &str) -> String {
+    let chars: Vec<char> = s.chars().collect();
+    let mut out = String::with_capacity(s.len() + 8);
+    let mut i = 0;
+    while i < chars.len() {
+        let c = chars[i];
+        if c == '\n' {
+            // Lone LF (no preceding CR) → CRLF. A preceding CR (already emitted as part of
+            // a CRLF pair below) means this LF is the second half of an existing CRLF → emit as-is.
+            if i > 0 && chars[i - 1] == '\r' {
+                out.push('\n'); // existing CRLF's LF
+            } else {
+                out.push('\r');
+                out.push('\n');
+            }
+        } else if c == '\r' {
+            // Lone CR (no following LF) → CRLF. CR followed by LF → emit CR now, the LF is
+            // handled next iteration (preserves the existing CRLF).
+            let next_is_lf = i + 1 < chars.len() && chars[i + 1] == '\n';
+            out.push('\r');
+            if !next_is_lf {
+                out.push('\n');
+            }
+        } else {
+            out.push(c);
+        }
+        i += 1;
+    }
+    out
+}
+
 /// Build the prepared-format list from the `(text, image)` Options. Cardinality:
 /// `(None, None)` → empty Vec (restore_with clears only — the §B empty-original case);
 /// `(Some(t), None)` → one `[CF_UNICODETEXT, utf16-NUL]`; `(None, Some(img))` → one
@@ -172,10 +233,12 @@ fn build_blobs(
 
     let mut out: Vec<(u32, Vec<u8>)> = Vec::with_capacity(2);
 
-    // (a) UTF-16 NUL-terminated text. encode_wide is on OsStr (via OsStrExt), so go
-    // through OsStr — str: AsRef<OsStr>.
+    // (a) UTF-16 NUL-terminated text. CF_UNICODETEXT requires CR-LF line endings (Windows
+    // standard clipboard format, round-14 P2 #4): normalize lone \n and lone \r to \r\n,
+    // but preserve an existing \r\n. encode_wide is on OsStr (via OsStrExt).
     if let Some(t) = text {
-        let mut u16s: Vec<u16> = std::ffi::OsStr::new(t).encode_wide().collect();
+        let normalized = normalize_crlf(t);
+        let mut u16s: Vec<u16> = std::ffi::OsStr::new(&normalized).encode_wide().collect();
         u16s.push(0); // NUL terminator
         let bytes: Vec<u8> = u16s.iter().flat_map(|w| w.to_le_bytes()).collect();
         out.push((CF_UNICODETEXT as u32, bytes));
@@ -305,6 +368,30 @@ mod tests {
     }
 
     #[test]
+    fn build_blobs_normalizes_crlf_for_unicode_text() {
+        // CF_UNICODETEXT requires CR-LF (round-14 P2 #4). Input mixes: lone \n, lone \r,
+        // a double lone \r, a lone \n, and an existing \r\n. All line-endings must become
+        // \r\n with no doubling of the existing CRLF. Input chars: a \n b \r \r c \n d \r \n.
+        use windows_sys::Win32::System::Ole::CF_UNICODETEXT;
+        let input = "a\nb\r\rc\nd\r\n";
+        let out = build_blobs(Some(input), None).unwrap();
+        assert_eq!(out[0].0, CF_UNICODETEXT as u32);
+        let u16s: Vec<u16> = out[0]
+            .1
+            .chunks_exact(2)
+            .map(|c| u16::from_le_bytes([c[0], c[1]]))
+            .collect();
+        let s = String::from_utf16_lossy(&u16s);
+        // Traced: a→a; \n(prev a)→\r\n; b→b; \r(next \r)→\r\n; \r(next c)→\r\n; c→c;
+        // \n(prev c)→\r\n; d→d; \r(next \n)→\r; \n(prev \r)→\n (existing CRLF). + NUL.
+        let expected = "a\r\nb\r\n\r\nc\r\nd\r\n\0";
+        assert_eq!(s, expected, "CRLF normalization: got {s:?}");
+        // No lone \n (every \n is preceded by \r) and no lone \r (every \r is followed by \n).
+        assert!(!s.contains('\n') || s.as_bytes().windows(2).all(|w| !(w[0] != b'\r' && w[1] == b'\n')),
+            "no lone LF in result");
+    }
+
+    #[test]
     fn build_blobs_image_only_is_one_dibv5() {
         use windows_sys::Win32::System::Ole::CF_DIBV5;
         let img = ImageBlob {
@@ -351,12 +438,11 @@ mod tests {
         assert!(blob.len() > 124);
         let hdr_size = u32::from_le_bytes([blob[0], blob[1], blob[2], blob[3]]);
         assert_eq!(hdr_size, 124);
-        // Read key header fields by offset (see BITMAPV5HEADER layout). This is fragile to
-        // struct reordering, but the layout is a stable ABI; offset-based reads mirror how
-        // an external reader would parse it. We re-derive offsets from the struct to avoid
-        // magic numbers.
-        let hdr: &windows_sys::Win32::Graphics::Gdi::BITMAPV5HEADER = unsafe {
-            &*(blob.as_ptr() as *const windows_sys::Win32::Graphics::Gdi::BITMAPV5HEADER)
+        // Read the header via ptr::read_unaligned (round-14 P2 #5): blob is a Vec<u8>
+        // (only u8-alignment guaranteed), not the struct's alignment. A direct &-cast would
+        // be undefined behavior on platforms where the struct needs stricter alignment.
+        let hdr: windows_sys::Win32::Graphics::Gdi::BITMAPV5HEADER = unsafe {
+            std::ptr::read_unaligned(blob.as_ptr() as *const windows_sys::Win32::Graphics::Gdi::BITMAPV5HEADER)
         };
         assert_eq!(hdr.bV5Width, 1);
         assert_eq!(hdr.bV5Height, -1, "negated ⇒ top-down");
@@ -374,18 +460,19 @@ mod tests {
         assert!(build_blobs(None, Some(&ImageBlob { width: 2, height: 2, bytes: vec![0; 4] })).is_err());
     }
 
-    // === The REAL alloc_global leak test (round-13 review P1) ===
-    // Inject a GlobalMemOps fake that forces GlobalLock to fail; assert the helper frees
-    // the alloc'd handle (the leak a ClipOps-level fake can't catch, since ClipOps::alloc
-    // is one black box). A local RAII guard in alloc_global is the production equivalent.
+    // === The REAL alloc_global leak/unlock tests (round-13 + round-14 review P1) ===
+    // Inject a GlobalMemOps fake that forces GlobalLock or GlobalUnlock to fail; assert
+    // the helper frees the alloc'd handle in BOTH cases (a ClipOps-level fake can't reach
+    // the adapter's internals — ClipOps::alloc is one black box).
     struct FakeGlobalMem {
         lock_fails: bool,
+        unlock_fails: bool,
         log: std::cell::RefCell<Vec<&'static str>>,
     }
     impl GlobalMemOps for FakeGlobalMem {
         fn alloc(&mut self, _flags: u32, _bytes: usize) -> *mut core::ffi::c_void {
             self.log.borrow_mut().push("alloc");
-            // Non-null sentinel pointer (never dereferenced: lock returns null).
+            // Non-null sentinel handle (never really allocated; free just logs it).
             0xdead_beef as *mut _
         }
         fn lock(&mut self, _h: *mut core::ffi::c_void) -> *mut core::ffi::c_void {
@@ -393,15 +480,25 @@ mod tests {
             if self.lock_fails {
                 std::ptr::null_mut()
             } else {
-                // This branch is unreachable in real_alloc_helper_frees_on_lock_fail (which
-                // always sets lock_fails: true). unreachable! (not unimplemented!) so clippy's
-                // clippy::unimplemented lint doesn't fire under -D warnings.
-                unreachable!("lock-ok path not used in this test")
+                // Non-null sentinel pointer. The helper copies `bytes` into it; in the test
+                // the buffer is never actually read back, so a bogus writable address would
+                // be UB. Instead point at a real scratch buffer sized to the test payload.
+                // (Tests use small payloads; this static is large enough.)
+                static SCRATCH: std::sync::Mutex<Vec<u8>> = std::sync::Mutex::new(Vec::new());
+                let mut g = SCRATCH.lock().unwrap();
+                if g.len() < 64 {
+                    g.resize(64, 0);
+                }
+                g.as_mut_ptr() as *mut _
             }
         }
-        unsafe fn unlock(&mut self, _h: *mut core::ffi::c_void) -> i32 {
+        unsafe fn unlock(&mut self, _h: *mut core::ffi::c_void) -> Result<(), String> {
             self.log.borrow_mut().push("unlock");
-            1
+            if self.unlock_fails {
+                Err("injected GlobalUnlock failure".into())
+            } else {
+                Ok(())
+            }
         }
         unsafe fn free(&mut self, _h: *mut core::ffi::c_void) {
             self.log.borrow_mut().push("free");
@@ -413,6 +510,7 @@ mod tests {
         // GlobalAlloc ok, GlobalLock fails → helper must GlobalFree the handle before Err.
         let mut m = FakeGlobalMem {
             lock_fails: true,
+            unlock_fails: false,
             log: std::cell::RefCell::new(Vec::new()),
         };
         let r = alloc_global(&mut m, b"payload");
@@ -424,6 +522,33 @@ mod tests {
             log.contains(&"free"),
             "free MUST be called on lock fail (the leak this test guards): {log:?}"
         );
-        assert!(!log.contains(&"unlock"), "no unlock on the failure path: {log:?}");
+        assert!(!log.contains(&"unlock"), "no unlock on the lock-fail path: {log:?}");
+    }
+
+    #[test]
+    fn real_alloc_helper_frees_on_unlock_fail() {
+        // Round-14 review P1 #2: GlobalAlloc ok, GlobalLock ok, GlobalUnlock FAILS → the
+        // helper must NOT transfer the still-locked handle to the caller (passing a locked
+        // HGLOBAL to SetClipboardData would be wrong). It must free it and return Err.
+        let mut m = FakeGlobalMem {
+            lock_fails: false,
+            unlock_fails: true,
+            log: std::cell::RefCell::new(Vec::new()),
+        };
+        let r = alloc_global(&mut m, b"payload");
+        assert!(r.is_err(), "alloc_global should return Err on unlock fail");
+        let err = r.unwrap_err();
+        assert!(
+            err.contains("GlobalUnlock failure"),
+            "err must surface the unlock cause; got: {err}"
+        );
+        let log = m.log.borrow();
+        assert!(log.contains(&"alloc"), "alloc called: {log:?}");
+        assert!(log.contains(&"lock"), "lock called: {log:?}");
+        assert!(log.contains(&"unlock"), "unlock called: {log:?}");
+        assert!(
+            log.contains(&"free"),
+            "free MUST be called on unlock fail (no transfer of a still-locked handle): {log:?}"
+        );
     }
 }

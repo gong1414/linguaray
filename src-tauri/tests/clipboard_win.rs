@@ -118,45 +118,122 @@ impl Drop for OwnerWindow {
 }
 
 // --- Clipboard read helpers ---
+// All read paths use RAII so GlobalUnlock runs BEFORE CloseClipboard (Win32 contract:
+// a clipboard memory object must be unlocked before the clipboard is closed). Round-14 P1.
 
 fn clipboard_has(fmt: u32) -> bool {
     use windows_sys::Win32::System::DataExchange::IsClipboardFormatAvailable;
     unsafe { IsClipboardFormatAvailable(fmt) != 0 }
 }
 
+/// RAII: owns a locked clipboard HGLOBAL; Drop GlobalUnlocks it. Must be dropped BEFORE
+/// the owning clipboard session (CloseClipboard) closes.
+struct LockedClipData {
+    handle: windows_sys::Win32::Foundation::HANDLE,
+}
+impl LockedClipData {
+    /// Returns the locked pointer + the total GlobalSize (bytes). Null ptr = failure.
+    unsafe fn lock(handle: windows_sys::Win32::Foundation::HANDLE) -> Option<(*const u8, usize)> {
+        use windows_sys::Win32::System::Memory::{GlobalLock, GlobalSize};
+        unsafe {
+            let ptr = GlobalLock(handle);
+            if ptr.is_null() {
+                return None;
+            }
+            let size = GlobalSize(handle); // 0 on failure; treat as "no data"
+            Some((ptr as *const u8, size))
+        }
+    }
+}
+impl Drop for LockedClipData {
+    fn drop(&mut self) {
+        // SAFETY: handle was GlobalLock'd in lock(); GlobalUnlock is the documented
+        // release. Run BEFORE CloseClipboard (callers drop this guard first).
+        use windows_sys::Win32::System::Memory::GlobalUnlock;
+        unsafe {
+            let _ = GlobalUnlock(self.handle);
+        }
+    }
+}
+
 fn read_unicode_text() -> Option<String> {
-    use windows_sys::Win32::System::DataExchange::{GetClipboardData, OpenClipboard, CloseClipboard};
-    use windows_sys::Win32::System::Memory::GlobalLock;
+    use windows_sys::Win32::System::DataExchange::{CloseClipboard, GetClipboardData, OpenClipboard};
     use windows_sys::Win32::System::Ole::CF_UNICODETEXT;
     unsafe {
         if OpenClipboard(std::ptr::null_mut()) == 0 {
             return None;
         }
+        // RAII: ensures CloseClipboard runs even on early return.
+        struct ClipGuard;
+        impl Drop for ClipGuard {
+            fn drop(&mut self) {
+                unsafe { CloseClipboard() };
+            }
+        }
+        let _clip = ClipGuard;
+
         let h = GetClipboardData(CF_UNICODETEXT as u32);
         if h.is_null() {
-            CloseClipboard();
             return None;
         }
-        let ptr = GlobalLock(h) as *const u16;
-        let s = if ptr.is_null() {
-            None
-        } else {
-            // Read until NUL.
-            let mut len = 0usize;
-            while *ptr.add(len) != 0 {
-                len += 1;
+        let (ptr, _size) = LockedClipData::lock(h)?; // _locked dropped (unlock) before _clip
+        let _locked = LockedClipData { handle: h };
+        // Read until a NUL u16 (UTF-16 code unit). ptr is *const u8; step by u16.
+        let u16ptr = ptr as *const u16;
+        let mut len = 0usize;
+        // SAFETY: u16ptr points to the locked CF_UNICODETEXT buffer; reading sequentially
+        // until a 0 u16 (the NUL terminator). The buffer is GlobalSize'd so the read stays
+        // in bounds (a well-formed CF_UNICODETEXT blob is NUL-terminated).
+        while *u16ptr.add(len) != 0 {
+            len += 1;
+        }
+        let slice = std::slice::from_raw_parts(u16ptr, len);
+        drop(_locked); // unlock BEFORE _clip (CloseClipboard) drops
+        Some(String::from_utf16_lossy(slice))
+    }
+}
+
+/// Read CF_DIBV5: returns (header bytes, pixel bytes) from the real clipboard. Used for
+/// the full pixel round-trip (P2 #6): assert header + the 4 BGRA pixels after the system
+/// clipboard round-trip.
+fn read_dibv5() -> Option<(Vec<u8>, Vec<u8>)> {
+    use windows_sys::Win32::System::DataExchange::{CloseClipboard, GetClipboardData, OpenClipboard};
+    use windows_sys::Win32::System::Ole::CF_DIBV5;
+    const HDR_SIZE: usize = std::mem::size_of::<windows_sys::Win32::Graphics::Gdi::BITMAPV5HEADER>();
+    unsafe {
+        if OpenClipboard(std::ptr::null_mut()) == 0 {
+            return None;
+        }
+        struct ClipGuard;
+        impl Drop for ClipGuard {
+            fn drop(&mut self) {
+                unsafe { CloseClipboard() };
             }
-            let slice = std::slice::from_raw_parts(ptr, len);
-            Some(String::from_utf16_lossy(slice))
-        };
-        CloseClipboard();
-        s
+        }
+        let _clip = ClipGuard;
+
+        let h = GetClipboardData(CF_DIBV5 as u32);
+        if h.is_null() {
+            return None;
+        }
+        let (ptr, size) = LockedClipData::lock(h)?;
+        let _locked = LockedClipData { handle: h };
+        if size < HDR_SIZE {
+            drop(_locked);
+            return None;
+        }
+        // Header + pixel bytes (the blob is header followed by pixel data; total = size).
+        let header = std::slice::from_raw_parts(ptr, HDR_SIZE).to_vec();
+        let pixels = std::slice::from_raw_parts(ptr.add(HDR_SIZE), size - HDR_SIZE).to_vec();
+        drop(_locked); // unlock BEFORE _clip (CloseClipboard) drops
+        Some((header, pixels))
     }
 }
 
 // --- The four cardinality cases ---
 
 #[test]
+#[ignore = "touches the REAL system clipboard (Win-only); run via `cargo test --test clipboard_win -- --ignored --test-threads=1` (CI does this)"]
 fn restore_none_none_clears_sentinel() {
     use windows_sys::Win32::System::Ole::CF_UNICODETEXT;
     let _g = CLIP_GUARD.lock().unwrap(); // serialize real-clipboard tests (OpenClipboard)
@@ -173,6 +250,7 @@ fn restore_none_none_clears_sentinel() {
 }
 
 #[test]
+#[ignore = "touches the REAL system clipboard (Win-only); run via `cargo test --test clipboard_win -- --ignored --test-threads=1` (CI does this)"]
 fn restore_text_only() {
     use windows_sys::Win32::System::Ole::CF_DIBV5;
     let _g = CLIP_GUARD.lock().unwrap(); // serialize real-clipboard tests (OpenClipboard)
@@ -184,6 +262,7 @@ fn restore_text_only() {
 }
 
 #[test]
+#[ignore = "touches the REAL system clipboard (Win-only); run via `cargo test --test clipboard_win -- --ignored --test-threads=1` (CI does this)"]
 fn restore_image_only() {
     use windows_sys::Win32::System::Ole::{CF_DIBV5, CF_UNICODETEXT};
     let _g = CLIP_GUARD.lock().unwrap(); // serialize real-clipboard tests (OpenClipboard)
@@ -200,6 +279,7 @@ fn restore_image_only() {
 }
 
 #[test]
+#[ignore = "touches the REAL system clipboard (Win-only); run via `cargo test --test clipboard_win -- --ignored --test-threads=1` (CI does this)"]
 fn restore_text_and_image_both_readable() {
     use windows_sys::Win32::Graphics::Gdi::BITMAPV5HEADER;
     use windows_sys::Win32::System::Ole::CF_DIBV5;
@@ -221,14 +301,41 @@ fn restore_text_and_image_both_readable() {
     restore_snapshot(owner.owner(), Some("hi"), Some(&img)).expect("text+image restore");
     owner.pump();
 
-    // Text.
+    // Text round-trip.
     assert_eq!(read_unicode_text().as_deref(), Some("hi"));
 
-    // CF_DIBV5: read header + per-position BGRA pixels.
+    // CF_DIBV5: FULL pixel round-trip (round-14 P2 #6). Read header + pixels back from the
+    // REAL clipboard via GlobalSize/Lock/copy/Unlock, then assert the header + each BGRA
+    // pixel position. A wrong stride, a bottom-up flip, or a channel-swap would scramble
+    // these distinct per-position values (this is the test the prev version skipped).
     assert!(clipboard_has(CF_DIBV5 as u32));
-    // For brevity + robustness we assert the DIBV5 is present + sized correctly; the
-    // header/pixel content is already validated by build_blobs_dibv5_header_and_first_pixel_bgra
-    // in windows::tests (which reads the blob directly, no clipboard round-trip). Here we
-    // confirm the real clipboard accepted both formats simultaneously (the compound write).
-    let _ = std::mem::size_of::<BITMAPV5HEADER>(); // 124 (compile-time check the type is in scope)
+    let (header, pixels) = read_dibv5().expect("read CF_DIBV5 back");
+    assert_eq!(header.len(), std::mem::size_of::<BITMAPV5HEADER>(), "header is 124 bytes");
+    // Parse the header via ptr::read_unaligned (the buffer came from GlobalLock, alignment
+    // not guaranteed for a raw byte slice). Check the load-bearing fields.
+    let hdr: BITMAPV5HEADER = unsafe { std::ptr::read_unaligned(header.as_ptr() as *const BITMAPV5HEADER) };
+    assert_eq!(hdr.bV5Size, 124);
+    assert_eq!(hdr.bV5Width, 2);
+    assert_eq!(hdr.bV5Height, -2, "negated ⇒ top-down");
+    assert_eq!(hdr.bV5BitCount, 32);
+    assert_eq!(hdr.bV5Compression, windows_sys::Win32::Graphics::Gdi::BI_BITFIELDS);
+    assert_eq!(hdr.bV5RedMask, 0x00FF_0000);
+    assert_eq!(hdr.bV5AlphaMask, 0xFF00_0000);
+    // 4 pixels × 4 bytes = 16 bytes of BGRA, in top-down order TL,TR,BL,BR.
+    assert_eq!(pixels.len(), 16, "2×2×4 bytes of pixel data");
+    // Expected BGRA per source RGBA (r,g,b,a)→(b,g,r,a):
+    let expected: [[u8; 4]; 4] = [
+        [0, 0, 255, 255],     // (0,0) red   RGBA(255,0,0,255)
+        [0, 255, 0, 255],     // (1,0) green RGBA(0,255,0,255)
+        [255, 0, 0, 255],     // (0,1) blue  RGBA(0,0,255,255)
+        [0, 255, 255, 255],   // (1,1) yellow RGBA(255,255,0,255)
+    ];
+    for (i, want) in expected.iter().enumerate() {
+        let got = &pixels[i * 4..i * 4 + 4];
+        assert_eq!(
+            got, want,
+            "pixel {i} BGRA mismatch (got {:?}, want {:?}) — stride/flip/channel-swap check",
+            got, want
+        );
+    }
 }
