@@ -1,0 +1,23 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main",
+  "description": "Capability for the main window — full command set",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "allow-translate",
+    "allow-translate-default",
+    "allow-translate-clipboard",
+    "allow-list-engines",
+    "allow-set-key",
+    "allow-delete-key",
+    "allow-key-status",
+    "allow-get-settings",
+    "allow-set-setting",
+    "allow-lookup-dictionary",
+    "allow-a11y-status",
+    "allow-keystore-health",
+    "allow-archive-keystore",
+    "allow-reset-keystore"
+  ]
+}

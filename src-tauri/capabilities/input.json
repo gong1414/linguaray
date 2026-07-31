@@ -1,0 +1,10 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "input",
+  "description": "Capability for the input window — translate_default only",
+  "windows": ["input"],
+  "permissions": [
+    "core:default",
+    "allow-translate-default"
+  ]
+}
