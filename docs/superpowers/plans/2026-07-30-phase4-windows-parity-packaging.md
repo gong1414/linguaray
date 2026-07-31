@@ -1,25 +1,22 @@
-# Phase 4: Windows Parity + Cross-Platform Packaging — Implementation Plan (rev 13)
+# Phase 4: Windows Parity + Cross-Platform Packaging — Implementation Plan (rev 14)
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** rev 13 — fixes round-12 review issues (4 blockers). **One CODE fix landed +
-tested:** the empty-snapshot regression test was a FALSE GREEN (it only drove the Fake,
-which cleared (None,None) even before the prod fix). Extracted `restore_empty_to(&NSPasteboard)`
-so prod + test share one impl; added `restore_empty_removes_sentinel_on_real_pasteboard`
-against `pasteboardWithUniqueName`; verified it FAILS if the helper regresses to a no-op.
-**Four plan P1s:** (a) **cfg split closes** — the existing `#[cfg(not(macos))] pub fn
-restore_snapshot` compiles on Windows, so adding a Windows one would duplicate it;
-narrow it to `not(any(macos, windows))`, put the Windows `pub restore_snapshot` IN
-`windows.rs` (alongside private `build_blobs`/`Win32ClipOps`), and re-export from
-`clipboard.rs`. Stated as the first commit of Task 2b. (b) **`RestoreError` is actually
-compilable** — `#[derive(Debug, thiserror::Error)]` on the enum + `#[error(...)]` on
-each variant (the prev rev's commented-out derive produced no Display). (c) **`ClipOps::alloc`
-Err postcondition** — on Err NO app-owned handle is live (adapter frees partial
-allocation internally); `Win32ClipOps::alloc` uses a local RAII `GlobalGuard` that
-`GlobalFree`s in Drop and is `mem::forget`-disarmed only on the success path (covers
-`GlobalAlloc` ok / `GlobalLock` fail, which would otherwise leak the `HGLOBAL`). Added
-`alloc_lock_fails` fake test. Small: corrected the stale "Windows-only owner param /
-signature unchanged" wording (the param is on ALL targets; only its type cfg's).
+**Status:** rev 14 — fixes round-13 review (2 plan P1s, both test-coverage gaps where a
+fake can't reach the real adapter/builder). (a) **`alloc` leak-safety is now testable
+against the REAL helper** — factor Win32 memory ops behind an injectable `GlobalMemOps`
+trait; the real `alloc_global<M: GlobalMemOps>` is unit-tested in `windows::tests` with a
+`FakeGlobalMem { lock_fails: true }` that asserts `free` is called on the alloc'd handle
+(a `ClipOps`-level fake sees alloc as one black box and couldn't catch a missing
+`GlobalFree`). Handle is pinned as a `struct Handle(pub HGLOBAL)` newtype (`.0` unwraps in
+set/free). FSM `first/second_alloc_fails` retained for the FSM's own alloc-loop. (b)
+**`build_blobs` cardinality now tested** — `windows::tests` unit-tests all four Option
+combos → asserts exact 0/1/1/2 entry COUNT, real `CF_UNICODETEXT`/`CF_DIBV5` ids, and ORDER
+`[text, dib]` (the FSM is format-agnostic, so a swap would slip through without this). Real
+Windows CI test expanded from text+image-only to all four cases incl. `(None,None)`
+sentinel-clear (mirrors the macOS `restore_empty_to` real-pasteboard test). Small:
+corrected the last stale "Windows-only param / signature unchanged" wording (third param
+on ALL targets; only its type cfg's).
 
 **Goal:** Windows builds (real `atomic_replace` + ACL), correct signing (macOS notarization via cert-import; Windows Authenticode via PFX/signtool — distinct from the updater key), and a clean CI matrix (arm64 + Intel macOS via `macos-15-intel`, Windows).
 
@@ -100,11 +97,11 @@ The public `restore_snapshot` takes two `Option`s, but the FSM itself operates o
       Today the path is `lib.rs::on_hotkey` → `selection::capture_selection(timeout)`
       → unit `OsClipboard` → `clipboard::restore_snapshot(text, image)`, with no
       `AppHandle`/`Window`/HWND anywhere. Changes:
-      - **`selection.rs`**: `OsClipboard` gains a Windows-only owner field.
-        `capture_selection` / `capture_selection_with_ax` gain a Windows-only
-        `owner: windows_sys::Win32::Foundation::HWND` param threaded into
-        `OsClipboard { #[cfg(windows)] owner }`. **Keep the cross-platform AX test
-        helper's signature unchanged** (see test-migration note below):
+      - **`selection.rs`**: `OsClipboard` gains an owner field (cfg-gated to Windows).
+        `capture_selection` / `capture_selection_with_ax` gain a THIRD `owner: OwnerHwnd`
+        param on ALL targets (only the TYPE differs by cfg — raw HWND on Windows, `()`
+        elsewhere), threaded into `OsClipboard`. The existing AX test helper's arity
+        changes too — its call site's owner value is cfg'd (see test-migration note):
         ```rust
         // selection.rs
         #[cfg(target_os = "windows")]
@@ -211,29 +208,66 @@ The public `restore_snapshot` takes two `Option`s, but the FSM itself operates o
       NOT `GlobalFree` a submitted handle (the system frees it on next empty). Only
       `GlobalFree` handles that were NOT successfully submitted.
 
-- [ ] **`Win32ClipOps::alloc` leak-safety (round-12 review P1 #4).** `GlobalAlloc` can
-      succeed and `GlobalLock` fail; if `alloc` then returns Err without freeing, the
-      `HGLOBAL` leaks (restore_with can't free a handle it never received). Implement
-      `alloc` with a local RAII guard that owns the raw `HGLOBAL` and frees it in `Drop`;
-      disarm the guard (forget the handle) ONLY on the success path, right before
-      returning the `Handle`:
+- [ ] **`Win32ClipOps::alloc` leak-safety (round-12 review P1 #4), testable against the
+      REAL alloc helper (round-13 review P1: a fake in `fsm::tests` can't catch the real
+      adapter forgetting to `GlobalFree`).** `GlobalAlloc` can succeed and `GlobalLock`
+      fail; if `alloc` returns Err without freeing, the `HGLOBAL` leaks (restore_with can't
+      free a handle it never received). Factor the Win32 memory ops behind an injectable
+      low-level trait so the REAL alloc helper is unit-tested with an injected lock failure:
       ```rust
-      fn alloc(&mut self, bytes: &[u8]) -> Result<Handle, String> {
-          let raw = unsafe { GlobalAlloc(GMEM_MOVEABLE, bytes.len()) };
+      // clipboard/windows.rs — the HGLOBAL is a tuple newtype so Handle is well-defined
+      // (round-13 review: the prev sketch used Handle(raw) without defining Handle).
+      pub(super) struct Handle(pub windows_sys::Win32::Foundation::HGLOBAL);  // .0 unwraps in set/free
+
+      // Injectable low-level memory ops. The real impl calls GlobalAlloc/GlobalLock/etc;
+      // a fake records calls and can force GlobalLock to "fail" (return null).
+      trait GlobalMemOps {
+          fn alloc(&mut self, flags: u32, bytes: usize) -> *mut core::ffi::c_void; // HGLOBAL; null = fail
+          fn lock(&mut self, h: *mut core::ffi::c_void) -> *mut core::ffi::c_void;  // ptr; null = fail
+          unsafe fn unlock(&mut self, h: *mut core::ffi::c_void) -> i32;
+          unsafe fn free(&mut self, h: *mut core::ffi::c_void);
+      }
+      struct RealGlobalMem;   // impl GlobalMemOps via GlobalAlloc/GlobalLock/GlobalUnlock/GlobalFree
+      #[cfg(test)]
+      struct FakeGlobalMem { lock_fails: bool, log: Vec<&'static str> }  // records "alloc"/"lock"/"free"
+
+      // The REAL alloc helper, generic over GlobalMemOps — so a Windows unit test injects
+      // FakeGlobalMem { lock_fails: true } and asserts `free` was called on the leaked handle.
+      // The ClipOps::alloc impl delegates here with RealGlobalMem.
+      fn alloc_global<M: GlobalMemOps>(m: &mut M, bytes: &[u8]) -> Result<Handle, String> {
+          let raw = m.alloc(GMEM_MOVEABLE, bytes.len());
           if raw.is_null() { return Err("GlobalAlloc failed".into()); }
-          let guard = GlobalGuard(raw);              // Drop calls GlobalFree(raw)
-          let ptr = unsafe { GlobalLock(raw) };
-          if ptr.is_null() { return Err("GlobalLock failed".into()); } // guard Drop frees raw ✓
-          unsafe { std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr as *mut u8, bytes.len()); }
-          let _ = unsafe { GlobalUnlock(raw) };      // best-effort
-          std::mem::forget(guard);                   // disarm: ownership transfers to caller
+          // RAII: owns `raw`, Drop calls m.free(raw). Disarm ONLY on success.
+          struct Guard<'a, M: GlobalMemOps>(&'a mut M, *mut core::ffi::c_void);
+          impl<M: GlobalMemOps> Drop for Guard<'_, M> { fn drop(&mut self) { unsafe { self.0.free(self.1) } } }
+          let g = Guard(m, raw);
+          let ptr = g.0.lock(raw);
+          if ptr.is_null() { return Err("GlobalLock failed".into()); } // g.Drop frees raw ✓
+          unsafe { std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr as *mut u8, bytes.len()) };
+          let _ = unsafe { g.0.unlock(raw) };
+          std::mem::forget(g);                        // disarm: ownership → caller via Handle
           Ok(Handle(raw))
       }
+      impl ClipOps for Win32ClipOps {
+          type Handle = Handle;
+          fn alloc(&mut self, bytes: &[u8]) -> Result<Handle, String> { alloc_global(&mut RealGlobalMem, bytes) }
+          fn free(&mut self, h: Handle) { unsafe { RealGlobalMem.free(h.0) } }
+          fn set(&mut self, fmt: u32, h: Handle) -> Result<(), (Handle, String)> {
+              // SetClipboardData(fmt, h.0); on failure return (h, err) so caller frees h.0
+              …
+          }
+          …
+      }
       ```
-      This makes the `ClipOps::alloc` postcondition hold: Err ⇒ no live app-owned handle.
-      Add a fake test (`alloc_lock_fails`) that models a two-step alloc (alloc-ok / lock-fail)
-      and asserts the fake records a `free` of the partial allocation on the Err path — the
-      real adapter's guard is the production equivalent.
+      **Two layers of testing** (round-13 review):
+      - `fsm::tests` KEEP `first_alloc_fails` / `second_alloc_fails` — they test the FSM's
+        alloc-loop ownership (restore_with), using a Fake whose `ClipOps::alloc` is a single
+        black box. These are unchanged.
+      - `windows::tests` (Windows-only unit test) ADD `real_alloc_helper_frees_on_lock_fail`:
+        injects `FakeGlobalMem { lock_fails: true }` into `alloc_global`, asserts the helper
+        returns Err AND `FakeGlobalMem.log` contains a `free` for the alloc'd handle — i.e.
+        the REAL Win32 alloc path honors the postcondition (Err ⇒ no live HGLOBAL). This is
+        the test the round-12 fake could NOT provide.
 
 - [ ] **CF_DIBV5 pixel layout (BITMAPV5HEADER)** (Windows-only, lives in the
       `#[cfg(windows)]` blob builder — see three-layer split below):
@@ -272,8 +306,9 @@ The public `restore_snapshot` takes two `Option`s, but the FSM itself operates o
           // left live — the adapter frees any partial allocation internally before
           // returning Err (e.g. GlobalAlloc succeeded but GlobalLock failed → GlobalFree
           // the HGLOBAL first). restore_with relies on this: it cannot free a handle the
-          // adapter never handed back. Implement via a local RAII guard that owns the raw
-          // allocation and is disarmed only when the Handle is successfully returned.
+          // adapter never handed back. The REAL adapter's leak-safety is unit-tested by
+          // injecting a GlobalMemOps fake that forces lock-fail — see the Win32ClipOps::alloc
+          // bullet (round-13: a ClipOps-level fake can't reach into the adapter's internals).
           fn alloc(&mut self, bytes: &[u8]) -> Result<Self::Handle, String>;
           fn free(&mut self, h: Self::Handle);
       }
@@ -474,10 +509,12 @@ The public `restore_snapshot` takes two `Option`s, but the FSM itself operates o
         RestoreError::Alloc.
       - **`second_alloc_fails`** (2 fmts): alloc#1 ok, alloc#2 errs → EXACTLY 1 `free`
         (h_text — the previously-leaked handle), no `open`. RestoreError::Alloc.
-      - **`alloc_lock_fails`** (round-12 P1 #4): the fake models a two-step alloc
-        (raw-alloc ok, "lock" fail) and records a `free` of the partial raw allocation
-        on the Err path — proves the adapter honors the alloc postcondition (Err ⇒ no
-        live handle). restore_with then sees a normal Alloc Err (no handle to free).
+      - (NOT here: `alloc_lock_fails`. A ClipOps-level fake sees alloc as one black box and
+        CANNOT catch the real adapter forgetting to GlobalFree on a GlobalLock failure —
+        round-13 review P1. That leak-safety is tested in `windows::tests` by injecting a
+        `GlobalMemOps` fake into the REAL `alloc_global` helper; see the Win32ClipOps::alloc
+        bullet. The FSM fake here only models the alloc Ok/Err outcome, which is already
+        covered by `first_alloc_fails` / `second_alloc_fails` above.)
       - **`cleanup_empty_fails`** (2 fmts): set#1 ok, set#2 errs, remedial `empty` errs →
         1 `free` (h_dib), result is `RestoreError::SetPartial { cleanup_err: <str> }`.
         The test asserts `err.to_string()` mentions the cleanup failure AND partial data
@@ -488,15 +525,33 @@ The public `restore_snapshot` takes two `Option`s, but the FSM itself operates o
         cleanup empty.**
       - `close` count is `== 1` in every branch that opened (the `OpenClip` guard's `Drop`
         calls `ClipOps::close`, which the fake records). `RestoreError`'s `Display`
-        (thiserror) is asserted via `to_string()` in the cross-platform fake tests — these
-        do NOT exercise the Windows-only public `restore_snapshot` wrapper.
+      (thiserror) is asserted via `to_string()` in the cross-platform fake tests — these
+      do NOT exercise the Windows-only public `restore_snapshot` wrapper.
+
+- [ ] **`windows::tests` — `build_blobs` cardinality/ORDER unit tests (round-13 review
+      P1 #2: the cross-platform FSM fake tests take a pre-built format list and so cannot
+      prove `build_blobs` maps the four Option combos correctly).** Private Windows-only
+      unit tests (inside `windows.rs`, `#[cfg(test)]`) that call `build_blobs` directly and
+      assert the exact entry COUNT, FORMAT IDS, and ORDER for each combo:
+      - `(None, None)` → empty Vec (0 entries) — the §B empty-original case.
+      - `(Some("hi"), None)` → exactly 1 entry: `(CF_UNICODETEXT, …)`. Decode the bytes as
+        UTF-16 + NUL, assert == "hi".
+      - `(None, Some(img))` → exactly 1 entry: `(CF_DIBV5, …)`. (Header/pixel content is
+        validated by the real integration test below; here just assert the format id + count.)
+      - `(Some("hi"), Some(img))` → exactly 2 entries, ORDER `[CF_UNICODETEXT, CF_DIBV5]`
+        (text first). Asserting the ORDER here catches a swap that the FSM would silently
+        accept (the FSM is format-id-agnostic).
+      Format ids are the real `CF_UNICODETEXT`/`CF_DIBV5` constants (these tests compile only
+      on Windows). This is the layer that proves the public `restore_snapshot` produces the
+      right shape before any clipboard call.
 
 - [ ] **Real Windows integration test (`tests/clipboard_win.rs`, Windows CI only).**
-      This is the SUCCESS path only — the failure branches are covered by the fake
-      FSM above (they can't be reliably forced against the real clipboard). It needs
-      an owner HWND but has no Tauri window, so it creates a throwaway message-only
-      window FOR THE TEST (not the app). Lifecycle discipline (round-9 small fix —
-      "short-lived" must have an actual cleanup step):
+      The SUCCESS paths for ALL FOUR cardinalities (round-13 review P1 #2: the prev test
+      only covered text+image). Failure branches are covered by the fake FSM above (they
+      can't be reliably forced against the real clipboard). It needs an owner HWND but has
+      no Tauri window, so it creates a throwaway message-only window FOR THE TEST (not the
+      app). Lifecycle discipline (round-9 small fix — "short-lived" must have an actual
+      cleanup step):
       - Create the owner on the TEST thread: `CreateWindowExW(0, "STATIC", …,
         HWND_MESSAGE, …)`.
       - Wrap it in an RAII guard whose `Drop` calls `DestroyWindow(hwnd)` — and
@@ -510,21 +565,24 @@ The public `restore_snapshot` takes two `Option`s, but the FSM itself operates o
         cross-thread sends are outstanding is undefined; pump first, then destroy.
       - This is acceptable in a test (single short-lived thread) precisely because it
         is NOT the app's permanent owner (the app reuses the Tauri main window).
-      1. Build a **4-color 2×2 RGBA** image (not uniform red — round-8 review: a
-         uniform image can't prove row stride or top-down vs bottom-up order):
-         `[(255,0,0,255), (0,255,0,255),  (0,0,255,255), (255,255,0,255)]` —
-         TL=red, TR=green, BL=blue, BR=yellow.
-      2. `restore_snapshot(owner, Some("hi"), Some(&img))`.
-      3. Read back: assert CF_UNICODETEXT == "hi".
-      4. Read CF_DIBV5, assert header (2×2, 32bpp, BI_BITFIELDS, masks), then assert
-         EACH pixel position by its DISTINCT color:
-         - pos(0,0)=red→BGRA (0,0,255,255), pos(1,0)=green→(0,255,0,255),
-           pos(0,1)=blue→(255,0,0,255), pos(1,1)=yellow→(0,255,255,255).
-         A wrong row stride OR a bottom-up flip would scramble these distinct
-         values — this is the definitive stride + row-direction test (the uniform
-         all-red image could not do this).
-      5. Negative: invalid RGBA (len mismatch) returns Err, clipboard unchanged
-         (marker survives).
+      Cases (each on a fresh EmptyClipboard):
+      1. **`(None, None)` — sentinel cleared (round-13 P1 #2):** write a §B sentinel string
+         to the clipboard first, then `restore_snapshot(owner, None, None)`, assert
+         `IsClipboardFormatAvailable(CF_UNICODETEXT)` is FALSE and the clipboard has no
+         data (the sentinel is gone). Mirrors the macOS `restore_empty_to` real-pasteboard test.
+      2. **Text-only:** `restore_snapshot(owner, Some("hi"), None)` → read CF_UNICODETEXT == "hi",
+         assert CF_DIBV5 absent.
+      3. **Image-only:** `restore_snapshot(owner, None, Some(&img))` → read CF_DIBV5, assert
+         header + pixels; assert CF_UNICODETEXT absent.
+      4. **Text+image (4-color 2×2):** `restore_snapshot(owner, Some("hi"), Some(&img))` →
+         read both; CF_UNICODETEXT == "hi"; CF_DIBV5 header (2×2, 32bpp, BI_BITFIELDS, masks)
+         then assert EACH pixel position by its DISTINCT color:
+         - `[(255,0,0,255), (0,255,0,255), (0,0,255,255), (255,255,0,255)]` —
+           TL=red, TR=green, BL=blue, BR=yellow → BGRA per the masks. A wrong row stride OR a
+           bottom-up flip scrambles these distinct values (the definitive stride + row-direction
+           test; a uniform image couldn't do it).
+      5. **Negative:** invalid RGBA (len mismatch) returns Err, clipboard unchanged (marker
+         survives).
 
 - [ ] Commit.
 
