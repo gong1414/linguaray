@@ -1,26 +1,25 @@
-# Phase 4: Windows Parity + Cross-Platform Packaging — Implementation Plan (rev 12)
+# Phase 4: Windows Parity + Cross-Platform Packaging — Implementation Plan (rev 13)
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** rev 12 — fixes round-11 review issues. **One CODE defect landed + tested**
-(P1 #1: an empty original clipboard `(None,None)` left the §B sentinel on the pasteboard
-— `restore_snapshot(None,None)` now clears on macOS (`clearContents`) and non-mac
-(arboard `clear()`); new `empty_original_clipboard_noselection_clears_sentinel` test).
-**Three plan P1s:** (a) **FSM generalized to 0–N formats** — `restore_with` takes
-`&[(u32, Vec<u8>)]`; 0 entries = clear-only (the §B empty-original case on Windows),
-1 = text- or image-only, 2 = both. The public `restore_snapshot` still takes two
-`Option`s; the cfg(windows) `build_blobs` maps them to the right cardinality.
-(b) **`build_blobs` + `Win32ClipOps` moved out of `fsm.rs`** into a new
-`#[cfg(windows)] src/clipboard/windows.rs` (they use `OsStr::encode_wide`,
-`BITMAPV5HEADER`, `BI_BITFIELDS`, `LCS_sRGB` — none of which exist on macOS); the
-always-compiled `fsm.rs` keeps ONLY the ownership state machine + fake tests, with
-format ids as plain `u32`. (c) **borrow conflict fixed** — format ids are bound to
-locals / carried in the format-list entries before `c` is mutably borrowed. Smalls:
-`RestoreError` gets thiserror `Display`; `SetPartial.cleanup_err` is a `String`;
-top "both absent" claim corrected to "both absent IF remedial empty succeeds, else
-partial may remain"; `cleanup_empty_fails` asserts only app-owned handles cleared
-(not system-owned h_text, which may legitimately persist); file list no longer
-contradicts the cfg'd owner.
+**Status:** rev 13 — fixes round-12 review issues (4 blockers). **One CODE fix landed +
+tested:** the empty-snapshot regression test was a FALSE GREEN (it only drove the Fake,
+which cleared (None,None) even before the prod fix). Extracted `restore_empty_to(&NSPasteboard)`
+so prod + test share one impl; added `restore_empty_removes_sentinel_on_real_pasteboard`
+against `pasteboardWithUniqueName`; verified it FAILS if the helper regresses to a no-op.
+**Four plan P1s:** (a) **cfg split closes** — the existing `#[cfg(not(macos))] pub fn
+restore_snapshot` compiles on Windows, so adding a Windows one would duplicate it;
+narrow it to `not(any(macos, windows))`, put the Windows `pub restore_snapshot` IN
+`windows.rs` (alongside private `build_blobs`/`Win32ClipOps`), and re-export from
+`clipboard.rs`. Stated as the first commit of Task 2b. (b) **`RestoreError` is actually
+compilable** — `#[derive(Debug, thiserror::Error)]` on the enum + `#[error(...)]` on
+each variant (the prev rev's commented-out derive produced no Display). (c) **`ClipOps::alloc`
+Err postcondition** — on Err NO app-owned handle is live (adapter frees partial
+allocation internally); `Win32ClipOps::alloc` uses a local RAII `GlobalGuard` that
+`GlobalFree`s in Drop and is `mem::forget`-disarmed only on the success path (covers
+`GlobalAlloc` ok / `GlobalLock` fail, which would otherwise leak the `HGLOBAL`). Added
+`alloc_lock_fails` fake test. Small: corrected the stale "Windows-only owner param /
+signature unchanged" wording (the param is on ALL targets; only its type cfg's).
 
 **Goal:** Windows builds (real `atomic_replace` + ACL), correct signing (macOS notarization via cert-import; Windows Authenticode via PFX/signtool — distinct from the updater key), and a clean CI matrix (arm64 + Intel macOS via `macos-15-intel`, Windows).
 
@@ -117,11 +116,11 @@ The public `restore_snapshot` takes two `Option`s, but the FSM itself operates o
             #[cfg(target_os = "windows")]
             owner: OwnerHwnd,
         }
-        // Both targets take `owner` so the SAME signature compiles everywhere; on
-        // non-Windows it's a unit () and ignored. This keeps the AX unit test
-        // (tests/selection_engine.rs:204 `capture_selection_with_ax(ax, 1)`) working
-        // WITHOUT a signature change — pass `()` as the owner on non-Windows. The
-        // macOS `restore_snapshot` ignores the extra arg via cfg.
+        // BOTH targets take an `owner` param so the SAME arity compiles everywhere; the
+        // TYPE differs by cfg (raw HWND on Windows, () placeholder elsewhere). The existing
+        // AX unit test (tests/selection_engine.rs:204) gets a THIRD arg — its owner value is
+        // cfg'd (null_mut on Win / () else); see the Test migration bullet. macOS's
+        // restore_snapshot ignores the extra arg via cfg.
         #[cfg(target_os = "windows")]
         pub fn capture_selection(timeout_ms: u64, owner: OwnerHwnd) -> Result<Capture, String> { … }
         #[cfg(not(target_os = "windows"))]
@@ -212,6 +211,30 @@ The public `restore_snapshot` takes two `Option`s, but the FSM itself operates o
       NOT `GlobalFree` a submitted handle (the system frees it on next empty). Only
       `GlobalFree` handles that were NOT successfully submitted.
 
+- [ ] **`Win32ClipOps::alloc` leak-safety (round-12 review P1 #4).** `GlobalAlloc` can
+      succeed and `GlobalLock` fail; if `alloc` then returns Err without freeing, the
+      `HGLOBAL` leaks (restore_with can't free a handle it never received). Implement
+      `alloc` with a local RAII guard that owns the raw `HGLOBAL` and frees it in `Drop`;
+      disarm the guard (forget the handle) ONLY on the success path, right before
+      returning the `Handle`:
+      ```rust
+      fn alloc(&mut self, bytes: &[u8]) -> Result<Handle, String> {
+          let raw = unsafe { GlobalAlloc(GMEM_MOVEABLE, bytes.len()) };
+          if raw.is_null() { return Err("GlobalAlloc failed".into()); }
+          let guard = GlobalGuard(raw);              // Drop calls GlobalFree(raw)
+          let ptr = unsafe { GlobalLock(raw) };
+          if ptr.is_null() { return Err("GlobalLock failed".into()); } // guard Drop frees raw ✓
+          unsafe { std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr as *mut u8, bytes.len()); }
+          let _ = unsafe { GlobalUnlock(raw) };      // best-effort
+          std::mem::forget(guard);                   // disarm: ownership transfers to caller
+          Ok(Handle(raw))
+      }
+      ```
+      This makes the `ClipOps::alloc` postcondition hold: Err ⇒ no live app-owned handle.
+      Add a fake test (`alloc_lock_fails`) that models a two-step alloc (alloc-ok / lock-fail)
+      and asserts the fake records a `free` of the partial allocation on the Err path — the
+      real adapter's guard is the production equivalent.
+
 - [ ] **CF_DIBV5 pixel layout (BITMAPV5HEADER)** (Windows-only, lives in the
       `#[cfg(windows)]` blob builder — see three-layer split below):
       - `bV5Size` = `size_of::<BITMAPV5HEADER>()` (124)
@@ -245,6 +268,12 @@ The public `restore_snapshot` takes two `Option`s, but the FSM itself operates o
           fn empty(&mut self) -> Result<(), String>;
           // set transfers Handle ownership to the system on Ok; on Err RETURNS the handle.
           fn set(&mut self, fmt: u32, h: Self::Handle) -> Result<(), (Self::Handle, String)>;
+          // alloc POSTCONDITION (round-12 review P1 #4): on Err, NO app-owned handle is
+          // left live — the adapter frees any partial allocation internally before
+          // returning Err (e.g. GlobalAlloc succeeded but GlobalLock failed → GlobalFree
+          // the HGLOBAL first). restore_with relies on this: it cannot free a handle the
+          // adapter never handed back. Implement via a local RAII guard that owns the raw
+          // allocation and is disarmed only when the Handle is successfully returned.
           fn alloc(&mut self, bytes: &[u8]) -> Result<Self::Handle, String>;
           fn free(&mut self, h: Self::Handle);
       }
@@ -319,41 +348,66 @@ The public `restore_snapshot` takes two `Option`s, but the FSM itself operates o
           Ok(())   // clip drops → close() exactly once on every path (incl. panic)
       }
 
-      #[derive(Debug)]   // Display via thiserror below — round-11 small fix.
+      // thiserror is already a dep. Debug + thiserror::Error MUST be on the SAME derive
+      // as the enum (round-12 review P1 #3: a commented-out derive after the enum does
+      // nothing — map_err(|e| e.to_string()) and the fake assertions wouldn't compile).
+      // Each variant gets a #[error(...)] so Display is real.
+      #[derive(Debug, thiserror::Error)]
       pub(super) enum RestoreError {
-          Alloc(String), Open(String), Empty(String), Set(String),
+          #[error("clipboard allocation failed: {0}")]           Alloc(String),
+          #[error("clipboard open failed: {0}")]                 Open(String),
+          #[error("clipboard empty failed: {0}")]                Empty(String),
+          #[error("clipboard set failed: {0}")]                  Set(String),
           // a later set failed AND the remedial EmptyClipboard failed: earlier-submitted
           // formats MAY still be on the clipboard. cleanup_err is a String (always present
-          // in this variant — not an Option that's forever Some). Honest user message:
-          // "clipboard restore failed and cleanup also failed; clipboard may contain partial data".
+          // in this variant). The honest user-visible message names both failures + the
+          // partial-data possibility — NOT silenced (prev rev did `let _ = clip.empty()`).
+          #[error(
+              "clipboard set failed: {cause}; cleanup also failed: {cleanup_err}; \
+               clipboard may contain partial data"
+          )]
           SetPartial { cause: String, cleanup_err: String },
       }
-      // thiserror is already a dep — derive Display so err.to_string() is meaningful and
-      // the cross-platform fake tests can assert on it (NOT on the Windows-only public wrapper).
-      //   #[derive(thiserror::Error)]
-      //   impl Display for RestoreError { ... "set failed: {cause}; cleanup also failed: {cleanup_err}" ... }
 
-      // === src/clipboard/windows.rs — #[cfg(windows)] ONLY (build_blobs + Win32ClipOps) ===
+      // === src/clipboard/windows.rs — #[cfg(windows)] ONLY ===
+      // Holds EVERYTHING Windows-specific: build_blobs + Win32ClipOps (both private to
+      // the module) AND the public Windows restore_snapshot. This avoids two cfg mistakes
+      // (round-12 review P1 #2): the parent must NOT call private build_blobs/Win32ClipOps
+      // across the module boundary, and there must NOT be two `pub fn restore_snapshot`
+      // definitions on Windows.
+      //
       // build_blobs returns Vec<(u32, Vec<u8>)>: 0/1/2 entries based on text/image Options:
       //   - (None, None) → empty Vec  → restore_with clears only (§B empty-original fix)
       //   - (Some(t), None) → [(CF_UNICODETEXT, utf16_nul_bytes)]
       //   - (None, Some(img)) → [(CF_DIBV5, bitmapv5_bytes)]
       //   - (Some, Some) → both, in that order
-      // fn build_blobs(text: Option<&str>, image: Option<&ImageBlob>) -> Result<Vec<(u32, Vec<u8>)>, String>
       //   (uses OsStr::encode_wide, BITMAPV5HEADER, BI_BITFIELDS, LCS_sRGB — hence cfg(windows).)
       //
-      // struct Win32ClipOps { owner: windows_sys::Win32::Foundation::HWND }
-      //   impl ClipOps (open→OpenClipboard(self.owner), close→CloseClipboard, empty→EmptyClipboard,
-      //   set→SetClipboardData(fmt,h), alloc→GlobalAlloc(GMEM_MOVEABLE)+Lock+copy+Unlock,
-      //   free→GlobalFree)
+      // Win32ClipOps { owner }: impl ClipOps (open→OpenClipboard(self.owner),
+      //   close→CloseClipboard, empty→EmptyClipboard, set→SetClipboardData(fmt,h),
+      //   alloc→ see postcondition below, free→GlobalFree).
       //
-      // === LAYER C: public, NON-generic, Windows-only ===
-      // #[cfg(windows)] pub fn restore_snapshot(owner, text, image) -> Result<(), String> {
-      //     let formats = windows::build_blobs(text, image)?;       // LAYER A (cfg(windows))
-      //     let mut ops = Win32ClipOps { owner };                   // real adapter (cfg(windows))
-      //     fsm::restore_with(&mut ops, &formats)                   // LAYER B (platform-neutral)
-      //         .map_err(|e| e.to_string())
-      // }
+      // The PUBLIC wrapper lives HERE (not in clipboard.rs):
+      //   pub fn restore_snapshot(owner: OwnerHwnd, text: Option<&str>, image: Option<&ImageBlob>)
+      //       -> Result<(), String>
+      //   {
+      //       let formats = build_blobs(text, image)?;              // private, same module
+      //       let mut ops = Win32ClipOps { owner };                 // private, same module
+      //       super::fsm::restore_with(&mut ops, &formats)          // platform-neutral FSM
+      //           .map_err(|e| e.to_string())
+      //   }
+      //
+      // === clipboard.rs cfg split (round-12 review P1 #2) — AVOID duplicate definitions ===
+      // The existing `#[cfg(not(target_os = "macos"))] pub fn restore_snapshot` currently
+      // compiles on Windows too. Narrow it and re-export so each target has exactly ONE
+      // `restore_snapshot`:
+      //   #[cfg(target_os = "macos")]   pub fn restore_snapshot(...) { … }           // current
+      //   #[cfg(target_os = "windows")] mod windows;
+      //   #[cfg(target_os = "windows")] pub use windows::restore_snapshot;          // re-export
+      //   #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+      //   pub fn restore_snapshot(...) { … arboard sequential stub … }               // narrowed
+      // (This is the FIRST commit of Task 2b — narrow the non-mac arm BEFORE adding the
+      // Windows module, or Windows gets two `restore_snapshot` and fails to compile.)
       ```
       Why this shape: the always-compiled `fsm.rs` references NO Win32 symbol (format ids
       are plain `u32` params) and models 0–N formats generically (0 = clear-only, covering
@@ -420,6 +474,10 @@ The public `restore_snapshot` takes two `Option`s, but the FSM itself operates o
         RestoreError::Alloc.
       - **`second_alloc_fails`** (2 fmts): alloc#1 ok, alloc#2 errs → EXACTLY 1 `free`
         (h_text — the previously-leaked handle), no `open`. RestoreError::Alloc.
+      - **`alloc_lock_fails`** (round-12 P1 #4): the fake models a two-step alloc
+        (raw-alloc ok, "lock" fail) and records a `free` of the partial raw allocation
+        on the Err path — proves the adapter honors the alloc postcondition (Err ⇒ no
+        live handle). restore_with then sees a normal Alloc Err (no handle to free).
       - **`cleanup_empty_fails`** (2 fmts): set#1 ok, set#2 errs, remedial `empty` errs →
         1 `free` (h_dib), result is `RestoreError::SetPartial { cleanup_err: <str> }`.
         The test asserts `err.to_string()` mentions the cleanup failure AND partial data
