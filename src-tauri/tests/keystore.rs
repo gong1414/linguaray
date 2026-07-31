@@ -152,6 +152,20 @@ fn different_dirs_do_not_block_each_other() {
         "dir2 load took {elapsed:?} — blocked by dir1's lock (process-global lock bug)"
     );
 
+    // Round-6 review P1 #3: timing alone can't distinguish "per-dir flock" from
+    // "static OnceLock<File> where the second open reuses one fd that flock sees as
+    // already-held". The OnceLock regression would NOT create dir2's sidecar (it
+    // reuses the first one). Asserting BOTH sidecars exist on disk proves each
+    // Keystore opens its OWN keystore.lock per call.
+    assert!(
+        dir1.join("keystore.lock").exists(),
+        "dir1/keystore.lock sidecar must exist (per-dir lock file)"
+    );
+    assert!(
+        dir2.join("keystore.lock").exists(),
+        "dir2/keystore.lock sidecar must exist — a static OnceLock<File> would NOT create this (it'd reuse dir1's), so this catches that regression"
+    );
+
     h1.join().unwrap();
     let _ = std::fs::remove_dir_all(&dir1);
     let _ = std::fs::remove_dir_all(&dir2);
