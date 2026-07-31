@@ -1,20 +1,23 @@
-# Phase 4: Windows Parity + Cross-Platform Packaging — Implementation Plan (rev 8)
+# Phase 4: Windows Parity + Cross-Platform Packaging — Implementation Plan (rev 9)
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** rev 8 — fixes round-7 review issues: (a) Task 2b HWND owner now reuses
-the Tauri main window's HWND (`Window::hwnd()`, on the event-loop thread that
-already pumps messages — required because the owner receives WM_DESTROYCLIPBOARD
-even with eager rendering; dropped the message-only-window-on-an-async-worker +
-OnceCell approach), (b) submit/handle-ownership sequence corrected — first-submit
-failure frees BOTH handles with NO re-empty (nothing on clipboard; EmptyClipboard
-after CloseClipboard is invalid); only second-submit failure re-empties WHILE OPEN
-and frees only the unsubmitted handle, (c) windows-sys 0.59 feature map corrected
-by grepping the crate source: CF_UNICODETEXT/CF_DIBV5 are in `Win32_System_Ole`
-(was wrongly placed in WindowsAndMessaging), DataExchange already provides the
-clipboard functions, WindowsAndMessaging is no longer needed, LCS_sRGB is in
-`Win32_UI_ColorSystem`; added explicit checked i32/u32/usize conversions mirroring
-the macOS preflight.
+**Status:** rev 9 — fixes round-8 review issues (all in Task 2b, all from the
+HWND decision not yet landing in the data flow): (a) **callchain + HWND threading**
+— files list now includes `lib.rs`/`selection.rs`/tests; `OsClipboard` carries a
+Windows-only owner HWND; `capture_selection` gains a Windows-only `owner` param;
+`on_hotkey` resolves `app.get_window("main").hwnd()` and threads it down; the
+windows-crate `HWND` (tauri's `windows` 0.61, newtype `HWND(pub *mut c_void)`)
+converts to windows-sys's `HWND` (`*mut c_void`) via a single `.0` field access
+(no isize round-trip); `ClipboardLike` trait and the pure FSM stay unchanged.
+(b) **single-close RAII** — `ClipGuard` constructed right after a successful
+`OpenClipboard` is the ONLY closer; no manual `CloseClipboard()` in any branch
+(prev rev double-closed); each branch just `return`s. (c) **failure-injection
+tests** — extract a `ClipOps` adapter; a fake forces open/empty/set1/set2 failures
+and asserts exact `free`/`empty`/`close` counts + order + no-leak/no-double-free
+via ownership bookkeeping (runs in `cargo test` on all platforms, no clipboard
+needed); the real Windows CI test is success-only with a 4-color image that proves
+stride + row direction.
 
 **Goal:** Windows builds (real `atomic_replace` + ACL), correct signing (macOS notarization via cert-import; Windows Authenticode via PFX/signtool — distinct from the updater key), and a clean CI matrix (arm64 + Intel macOS via `macos-15-intel`, Windows).
 
@@ -42,7 +45,9 @@ the macOS preflight.
 
 ## Task 2b: Windows compound clipboard restore (§B image promise)
 
-**Files:** `src-tauri/src/clipboard.rs`, `src-tauri/Cargo.toml`
+**Files:** `src-tauri/src/clipboard.rs`, `src-tauri/src/selection.rs`,
+`src-tauri/src/lib.rs`, `src-tauri/Cargo.toml`, `src-tauri/tests/clipboard_win.rs`
+(new), `src-tauri/tests/clipboard_win_fsm.rs` (new, failure-injection unit tests).
 
 Windows mirrors the macOS compound write (one `EmptyClipboard`, both formats in one
 open window). "All-or-nothing" here means: **conversion-phase failures never touch
@@ -69,13 +74,80 @@ the clipboard is left with NEITHER format, matching the macOS single-item semant
       owner HWND MUST belong to a thread with a running message pump — otherwise a
       cross-thread SendMessage from the emptying app can block.
       **Decision: reuse the existing Tauri main window's HWND.** It is created on
-      Tauri's event-loop thread (which already pumps messages), it is stable for the
-      app lifetime, and `tauri::Window::hwnd() -> crate::Result<HWND>` is the public
-      accessor (`#[cfg(windows)]`, tauri 2.11.5 `src/window/mod.rs:1668`). Obtain it
-      from the `AppHandle`/`Window` passed into the restore path; do NOT create a
-      message-only window on an arbitrary async-runtime worker and cache its HWND in
-      a `OnceCell` (that thread has no message loop and may exit, leaving a stale
-      owner). If the main window is unavailable, return Err (best-effort: no restore).
+      Tauri's event-loop thread (which already pumps messages) and is stable for the
+      app lifetime. If the main window is unavailable, return Err (best-effort: no
+      restore). Do NOT create a message-only window on an arbitrary async-runtime
+      worker and cache its HWND in a `OnceCell` (that thread has no message loop and
+      may exit, leaving a stale owner).
+
+- [ ] **Callchain + HWND threading (round-8 review P1: the HWND decision must land
+      in the actual data flow, not just be stated).** Today the path is
+      `lib.rs::on_hotkey` → `selection::capture_selection(timeout)` → unit
+      `OsClipboard` → `clipboard::restore_snapshot(text, image)`, with no
+      `AppHandle`/`Window`/HWND anywhere. Changes:
+      - **`selection.rs`**: `OsClipboard` gains a Windows-only owner field.
+        `capture_selection` / `capture_selection_with_ax` gain a Windows-only
+        `owner: windows_sys::Win32::Foundation::HWND` param threaded into
+        `OsClipboard { #[cfg(windows)] owner }`:
+        ```rust
+        // selection.rs
+        #[cfg(target_os = "windows")]
+        type OwnerHwnd = windows_sys::Win32::Foundation::HWND; // *mut c_void
+        struct OsClipboard {
+            #[cfg(target_os = "windows")]
+            owner: OwnerHwnd,
+        }
+        // macOS path keeps OsClipboard as a unit struct (no HWND) — the cfg keeps
+        // the macOS build and its selection_engine unit tests unchanged.
+        #[cfg(target_os = "windows")]
+        pub fn capture_selection(timeout_ms: u64, owner: OwnerHwnd) -> Result<Capture, String> { … }
+        #[cfg(not(target_os = "windows"))]
+        pub fn capture_selection(timeout_ms: u64) -> Result<Capture, String> { … }
+        ```
+        `OsClipboard::restore_snapshot` passes `self.owner` to the Windows
+        `clipboard::restore_snapshot`. The `ClipboardLike` trait itself is
+        UNCHANGED — `OsClipboard` already implements it; only its concrete fields
+        and the `restore_snapshot` body differ by cfg. `selection_engine::capture`
+        (the pure FSM, unit-tested with a Fake) is untouched.
+      - **`lib.rs::on_hotkey`** (the only caller of `capture_selection`):
+        ```rust
+        // Windows: resolve the main window's HWND on the event-loop-owned call and
+        // pass it down. macOS/other: unchanged signature.
+        #[cfg(target_os = "windows")]
+        let cap = {
+            let hwnd = app2.get_window("main")
+                .ok_or_else(|| "main window unavailable".to_string())
+                .and_then(|w| w.hwnd().map_err(|e| e.to_string()))?;
+            selection::capture_selection(800, owner_from_tauri(hwnd))
+        };
+        #[cfg(not(target_os = "windows"))]
+        let cap = selection::capture_selection(800);
+        ```
+      - **windows-crate HWND → windows-sys HWND conversion (round-8 review P1).**
+        `tauri::Window::hwnd()` returns the HIGH-LEVEL `windows` crate's
+        `HWND` (`windows::Win32::Foundation::HWND`, a newtype
+        `pub struct HWND(pub *mut c_void)` — tauri 2.11.5 depends on `windows`
+        0.61). Our code calls `windows-sys` 0.59, whose `HWND` is a type alias
+        `*mut c_void`. Same pointee type, so the conversion is a single field
+        access — NO `isize` round-trip, NO handle reinterpretation:
+        ```rust
+        // clipboard.rs (Windows)
+        fn owner_from_tauri(h: windows::Win32::Foundation::HWND) -> windows_sys::Win32::Foundation::HWND {
+            h.0 // *mut c_void  ==  windows-sys HWND
+        }
+        ```
+        (We do NOT add a `windows` crate dependency to islandpot — only the one
+        conversion site references the type, and it lives behind the cfg in the
+        `lib.rs` call site where `w.hwnd()` already returns it. If avoiding the
+        `windows` crate entirely is preferred, `w.hwnd().unwrap().0 as isize` then
+        `isize as *mut c_void` is equivalent but adds a redundant cast chain; the
+        `.0` direct access is cleaner and type-checked.)
+      - **`translate_clipboard`** (the other selection caller, lib.rs:142) does NOT
+        call `restore_snapshot` — it only reads text — so it needs no HWND change.
+      - **`clipboard.rs`**: the Windows `restore_snapshot` signature becomes
+        `restore_snapshot(owner: OwnerHwnd, text: Option<&str>, image: Option<&ImageBlob>)`.
+        macOS signature is unchanged. The Win32 adapter (see FSM bullet below) is
+        injected here so the failure paths are unit-testable.
 
 - [ ] **Memory: `GlobalAlloc(GMEM_MOVEABLE, len)` for EACH blob.** Verified: "A
       memory object that is to be placed on the clipboard should be allocated by
@@ -105,35 +177,38 @@ the clipboard is left with NEITHER format, matching the macOS single-item semant
         `(b,g,r,a)`. Row stride = width*4 (no padding at 32bpp). This channel swap +
         the alpha mask are what the test asserts (see test).
 
-- [ ] **Submit sequence + handle ownership (RAII):**
-      1. `OpenClipboard(hwnd_owner)` → on fail: `GlobalFree` BOTH pre-built handles
-         (`h_text`, `h_dib`), return Err. (Clipboard was never opened; nothing to
-         close or empty.)
-      2. `EmptyClipboard()` → on fail: `GlobalFree` BOTH handles, `CloseClipboard()`,
-         return Err. (Nothing was submitted, so no half-state.)
-      3. `SetClipboardData(CF_UNICODETEXT, h_text)`:
-         - **Success:** `h_text` ownership transfers to the system — do NOT free it.
-         - **Failure:** `h_text` was NOT taken (the call failed), so `GlobalFree` it;
-           `h_dib` is also still unsubmitted, so `GlobalFree` it too. There is **no
-           half-state to clean up** (nothing was submitted), so do NOT call
-           `EmptyClipboard` again. `CloseClipboard()`, return Err.
-           (Prev rev was wrong here: it freed only `h_dib` and re-emptied — but on a
-           first-submit failure nothing is on the clipboard to remove, and a call to
-           `EmptyClipboard` AFTER `CloseClipboard` is invalid anyway — it requires
-           the clipboard to still be open.)
-      4. `SetClipboardData(CF_DIBV5, h_dib)`:
-         - **Success:** `h_dib` ownership transfers to the system. Both formats are
-           now live (both system-owned). `CloseClipboard()`, return Ok.
-         - **Failure:** `h_text` WAS already taken by step 3 (system-owned — do NOT
-           free it, or double-free). `h_dib` was not taken → `GlobalFree` it. Now
-           there IS a half-state (only text is on the clipboard). Re-`EmptyClipboard()`
-           to remove the orphaned text — **while the clipboard is still open** (the
-           guard has not closed it yet). `CloseClipboard()`, return Err.
-      - Use a small RAII guard (`struct ClipGuard { opened: bool }` impls Drop:
-        `if opened { CloseClipboard() }`) so `CloseClipboard` always runs even on
-        early-return / panic. The re-`EmptyClipboard` in step 4 runs BEFORE the guard
-        drops (clipboard still open); steps 1-3 never need a re-empty because nothing
-        is on the clipboard until a submit succeeds.
+- [ ] **Submit sequence + handle ownership (single-close RAII discipline).**
+      Round-8 review P1: the prev rev called `CloseClipboard()` manually in branches
+      2-4 AND in `ClipGuard::drop` — a double close. Fix: **the guard is the ONLY
+      closer.** Construct it immediately after a successful `OpenClipboard`; every
+      branch from then on does its handle work and then `return`s — the guard's
+      `Drop` closes exactly once, including on panic. No manual `CloseClipboard()`
+      appears anywhere after the guard exists.
+      ```text
+      1. build h_text, h_dib (GMEM_MOVEABLE + GlobalLock/copy/Unlock)   [clipboard UNTOUCHED on fail → return Err]
+      2. OpenClipboard(owner):
+           fail → GlobalFree(h_text); GlobalFree(h_dib); return Err     [never opened, no guard]
+           ok   → let _guard = ClipGuard::new();   // ONLY closer from here
+      3. EmptyClipboard():
+           fail → GlobalFree(h_text); GlobalFree(h_dib); return Err     [_guard drops → CloseClipboard once]
+      4. SetClipboardData(CF_UNICODETEXT, h_text):
+           fail → GlobalFree(h_text); GlobalFree(h_dib); return Err     [NOTHING submitted yet;
+                                                                       no half-state; no re-empty;
+                                                                       _guard drops → CloseClipboard once]
+           ok   → h_text is now system-owned (do NOT free)
+      5. SetClipboardData(CF_DIBV5, h_dib):
+           ok   → return Ok(())   [both system-owned; _guard drops → CloseClipboard once]
+           fail → h_text WAS taken (system-owned, do NOT free);
+                  GlobalFree(h_dib);                              // half-state: only text is live
+                  EmptyClipboard();                               // remove orphaned text — STILL OPEN (_guard alive)
+                  return Err                                      [_guard drops → CloseClipboard once]
+      ```
+      `struct ClipGuard; impl Drop for ClipGuard { fn drop(&mut self) { unsafe { CloseClipboard(); } } }`
+      — no `opened` flag needed (it's only ever constructed right after a successful
+      open, so Drop always closes). The re-`EmptyClipboard` in step 5 runs while the
+      guard is alive (clipboard still open); steps 3-4 never re-empty because nothing
+      is on the clipboard until a submit succeeds. Handle ownership is trackable in
+      the fake FSM test (next bullet) by counting `GlobalAlloc`/`GlobalFree` pairs.
 
 - [ ] **windows-sys 0.59 features** — verified module paths by grepping the crate
       source (`~/.cargo/registry/.../windows-sys-0.59.0/src/`), NOT by guessing.
@@ -147,9 +222,12 @@ the clipboard is left with NEITHER format, matching the macOS single-item semant
       - `Win32_UI_ColorSystem` — `LCS_sRGB` (lives in ColorSystem, not Gdi)
       Already present, no action: `Win32_System_DataExchange` provides
       `OpenClipboard`/`EmptyClipboard`/`SetClipboardData`/`CloseClipboard`. NOTE:
-      `Win32_UI_WindowsAndMessaging` is NOT needed (we reuse the Tauri main-window
-      HWND — no `CreateWindowExW`/`HWND_MESSAGE`); it was listed in the prev rev for
-      the now-dropped message-only-window approach.
+      `Win32_UI_WindowsAndMessaging` is NOT needed by the APP (it reuses the Tauri
+      main-window HWND — no `CreateWindowExW`/`HWND_MESSAGE`), but the real Windows
+      CI test DOES use `CreateWindowExW`/`HWND_MESSAGE`/`PeekMessage`/`DispatchMessage`
+      for its throwaway test owner, so add `Win32_UI_WindowsAndMessaging` as a
+      `[dev-dependencies]`-style test-only feature (or accept it in the main dep —
+      it's cheap). The app's production path never touches it.
       (Task 2's `Win32_Security_Authorization`/`Win32_Security` are separate.)
 
 - [ ] **Checked conversions for the FFI boundary** (mirror the macOS preflight
@@ -166,25 +244,85 @@ the clipboard is left with NEITHER format, matching the macOS single-item semant
       - Image byte count: `usize::try_from(total_u64)` as in the macOS preflight.
       Any conversion failure returns Err before any Win32 call (clipboard untouched).
 
-- [ ] Add `#[cfg(target_os = "windows")] fn restore_snapshot(...)` mirroring the
-      macOS signature, replacing the sequential-arboard cfg-arm for Windows. Keep the
+- [ ] Add `#[cfg(target_os = "windows")] fn restore_snapshot(owner, text, image)`
+      (owner-bearing signature per the callchain bullet), replacing the
+      sequential-arboard cfg-arm for Windows. macOS signature unchanged. Keep a
       non-mac/non-win sequential stub for unsupported targets.
 
-- [ ] **Test (Windows CI, `#[cfg(target_os="windows")]` integration test):**
-      1. Build a 2×2 all-red RGBA `ImageBlob` (R=255,G=0,B=0,A=255).
-      2. `restore_snapshot(Some("hi"), Some(&img))`.
-      3. `OpenClipboard(NULL)` (read path: NULL is fine for reading), assert
-         `IsClipboardFormatAvailable(CF_UNICODETEXT)` AND
-         `IsClipboardFormatAvailable(CF_DIBV5)`.
-      4. `GetClipboardData(CF_UNICODETEXT)` → decode UTF-16, assert == "hi".
-      5. `GetClipboardData(CF_DIBV5)` → lock, read BITMAPV5HEADER, assert width==2,
-         height==2 (abs), bitcount==32, compression==BI_BITFIELDS, redMask==
-         0x00FF0000, alphaMask==0xFF000000; read ALL 4 pixels, assert each BGRA ==
-         (0,0,255,255) (red in BGRA). All-4-pixels (not just the first) catches a
-         row-stride bug that would read padding bytes on rows 2; channel order +
-         alpha are covered by the BGRA values.
-      6. Negative test: invalid RGBA (len mismatch) returns Err AND clipboard is
-         unchanged (write a marker first, assert it survives).
+- [ ] **Extract an injectable Win32 adapter so the failure branches are testable
+      without a real clipboard (round-8 review P1).** The submit logic is the
+      danger zone; isolate it behind a trait the real impl and a fake both satisfy:
+      ```rust
+      #[cfg(target_os = "windows")]
+      trait ClipOps {
+          fn open(&mut self, owner: OwnerHwnd) -> Result<()>;
+          fn empty(&mut self) -> Result<()>;
+          fn set(&mut self, fmt: u32, h: GlobalHandle) -> Result<()>; // ownership transfers on Ok
+          // GlobalAlloc/Lock/Free are also on the trait (or on a MemoryOps sibling)
+          // so the fake can count alloc/free pairs to prove no double-free / no leak.
+          fn alloc(&mut self, bytes: &[u8]) -> Result<GlobalHandle>;
+          fn free(&mut self, h: GlobalHandle);
+      }
+      ```
+      `restore_snapshot` takes a `&mut impl ClipOps` (the real impl wraps the
+      `windows-sys` calls; a fake records calls). This mirrors how
+      `selection_engine::capture` is already pure + tested via a `Fake` clipboard.
+      The submit algorithm lives in a `fn submit<C: ClipOps>(c: &mut C, h_text, h_dib)
+      -> Result<()>` that encodes ONLY the step-2..5 sequence above — no preflight,
+      no conversion, pure ownership transitions. (Preflight + BGRA conversion stay
+      in the non-generic `restore_snapshot` wrapper and get their own unit tests.)
+
+- [ ] **Failure-injection unit tests (`tests/clipboard_win_fsm.rs`).** The fake
+      needs no Win32 types (it just records calls against an in-memory ownership
+      map), so these are NOT cfg-gated to Windows — they run in `cargo test` on ALL
+      platforms (macOS dev, Linux CI, Windows CI), exactly like the existing
+      `selection_engine` FSM tests that use a cross-platform `Fake` clipboard. The
+      fake forces each API to fail and records the call sequence:
+      - `open_fails`: OpenClipboard errs → exactly 2 `free` (h_text, h_dib), zero
+        `empty`, zero `set`, zero `close` (guard never constructed). No leak.
+      - `empty_fails`: EmptyClipboard errs → 2 `free`, zero `set`, exactly 1
+        `close` (guard dropped). No re-empty.
+      - `first_set_fails`: Set(CF_UNICODETEXT) errs → 2 `free` (both unsubmitted),
+        zero `set` success, ZERO `empty` after the failure (nothing to remove),
+        exactly 1 `close`. Proves no re-empty on first-submit failure.
+      - `second_set_fails`: Set(CF_UNICODETEXT) ok, Set(CF_DIBV5) errs → exactly 1
+        `free` (h_dib only — h_text is system-owned, freeing it would double-free),
+        exactly 1 `empty` AFTER the failure (remove orphaned text) WHILE still open,
+        exactly 1 `close`. Proves the half-state cleanup + ownership transfer.
+      - `success`: both sets ok → zero `free` (both system-owned), zero re-`empty`,
+        exactly 1 `close`.
+      - **Ownership bookkeeping**: the fake tracks each `alloc`'d handle as
+        "owned-by-us" and flips it to "owned-by-system" on a successful `set`.
+        `free` on a system-owned handle panics (double-free detector). At end of
+        every test, assert every handle is either system-owned or freed — no leaks,
+        no double-frees. This is the core safety property the protocol must hold.
+      - Close count is asserted `== 1` in every branch that opened (the guard is
+        the only closer; these tests prove the single-close discipline directly).
+
+- [ ] **Real Windows integration test (`tests/clipboard_win.rs`, Windows CI only).**
+      This is the SUCCESS path only — the failure branches are covered by the fake
+      FSM above (they can't be reliably forced against the real clipboard). It needs
+      an owner HWND but has no Tauri window, so it creates a throwaway message-only
+      window FOR THE TEST (not the app): `CreateWindowExW(0, "STATIC", …,
+      HWND_MESSAGE, …)` on the test thread and runs a minimal `PeekMessage`/`Dispatch`
+      loop around the assertion (so a `WM_DESTROYCLIPBOARD` from a concurrent app
+      can't deadlock the test). This is acceptable in a test (short-lived, single
+      thread) precisely because it is NOT the app's permanent owner.
+      1. Build a **4-color 2×2 RGBA** image (not uniform red — round-8 review: a
+         uniform image can't prove row stride or top-down vs bottom-up order):
+         `[(255,0,0,255), (0,255,0,255),  (0,0,255,255), (255,255,0,255)]` —
+         TL=red, TR=green, BL=blue, BR=yellow.
+      2. `restore_snapshot(owner, Some("hi"), Some(&img))`.
+      3. Read back: assert CF_UNICODETEXT == "hi".
+      4. Read CF_DIBV5, assert header (2×2, 32bpp, BI_BITFIELDS, masks), then assert
+         EACH pixel position by its DISTINCT color:
+         - pos(0,0)=red→BGRA (0,0,255,255), pos(1,0)=green→(0,255,0,255),
+           pos(0,1)=blue→(255,0,0,255), pos(1,1)=yellow→(0,255,255,255).
+         A wrong row stride OR a bottom-up flip would scramble these distinct
+         values — this is the definitive stride + row-direction test (the uniform
+         all-red image could not do this).
+      5. Negative: invalid RGBA (len mismatch) returns Err, clipboard unchanged
+         (marker survives).
 
 - [ ] Commit.
 
