@@ -2234,48 +2234,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "linguaray"
-version = "0.1.0"
-dependencies = [
- "accessibility-ng",
- "accessibility-sys",
- "accessibility-sys-ng",
- "aes-gcm",
- "anyhow",
- "arboard",
- "argon2",
- "async-trait",
- "base64 0.22.1",
- "core-foundation 0.9.4",
- "core-foundation-sys",
- "enigo",
- "fs2",
- "log",
- "mouse_position",
- "objc2 0.6.4",
- "objc2-app-kit",
- "objc2-foundation",
- "parking_lot",
- "rand 0.8.7",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-global-shortcut",
- "tauri-plugin-opener",
- "tauri-plugin-single-instance",
- "tauri-plugin-store",
- "tempfile",
- "thiserror 1.0.69",
- "tokio",
- "url",
- "windows-sys 0.59.0",
- "wiremock",
- "zeroize",
-]
-
-[[package]]
 name = "itoa"
 version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2454,6 +2412,48 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c943259e342f1e06ff2da7a83eabdfe7f92ce10262688dbf1895ff0b3e6e4652"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "linguaray"
+version = "0.1.0"
+dependencies = [
+ "accessibility-ng",
+ "accessibility-sys",
+ "accessibility-sys-ng",
+ "aes-gcm",
+ "anyhow",
+ "arboard",
+ "argon2",
+ "async-trait",
+ "base64 0.22.1",
+ "core-foundation 0.9.4",
+ "core-foundation-sys",
+ "enigo",
+ "fs2",
+ "log",
+ "mouse_position",
+ "objc2 0.6.4",
+ "objc2-app-kit",
+ "objc2-foundation",
+ "parking_lot",
+ "rand 0.8.7",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-global-shortcut",
+ "tauri-plugin-opener",
+ "tauri-plugin-single-instance",
+ "tauri-plugin-store",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tokio",
+ "url",
+ "windows-sys 0.59.0",
+ "wiremock",
+ "zeroize",
 ]
 
 [[package]]

@@ -201,6 +201,14 @@ fn cross_process_lock_mutual_exclusion() {
     }
     assert!(std::path::Path::new(bin).exists(), "xproc-lock-holder still not built at {bin}");
 
+    // Pre-create + protect the dir BEFORE spawning the holder. On Windows the production
+    // keystore locks the dir to the current user with an INHERITABLE ACE; files the holder
+    // then creates inside (keystore.lock, holding) auto-inherit that ACE so the parent's
+    // later load() can open them. Without this the holder's files inherit the system
+    // default ACL and the parent gets Access Denied (Task 2 Windows ACL). On macOS the
+    // 0o700 dir + umask achieves the same; this call is a harmless no-op extra create.
+    Keystore::new(dir.clone()).expect("pre-create + protect dir");
+
     // Spawn the holder; it acquires the lock and sleeps HOLD_SECS.
     let mut child = Command::new(bin)
         .arg(&dir)
