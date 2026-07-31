@@ -109,14 +109,68 @@ fn with_locks_same_dir_concurrent_no_clobber() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
-// NOTE on different-dirs independence: a timing-based test for "dir2's write isn't
-// blocked by dir1's lock" is unreliable because each Keystore op runs the Argon2id
-// 64MiB KDF (~0.5s, variable under load), swamping the lock-wait signal. Instead,
-// independence is established structurally: Keystore::new(dir) opens THIS dir's
-// keystore.lock (self.dir.join(LOCK)), and with_locks flocks that per-instance
-// path — there is no global/shared lock path (the cross_process test below proves
-// the flock works cross-process on a given dir). The global-OnceLock bug that this
-// test would have caught is now impossible by construction.
+#[test]
+fn different_dirs_do_not_block_each_other() {
+    // Round-3 review P1 #6 (second test): PROVE dir1's lock doesn't block dir2.
+    // Approach: child process holds dir1's lock (update_keys sleeps); parent calls
+    // load() on an EMPTY dir2 (no keystore file → load returns {} without KDF —
+    // deterministic, no Argon2). If locks were global/shared, dir2's load would
+    // block until dir1 releases; if independent, it completes instantly.
+    use islandpot_lib::keystore::Keystore;
+    use std::process::Command;
+    use std::time::Instant;
+
+    let pid = std::process::id();
+    let dir1 = std::env::temp_dir().join(format!("islandpot-ks-dd1-{}", pid));
+    let dir2 = std::env::temp_dir().join(format!("islandpot-ks-dd2-{}", pid));
+    let _ = std::fs::remove_dir_all(&dir1);
+    let _ = std::fs::remove_dir_all(&dir2);
+    const HOLD_SECS: u64 = 3;
+
+    // Child holds dir1's lock for HOLD_SECS.
+    let bin = env!("CARGO_BIN_EXE_xproc-lock-holder");
+    if !std::path::Path::new(bin).exists() {
+        let status = std::process::Command::new(
+            std::env::var("CARGO").unwrap_or_else(|_| "cargo".into()),
+        )
+        .args(["build", "--bin", "xproc-lock-holder", "--tests"])
+        .status()
+        .expect("failed to build xproc-lock-holder");
+        assert!(status.success(), "building xproc-lock-holder failed");
+    }
+    let mut child = Command::new(bin)
+        .arg(&dir1)
+        .arg(HOLD_SECS.to_string())
+        .spawn()
+        .expect("spawn holder");
+
+    // Wait for child to confirm it's holding dir1's lock.
+    let flag1 = dir1.join("holding");
+    let mut waited = 0;
+    while !flag1.exists() && waited < 200 {
+        std::thread::sleep(std::time::Duration::from_millis(50));
+        waited += 1;
+    }
+    assert!(flag1.exists(), "holder did not signal it's holding dir1");
+
+    // dir2 is EMPTY (no keystore.json) → load() returns {} without KDF.
+    // Time it: if independent (per-dir lock), completes instantly (~0ms).
+    // If shared/global lock, blocks ~HOLD_SECS.
+    let ks2 = Keystore::new(dir2.clone()).unwrap();
+    let start = Instant::now();
+    let result = ks2.load().expect("dir2 load should succeed (empty)");
+    let elapsed = start.elapsed();
+
+    assert!(result.as_object().unwrap().is_empty(), "dir2 should be empty");
+    assert!(
+        elapsed < std::time::Duration::from_secs(1),
+        "dir2 load took {elapsed:?} — blocked by dir1's lock (shared/global lock bug)"
+    );
+
+    let _ = child.wait();
+    let _ = std::fs::remove_dir_all(&dir1);
+    let _ = std::fs::remove_dir_all(&dir2);
+}
 
 #[test]
 fn cross_process_lock_mutual_exclusion() {
