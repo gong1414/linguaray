@@ -1,8 +1,20 @@
-# Phase 4: Windows Parity + Cross-Platform Packaging — Implementation Plan (rev 7)
+# Phase 4: Windows Parity + Cross-Platform Packaging — Implementation Plan (rev 8)
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** rev 7 — fixes round-6 review issues: (a) Task 2b Windows compound-clipboard now spells the full Win32 protocol (non-NULL HWND owner via message-only window, GMEM_MOVEABLE + ownership transfer, RAII CloseClipboard, explicit re-EmptyClipboard half-state cleanup on second-SetClipboardData failure, BGRA pixel layout + masks, required windows-sys features), (b) macOS signing identity is verified with `grep -F` against `APPLE_SIGNING_IDENTITY` (fail-fast, not just listed), (c) removed the stray code fence + duplicated unsigned-cert note, (d) "all-or-nothing" qualified to mean conversion-phase only (clearContents/writeObjects are not themselves a transaction).
+**Status:** rev 8 — fixes round-7 review issues: (a) Task 2b HWND owner now reuses
+the Tauri main window's HWND (`Window::hwnd()`, on the event-loop thread that
+already pumps messages — required because the owner receives WM_DESTROYCLIPBOARD
+even with eager rendering; dropped the message-only-window-on-an-async-worker +
+OnceCell approach), (b) submit/handle-ownership sequence corrected — first-submit
+failure frees BOTH handles with NO re-empty (nothing on clipboard; EmptyClipboard
+after CloseClipboard is invalid); only second-submit failure re-empties WHILE OPEN
+and frees only the unsubmitted handle, (c) windows-sys 0.59 feature map corrected
+by grepping the crate source: CF_UNICODETEXT/CF_DIBV5 are in `Win32_System_Ole`
+(was wrongly placed in WindowsAndMessaging), DataExchange already provides the
+clipboard functions, WindowsAndMessaging is no longer needed, LCS_sRGB is in
+`Win32_UI_ColorSystem`; added explicit checked i32/u32/usize conversions mirroring
+the macOS preflight.
 
 **Goal:** Windows builds (real `atomic_replace` + ACL), correct signing (macOS notarization via cert-import; Windows Authenticode via PFX/signtool — distinct from the updater key), and a clean CI matrix (arm64 + Intel macOS via `macos-15-intel`, Windows).
 
@@ -41,19 +53,29 @@ the clipboard is left with NEITHER format, matching the macOS single-item semant
 
 **Win32 protocol (verified against MS docs, refs at end of task):**
 
-- [ ] **HWND owner — MUST be non-NULL.** `EmptyClipboard` assigns ownership to the
-      window that has the clipboard open. If `OpenClipboard(NULL)` was used,
-      `EmptyClipboard` succeeds but sets the owner to NULL, which makes
-      `SetClipboardData` fail. (Verified: EmptyClipboard Remarks — "If the
-      application specifies a NULL window handle when opening the clipboard,
-      EmptyClipboard succeeds but sets the clipboard owner to NULL. Note that this
-      causes SetClipboardData to fail.") Tauri's Rust backend has no UI window on
-      the capture thread, so create a **message-only window** as the owner:
-      `CreateWindowExW(0, "STATIC", "", 0, 0,0,0,0, HWND_MESSAGE, null, hinst, null)`
-      (HWND_MESSAGE = -3). Cache it in a `static OnceCell<isize>` keyed lazily on
-      first restore; it only needs to exist (we use eager rendering, NOT delayed
-      rendering, so no WndProc / message pump is required — we hand real handles to
-      `SetClipboardData`, never NULL).
+- [ ] **HWND owner — MUST be non-NULL, AND it must be owned by a thread that runs a
+      message loop.** `EmptyClipboard` assigns ownership to the window that has the
+      clipboard open. If `OpenClipboard(NULL)` was used, `EmptyClipboard` succeeds
+      but sets the owner to NULL, which makes `SetClipboardData` fail. (Verified:
+      EmptyClipboard Remarks — "If the application specifies a NULL window handle
+      when opening the clipboard, EmptyClipboard succeeds but sets the clipboard
+      owner to NULL. Note that this causes SetClipboardData to fail.") **Beyond the
+      non-NULL requirement:** the owner receives `WM_DESTROYCLIPBOARD` whenever ANY
+      other app later empties the clipboard (verified: WM_DESTROYCLIPBOARD — "Sent
+      to the clipboard owner when a call to the EmptyClipboard function empties the
+      clipboard. A window receives this message through its WindowProc function.").
+      This applies even with eager rendering (we never pass NULL to
+      SetClipboardData). Window messages are delivered on the owning thread, so the
+      owner HWND MUST belong to a thread with a running message pump — otherwise a
+      cross-thread SendMessage from the emptying app can block.
+      **Decision: reuse the existing Tauri main window's HWND.** It is created on
+      Tauri's event-loop thread (which already pumps messages), it is stable for the
+      app lifetime, and `tauri::Window::hwnd() -> crate::Result<HWND>` is the public
+      accessor (`#[cfg(windows)]`, tauri 2.11.5 `src/window/mod.rs:1668`). Obtain it
+      from the `AppHandle`/`Window` passed into the restore path; do NOT create a
+      message-only window on an arbitrary async-runtime worker and cache its HWND in
+      a `OnceCell` (that thread has no message loop and may exit, leaving a stale
+      owner). If the main window is unavailable, return Err (best-effort: no restore).
 
 - [ ] **Memory: `GlobalAlloc(GMEM_MOVEABLE, len)` for EACH blob.** Verified: "A
       memory object that is to be placed on the clipboard should be allocated by
@@ -83,32 +105,66 @@ the clipboard is left with NEITHER format, matching the macOS single-item semant
         `(b,g,r,a)`. Row stride = width*4 (no padding at 32bpp). This channel swap +
         the alpha mask are what the test asserts (see test).
 
-- [ ] **Submit sequence + half-state cleanup (RAII):**
-      1. `OpenClipboard(hwnd_owner)` → must succeed; on fail, `GlobalFree` both
-         pre-built handles, return Err.
-      2. `EmptyClipboard()` → on fail, close + free both, return Err.
-      3. `SetClipboardData(CF_UNICODETEXT, h_text)` → on fail: free `h_dib`, close,
-         re-`EmptyClipboard()` (the text handle was NOT taken since the call failed),
-         return Err. (Half-state: only text submitted ⇒ re-empty to leave neither.)
-      4. `SetClipboardData(CF_DIBV5, h_dib)` → on fail: **`h_text` was already taken
-         by step 3 (do NOT free it — it's system-owned).** Re-`EmptyClipboard()` to
-         remove the orphaned text, `GlobalFree(h_dib)` (not taken), close, return Err.
-      5. Success: both submitted → both now system-owned. Just `CloseClipboard()`.
-      - Use a small RAII guard (`struct ClipGuard { hwnd, opened: bool }` impls Drop:
+- [ ] **Submit sequence + handle ownership (RAII):**
+      1. `OpenClipboard(hwnd_owner)` → on fail: `GlobalFree` BOTH pre-built handles
+         (`h_text`, `h_dib`), return Err. (Clipboard was never opened; nothing to
+         close or empty.)
+      2. `EmptyClipboard()` → on fail: `GlobalFree` BOTH handles, `CloseClipboard()`,
+         return Err. (Nothing was submitted, so no half-state.)
+      3. `SetClipboardData(CF_UNICODETEXT, h_text)`:
+         - **Success:** `h_text` ownership transfers to the system — do NOT free it.
+         - **Failure:** `h_text` was NOT taken (the call failed), so `GlobalFree` it;
+           `h_dib` is also still unsubmitted, so `GlobalFree` it too. There is **no
+           half-state to clean up** (nothing was submitted), so do NOT call
+           `EmptyClipboard` again. `CloseClipboard()`, return Err.
+           (Prev rev was wrong here: it freed only `h_dib` and re-emptied — but on a
+           first-submit failure nothing is on the clipboard to remove, and a call to
+           `EmptyClipboard` AFTER `CloseClipboard` is invalid anyway — it requires
+           the clipboard to still be open.)
+      4. `SetClipboardData(CF_DIBV5, h_dib)`:
+         - **Success:** `h_dib` ownership transfers to the system. Both formats are
+           now live (both system-owned). `CloseClipboard()`, return Ok.
+         - **Failure:** `h_text` WAS already taken by step 3 (system-owned — do NOT
+           free it, or double-free). `h_dib` was not taken → `GlobalFree` it. Now
+           there IS a half-state (only text is on the clipboard). Re-`EmptyClipboard()`
+           to remove the orphaned text — **while the clipboard is still open** (the
+           guard has not closed it yet). `CloseClipboard()`, return Err.
+      - Use a small RAII guard (`struct ClipGuard { opened: bool }` impls Drop:
         `if opened { CloseClipboard() }`) so `CloseClipboard` always runs even on
-        early-return / panic. The re-`EmptyClipboard` in the failure branches is the
-        explicit de-half-state step (the RAII close handles only CloseClipboard).
+        early-return / panic. The re-`EmptyClipboard` in step 4 runs BEFORE the guard
+        drops (clipboard still open); steps 1-3 never need a re-empty because nothing
+        is on the clipboard until a submit succeeds.
 
-- [ ] **windows-sys features** (add to the existing `windows-sys` dep): currently
-      `Win32_System_DataExchange` + `Win32_Foundation`. ADD:
-      - `Win32_System_Memory` (GlobalAlloc/GlobalLock/GlobalUnlock/GlobalFree,
-        GMEM_MOVEABLE)
-      - `Win32_Graphics_Gdi` (BITMAPV5HEADER, BI_BITFIELDS, LCS_sRGB, LCS_GM_IMAGES)
-      - `Win32_UI_WindowsAndMessaging` (CreateWindowExW, HWND_MESSAGE,
-        OpenClipboard, EmptyClipboard, SetClipboardData, CloseClipboard,
-        CF_UNICODETEXT, CF_DIBV5)
-      (Verify each symbol's module via `windows-docs-rs` during impl; the
-      `Win32_Security_Authorization`/`Win32_Security` from Task 2 are separate.)
+- [ ] **windows-sys 0.59 features** — verified module paths by grepping the crate
+      source (`~/.cargo/registry/.../windows-sys-0.59.0/src/`), NOT by guessing.
+      The dep currently has `Win32_System_DataExchange` + `Win32_Foundation`. ADD:
+      - `Win32_System_Memory` — `GlobalAlloc`, `GlobalLock`, `GlobalUnlock`,
+        `GlobalFree`, `GMEM_MOVEABLE`
+      - `Win32_System_Ole` — **`CF_UNICODETEXT`, `CF_DIBV5`** (these format
+        constants live in Ole, NOT WindowsAndMessaging — the prev rev placed them
+        wrong and the build would have failed)
+      - `Win32_Graphics_Gdi` — `BITMAPV5HEADER`, `BI_BITFIELDS`, `LCS_GM_IMAGES`
+      - `Win32_UI_ColorSystem` — `LCS_sRGB` (lives in ColorSystem, not Gdi)
+      Already present, no action: `Win32_System_DataExchange` provides
+      `OpenClipboard`/`EmptyClipboard`/`SetClipboardData`/`CloseClipboard`. NOTE:
+      `Win32_UI_WindowsAndMessaging` is NOT needed (we reuse the Tauri main-window
+      HWND — no `CreateWindowExW`/`HWND_MESSAGE`); it was listed in the prev rev for
+      the now-dropped message-only-window approach.
+      (Task 2's `Win32_Security_Authorization`/`Win32_Security` are separate.)
+
+- [ ] **Checked conversions for the FFI boundary** (mirror the macOS preflight
+      added in round-7). The Win32 functions take `i32`/`u32` sizes and `isize`
+      handles; a wrapping `as` cast would be UB at the boundary:
+      - Reject zero width/height.
+      - `i32::try_from(width)` / `i32::try_from(height)` (BITMAPV5HEADER fields are
+        `LONG`/i32; bV5Height is then negated for top-down — guard against
+        i32::MIN which can't be negated).
+      - `bV5SizeImage` (u32): `width.checked_mul(height)?.checked_mul(4)` →
+        `u32::try_from`.
+      - Text blob length (usize → `usize` for GlobalAlloc is fine, but the UTF-16
+        byte count must be `u16_count.checked_mul(2)` then `usize::try_from`).
+      - Image byte count: `usize::try_from(total_u64)` as in the macOS preflight.
+      Any conversion failure returns Err before any Win32 call (clipboard untouched).
 
 - [ ] Add `#[cfg(target_os = "windows")] fn restore_snapshot(...)` mirroring the
       macOS signature, replacing the sequential-arboard cfg-arm for Windows. Keep the
@@ -123,8 +179,10 @@ the clipboard is left with NEITHER format, matching the macOS single-item semant
       4. `GetClipboardData(CF_UNICODETEXT)` → decode UTF-16, assert == "hi".
       5. `GetClipboardData(CF_DIBV5)` → lock, read BITMAPV5HEADER, assert width==2,
          height==2 (abs), bitcount==32, compression==BI_BITFIELDS, redMask==
-         0x00FF0000, alphaMask==0xFF000000; read first pixel, assert BGRA ==
-         (0,0,255,255) (red in BGRA). This covers channel order, stride, alpha.
+         0x00FF0000, alphaMask==0xFF000000; read ALL 4 pixels, assert each BGRA ==
+         (0,0,255,255) (red in BGRA). All-4-pixels (not just the first) catches a
+         row-stride bug that would read padding bytes on rows 2; channel order +
+         alpha are covered by the BGRA values.
       6. Negative test: invalid RGBA (len mismatch) returns Err AND clipboard is
          unchanged (write a marker first, assert it survives).
 
