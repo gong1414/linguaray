@@ -15,6 +15,7 @@ function App() {
   const [busy, setBusy] = createSignal(false);
   const [defaultProvider, setDefaultProvider] = createSignal("");
   const [targetLang, setTargetLang] = createSignal("zh");
+  const [fallbackEngine, setFallbackEngine] = createSignal("");
   const [clipBusy, setClipBusy] = createSignal(false);
   const [a11yOk, setA11yOk] = createSignal(true);
   const [ksHealth, setKsHealth] = createSignal("");
@@ -33,9 +34,10 @@ function App() {
     // surface a banner if unreadable. onMount never aborts on a corrupt keystore.
     setKsHealth(await invoke<string>("keystore_health"));
     setSelected(list.find((e) => e.kind === "provider")?.id ?? list[0]?.id ?? "");
-    const s = await invoke<{ default_provider: string; target_language: string }>("get_settings");
+    const s = await invoke<{ default_provider: string; target_language: string; fallback_engine: string | null }>("get_settings");
     setDefaultProvider(s.default_provider);
     setTargetLang(s.target_language);
+    setFallbackEngine(s.fallback_engine ?? "");
     refreshA11y(); // Accessibility onboarding (macOS): show banner if not granted
     // Re-check when the window regains focus (user just granted permission).
     const { getCurrentWindow } = await import("@tauri-apps/api/window");
@@ -49,6 +51,11 @@ function App() {
   async function changeTarget(v: string) {
     setTargetLang(v);
     await invoke("set_setting", { key: "target_language", value: v });
+  }
+  async function changeFallback(v: string) {
+    setFallbackEngine(v);
+    // Empty string = None (opt-out). The backend stores null for no fallback.
+    await invoke("set_setting", { key: "fallback_engine", value: v || null });
   }
   async function translateClip() {
     setClipBusy(true);
@@ -129,6 +136,11 @@ function App() {
         <label>Target language</label>
         <select value={targetLang()} onChange={(e) => changeTarget(e.currentTarget.value)}>
           <For each={["zh", "en", "ja", "ko", "fr", "de", "es"]}>{(l) => <option value={l}>{l}</option>}</For>
+        </select>
+        <label>Fallback engine (on AI error)</label>
+        <select value={fallbackEngine()} onChange={(e) => changeFallback(e.currentTarget.value)}>
+          <option value="">None</option>
+          <For each={engines().filter((e) => e.kind === "traditional")}>{(e) => <option value={e.id}>{e.label}</option>}</For>
         </select>
         <button onClick={translateClip} disabled={clipBusy()}>{clipBusy() ? "…" : "Translate clipboard"}</button>
       </div>

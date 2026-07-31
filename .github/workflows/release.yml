@@ -215,20 +215,21 @@ jobs:
       - name: Verify bundle executable identity (Windows)
         if: matrix.os == 'windows-latest'
         run: |
-          $bundleDir = "src-tauri\target\${{ matrix.target }}\release\bundle"
-          $exes = @(Get-ChildItem -Path $bundleDir -Recurse -Filter "linguaray.exe")
-          if ($exes.Count -eq 0) {
-            # Also check the MSI contents indirectly: if xproc-lock-holder.exe is the
-            # main binary, the package name in the build output will reflect it.
-            $wrongExes = @(Get-ChildItem -Path $bundleDir -Recurse -Filter "xproc-lock-holder.exe")
-            if ($wrongExes.Count -gt 0) {
-              Write-Error "xproc-lock-holder.exe found in bundle — wrong binary was packaged. Add default-run to Cargo.toml."
+          # On Windows the compiled binary is in target/.../release/ (not bundle/).
+          # bundle/ contains only the .msi/.exe installers. Verify the release dir
+          # has linguaray.exe (the correct main binary, not xproc-lock-holder).
+          $releaseDir = "src-tauri\target\${{ matrix.target }}\release"
+          $mainExe = Join-Path $releaseDir "linguaray.exe"
+          if (-not (Test-Path $mainExe)) {
+            $wrongExe = Join-Path $releaseDir "xproc-lock-holder.exe"
+            if (Test-Path $wrongExe) {
+              Write-Error "xproc-lock-holder.exe is the main binary — wrong binary was packaged. Add default-run to Cargo.toml."
               exit 1
             }
-            Write-Error "linguaray.exe not found in bundle — verify the binary name"
+            Write-Error "linguaray.exe not found in release dir — verify the binary name"
             exit 1
           }
-          Write-Host "✓ linguaray.exe found in bundle"
+          Write-Host "✓ linguaray.exe is the main binary"
 
       # ── Artifact upload ─────────────────────────────────────────────────────────
       # Upload ONLY installers (.dmg on macOS, .msi/.exe on Windows). Do NOT upload
