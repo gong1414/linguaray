@@ -411,17 +411,56 @@ impl Keystore {
 }
 
 /// Atomic replace. macOS: rename over target (first-create or update).
+/// Windows: MoveFileExW for first-create; ReplaceFileW for updates.
 #[cfg(target_os = "macos")]
 fn atomic_replace(src: &Path, dst: &Path) -> Result<(), KeystoreError> {
     std::fs::rename(src, dst)?;
     Ok(())
 }
 
-// NOTE: the spec describes a Windows atomic_replace using ReplaceFileW for updates
-// and MoveFileExW for first-create. That code is #[cfg(target_os = "windows")] and is
-// omitted from this macOS build; it will be added (or the windows-sys dep pulled in)
-// when building for Windows. For now, only the macOS path exists.
-#[cfg(not(target_os = "macos"))]
+#[cfg(target_os = "windows")]
+fn atomic_replace(src: &Path, dst: &Path) -> Result<(), KeystoreError> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::Storage::FileSystem::{
+        MoveFileExW, ReplaceFileW, MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH,
+    };
+
+    fn wide(path: &Path) -> Vec<u16> {
+        path.as_os_str()
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect()
+    }
+
+    let src_wide = wide(src);
+    let dst_wide = wide(dst);
+    // SAFETY: both buffers are NUL-terminated and remain alive for the duration
+    // of the Win32 call. The optional backup/exclude/preserved pointers are null.
+    let result = unsafe {
+        if dst.exists() {
+            ReplaceFileW(
+                dst_wide.as_ptr(),
+                src_wide.as_ptr(),
+                std::ptr::null(),
+                0,
+                std::ptr::null(),
+                std::ptr::null(),
+            )
+        } else {
+            MoveFileExW(
+                src_wide.as_ptr(),
+                dst_wide.as_ptr(),
+                MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
+            )
+        }
+    };
+    if result == 0 {
+        return Err(KeystoreError::Io(std::io::Error::last_os_error()));
+    }
+    Ok(())
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 fn atomic_replace(_src: &Path, _dst: &Path) -> Result<(), KeystoreError> {
     Err(KeystoreError::Envelope("atomic_replace not implemented on this platform".into()))
 }
@@ -442,5 +481,46 @@ mod tests {
         // round-trip via the test helper
         let out = decrypt_with_identity(&env, "test-machine-uuid").unwrap();
         assert_eq!(out, serde_json::json!({"openai":"sk-test"}));
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn atomic_replace_first_create_moves_source() {
+        let dir = tempfile::tempdir().unwrap();
+        let src = dir.path().join("keystore.json.tmp");
+        let dst = dir.path().join("keystore.json");
+        std::fs::write(&src, b"first").unwrap();
+
+        atomic_replace(&src, &dst).unwrap();
+
+        assert_eq!(std::fs::read(&dst).unwrap(), b"first");
+        assert!(!src.exists());
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn atomic_replace_update_replaces_destination() {
+        let dir = tempfile::tempdir().unwrap();
+        let src = dir.path().join("keystore.json.tmp");
+        let dst = dir.path().join("keystore.json");
+        std::fs::write(&dst, b"old").unwrap();
+        std::fs::write(&src, b"new").unwrap();
+
+        atomic_replace(&src, &dst).unwrap();
+
+        assert_eq!(std::fs::read(&dst).unwrap(), b"new");
+        assert!(!src.exists());
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn atomic_replace_failure_preserves_destination() {
+        let dir = tempfile::tempdir().unwrap();
+        let missing_src = dir.path().join("missing.tmp");
+        let dst = dir.path().join("keystore.json");
+        std::fs::write(&dst, b"canonical").unwrap();
+
+        assert!(atomic_replace(&missing_src, &dst).is_err());
+        assert_eq!(std::fs::read(&dst).unwrap(), b"canonical");
     }
 }
