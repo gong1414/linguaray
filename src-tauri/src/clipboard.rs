@@ -87,8 +87,12 @@ pub fn restore_snapshot(
 }
 
 /// Inner: compound text+image write to a GIVEN NSPasteboard (testable with
-/// `pasteboardWithUniqueName`). All conversions happen BEFORE clearContents; on
-/// any error the pasteboard is untouched (returns Err at the failing step).
+/// `pasteboardWithUniqueName`). Preflight (dimension/range checks) and all TIFF
+/// conversion happen BEFORE clearContents, so a preflight or conversion error
+/// leaves the pasteboard untouched. This does NOT cover a `writeObjects` failure:
+/// that runs AFTER clearContents, so the pasteboard would already be empty if it
+/// returned false (in practice writeObjects only fails on a malformed item, which
+/// the preceding setString/setData calls rule out).
 ///
 /// This is a SAFE function: the only FFI invariants are "the pasteboard pointer is
 /// a valid NSPasteboard" (guaranteed by the `&NSPasteboard` borrow) and the
@@ -110,10 +114,30 @@ fn restore_compound_to(
     use objc2::rc::Retained;
     use objc2::AnyThread;
 
-    // Step 1: validate dimensions + overflow.
-    let expected = img.width.checked_mul(img.height)
+    // Step 1: full FFI preflight. These values feed a designated initializer that
+    // takes NSInteger (isize); a negative/overflowed dimension or stride would be
+    // UB at the FFI boundary. The old check (usize checked_mul of width*height*4)
+    // was insufficient: e.g. (width=usize::MAX, height=0, bytes=[]) passed it, then
+    // `width as isize` wrapped negative and `w*4` overflowed. Reject zero dims and
+    // use checked conversions for EVERY value that crosses into Cocoa.
+    if img.width == 0 || img.height == 0 {
+        return Err(format!("image has zero dimension ({}x{})", img.width, img.height));
+    }
+    // isize/NSInteger range — also bounds width so bytes_per_row can't overflow.
+    let w = isize::try_from(img.width)
+        .map_err(|_| format!("image width {} exceeds isize range", img.width))?;
+    let h = isize::try_from(img.height)
+        .map_err(|_| format!("image height {} exceeds isize range", img.height))?;
+    let bytes_per_row = w.checked_mul(4)
+        .ok_or_else(|| "row stride (width*4) overflows isize".to_string())?;
+    // Total bytes, validated against the actual slice length. Use u64 to avoid any
+    // platform-dependent usize overflow on the intermediate product.
+    let total = (img.width as u64)
+        .checked_mul(img.height as u64)
         .and_then(|n| n.checked_mul(4))
-        .ok_or_else(|| "image dimensions overflow".to_string())?;
+        .ok_or_else(|| "image byte count overflows u64".to_string())?;
+    let expected = usize::try_from(total)
+        .map_err(|_| "image byte count exceeds usize".to_string())?;
     if img.bytes.len() != expected {
         return Err(format!(
             "image bytes {} != width*height*4 ({})", img.bytes.len(), expected
@@ -121,21 +145,19 @@ fn restore_compound_to(
     }
 
     // Step 2: convert RGBA → TIFF NSData via NSBitmapImageRep.
-    let w = img.width as isize;
-    let h = img.height as isize;
     let color_space = NSString::from_str("NSCalibratedRGBColorSpace");
     // Safety: this is the designated initializer for NSBitmapImageRep; `planes`
-    // is null (the rep allocates its own buffer), dims/strides are validated
-    // above, and the color-space name is a statically-known constant. objc2
-    // marks the init method `pub unsafe fn` because a wrong pointer/plane layout
-    // would be UB; the contract here is honored.
+    // is null (the rep allocates its own buffer), dims/strides are validated and
+    // in-range above, and the color-space name is a statically-known constant.
+    // objc2 marks the init method `pub unsafe fn` because a wrong pointer/plane
+    // layout would be UB; the contract here is honored.
     let rep = unsafe {
         NSBitmapImageRep::initWithBitmapDataPlanes_pixelsWide_pixelsHigh_bitsPerSample_samplesPerPixel_hasAlpha_isPlanar_colorSpaceName_bytesPerRow_bitsPerPixel(
             NSBitmapImageRep::alloc(),
             std::ptr::null_mut(),
             w, h, 8, 4, true, false,
             &color_space,
-            w * 4, 32,
+            bytes_per_row, 32,
         )
     }.ok_or_else(|| "NSBitmapImageRep init failed".to_string())?;
     let data_ptr = NSBitmapImageRep::bitmapData(&rep);
@@ -182,11 +204,11 @@ pub fn restore_snapshot(
     text: Option<&str>,
     image: Option<&crate::selection_engine::ImageBlob>,
 ) -> std::result::Result<(), String> {
-    // Non-macOS non-Windows: single-flavor via arboard (sequential; both-present
-    // loses one — documented P2, no supported target hits this). Windows gets its
-    // own compound impl in Phase 4 Task 2b (Win32 OpenClipboard/EmptyClipboard +
-    // SetClipboardData for CF_UNICODETEXT + CF_DIBV5); until then this cfg-arm is
-    // unreachable on supported targets (Win+macOS only).
+    // Non-macOS (this cfg-arm covers Windows AND any unsupported target). Windows
+    // gets its own compound impl in Phase 4 Task 2b (Win32 OpenClipboard/
+    // EmptyClipboard + SetClipboardData for CF_UNICODETEXT + CF_DIBV5). Until that
+    // task lands, Windows falls through to THIS sequential-arboard path, which
+    // loses one flavor when both text+image are present (documented limitation).
     let mut g = clip()?;
     let c = g.as_mut().unwrap();
     if let Some(img) = image {
@@ -256,8 +278,12 @@ mod tests {
         assert_eq!(text.to_string(), "hello world", "text flavor present");
 
         // Assert: TIFF data round-trips to the expected 2×2 red image. Reading it
-        // back via NSBitmapImageRep catches channel-order, stride, and alpha bugs
-        // that a bare "non-empty" check would miss (round-6 review P2).
+        // back via NSBitmapImageRep catches channel-order and alpha bugs that a
+        // bare "non-empty" check would miss (round-6 review P2). It does NOT by
+        // itself prove row stride / direction — the source is uniformly red, so a
+        // wrong stride would still read red. All 4 pixels are checked (so a stride
+        // bug that read garbage from padding would be caught), but a definitive
+        // stride test needs a non-uniform image (deferred — not a round-7 blocker).
         let tiff = pb.dataForType(unsafe { NSPasteboardTypeTIFF })
             .expect("dataForType(TIFF) should return");
         assert!(!tiff.is_empty(), "TIFF data is non-empty");
@@ -268,12 +294,16 @@ mod tests {
         assert_eq!(rep.pixelsHigh(), 2, "decoded height");
         assert_eq!(rep.samplesPerPixel(), 4, "decoded samples per pixel (RGBA)");
 
-        // Decode the first pixel. NSBitmapImageRep owns its buffer; bitmapData is a
+        // Decode ALL 4 pixels. NSBitmapImageRep owns its buffer; bitmapData is a
         // raw pointer we must read in an unsafe block (verified non-null first).
         let px = NSBitmapImageRep::bitmapData(&rep);
         assert!(!px.is_null(), "decoded bitmapData non-null");
-        let rgba = unsafe { std::slice::from_raw_parts(px, 4) };
-        assert_eq!(rgba, &[255, 0, 0, 255], "first pixel is opaque red (R,G,B,A)");
+        let rgba = unsafe { std::slice::from_raw_parts(px, 16) };
+        assert_eq!(
+            rgba,
+            &[255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255],
+            "all 4 pixels are opaque red (R,G,B,A) — channel order + reads across rows"
+        );
     }
 
     #[test]
@@ -302,5 +332,49 @@ mod tests {
             text.to_string(), "marker-before",
             "pasteboard unchanged after failed conversion (clearContents not called)"
         );
+    }
+
+    #[test]
+    fn compound_restore_pathological_dimensions_do_not_touch_pasteboard() {
+        // Round-7 review P1: the preflight must reject dimensions that would be UB
+        // at the Cocoa FFI boundary (NSInteger/isize). The OLD check
+        // (width.checked_mul(height).checked_mul(4) == bytes.len()) let
+        // (usize::MAX, 0, []) through, then `width as isize` wrapped negative and
+        // `w*4` overflowed — feeding garbage to the designated initializer.
+        let pb = NSPasteboard::pasteboardWithUniqueName();
+        pb.clearContents();
+        let marker = NSString::from_str("marker-before");
+        pb.setString_forType(&marker, unsafe { NSPasteboardTypeString });
+
+        let check = |w: usize, h: usize, bytes: Vec<u8>, label: &str| {
+            let img = ImageBlob { width: w, height: h, bytes };
+            let res = restore_compound_to(&pb, "x", &img);
+            assert!(res.is_err(), "{label}: expected preflight rejection");
+            // Pasteboard untouched — the unsafe initializer never ran.
+            let t = pb.stringForType(unsafe { NSPasteboardTypeString })
+                .expect("marker readable");
+            assert_eq!(t.to_string(), "marker-before", "{label}: pasteboard changed");
+        };
+
+        // The case that defeated the old check: huge width, zero height, empty bytes
+        // (width*height*4 == 0 == bytes.len()). Must be rejected for zero dimension.
+        check(usize::MAX, 0, vec![], "max-width × zero-height × empty");
+
+        // Zero width, non-zero height.
+        check(0, 4, vec![], "zero-width");
+
+        // Width that fits in usize but overflows isize (NSInteger) on this platform.
+        // On 64-bit, isize::MAX+1 as usize. (Skipped where usize==isize bits can't
+        // represent it, but on 64-bit it always can.)
+        let over_isize = (isize::MAX as usize).wrapping_add(1);
+        if over_isize > isize::MAX as usize {
+            check(over_isize, 1, vec![], "width overflows isize");
+        }
+
+        // Width whose row-stride (w*4) overflows isize, even though w itself fits.
+        // w = isize::MAX/4 + 1 → w*4 > isize::MAX. Height 1, but bytes need not be
+        // huge for the stride check to trip (it runs before the length check).
+        let stride_overflow_w = (isize::MAX as usize / 4) + 1;
+        check(stride_overflow_w, 1, vec![], "row stride overflows isize");
     }
 }
