@@ -178,10 +178,13 @@ async fn translate_clipboard(
 
 #[tauri::command]
 fn list_engines() -> Vec<EngineInfo> {
-    providers::presets()
+    let mut out: Vec<EngineInfo> = providers::presets()
         .into_iter()
         .map(EngineInfo::from_provider)
-        .collect()
+        .collect();
+    // Also include built-in traditional engines (for the fallback selector).
+    out.extend(engines::registry().iter().map(|e| EngineInfo::from_traditional(e.as_ref())));
+    out
 }
 
 #[tauri::command]
@@ -316,6 +319,14 @@ impl EngineInfo {
             label: p.label,
             kind: "provider".into(),
             needs_key: p.needs_key,
+        }
+    }
+    fn from_traditional(e: &dyn engines::TraditionalEngine) -> Self {
+        Self {
+            id: e.id().into(),
+            label: e.label().into(),
+            kind: "traditional".into(),
+            needs_key: e.needs_key(),
         }
     }
 }
