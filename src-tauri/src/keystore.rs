@@ -395,12 +395,27 @@ impl Keystore {
         })
     }
 
-    /// Delete the keystore entirely (fresh start). User-initiated.
-    pub fn reset(&self) -> Result<(), KeystoreError> {
+    /// User-initiated reset (fresh start). Round-2 review P1 #4: per the §A
+    /// fail-closed protocol, Reset must NOT unrecoverably delete the canonical file
+    /// — it MOVES it to keystore.json.broken-<ts> (recoverable), then clears tmp.
+    /// A subsequent store() starts a fresh keystore. Returns the archive path if a
+    /// canonical file existed (None if there was nothing to archive).
+    pub fn reset(&self) -> Result<Option<std::path::PathBuf>, KeystoreError> {
         self.with_locks(|ks| {
-            let _ = std::fs::remove_file(ks.file());
+            let src = ks.file();
+            let archived = if src.exists() {
+                let ts = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0);
+                let dst = ks.dir.join(format!("keystore.json.broken-{ts}"));
+                std::fs::rename(&src, &dst)?;
+                Some(dst)
+            } else {
+                None
+            };
             let _ = std::fs::remove_file(ks.dir.join(TMP));
-            Ok(())
+            Ok(archived)
         })
     }
 

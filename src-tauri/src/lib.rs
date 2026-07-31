@@ -221,8 +221,9 @@ fn archive_keystore(state: tauri::State<'_, Arc<Session>>) -> Result<String, Str
 
 /// User-initiated: delete the keystore entirely (fresh start).
 #[tauri::command]
-fn reset_keystore(state: tauri::State<'_, Arc<Session>>) -> Result<(), String> {
-    state.keystore.reset().map_err(|e| e.to_string())
+fn reset_keystore(state: tauri::State<'_, Arc<Session>>) -> Result<Option<String>, String> {
+    // §A: reset ARCHIVES the canonical file (recoverable), it does not delete it.
+    state.keystore.reset().map(|opt| opt.map(|p| p.to_string_lossy().into_owned())).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
