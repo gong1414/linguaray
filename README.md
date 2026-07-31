@@ -42,7 +42,7 @@ Three legs, decided in the design grilling:
 - PaddleOCR screenshot/OCR translate · TTS · external invocation
 - Long-text segmentation/chunking
 - Additional traditional engines (DeepL / 百度 / 有道 / …)
-- Dictionary lookup UI + fallback-engine selector UI
+- Dictionary lookup product UI (select-word → definition popup; backend groundwork exists, no v1 user entry point)
 - Plugin/WASM extensibility
 
 ## Tech stack
@@ -202,8 +202,8 @@ Get-AuthenticodeSignature "C:\Program Files\LinguaRay\LinguaRay.exe"
 - **Phase 0 — foundation** ✅ Tauri 2 + SolidJS scaffold, translate contract wired
 - **Phase 1 — AI provider catalog + keystore + unified pipeline** ✅ (the headline feature)
 - **Phase 2 — selection/input translate + user-initiated clipboard translate + cursor-anchored popup** ✅
-- **Phase 3 — built-in traditional engines** (Google ✅; DeepL/百度/有道/… follow the pattern) + system dict + §G fallback chain ✅
-- **Phase 4 — cross-platform parity + packaging** — Windows keystore (atomic replace + ACL), Windows compound clipboard restore, CSP hardening, per-window capabilities, release/signing CI ✅ (fallback selector UI + dictionary lookup UI pending for v1.x)
+- **Phase 3 — built-in traditional engines** (Google ✅; DeepL/百度/有道/… follow the pattern) + §G fallback chain ✅ (dictionary backend groundwork exists; product UI deferred to v1.x)
+- **Phase 4 — cross-platform parity + packaging** — Windows keystore (atomic replace + ACL), Windows compound clipboard restore, CSP hardening, per-window capabilities, release/signing CI ✅
 
 **v1.x (before public open-source release):**
 - PaddleOCR screenshot/OCR translate · TTS · external invocation

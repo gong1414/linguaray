@@ -14,7 +14,6 @@
     "allow-key-status",
     "allow-get-settings",
     "allow-set-setting",
-    "allow-lookup-dictionary",
     "allow-a11y-status",
     "allow-keystore-health",
     "allow-archive-keystore",

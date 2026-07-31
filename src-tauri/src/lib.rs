@@ -274,8 +274,9 @@ fn set_setting(app: tauri::AppHandle, key: String, value: String) -> Result<(), 
 
 /// Look up a word in the macOS system dictionary (spec §E: word definitions
 /// where LLMs are weak). Returns plain text or None. On non-macOS / when no
-/// definition is found, returns None. This command just exposes the capability;
-/// wiring a UI affordance (lookup button / settings toggle) is a later UX task.
+/// definition is found, returns None. The dictionary product UI (select-word →
+/// definition popup) is deferred to v1.x; the backend groundwork is kept here.
+#[allow(dead_code)] // v1.x: dictionary UI not yet wired (removed from invoke_handler + AppManifest)
 #[tauri::command]
 fn lookup_dictionary(word: String) -> Option<String> {
     dict::lookup(&word)
@@ -559,7 +560,6 @@ pub fn run() {
             key_status,
             get_settings,
             set_setting,
-            lookup_dictionary,
             a11y_status,
             keystore_health,
             archive_keystore,
