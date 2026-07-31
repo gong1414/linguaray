@@ -97,6 +97,11 @@ struct FakeImg {
     /// tracks state. Set copy_fail / get_text_fail to inject errors.
     copy_fail: bool,
     get_text_fail_on_second: bool,
+    /// Simulates an EMPTY original clipboard: real arboard's get_text() returns Err
+    /// when there's no text, so Saved::capture's `.ok()` yields None. Used to test the
+    /// §B invariant that an empty original (None,None) snapshot still clears the
+    /// sentinel on restore (round-11 review P1 #1).
+    get_text_always_fails: bool,
     get_text_calls: RefCell<u32>,
 }
 impl FakeImg {
@@ -106,6 +111,10 @@ impl ClipboardLike for FakeImg {
     fn get_text(&self) -> Result<String, String> {
         let mut calls = self.get_text_calls.borrow_mut();
         *calls += 1;
+        // Empty-clipboard model: get_text always errors (mirrors real arboard on no text).
+        if self.get_text_always_fails {
+            return Err("no text on clipboard".into());
+        }
         // First call = the Saved::capture read; second = the post-copy selection read.
         if *calls == 2 && self.get_text_fail_on_second {
             return Err("injected get_text failure".into());
@@ -159,7 +168,7 @@ fn copy_failure_restores_saved() {
     let f = FakeImg {
         text: RefCell::new("original".into()), image: RefCell::new(None),
         seq: RefCell::new(5), copy_fail: true, get_text_fail_on_second: false,
-        get_text_calls: RefCell::new(0),
+        get_text_always_fails: false, get_text_calls: RefCell::new(0),
     };
     let err = capture(&f, || if f.copy_fail { Err("copy failed".into()) } else { Ok(()) }, 50).unwrap_err();
     assert_eq!(err, "copy failed");
@@ -174,7 +183,7 @@ fn get_text_failure_restores_saved() {
     let f = FakeImg {
         text: RefCell::new("original".into()), image: RefCell::new(None),
         seq: RefCell::new(5), copy_fail: false, get_text_fail_on_second: true,
-        get_text_calls: RefCell::new(0),
+        get_text_always_fails: false, get_text_calls: RefCell::new(0),
     };
     let res = capture(&f, || { f.set_text("hello").map(|_| ()) }, 50);
     assert!(res.is_err(), "get_text failure propagates");
@@ -188,11 +197,43 @@ fn image_only_clipboard_restored() {
     let f = FakeImg {
         text: RefCell::new(String::new()), image: RefCell::new(Some((1, 1, vec![1, 2, 3, 4]))),
         seq: RefCell::new(5), copy_fail: false, get_text_fail_on_second: false,
-        get_text_calls: RefCell::new(0),
+        get_text_always_fails: false, get_text_calls: RefCell::new(0),
     };
     let res = capture(&f, || { f.set_text("selected").map(|_| ()) }, 50).unwrap();
     assert!(matches!(res, Capture::Selected(t) if t == "selected"));
     assert_eq!(*f.image.borrow(), Some((1, 1, vec![1, 2, 3, 4])), "image restored");
+}
+
+#[test]
+fn empty_original_clipboard_noselection_clears_sentinel() {
+    // §B regression (round-11 review P1 #1): when the original clipboard was EMPTY
+    // (no text → get_text errors → Saved.text = None; no image → None), the snapshot
+    // is (None, None). The sentinel written during capture MUST be removed on restore,
+    // returning the clipboard to empty. The prev production restore_snapshot(None,None)
+    // returned Ok(()) without clearing, leaving the sentinel behind.
+    //
+    // This test models the empty original via get_text_always_fails (real arboard
+    // errors on an empty clipboard → Saved.text = None) + image = None. The copy() here
+    // does NOT advance the sequence (nothing selected) → NoSelection. restore_if_owned
+    // fires (we still own the post-sentinel sequence) and must clear the sentinel.
+    let f = FakeImg {
+        text: RefCell::new(String::new()), image: RefCell::new(None),
+        seq: RefCell::new(5), copy_fail: false, get_text_fail_on_second: false,
+        get_text_always_fails: true, get_text_calls: RefCell::new(0),
+    };
+    let res = capture(&f, || { Ok(()) }, 50).unwrap(); // copy does nothing → NoSelection
+    assert!(matches!(res, Capture::NoSelection), "nothing selected");
+    // The Fake's restore_snapshot(None,None) clears BOTH fields. If restore had been a
+    // no-op (the bug), the sentinel "__islandpot_sel_*__" would still be in `text`.
+    assert!(
+        !f.text.borrow().contains("__islandpot_sel_"),
+        "sentinel must be cleared on empty-original restore (got {:?})",
+        f.text.borrow()
+    );
+    assert!(
+        f.image.borrow().is_none(),
+        "image must be None after clearing the empty snapshot"
+    );
 }
 
 #[test]
@@ -222,7 +263,7 @@ fn text_and_image_both_restored_when_present() {
         text: RefCell::new("hello".into()),
         image: RefCell::new(Some((2, 2, vec![0; 16]))), // 2x2 RGBA
         seq: RefCell::new(5), copy_fail: false, get_text_fail_on_second: false,
-        get_text_calls: RefCell::new(0),
+        get_text_always_fails: false, get_text_calls: RefCell::new(0),
     };
     let res = capture(&f, || { f.set_text("selected").map(|_| ()) }, 50).unwrap();
     assert!(matches!(res, Capture::Selected(t) if t == "selected"));

@@ -83,7 +83,15 @@ pub fn restore_snapshot(
             let pb = NSPasteboard::generalPasteboard();
             restore_compound_to(&pb, t, img)
         }
-        (None, None) => Ok(()),
+        // (None, None): the original clipboard was EMPTY (or held only unsupported
+        // formats). The §B restore must return to that empty state — the sentinel we
+        // wrote during capture is still on the pasteboard, so clearContents is required.
+        // (round-11 review P1 #1: the prev `Ok(())` left the sentinel behind, violating §B.)
+        (None, None) => {
+            let pb = NSPasteboard::generalPasteboard();
+            pb.clearContents();
+            Ok(())
+        }
     }
 }
 
@@ -212,6 +220,12 @@ pub fn restore_snapshot(
     // loses one flavor when both text+image are present (documented limitation).
     let mut g = clip()?;
     let c = g.as_mut().unwrap();
+    // (None, None): original clipboard was empty/unsupported — clear to remove the
+    // §B sentinel (round-11 review P1 #1). Task 2b's Windows FSM models this as the
+    // zero-format case (OpenClipboard → EmptyClipboard → CloseClipboard).
+    if text.is_none() && image.is_none() {
+        return c.clear().map_err(|e| e.to_string());
+    }
     if let Some(img) = image {
         let data = arboard::ImageData {
             width: img.width, height: img.height,
