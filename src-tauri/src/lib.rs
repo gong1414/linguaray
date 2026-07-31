@@ -30,7 +30,7 @@ use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use std::sync::Arc;
 use tauri::Manager;
-use tauri_plugin_global_shortcut::{Builder as GlobalShortcutBuilder, ShortcutState};
+use tauri_plugin_global_shortcut::{Builder as GlobalShortcutBuilder, GlobalShortcutExt, ShortcutState};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TranslateRequest {
@@ -458,44 +458,15 @@ fn on_input_hotkey(
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // The global-shortcut `Builder` holds ONE shared handler (its `with_handler`
-    // is a `replace`, and `build()` dispatches every registered shortcut to it by
-    // `ShortcutEvent.id`). So we register both hotkeys on a single Builder and
-    // route by the shortcut's string form in the handler below.
-    //
-    // Review P1 #10: registration must be FAULT-TOLERANT. A shortcut already owned
-    // by the OS or another app must NOT bring down startup (the old code .expect-
-    // ed and crashed via .run().expect()). We register each on a best-effort basis:
-    // if one fails to register, we log + skip it (that hotkey just won't fire) and
-    // the app still starts. (Full rebindability is a later UX feature.)
-    let alt_space = tauri_plugin_global_shortcut::Shortcut::from_str("Alt+Space");
-    let ctrl_space = tauri_plugin_global_shortcut::Shortcut::from_str("Ctrl+Space");
-    // Capture the ids (for handler routing) BEFORE moving the shortcuts into the builder.
-    let alt_space_id = alt_space.as_ref().ok().map(|s| s.id());
-    let ctrl_space_id = ctrl_space.as_ref().ok().map(|s| s.id());
-    let mut builder = GlobalShortcutBuilder::new();
-    // Register only shortcuts that parsed (from_str is the failure point). A parse
-    // failure skips that hotkey but does NOT crash startup. with_shortcut on an
-    // already-parsed Shortcut won't fail, so .expect is sound here.
-    if let Ok(s) = alt_space {
-        builder = builder.with_shortcut(s).expect("register parsed Alt+Space");
-    } else {
-        log::warn!("Alt+Space parse failed — selection hotkey disabled");
-    }
-    if let Ok(s) = ctrl_space {
-        builder = builder.with_shortcut(s).expect("register parsed Ctrl+Space");
-    } else {
-        log::warn!("Ctrl+Space parse failed — input hotkey disabled");
-    }
-    let shortcut_plugin = builder
-        .with_handler(move |app, shortcut, event| {
-            if Some(shortcut.id()) == ctrl_space_id {
-                on_input_hotkey(app, shortcut, event);
-            } else if Some(shortcut.id()) == alt_space_id {
-                on_hotkey(app, shortcut, event);
-            }
-        })
-        .build();
+    // Round-2 review P1 #2: the REAL registration failure point is the plugin's
+    // `setup`, which calls `manager.register(shortcut)?` for every `with_shortcut`
+    // and propagates a conflict error to `.run().expect()` → startup crash.
+    // Parse-time tolerance (round-1) was insufficient. Fix: register the plugin
+    // with NO shortcuts (Builder builds a plugin, but registers nothing at setup),
+    // then in the app `setup()` call the runtime `on_shortcut` PER shortcut and
+    // catch each Result — a conflict logs + skips THAT shortcut only, the app and
+    // the other shortcut keep running.
+    let shortcut_plugin = GlobalShortcutBuilder::new().build();
 
     tauri::Builder::default()
         // single-instance MUST be first: defense-in-depth on top of the real
@@ -503,7 +474,6 @@ pub fn run() {
         // instance/external writer on the same dir; single-instance just avoids
         // spawning a second process). This plugin focuses the existing instance
         // instead of launching a second.
-        // a second one.
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             if let Some(w) = app.get_webview_window("main") {
                 let _ = w.show();
@@ -540,6 +510,23 @@ pub fn run() {
                 keystore,
                 gen: concurrency::GenerationToken::new(),
             }));
+            // Round-2 review P1 #2: register hotkeys at RUNTIME (per-shortcut,
+            // catching each Result) so a conflict skips just that shortcut, not the
+            // whole app. on_shortcut registers + attaches the handler in one call.
+            let handle: tauri::AppHandle = app.handle().clone();
+            let gs = handle.global_shortcut();
+            let handle_for_alt = handle.clone();
+            if let Err(e) = gs.on_shortcut("Alt+Space", move |_a, _s, ev| {
+                on_hotkey(&handle_for_alt, _s, ev);
+            }) {
+                log::warn!("Alt+Space registration failed (conflict?): {e} — selection hotkey disabled");
+            }
+            let handle_for_ctrl = handle.clone();
+            if let Err(e) = gs.on_shortcut("Ctrl+Space", move |_a, _s, ev| {
+                on_input_hotkey(&handle_for_ctrl, _s, ev);
+            }) {
+                log::warn!("Ctrl+Space registration failed (conflict?): {e} — input hotkey disabled");
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
