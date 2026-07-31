@@ -53,9 +53,14 @@ function App() {
     await invoke("set_setting", { key: "target_language", value: v });
   }
   async function changeFallback(v: string) {
-    setFallbackEngine(v);
-    // Empty string = None (opt-out). The backend stores null for no fallback.
-    await invoke("set_setting", { key: "fallback_engine", value: v || null });
+    // Send value: v (always a string). The backend converts empty string to None.
+    // Update the signal only AFTER the invoke succeeds (no optimistic UI on error).
+    try {
+      await invoke("set_setting", { key: "fallback_engine", value: v });
+      setFallbackEngine(v);
+    } catch (e) {
+      setError(String(e));
+    }
   }
   async function translateClip() {
     setClipBusy(true);
@@ -137,7 +142,7 @@ function App() {
         <select value={targetLang()} onChange={(e) => changeTarget(e.currentTarget.value)}>
           <For each={["zh", "en", "ja", "ko", "fr", "de", "es"]}>{(l) => <option value={l}>{l}</option>}</For>
         </select>
-        <label>Fallback engine (on AI error)</label>
+        <label>Fallback engine (on net/timeout/5xx/parse errors — text sent to 2nd remote; NOT on 401/403/missing key)</label>
         <select value={fallbackEngine()} onChange={(e) => changeFallback(e.currentTarget.value)}>
           <option value="">None</option>
           <For each={engines().filter((e) => e.kind === "traditional")}>{(e) => <option value={e.id}>{e.label}</option>}</For>
