@@ -1,8 +1,8 @@
-# Phase 4: Windows Parity + Cross-Platform Packaging — Implementation Plan (rev 5)
+# Phase 4: Windows Parity + Cross-Platform Packaging — Implementation Plan (rev 6)
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** rev 5 — fixes the round-3 review's 4 plan blockers: (a) CSP tightened to IPC-only `connect-src` (no wildcard https/ws — provider calls are Rust-side), (b) AppManifest::commands pinned with exact build.rs code + permission IDs, (c) macOS signing script: `$RUNNER_TEMP` path + `codesign:` in partition list + `if: always()` cleanup, (d) Windows signing: `certificateThumbprint` via overlay config (no `certificatePath`).
+**Status:** rev 6 — fixes round-4 review issues: (a) CSP includes `ipc:` + `http://ipc.localhost` for Tauri IPC, (b) AppManifest permission IDs use `allow-$command` (no `islandpot:` prefix), popup gets `core:window:allow-hide`, store/input perms corrected, (c) macOS signing adds `set-keychain-settings` + `find-identity` verification + cert file cleanup, (d) Windows overlay uses `ConvertTo-Json` to a file (no inline quoting), (e) added Windows compound-clipboard-restore task (§B image promise on Windows too).
 
 **Goal:** Windows builds (real `atomic_replace` + ACL), correct signing (macOS notarization via cert-import; Windows Authenticode via PFX/signtool — distinct from the updater key), and a clean CI matrix (arm64 + Intel macOS via `macos-15-intel`, Windows).
 
@@ -28,11 +28,20 @@
 - [ ] Windows-only test (CI): verify via `GetNamedSecurityInfoW` the DACL has exactly one explicit user ACE, full control, and is protected.
 - [ ] Commit.
 
+## Task 2b: Windows compound clipboard restore (§B image promise)
+
+**Files:** `src-tauri/src/clipboard.rs`
+
+- [ ] The macOS `restore_snapshot` uses objc2 `NSPasteboardItem` for a single clear + multi-format write. Windows must do the same via Win32: one `OpenClipboard`/`EmptyClipboard`, then `SetClipboardData(CF_UNICODETEXT, ...)` + `SetClipboardData(CF_DIBV5, ...)` (or register a PNG format), then `CloseClipboard`. Convert RGBA → `BITMAPV5HEADER` + pixel data for CF_DIBV5. All-or-nothing: build both blobs BEFORE `EmptyClipboard`.
+- [ ] Add a `#[cfg(target_os = "windows")]` `restore_snapshot` impl replacing the current sequential-arboard fallback. Keep the non-mac/win stub for other platforms.
+- [ ] Test (Windows CI): write both formats, verify both readable. (Can't run locally on macOS.)
+- [ ] Commit.
+
 ## Task 3: Release bundle config — CSP + env-driven signing
 
 **Files:** `src-tauri/tauri.conf.json`
 
-- [ ] CSP (production): **NO wildcard `https:` / `ws:`** — provider HTTP calls go through Rust reqwest, NOT the WebView. The WebView only needs Tauri IPC. Production CSP: `"default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'"`. **`devCsp`**: add ONLY the Vite HMR origin explicitly: `connect-src 'self' ws://localhost:1420` (Vite dev server port) + `'unsafe-inline'` in script-src. Verify dev (HMR works) + the three windows work. [Tauri Capabilities](https://v2.tauri.app/security/capabilities/)
+- [ ] CSP (production): NO wildcard `https:` / `ws:`. Provider HTTP goes through Rust reqwest, NOT the WebView. The WebView needs Tauri IPC (`ipc:` + `http://ipc.localhost`). Production: `"default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' ipc: http://ipc.localhost"`. **`devCsp`**: same + `ws://localhost:1420` for Vite HMR. [Tauri CSP](https://v2.tauri.app/security/csp/)
 - [ ] Signing: drive purely via env vars (NO `${APPLE_SIGNING_IDENTITY}` in JSON). Keep `bundle.macOS.minimumSystemVersion: "11.0"`.
 - [ ] Commit.
 
@@ -40,7 +49,7 @@
 
 **Files:** `src-tauri/build.rs`, `src-tauri/capabilities/`
 
-- [ ] **Exact build.rs code** (no "verify API" TBD):
+- [ ] **Exact build.rs code**:
 ```rust
 fn main() {
     tauri_build::try_build(
@@ -58,11 +67,12 @@ fn main() {
     .expect("failed to run tauri build");
 }
 ```
-- [ ] Per-window capabilities with exact permission IDs:
-  - `capabilities/main.json` — `"permissions": ["core:default", "store:default", "islandpot:allow-translate", "islandpot:allow-translate-default", "islandpot:allow-translate-clipboard", "islandpot:allow-list-engines", "islandpot:allow-set-key", "islandpot:allow-delete-key", "islandpot:allow-key-status", "islandpot:allow-get-settings", "islandpot:allow-set-setting", "islandpot:allow-lookup-dictionary", "islandpot:allow-a11y-status", "islandpot:allow-keystore-health", "islandpot:allow-archive-keystore", "islandpot:allow-reset-keystore"]`
-  - `capabilities/popup.json` — `"permissions": ["core:default"]` (popup only listens to events; no commands)
-  - `capabilities/input.json` — `"permissions": ["core:default", "islandpot:allow-translate-default", "islandpot:allow-get-settings"]`
-- [ ] Drop `opener`, `global-shortcut` from window permissions. Verify each window resolves its scoped commands at runtime (exercise all three in dev).
+- [ ] Per-window capabilities with correct permission IDs (`allow-$command`, NO `islandpot:` prefix):
+  - `capabilities/main.json` — `"permissions": ["core:default", "allow-translate", "allow-translate-default", "allow-translate-clipboard", "allow-list-engines", "allow-set-key", "allow-delete-key", "allow-key-status", "allow-get-settings", "allow-set-setting", "allow-lookup-dictionary", "allow-a11y-status", "allow-keystore-health", "allow-archive-keystore", "allow-reset-keystore"]`
+  - `capabilities/popup.json` — `"permissions": ["core:default", "core:window:allow-hide"]` (popup hides via window API, not a custom command; `core:default` does NOT include `allow-hide`)
+  - `capabilities/input.json` — `"permissions": ["core:default", "allow-translate-default"]` (input only calls translate_default; NOT get_settings)
+  - Drop `store:default` (frontend doesn't call the store plugin directly — Rust does). Drop `opener`/`global-shortcut` (backend plugins).
+- [ ] Verify each window resolves its scoped commands at runtime (exercise all three in dev).
 - [ ] Commit.
 
 ## Task 5: GitHub Actions release workflow (correct signing + runner)
@@ -70,7 +80,7 @@ fn main() {
 **Files:** `.github/workflows/release.yml`
 
 - [ ] Matrix: `macos-latest` (arm64), **`macos-15-intel`** (NOT retired `macos-13`), `windows-latest` (x86_64-pc-windows-msvc).
-- [ ] **macOS signing** (pinned, no TBD):
+- [ ] **macOS signing** (pinned, full official flow):
 ```yaml
 - name: Import signing cert + build (macOS)
   id: mac-build
@@ -89,16 +99,21 @@ fn main() {
     security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
     security default-keychain -s build.keychain
     security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+    # Auto-lock after 3600s (official recommendation).
+    security set-keychain-settings -t 3600 -u build.keychain
     security import "$CERT_PATH" -P "$APPLE_CERTIFICATE_PASSWORD" -k build.keychain -T /usr/bin/codesign
     security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+    # Verify the identity matches APPLE_SIGNING_IDENTITY.
+    security find-identity -v -p codesigning build.keychain
     pnpm tauri build --target ${{ matrix.target }}
 
-- name: Cleanup keychain (macOS)
+- name: Cleanup keychain + cert (macOS)
   if: always() && startsWith(matrix.os, 'macos')
-  run: security delete-keychain build.keychain || true
+  run: |
+    security delete-keychain build.keychain || true
+    rm -f "$RUNNER_TEMP/islandpot-cert.p12"
 ```
-Key fixes from round-3 review: `$RUNNER_TEMP` (not `mktemp` template); `codesign:` added to partition list; cleanup in `if: always()` step.
-- [ ] **Windows signing** (Authenticode via `certificateThumbprint` overlay — NOT the `TAURI_SIGNING_PRIVATE_KEY*` updater key; NOT nonexistent `certificatePath`):
+- [ ] **Windows signing** (Authenticode via `certificateThumbprint` overlay config written to a FILE — no inline JSON quoting):
 ```yaml
 - name: Import PFX + build (Windows)
   if: matrix.os == 'windows-latest'
@@ -108,11 +123,19 @@ Key fixes from round-3 review: `$RUNNER_TEMP` (not `mktemp` template); `codesign
   run: |
     $certPath = "$env:RUNNER_TEMP\islandpot-cert.pfx"
     [System.Convert]::FromBase64String("$env:WINDOWS_CERTIFICATE_PFX") | Set-Content $certPath -AsByteStream
-    $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($certPath, $env:WINDOWS_CERTIFICATE_PASSWORD)
-    Import-PfxCertificate -CertStoreLocation Cert:\CurrentUser\My -FilePath $certPath -Password (ConvertTo-SecureString -String $env:WINDOWS_CERTIFICATE_PASSWORD -AsPlainText -Force)
-    $thumbprint = $cert.Thumbprint
-    # Pass the thumbprint to Tauri via an overlay config.
-    pnpm tauri build --target ${{ matrix.target }} --config `"{"bundle":{"windows":{"certificateThumbprint":"$thumbprint","digestAlgorithm":"sha256","timestampUrl":"http://timestamp.digicert.com"}}}`"
+    $imported = Import-PfxCertificate -CertStoreLocation Cert:\CurrentUser\My -FilePath $certPath -Password (ConvertTo-SecureString -String $env:WINDOWS_CERTIFICATE_PASSWORD -AsPlainText -Force)
+    $thumbprint = $imported.Thumbprint
+    # Write overlay config to a FILE (no inline JSON quoting issues).
+    $config = @{ bundle = @{ windows = @{ certificateThumbprint = $thumbprint; digestAlgorithm = "sha256"; timestampUrl = "http://timestamp.digicert.com" } } }
+    $configPath = "$env:RUNNER_TEMP\tauri-windows-signing.conf.json"
+    $config | ConvertTo-Json -Depth 5 | Set-Content $configPath
+    pnpm tauri build --target ${{ matrix.target }} --config $configPath
+
+- name: Cleanup cert (Windows)
+  if: always() && matrix.os == 'windows-latest'
+  run: Remove-Item "$env:RUNNER_TEMP\islandpot-cert.pfx" -ErrorAction SilentlyContinue
+```
+`TAURI_SIGNING_PRIVATE_KEY*` is the UPDATER signature only — do NOT conflate. If no Authenticode cert: build unsigned (document SmartScreen warning).
 ```
 If no Authenticode cert: build unsigned (document the SmartScreen warning). `TAURI_SIGNING_PRIVATE_KEY*` is the UPDATER signature only (separate plugin).
 - [ ] Artifacts upload. Lint YAML. Commit.
