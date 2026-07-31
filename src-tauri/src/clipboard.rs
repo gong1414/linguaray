@@ -87,12 +87,23 @@ pub fn restore_snapshot(
         // formats). The §B restore must return to that empty state — the sentinel we
         // wrote during capture is still on the pasteboard, so clearContents is required.
         // (round-11 review P1 #1: the prev `Ok(())` left the sentinel behind, violating §B.)
+        // round-12 review P1 #1: delegate to a testable inner fn so the production path
+        // and a real-pasteboard test share ONE implementation (a Fake-only test was a
+        // false green — the Fake cleared (None,None) even before the prod fix).
         (None, None) => {
             let pb = NSPasteboard::generalPasteboard();
-            pb.clearContents();
-            Ok(())
+            restore_empty_to(&pb)
         }
     }
+}
+
+/// Inner: clear a GIVEN NSPasteboard (testable with `pasteboardWithUniqueName`).
+/// Used by the (None, None) restore branch — an empty original snapshot must still
+/// remove the §B sentinel. Returns Ok after clearContents (no payload to write).
+#[cfg(target_os = "macos")]
+fn restore_empty_to(pb: &objc2_app_kit::NSPasteboard) -> std::result::Result<(), String> {
+    pb.clearContents();
+    Ok(())
 }
 
 /// Inner: compound text+image write to a GIVEN NSPasteboard (testable with
@@ -391,5 +402,42 @@ mod tests {
         // huge for the stride check to trip (it runs before the length check).
         let stride_overflow_w = (isize::MAX as usize / 4) + 1;
         check(stride_overflow_w, 1, vec![], "row stride overflows isize");
+    }
+
+    #[test]
+    fn restore_empty_removes_sentinel_on_real_pasteboard() {
+        // Round-12 review P1 #1: the empty-original regression test must exercise the
+        // PRODUCTION clear path, not just the Fake. A Fake-only test was a false green
+        // (the Fake cleared (None,None) even before the clipboard.rs fix). This test
+        // drives the same `restore_empty_to` the production (None,None) branch calls,
+        // against an isolated real NSPasteboard. Write a sentinel, clear via the helper,
+        // assert the sentinel is gone — if the helper regressed to a no-op, this fails.
+        let pb = NSPasteboard::pasteboardWithUniqueName();
+        // Seed the pasteboard with a §B sentinel (what capture writes).
+        pb.clearContents();
+        let sentinel = NSString::from_str("__islandpot_sel_test__");
+        pb.setString_forType(&sentinel, unsafe { NSPasteboardTypeString });
+        // Confirm it's there before the restore.
+        let before = pb.stringForType(unsafe { NSPasteboardTypeString })
+            .expect("sentinel readable before restore");
+        assert_eq!(before.to_string(), "__islandpot_sel_test__");
+
+        // The production (None,None) path:
+        super::restore_empty_to(&pb).expect("restore_empty_to should succeed");
+
+        // After restore, the sentinel must be gone. clearContents removes the items, so
+        // the String-type lookup returns None (no item carries that type anymore). If the
+        // helper regressed to a no-op, stringForType would still return the sentinel.
+        let after = pb.stringForType(unsafe { NSPasteboardTypeString });
+        match after {
+            Some(s) => assert!(
+                s.to_string() != "__islandpot_sel_test__",
+                "sentinel must be removed by restore_empty_to (still got {:?})",
+                s.to_string()
+            ),
+            None => { /* expected: cleared pasteboard has no String-typed item */ }
+        }
+        assert_eq!(pb.pasteboardItems().map(|i| i.count()).unwrap_or(0), 0,
+            "no items remain after clearing the empty snapshot");
     }
 }
