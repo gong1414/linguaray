@@ -17,17 +17,33 @@ uses. Adding a provider = adding one line of config, not reverse-engineering cod
 
 Three legs, decided in the design grilling:
 
-1. **AI-native** — the LLM is the default, translation-tuned engine (auto language
-   detect, terminology consistency, long-text segmentation). Not a chat app —
-   just translation, done well.
-2. **Privacy / local-first** — local LLM (Ollama), local OCR (PaddleOCR), local
-   TTS are first-class. No telemetry. Users supply their own keys. API keys are
-   stored in a self-encrypted, machine-bound keystore (AES-256-GCM + Argon2id).
+1. **AI-native** — the LLM is the default translation engine (auto language detect).
+   Not a chat app — just translation, done well.
+2. **Privacy / local-first** — local LLM (Ollama) is first-class. No telemetry.
+   Users supply their own keys. API keys are stored in a self-encrypted,
+   machine-bound keystore (AES-256-GCM + Argon2id).
 3. **Continuously-maintained open source** — will never go closed/paid.
 
-Traditional MT engines (Google / DeepL / 百度 / 有道 / …) are built-in Rust modules
-that act as the **AI-failure fallback** and back the **system-dictionary** lookup
-mode (word definitions, where LLMs are weak).
+### Current capabilities (v1)
+
+- AI provider catalog (preset-based, fill-key-and-use)
+- Self-encrypted keystore (machine-bound, fail-closed)
+- Selection translate (Alt+Space) with hybrid AX-first + sentinel-copy-fallback capture
+- Input translate (Ctrl+Space)
+- User-initiated clipboard translate
+- Cursor-anchored popup with latest-wins generation token
+- Built-in Google traditional engine as AI-fallback (§G classified fallback)
+- Compound clipboard restore (text + image, single platform-level write)
+- Windows + macOS cross-platform parity (keystore atomic replace + ACL, compound clipboard)
+- CSP-hardened WebView, per-window least-privilege capabilities
+
+### Planned (v1.x, before public open-source)
+
+- PaddleOCR screenshot/OCR translate · TTS · external invocation
+- Long-text segmentation/chunking
+- Additional traditional engines (DeepL / 百度 / 有道 / …)
+- Dictionary lookup UI + fallback-engine selector UI
+- Plugin/WASM extensibility
 
 ## Tech stack
 
@@ -187,7 +203,7 @@ Get-AuthenticodeSignature "C:\Program Files\LinguaRay\LinguaRay.exe"
 - **Phase 1 — AI provider catalog + keystore + unified pipeline** ✅ (the headline feature)
 - **Phase 2 — selection/input translate + user-initiated clipboard translate + cursor-anchored popup** ✅
 - **Phase 3 — built-in traditional engines** (Google ✅; DeepL/百度/有道/… follow the pattern) + system dict + §G fallback chain ✅
-- **Phase 4 — cross-platform parity + packaging** — Windows keystore (atomic replace + ACL), Windows compound clipboard restore, CSP hardening, per-window capabilities, release/signing CI ✅
+- **Phase 4 — cross-platform parity + packaging** — Windows keystore (atomic replace + ACL), Windows compound clipboard restore, CSP hardening, per-window capabilities, release/signing CI ✅ (fallback selector UI + dictionary lookup UI pending for v1.x)
 
 **v1.x (before public open-source release):**
 - PaddleOCR screenshot/OCR translate · TTS · external invocation
@@ -200,5 +216,5 @@ MIT.
 ## Third-party
 
 - macOS selection capture uses a vendored AX-only read from
-  [`get-selected-text`](https://github.com/yetone/get-selected-text) (MIT OR Apache-2.0).
+  [`get-selected-text`](https://github.com/yetone/get-selected-text) (MIT).
   The upstream's AppleScript copy-fallback is deliberately excluded.

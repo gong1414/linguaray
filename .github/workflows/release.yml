@@ -153,9 +153,13 @@ jobs:
           WINDOWS_CERTIFICATE_PFX: ${{ secrets.WINDOWS_CERTIFICATE_PFX }}
           WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
         run: |
-          # Fail-closed: tag release MUST have Windows signing secrets.
+          # Fail-closed: tag release MUST have BOTH Windows signing secrets.
           if (-not $env:WINDOWS_CERTIFICATE_PFX) {
             Write-Error "WINDOWS_CERTIFICATE_PFX secret is missing — tag releases MUST be signed (fail-closed)"
+            exit 1
+          }
+          if (-not $env:WINDOWS_CERTIFICATE_PASSWORD) {
+            Write-Error "WINDOWS_CERTIFICATE_PASSWORD secret is missing — tag releases MUST be signed (fail-closed)"
             exit 1
           }
           $certPath = "$env:RUNNER_TEMP\linguaray-cert.pfx"
@@ -168,12 +172,68 @@ jobs:
           $config | ConvertTo-Json -Depth 5 | Set-Content $configPath
           cd src-tauri; pnpm tauri build --target ${{ matrix.target }} --config $configPath
 
+      # Verify Authenticode signature on the built MSI/EXE (fail-closed: signed path
+      # MUST produce a Valid signature, not just "built without error").
+      - name: Verify Authenticode signature (Windows, signed)
+        if: needs.mode.outputs.signed == 'true' && matrix.os == 'windows-latest'
+        run: |
+          $bundleDir = "src-tauri\target\${{ matrix.target }}\release\bundle"
+          $installers = @(Get-ChildItem -Path $bundleDir -Recurse -Include "*.msi","*.exe" | Where-Object { $_.FullName -notmatch "\.app\." })
+          if ($installers.Count -eq 0) { Write-Error "No MSI/EXE found in bundle dir"; exit 1 }
+          foreach ($installer in $installers) {
+            $sig = Get-AuthenticodeSignature $installer.FullName
+            Write-Host "$($installer.Name): Status=$($sig.Status)"
+            if ($sig.Status -ne "Valid") {
+              Write-Error "$($installer.Name) Authenticode status is '$($sig.Status)' — MUST be 'Valid'"
+              exit 1
+            }
+          }
+
       - name: Cleanup cert (Windows)
         if: always() && matrix.os == 'windows-latest'
         run: Remove-Item "$env:RUNNER_TEMP\linguaray-cert.pfx" -ErrorAction SilentlyContinue
 
+      # ── P0: Verify the bundle contains the CORRECT executable (linguaray, not a
+      # test helper). This catches the default-run regression where Tauri packaged
+      # xproc-lock-holder instead of the app.
+      - name: Verify bundle executable identity (macOS)
+        if: startsWith(matrix.os, 'macos')
+        run: |
+          APP_DIR=$(find src-tauri/target/${{ matrix.target }}/release/bundle/macos -name "*.app" -maxdepth 1 | head -1)
+          if [ -z "$APP_DIR" ]; then echo "::error::No .app found in bundle/macos"; exit 1; fi
+          EXEC_NAME=$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$APP_DIR/Contents/Info.plist" 2>/dev/null || echo "")
+          if [ "$EXEC_NAME" != "linguaray" ]; then
+            echo "::error::CFBundleExecutable is '$EXEC_NAME', expected 'linguaray' — wrong binary was packaged"
+            exit 1
+          fi
+          if [ ! -x "$APP_DIR/Contents/MacOS/linguaray" ]; then
+            echo "::error::linguaray executable not found or not executable in .app"
+            exit 1
+          fi
+          echo "✓ Bundle executable is linguaray"
+
+      - name: Verify bundle executable identity (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          $bundleDir = "src-tauri\target\${{ matrix.target }}\release\bundle"
+          $exes = @(Get-ChildItem -Path $bundleDir -Recurse -Filter "linguaray.exe")
+          if ($exes.Count -eq 0) {
+            # Also check the MSI contents indirectly: if xproc-lock-holder.exe is the
+            # main binary, the package name in the build output will reflect it.
+            $wrongExes = @(Get-ChildItem -Path $bundleDir -Recurse -Filter "xproc-lock-holder.exe")
+            if ($wrongExes.Count -gt 0) {
+              Write-Error "xproc-lock-holder.exe found in bundle — wrong binary was packaged. Add default-run to Cargo.toml."
+              exit 1
+            }
+            Write-Error "linguaray.exe not found in bundle — verify the binary name"
+            exit 1
+          }
+          Write-Host "✓ linguaray.exe found in bundle"
+
       # ── Artifact upload ─────────────────────────────────────────────────────────
-      # Upload the bundle artifacts (dmg/app on macOS, msi/exe on Windows).
+      # Upload ONLY installers (.dmg on macOS, .msi/.exe on Windows). Do NOT upload
+      # bare .app directories — upload-artifact loses file permissions, making the app
+      # un-runnable. Users get the .app inside the .dmg.
       - name: Upload artifacts (UNSIGNED dry-run)
         if: needs.mode.outputs.signed != 'true'
         uses: actions/upload-artifact@v4
@@ -181,7 +241,6 @@ jobs:
           name: linguaray-UNSIGNED-${{ matrix.label }}
           path: |
             src-tauri/target/${{ matrix.target }}/release/bundle/**/*.dmg
-            src-tauri/target/${{ matrix.target }}/release/bundle/**/*.app
             src-tauri/target/${{ matrix.target }}/release/bundle/**/*.msi
             src-tauri/target/${{ matrix.target }}/release/bundle/**/*.exe
           if-no-files-found: error
@@ -193,7 +252,6 @@ jobs:
           name: linguaray-signed-${{ matrix.label }}
           path: |
             src-tauri/target/${{ matrix.target }}/release/bundle/**/*.dmg
-            src-tauri/target/${{ matrix.target }}/release/bundle/**/*.app
             src-tauri/target/${{ matrix.target }}/release/bundle/**/*.msi
             src-tauri/target/${{ matrix.target }}/release/bundle/**/*.exe
           if-no-files-found: error
