@@ -1,7 +1,8 @@
 {
-  "name": "islandpot",
+  "name": "linguaray",
   "version": "0.1.0",
-  "description": "",
+  "description": "Open-source, AI-native translation desktop app for macOS and Windows",
+  "packageManager": "pnpm@11.18.0",
   "type": "module",
   "scripts": {
     "start": "vite",

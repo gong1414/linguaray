@@ -1,4 +1,4 @@
-//! AI provider preset catalog — IslandPot's core differentiator (spec §Wire).
+//! AI provider preset catalog — LinguaRay's core differentiator (spec §Wire).
 //!
 //! Each entry is CONFIG DATA (a FULL endpoint URL + dialect + default model + a
 //! key-needed flag). The user fills a key and it works. Adding a provider = one

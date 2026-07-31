@@ -1,8 +1,8 @@
-# IslandPot v1 — Design Spec
+# LinguaRay v1 — Design Spec
 
 **Status:** Approved (rev 4 — three closing fixes: A atomic-write semantics + pre-decrypt validation, B sentinel-marker state machine, wire option-wording) · **Date:** 2026-07-30
 
-IslandPot is an open-source, cross-platform translation/OCR desktop tool — a
+LinguaRay is an open-source, cross-platform translation/OCR desktop tool — a
 maintained successor to [pot-desktop](https://github.com/pot-app/pot-desktop) and
 the open answer to its author's later closed-source paid version ([manggo](https://manggo.pylogmon.cn/)).
 
@@ -53,12 +53,12 @@ full disk access, or full disk/system snapshots. Those are out of scope; stated 
   Parameters pinned: **m = 65536 KiB (64 MiB), t = 3, p = 1, output length = 32 bytes.**
 - **KDF inputs (no ambiguity):**
   - `password` = `DOMAIN_SEPARATOR || normalized_identity`, where
-    `DOMAIN_SEPARATOR = b"islandpot-keystore-v1\0"` (fixed).
+    `DOMAIN_SEPARATOR = b"linguaray-keystore-v1\0"` (fixed).
   - `salt` = the envelope's random 16-byte `salt`. **The salt is passed ONLY as the
     Argon2 `salt` parameter — it is NOT concatenated into `password`.** (rev-2 was
     ambiguous; salt appeared in both.)
 - **AEAD = AES-256-GCM.** 12-byte random `nonce` per write. **Fixed AAD** =
-  `b"islandpot-keystore-envelope-v1"`. **The 16-byte GCM tag is appended to
+  `b"linguaray-keystore-envelope-v1"`. **The 16-byte GCM tag is appended to
   `ciphertext` (standard GCM). There is NO separate `tag` field.** (rev-2 left this
   as "either"; pinned.)
 - GCM nonce uniqueness is load-bearing (NIST SP 800-38D). Nonce is freshly random

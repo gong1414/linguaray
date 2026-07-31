@@ -8,7 +8,7 @@
 
 **Tech Stack:** Rust 1.95 · Tauri 2 · `tauri-plugin-global-shortcut` · `mouse_position` (cross-platform cursor) · vendored `get-selected-text` (sentinel clipboard algorithm) · `enigo` (simulate Cmd+C/Ctrl+C) · existing Phase-1 modules (`service`, `providers`, `keystore`, `wire`). Frontend: SolidJS, a new `Popup.tsx` window.
 
-**Spec reference:** `docs/superpowers/specs/2026-07-30-islandpot-v1-design.md` (§B selection capture + sentinel algorithm, §C cursor-anchored popup, §D hotkey, §concurrency generation-token latest-wins, §G error classification).
+**Spec reference:** `docs/superpowers/specs/2026-07-30-linguaray-v1-design.md` (§B selection capture + sentinel algorithm, §C cursor-anchored popup, §D hotkey, §concurrency generation-token latest-wins, §G error classification).
 
 ---
 
@@ -50,7 +50,7 @@ enigo = "0.2"
 - [ ] **Step 3: Verify + commit.**
 Run: `cd src-tauri && cargo check` (cargo at `~/.cargo/bin/cargo`). Expected: Finished (may add crates).
 ```bash
-cd /Users/daoyu/Code/projects/islandpot && git checkout -b phase2a && git add src-tauri/Cargo.toml src-tauri/Cargo.lock src-tauri/capabilities/default.json && git -c user.name=daoyu -c user.email=daoyu@local commit -m "deps: global-shortcut, mouse_position, arboard, enigo for Phase 2a"
+cd /Users/daoyu/Code/projects/linguaray && git checkout -b phase2a && git add src-tauri/Cargo.toml src-tauri/Cargo.lock src-tauri/capabilities/default.json && git -c user.name=daoyu -c user.email=daoyu@local commit -m "deps: global-shortcut, mouse_position, arboard, enigo for Phase 2a"
 ```
 > NOTE for implementer: create the `phase2a` branch in this commit step (first task of the new phase).
 
@@ -221,7 +221,7 @@ pub fn capture<C: ClipboardLike, F: FnMut() -> std::result::Result<(), String>>(
     // 1. Save current content (best-effort; ignore read errors => empty).
     let saved = clip.get_text().unwrap_or_default();
     // 2. Write a unique sentinel.
-    let sentinel = format!("__islandpot_sel_{}__", clip.sequence());
+    let sentinel = format!("__linguaray_sel_{}__", clip.sequence());
     clip.set_text(&sentinel)?;
     let marker_sequence = clip.sequence();
     // 3. Simulate copy.
@@ -254,7 +254,7 @@ pub fn capture<C: ClipboardLike, F: FnMut() -> std::result::Result<(), String>>(
 - [ ] **Step 2: Write the fake-clipboard tests.** Create `src-tauri/tests/selection_engine.rs`:
 
 ```rust
-use islandpot_lib::selection_engine::{capture, ClipboardLike, Capture};
+use linguaray_lib::selection_engine::{capture, ClipboardLike, Capture};
 
 /// A fake clipboard that advances its sequence on every set, and can simulate
 /// a "selection" appearing after a copy, or a competing writer.
@@ -391,7 +391,7 @@ Keep the existing main window as the first entry.
 ```html
 <!DOCTYPE html>
 <html lang="en">
-  <head><meta charset="UTF-8" /><title>IslandPot</title></head>
+  <head><meta charset="UTF-8" /><title>LinguaRay</title></head>
   <body><div id="root"></div><script type="module" src="/src/popup-entry.tsx"></script></body>
 </html>
 ```
@@ -635,10 +635,10 @@ git add -A && git -c user.name=daoyu -c user.email=daoyu@local commit -m "feat(h
 
 **Files:** none (manual)
 
-- [ ] **Step 1: Run the dev app.** `cd /Users/daoyu/Code/projects/islandpot && pnpm tauri dev`. Window opens.
+- [ ] **Step 1: Run the dev app.** `cd /Users/daoyu/Code/projects/linguaray && pnpm tauri dev`. Window opens.
 - [ ] **Step 2: Set a key** in the main window for `openai` (or start Ollama locally and switch the default in Task 10's preset id).
 - [ ] **Step 3: Select text** in any other app (e.g. Safari, Notes), press **Alt+Space**. Expected: a frameless popup appears near the cursor showing the translation (or a classified error).
-- [ ] **Step 4: Verify restore**: your clipboard content before the press should be back (best-effort; on macOS Accessibility must be granted — System Settings → Privacy → Accessibility → enable IslandPot).
+- [ ] **Step 4: Verify restore**: your clipboard content before the press should be back (best-effort; on macOS Accessibility must be granted — System Settings → Privacy → Accessibility → enable LinguaRay).
 - [ ] **Step 5: Verify latest-wins**: press Alt+Space twice quickly with different selections; the popup should settle on the second, never show the first's stale result.
 - [ ] **Step 6: Verify NoSelection**: press Alt+Space with nothing selected → popup hides (or doesn't appear), no spurious "translation" of old clipboard.
 

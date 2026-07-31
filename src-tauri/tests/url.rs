@@ -1,4 +1,4 @@
-use islandpot_lib::providers::validate_endpoint;
+use linguaray_lib::providers::validate_endpoint;
 
 #[test]
 fn https_ok() {

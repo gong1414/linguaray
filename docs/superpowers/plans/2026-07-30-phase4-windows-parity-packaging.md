@@ -190,9 +190,9 @@ The public `restore_snapshot` takes two `Option`s, but the FSM itself operates o
         ```rust
         // tests/selection_engine.rs — ax_first_short_circuits_copy_fallback
         #[cfg(target_os = "windows")]
-        let owner: islandpot_lib::selection::OwnerHwnd = std::ptr::null_mut(); // unused: AX short-circuits
+        let owner: linguaray_lib::selection::OwnerHwnd = std::ptr::null_mut(); // unused: AX short-circuits
         #[cfg(not(target_os = "windows"))]
-        let owner: islandpot_lib::selection::OwnerHwnd = ();
+        let owner: linguaray_lib::selection::OwnerHwnd = ();
         let res = capture_selection_with_ax(|| Some("ax-text".into()), 1, owner).unwrap();
         ```
         (The alternative — a Windows-only extra param — was rejected because it would split
@@ -623,7 +623,7 @@ fn main() {
     .expect("failed to run tauri build");
 }
 ```
-- [ ] Per-window capabilities with correct permission IDs (`allow-$command`, NO `islandpot:` prefix):
+- [ ] Per-window capabilities with correct permission IDs (`allow-$command`, NO `linguaray:` prefix):
   - `capabilities/main.json` — `"permissions": ["core:default", "allow-translate", "allow-translate-default", "allow-translate-clipboard", "allow-list-engines", "allow-set-key", "allow-delete-key", "allow-key-status", "allow-get-settings", "allow-set-setting", "allow-lookup-dictionary", "allow-a11y-status", "allow-keystore-health", "allow-archive-keystore", "allow-reset-keystore"]`
   - `capabilities/popup.json` — `"permissions": ["core:default", "core:window:allow-hide"]` (popup hides via window API, not a custom command; `core:default` does NOT include `allow-hide`)
   - `capabilities/input.json` — `"permissions": ["core:default", "allow-translate-default"]` (input only calls translate_default; NOT get_settings)
@@ -650,7 +650,7 @@ fn main() {
     APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
     APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
   run: |
-    CERT_PATH="$RUNNER_TEMP/islandpot-cert.p12"
+    CERT_PATH="$RUNNER_TEMP/linguaray-cert.p12"
     echo "$APPLE_CERTIFICATE" | base64 --decode > "$CERT_PATH"
     security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
     security default-keychain -s build.keychain
@@ -673,7 +673,7 @@ fn main() {
   if: always() && startsWith(matrix.os, 'macos')
   run: |
     security delete-keychain build.keychain || true
-    rm -f "$RUNNER_TEMP/islandpot-cert.p12"
+    rm -f "$RUNNER_TEMP/linguaray-cert.p12"
 ```
 - [ ] **Windows signing** (Authenticode via `certificateThumbprint` overlay config written to a FILE — no inline JSON quoting):
 ```yaml
@@ -683,7 +683,7 @@ fn main() {
     WINDOWS_CERTIFICATE_PFX: ${{ secrets.WINDOWS_CERTIFICATE_PFX }}
     WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
   run: |
-    $certPath = "$env:RUNNER_TEMP\islandpot-cert.pfx"
+    $certPath = "$env:RUNNER_TEMP\linguaray-cert.pfx"
     [System.Convert]::FromBase64String("$env:WINDOWS_CERTIFICATE_PFX") | Set-Content $certPath -AsByteStream
     $imported = Import-PfxCertificate -CertStoreLocation Cert:\CurrentUser\My -FilePath $certPath -Password (ConvertTo-SecureString -String $env:WINDOWS_CERTIFICATE_PASSWORD -AsPlainText -Force)
     $thumbprint = $imported.Thumbprint
@@ -695,7 +695,7 @@ fn main() {
 
 - name: Cleanup cert (Windows)
   if: always() && matrix.os == 'windows-latest'
-  run: Remove-Item "$env:RUNNER_TEMP\islandpot-cert.pfx" -ErrorAction SilentlyContinue
+  run: Remove-Item "$env:RUNNER_TEMP\linguaray-cert.pfx" -ErrorAction SilentlyContinue
 ```
 
 > `TAURI_SIGNING_PRIVATE_KEY*` is the UPDATER signature only (separate plugin) —

@@ -1,5 +1,5 @@
-use islandpot_lib::engines::google::Google;
-use islandpot_lib::engines::TraditionalEngine;
+use linguaray_lib::engines::google::Google;
+use linguaray_lib::engines::TraditionalEngine;
 use wiremock::{MockServer, Mock, ResponseTemplate};
 use serde_json::json;
 
@@ -27,5 +27,5 @@ async fn google_500_is_fallback_eligible() {
     let eng = Google::with_base(server.uri());
     let client = reqwest::Client::new();
     let err = eng.translate(&client, "hi", "auto", "zh").await.unwrap_err();
-    assert!(matches!(err, islandpot_lib::error::Error::FallbackEligible(_)));
+    assert!(matches!(err, linguaray_lib::error::Error::FallbackEligible(_)));
 }

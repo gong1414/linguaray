@@ -8,7 +8,7 @@
 
 **Tech Stack:** Rust 1.95 · `objc2-core-services` (macOS Dictionary Services) or manual FFI to `DCSCopyTextDefinition` · existing `reqwest`/`service`/`error`/`providers`/`settings`/`popup`. Frontend: a small settings addition (fallback engine selector).
 
-**Spec reference:** `docs/superpowers/specs/2026-07-30-islandpot-v1-design.md` (§G fallback classification — `FallbackEligible` (429/5xx/network/parse) → may fall back; Config (missing-key/401/403/invalid-model/keystore) → Settings, no fallback; local mode sacred; cross-remote opt-in; §E system-dict integration for word lookups).
+**Spec reference:** `docs/superpowers/specs/2026-07-30-linguaray-v1-design.md` (§G fallback classification — `FallbackEligible` (429/5xx/network/parse) → may fall back; Config (missing-key/401/403/invalid-model/keystore) → Settings, no fallback; local mode sacred; cross-remote opt-in; §E system-dict integration for word lookups).
 
 **Facts verified upfront (2026-07-30):** macOS dict = `DCSCopyTextDefinition` (CoreServices), Rust via `objc2-core-services` crate or manual `extern "C"` FFI; returns plain-text definition. The central pot plugin repo `pot-app/pot-plugins` is GONE (404) but **each engine is a separate repo** (`pot-app/pot-app-translate-plugin-template` + `pot-app-translate-plugin-{google,baidu,youdao,...}`) and most are still accessible — leverage ① (port JS→Rust) still works, source is just distributed.
 
@@ -146,8 +146,8 @@ impl super::TraditionalEngine for Google {
 - [ ] **Step 2: Create `src-tauri/tests/google.rs`** (wiremock — does NOT hit the real Google endpoint):
 
 ```rust
-use islandpot_lib::engines::google::Google;
-use islandpot_lib::engines::TraditionalEngine;
+use linguaray_lib::engines::google::Google;
+use linguaray_lib::engines::TraditionalEngine;
 
 #[tokio::test]
 async fn google_parses_nested_response() {
@@ -195,11 +195,11 @@ let out = eng.translate(&client, "hello world", "auto", "zh").await.unwrap();
 assert_eq!(out, "你好世界");
 ```
 
-- [ ] **Step 5: Run tests.** `cd /Users/daoyu/Code/projects/islandpot/src-tauri && cargo test --test google` (cargo at `~/.cargo/bin/cargo`). Expected: PASS. Then `cargo test` (all prior + google) green.
+- [ ] **Step 5: Run tests.** `cd /Users/daoyu/Code/projects/linguaray/src-tauri && cargo test --test google` (cargo at `~/.cargo/bin/cargo`). Expected: PASS. Then `cargo test` (all prior + google) green.
 
 - [ ] **Step 6: Commit (Tasks 1+2 together).**
 ```bash
-cd /Users/daoyu/Code/projects/islandpot && git checkout -b phase3 && git add src-tauri/src/engines src-tauri/tests/google.rs src-tauri/Cargo.toml src-tauri/Cargo.lock && git -c user.name=daoyu -c user.email=daoyu@local commit -m "feat(engines): TraditionalEngine trait + Google (keyless) + wiremock test"
+cd /Users/daoyu/Code/projects/linguaray && git checkout -b phase3 && git add src-tauri/src/engines src-tauri/tests/google.rs src-tauri/Cargo.toml src-tauri/Cargo.lock && git -c user.name=daoyu -c user.email=daoyu@local commit -m "feat(engines): TraditionalEngine trait + Google (keyless) + wiremock test"
 ```
 > Create `phase3` branch in this commit (first task of the phase). Note: `lib.rs` may still reference the old `registry() -> Vec<()>` — if so, fix that reference too (it's likely unused now; grep).
 

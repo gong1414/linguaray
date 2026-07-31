@@ -6,7 +6,7 @@
 
 **Why round-1 under-delivered (honest note):** I declared "11 P1 closed, APPROVED" but the final reviewer caught that (a) OS image-restore is still a no-op, (b) hotkey registration's real failure point is the plugin's setup-time `manager.register` (not `with_shortcut` parse), (c) `new()` cleans tmp outside the lock, (d) Reset deletes unrecoverably vs the §A archive protocol, (e) AX is raw FFI not the spec-decided vendored `get-selected-text`, (f) the xproc test is same-process only. Each is a real miss. This plan closes them.
 
-**Spec reference:** `docs/superpowers/specs/2026-07-30-islandpot-v1-design.md` rev-4 (§A, §B "vendor get-selected-text"). **Facts verified:** tauri-plugin-global-shortcut 2.3.2 registers in `setup` via `manager.register(shortcut)?` (lib.rs:398) → propagates to `.run().expect()`; the `global_hotkey::GlobalHotKeyManager` has runtime `register`/`unregister` we can call post-setup; `arboard` supports `Image` get/set; Tauri updater keys ≠ Windows Authenticode; `macos-13` retired 2025-12-04.
+**Spec reference:** `docs/superpowers/specs/2026-07-30-linguaray-v1-design.md` rev-4 (§A, §B "vendor get-selected-text"). **Facts verified:** tauri-plugin-global-shortcut 2.3.2 registers in `setup` via `manager.register(shortcut)?` (lib.rs:398) → propagates to `.run().expect()`; the `global_hotkey::GlobalHotKeyManager` has runtime `register`/`unregister` we can call post-setup; `arboard` supports `Image` get/set; Tauri updater keys ≠ Windows Authenticode; `macos-13` retired 2025-12-04.
 
 ---
 

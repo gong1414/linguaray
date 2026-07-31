@@ -8,7 +8,7 @@
 
 **Tech Stack:** Rust 1.95 · Tauri 2 · `reqwest` (rustls, no default features to avoid native-tls) · `aes-gcm` · `argon2` · `rand` · `zeroize` · `base64` · `serde`/`serde_json` · `parking_lot` · `fd-lock` · `wiremock` (dev) · `tokio` (test). Frontend: SolidJS + `@tauri-apps/api`.
 
-**Spec reference:** `docs/superpowers/specs/2026-07-30-islandpot-v1-design.md` (§A keystore, §Wire, §G, §Privacy).
+**Spec reference:** `docs/superpowers/specs/2026-07-30-linguaray-v1-design.md` (§A keystore, §Wire, §G, §Privacy).
 
 ---
 
@@ -283,8 +283,8 @@ use base64::{engine::general_purpose::STANDARD as B64, Engine};
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
 
-const DOMAIN_SEPARATOR: &[u8] = b"islandpot-keystore-v1\0";
-const FIXED_AAD: &[u8] = b"islandpot-keystore-envelope-v1";
+const DOMAIN_SEPARATOR: &[u8] = b"linguaray-keystore-v1\0";
+const FIXED_AAD: &[u8] = b"linguaray-keystore-envelope-v1";
 const SALT_LEN: usize = 16;
 const NONCE_LEN: usize = 12;
 const VERSION: u64 = 1;
@@ -583,7 +583,7 @@ fn atomic_replace(src: &Path, dst: &Path) -> Result<(), KeystoreError> {
 Create `src-tauri/tests/keystore.rs`:
 
 ```rust
-use islandpot_lib::keystore::{encrypt, decrypt_with_identity, IdentitySource, Envelope};
+use linguaray_lib::keystore::{encrypt, decrypt_with_identity, IdentitySource, Envelope};
 use serde_json::json;
 
 #[test]
@@ -599,7 +599,7 @@ fn encrypt_decrypt_roundtrip_with_injected_identity() {
 fn wrong_identity_fails_closed() {
     let env = encrypt("machine-x", IdentitySource::MacosIoplatformuuid, &json!({"a":"b"})).unwrap();
     let err = decrypt_with_identity(&env, "machine-y").unwrap_err();
-    assert!(matches!(err, islandpot_lib::keystore::KeystoreError::AuthFailed));
+    assert!(matches!(err, linguaray_lib::keystore::KeystoreError::AuthFailed));
 }
 
 #[test]
@@ -612,7 +612,7 @@ fn tamper_fails_closed() {
     chars[last] = if chars[last] == 'A' { 'B' } else { 'A' };
     env2.ciphertext = chars.into_iter().collect();
     let err = decrypt_with_identity(&env2, "m").unwrap_err();
-    assert!(matches!(err, islandpot_lib::keystore::KeystoreError::AuthFailed));
+    assert!(matches!(err, linguaray_lib::keystore::KeystoreError::AuthFailed));
 }
 
 #[test]
@@ -628,7 +628,7 @@ fn tampered_kdf_params_rejected_not_honored() {
     let mut env = encrypt("m", IdentitySource::MacosIoplatformuuid, &json!({})).unwrap();
     env.kdf_params.m_kib = 999999; // attacker raises cost
     let err = decrypt_with_identity(&env, "m").unwrap_err();
-    assert!(matches!(err, islandpot_lib::keystore::KeystoreError::Envelope(_)));
+    assert!(matches!(err, linguaray_lib::keystore::KeystoreError::Envelope(_)));
 }
 
 #[test]
@@ -636,7 +636,7 @@ fn bad_length_fails_before_decrypt() {
     let mut env = encrypt("m", IdentitySource::MacosIoplatformuuid, &json!({})).unwrap();
     env.salt = base64::engine::general_purpose::STANDARD.encode([0u8; 3]); // wrong len
     let err = decrypt_with_identity(&env, "m").unwrap_err();
-    assert!(matches!(err, islandpot_lib::keystore::KeystoreError::Envelope(_)));
+    assert!(matches!(err, linguaray_lib::keystore::KeystoreError::Envelope(_)));
 }
 ```
 
@@ -901,8 +901,8 @@ pub async fn call(
 Create `src-tauri/tests/wire.rs`:
 
 ```rust
-use islandpot_lib::wire::{call, ApiKind, WireParams, build_prompt};
-use islandpot_lib::providers::ProviderPreset;
+use linguaray_lib::wire::{call, ApiKind, WireParams, build_prompt};
+use linguaray_lib::providers::ProviderPreset;
 use wiremock::{MockServer, Mock, ResponseTemplate};
 use serde_json::json;
 
@@ -938,7 +938,7 @@ async fn http_401_is_config_error() {
     let (sys, usr) = build_prompt("hi", "en", "zh", &Default::default());
     let params = WireParams { model: "m".into(), temperature: None, max_tokens: None, stream: false };
     let err = call(&client, &p, "bad", &params, &sys, &usr).await.unwrap_err();
-    assert!(matches!(err, islandpot_lib::error::Error::Config(_)));
+    assert!(matches!(err, linguaray_lib::error::Error::Config(_)));
 }
 
 #[tokio::test]
@@ -952,7 +952,7 @@ async fn http_429_is_fallback_eligible() {
     let (sys, usr) = build_prompt("hi", "en", "zh", &Default::default());
     let params = WireParams { model: "m".into(), temperature: None, max_tokens: None, stream: false };
     let err = call(&client, &p, "k", &params, &sys, &usr).await.unwrap_err();
-    assert!(matches!(err, islandpot_lib::error::Error::FallbackEligible(_)));
+    assert!(matches!(err, linguaray_lib::error::Error::FallbackEligible(_)));
 }
 ```
 
@@ -1109,7 +1109,7 @@ impl EngineInfo {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let dir = std::env::temp_dir().join("islandpot-keystore-test"); // PLACEHOLDER — fixed in Step 3
+    let dir = std::env::temp_dir().join("linguaray-keystore-test"); // PLACEHOLDER — fixed in Step 3
     let keystore = keystore::Keystore::new(dir).expect("keystore init");
     let client = reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::none()) // spec §Privacy: no cross-origin redirects
@@ -1221,7 +1221,7 @@ function App() {
 
   return (
     <main class="container">
-      <h1>IslandPot</h1>
+      <h1>LinguaRay</h1>
       <select value={selected()} onChange={(e) => setSelected(e.currentTarget.value)}>
         <For each={engines()}>{(e) => <option value={e.id}>{e.label}{hasKey()[e.id] ? " ✓" : ""}</option>}</For>
       </select>
@@ -1239,7 +1239,7 @@ export default App;
 
 - [ ] **Step 2: Run the app, manually verify**
 
-Run: `cd /Users/daoyu/Code/projects/islandpot && pnpm tauri dev`
+Run: `cd /Users/daoyu/Code/projects/linguaray && pnpm tauri dev`
 Expected: window opens; pick a provider (e.g. ollama if local, or enter an OpenAI key); type text; click Translate; see a real translation or a classified error.
 
 - [ ] **Step 3: Commit**
@@ -1289,7 +1289,7 @@ url = "2"
 - [ ] **Step 3: Test it — append to a new `src-tauri/tests/url.rs`**
 
 ```rust
-use islandpot_lib::providers::validate_endpoint;
+use linguaray_lib::providers::validate_endpoint;
 #[test] fn https_ok() { assert!(validate_endpoint("https://api.openai.com/v1").is_ok()); }
 #[test] fn http_loopback_ok() { assert!(validate_endpoint("http://localhost:11434/v1").is_ok()); }
 #[test] fn http_remote_rejected() { assert!(validate_endpoint("http://evil.com").is_err()); }

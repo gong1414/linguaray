@@ -98,7 +98,7 @@ pub fn capture<C: ClipboardLike, F: FnMut() -> std::result::Result<(), String>>(
     // 1. Save current content (text + image, each optional).
     let mut saved = Saved::capture(clip)?;
     // 2. Write a unique sentinel.
-    let sentinel = format!("__islandpot_sel_{}__", clip.sequence());
+    let sentinel = format!("__linguaray_sel_{}__", clip.sequence());
     clip.set_text(&sentinel)?;
     saved.owned_sequence = clip.sequence(); // the state WE left the clipboard in
     // 3. Simulate copy. On failure: restore (if still owned), propagate.

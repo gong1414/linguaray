@@ -23,11 +23,11 @@
 //!   tests/keystore.rs. This keeps these tests focused on the §G branches.
 
 use async_trait::async_trait;
-use islandpot_lib::engines::TraditionalEngine;
-use islandpot_lib::error::Error;
-use islandpot_lib::providers::ProviderPreset;
-use islandpot_lib::service::{translate_with_fallback, TranslateInput};
-use islandpot_lib::wire::ApiKind;
+use linguaray_lib::engines::TraditionalEngine;
+use linguaray_lib::error::Error;
+use linguaray_lib::providers::ProviderPreset;
+use linguaray_lib::service::{translate_with_fallback, TranslateInput};
+use linguaray_lib::wire::ApiKind;
 use serde_json::json;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -98,9 +98,9 @@ fn direct_client() -> reqwest::Client {
 
 /// An empty keystore over a temp dir. `needs_key: false` presets never touch it,
 /// but `translate_with_fallback`'s signature requires one.
-fn empty_keystore() -> islandpot_lib::keystore::Keystore {
+fn empty_keystore() -> linguaray_lib::keystore::Keystore {
     let dir = tempfile::tempdir().unwrap().keep();
-    islandpot_lib::keystore::Keystore::new(dir).unwrap()
+    linguaray_lib::keystore::Keystore::new(dir).unwrap()
 }
 
 #[tokio::test]

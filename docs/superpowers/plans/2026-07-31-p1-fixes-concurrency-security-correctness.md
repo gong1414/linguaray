@@ -8,7 +8,7 @@
 
 **Tech Stack:** Rust 1.95 · Tauri 2 · `tauri-plugin-single-instance` (new dep — the review established multi-instance breaks the "single-process" keystore-lock assumption) · existing modules.
 
-**Review reference:** the 2026-07-31 review (12 P1 findings; #11 is "rewrite Phase 4 plan" not code). Spec = `docs/superpowers/specs/2026-07-30-islandpot-v1-design.md` rev-4 (approved).
+**Review reference:** the 2026-07-31 review (12 P1 findings; #11 is "rewrite Phase 4 plan" not code). Spec = `docs/superpowers/specs/2026-07-30-linguaray-v1-design.md` rev-4 (approved).
 
 **Facts verified:** `gemini-2.0-flash` shut down 2026-06-01, replace with `gemini-2.5-flash` (Google deprecations page). `gen.next()` is inside `spawn` (lib.rs:299) — race confirmed. `store()` takes no lock (keystore.rs:305). `translate_clipboard` neither locks selection mutex nor allocates gen (lib.rs:138). Wire maps all non-401/403 non-2xx to FallbackEligible (wire.rs:108). No single-instance plugin.
 
@@ -56,7 +56,7 @@ if text.trim().is_empty() { return Err("clipboard empty".into()); }
 // ... translate_with_fallback ...
 // before showing result/error: if !state.gen.is_latest(gen) { return Ok(()); }
 ```
-This closes the race where clipboard-translate reads `__islandpot_sel_*__` mid-selection-capture, and prevents the two paths clobbering one popup.
+This closes the race where clipboard-translate reads `__linguaray_sel_*__` mid-selection-capture, and prevents the two paths clobbering one popup.
 
 - [ ] **Step 4: cargo check + cargo test.** No regression. Commit:
 ```bash
@@ -142,7 +142,7 @@ Currently `selection.rs` only simulates Cmd/Ctrl+C. The spec §B (rev-4) mandate
 - [ ] **Step 1: Vendor `get-selected-text`** (or re-implement the macOS AX read) into `src-tauri/src/selection.rs` / a new `src-tauri/src/a11y.rs`. The macOS AX path: get the system-wide focused UI element (`AXUIElementCopySystemSetting`/`AXUIElementCreateApplication` of the frontmost app via `NSWorkspace` → pid → `AXUIElementCreateApplication`), then `AXUIElementCopyAttributeValue` with `kAXSelectedTextAttribute`. Read the upstream `yetone/get-selected-text` macOS source for the exact calls; port to Rust (via the `accessibility` crate OR raw `objc2`/`core-foundation` FFI against the ApplicationServices framework). Prefer the `accessibility` crate if it exposes `kAXSelectedTextAttribute`; else raw FFI.
   - `capture_selection` becomes: try AX read first → on success return it (NO clipboard touch at all — cleanest); on AX failure/empty, fall back to the existing sentinel simulate-copy path (Task 3).
 
-- [ ] **Step 2: Accessibility permission check + onboarding.** Add `a11y_enabled() -> bool` (macOS: `AXIsProcessTrusted` from ApplicationServices). In `run()` setup, if not trusted, surface an onboarding state to the main window: a banner "IslandPot needs Accessibility to read your selection — [Open System Settings]" (the button opens `x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility`). Re-check on focus. Non-macOS: always enabled (Windows uses simulate-copy only).
+- [ ] **Step 2: Accessibility permission check + onboarding.** Add `a11y_enabled() -> bool` (macOS: `AXIsProcessTrusted` from ApplicationServices). In `run()` setup, if not trusted, surface an onboarding state to the main window: a banner "LinguaRay needs Accessibility to read your selection — [Open System Settings]" (the button opens `x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility`). Re-check on focus. Non-macOS: always enabled (Windows uses simulate-copy only).
 
 - [ ] **Step 3: surface capture errors visibly.** When AX+copy both fail / not trusted / NoSelection, the error must go somewhere the user sees — since the popup isn't shown, either (a) show the popup with the error, or (b) a main-window status. Pick (a): popup::error shows even on NoSelection/failure (currently NoSelection just hides — change to show a brief "no selection / permission needed" popup, auto-hide after a few seconds, OR surface via the main window). Document the chosen behavior.
 

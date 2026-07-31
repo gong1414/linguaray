@@ -8,7 +8,7 @@
 
 **Tech Stack:** Rust 1.95 · Tauri 2 · `tauri-plugin-store` (settings JSON) · existing modules (`service`, `providers`, `keystore`, `wire`, `popup`, `concurrency`, `clipboard`). Frontend: SolidJS — a new `InputPanel.tsx` window + settings UI in `App.tsx`.
 
-**Spec reference:** `docs/superpowers/specs/2026-07-30-islandpot-v1-design.md` (§Scope: input translate + USER-INITIATED clipboard translate — passive listening is OUT; §G error classification; §F settings UI = provider catalog list + per-row key/model/default).
+**Spec reference:** `docs/superpowers/specs/2026-07-30-linguaray-v1-design.md` (§Scope: input translate + USER-INITIATED clipboard translate — passive listening is OUT; §G error classification; §F settings UI = provider catalog list + per-row key/model/default).
 
 ---
 
@@ -90,7 +90,7 @@ pub fn save(app: &tauri::AppHandle, s: &Settings) -> Result<(), String> {
 
 - [ ] **Step 4: Commit.**
 ```bash
-cd /Users/daoyu/Code/projects/islandpot && git checkout -b phase2b && git add src-tauri/Cargo.toml src-tauri/Cargo.lock src-tauri/capabilities/default.json src-tauri/src/settings.rs src-tauri/src/lib.rs && git -c user.name=daoyu -c user.email=daoyu@local commit -m "feat(settings): typed settings over tauri-plugin-store"
+cd /Users/daoyu/Code/projects/linguaray && git checkout -b phase2b && git add src-tauri/Cargo.toml src-tauri/Cargo.lock src-tauri/capabilities/default.json src-tauri/src/settings.rs src-tauri/src/lib.rs && git -c user.name=daoyu -c user.email=daoyu@local commit -m "feat(settings): typed settings over tauri-plugin-store"
 ```
 > Create the `phase2b` branch in this commit (first task of the phase).
 
@@ -152,7 +152,7 @@ git add src-tauri/src/lib.rs && git -c user.name=daoyu -c user.email=daoyu@local
 ```json
 {
   "label": "input",
-  "title": "IslandPot — Translate",
+  "title": "LinguaRay — Translate",
   "url": "input.html",
   "width": 420,
   "height": 280,
@@ -170,7 +170,7 @@ git add src-tauri/src/lib.rs && git -c user.name=daoyu -c user.email=daoyu@local
 - [ ] **Step 3: entry HTML + entry tsx.** Create `input.html` (sibling of index.html):
 ```html
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8" /><title>IslandPot</title></head>
+<html lang="en"><head><meta charset="UTF-8" /><title>LinguaRay</title></head>
 <body><div id="root"></div><script type="module" src="/src/input-entry.tsx"></script></body>
 </html>
 ```

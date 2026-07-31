@@ -1,4 +1,4 @@
-# IslandPot
+# LinguaRay
 
 A cross-platform, open-source translation / OCR / TTS desktop tool — an
 actively-maintained successor to [pot-desktop](https://github.com/pot-app/pot-desktop)

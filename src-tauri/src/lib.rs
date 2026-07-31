@@ -1,4 +1,4 @@
-//! IslandPot — translation core.
+//! LinguaRay — translation core.
 //!
 //! Architecture decided in the grill-me session (2026-07-30):
 //! - Unified translate contract: `translate(text, from, to, options) -> text`.
@@ -136,7 +136,7 @@ async fn translate_clipboard(
     state: tauri::State<'_, Arc<Session>>,
 ) -> Result<(), String> {
     // Participate in latest-wins + the selection mutex so we can't read a sentinel
-    // mid-selection-capture (which would send `__islandpot_sel_*__` to a remote
+    // mid-selection-capture (which would send `__linguaray_sel_*__` to a remote
     // provider), and so two entry points can't clobber one popup.
     let gen = state.gen.next();
     let text = {
