@@ -359,7 +359,27 @@ fn on_hotkey(app: &tauri::AppHandle, _shortcut: &tauri_plugin_global_shortcut::S
         let (x, y, captured) = {
             let _g = state.gen.selection_lock();
             let pos = cursor::position();
-            let cap = selection::capture_selection(800);
+            // Windows: owner HWND from the main webview window (the event-loop thread that
+            // pumps messages + receives WM_DESTROYCLIPBOARD). `WebviewWindow::hwnd()` is
+            // #[cfg(windows)] and returns the windows-crate HWND (newtype HWND(*mut c_void));
+            // `.0` is the raw *mut c_void == windows-sys HWND. Non-Windows: pass ().
+            // The async block returns (), so resolve the HWND via a `match` (not `?`) and
+            // log+return on failure (best-effort: no valid owner → no compound restore).
+            #[cfg(target_os = "windows")]
+            let owner = match app2
+                .get_webview_window("main")
+                .ok_or_else(|| "main window unavailable".to_string())
+                .and_then(|w| w.hwnd().map(|h| h.0).map_err(|e| e.to_string()))
+            {
+                Ok(h) => h,
+                Err(e) => {
+                    log::warn!("clipboard restore skipped: no owner HWND ({e})");
+                    return;
+                }
+            };
+            #[cfg(not(target_os = "windows"))]
+            let owner = ();
+            let cap = selection::capture_selection(800, owner);
             (pos.0, pos.1, cap)
         };
 
