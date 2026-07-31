@@ -1,8 +1,8 @@
-# Phase 4: Windows Parity + Cross-Platform Packaging — Implementation Plan (rev 6)
+# Phase 4: Windows Parity + Cross-Platform Packaging — Implementation Plan (rev 7)
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** rev 6 — fixes round-4 review issues: (a) CSP includes `ipc:` + `http://ipc.localhost` for Tauri IPC, (b) AppManifest permission IDs use `allow-$command` (no `islandpot:` prefix), popup gets `core:window:allow-hide`, store/input perms corrected, (c) macOS signing adds `set-keychain-settings` + `find-identity` verification + cert file cleanup, (d) Windows overlay uses `ConvertTo-Json` to a file (no inline quoting), (e) added Windows compound-clipboard-restore task (§B image promise on Windows too).
+**Status:** rev 7 — fixes round-6 review issues: (a) Task 2b Windows compound-clipboard now spells the full Win32 protocol (non-NULL HWND owner via message-only window, GMEM_MOVEABLE + ownership transfer, RAII CloseClipboard, explicit re-EmptyClipboard half-state cleanup on second-SetClipboardData failure, BGRA pixel layout + masks, required windows-sys features), (b) macOS signing identity is verified with `grep -F` against `APPLE_SIGNING_IDENTITY` (fail-fast, not just listed), (c) removed the stray code fence + duplicated unsigned-cert note, (d) "all-or-nothing" qualified to mean conversion-phase only (clearContents/writeObjects are not themselves a transaction).
 
 **Goal:** Windows builds (real `atomic_replace` + ACL), correct signing (macOS notarization via cert-import; Windows Authenticode via PFX/signtool — distinct from the updater key), and a clean CI matrix (arm64 + Intel macOS via `macos-15-intel`, Windows).
 
@@ -30,12 +30,111 @@
 
 ## Task 2b: Windows compound clipboard restore (§B image promise)
 
-**Files:** `src-tauri/src/clipboard.rs`
+**Files:** `src-tauri/src/clipboard.rs`, `src-tauri/Cargo.toml`
 
-- [ ] The macOS `restore_snapshot` uses objc2 `NSPasteboardItem` for a single clear + multi-format write. Windows must do the same via Win32: one `OpenClipboard`/`EmptyClipboard`, then `SetClipboardData(CF_UNICODETEXT, ...)` + `SetClipboardData(CF_DIBV5, ...)` (or register a PNG format), then `CloseClipboard`. Convert RGBA → `BITMAPV5HEADER` + pixel data for CF_DIBV5. All-or-nothing: build both blobs BEFORE `EmptyClipboard`.
-- [ ] Add a `#[cfg(target_os = "windows")]` `restore_snapshot` impl replacing the current sequential-arboard fallback. Keep the non-mac/win stub for other platforms.
-- [ ] Test (Windows CI): write both formats, verify both readable. (Can't run locally on macOS.)
+Windows mirrors the macOS compound write (one `EmptyClipboard`, both formats in one
+open window). "All-or-nothing" here means: **conversion-phase failures never touch
+the clipboard**; `EmptyClipboard` + the two `SetClipboardData` calls are NOT a
+transaction — if the second `SetClipboardData` fails we must explicitly re-empty so
+the clipboard is left with NEITHER format, matching the macOS single-item semantics
+(both present, or both absent).
+
+**Win32 protocol (verified against MS docs, refs at end of task):**
+
+- [ ] **HWND owner — MUST be non-NULL.** `EmptyClipboard` assigns ownership to the
+      window that has the clipboard open. If `OpenClipboard(NULL)` was used,
+      `EmptyClipboard` succeeds but sets the owner to NULL, which makes
+      `SetClipboardData` fail. (Verified: EmptyClipboard Remarks — "If the
+      application specifies a NULL window handle when opening the clipboard,
+      EmptyClipboard succeeds but sets the clipboard owner to NULL. Note that this
+      causes SetClipboardData to fail.") Tauri's Rust backend has no UI window on
+      the capture thread, so create a **message-only window** as the owner:
+      `CreateWindowExW(0, "STATIC", "", 0, 0,0,0,0, HWND_MESSAGE, null, hinst, null)`
+      (HWND_MESSAGE = -3). Cache it in a `static OnceCell<isize>` keyed lazily on
+      first restore; it only needs to exist (we use eager rendering, NOT delayed
+      rendering, so no WndProc / message pump is required — we hand real handles to
+      `SetClipboardData`, never NULL).
+
+- [ ] **Memory: `GlobalAlloc(GMEM_MOVEABLE, len)` for EACH blob.** Verified: "A
+      memory object that is to be placed on the clipboard should be allocated by
+      using GlobalAlloc with the GMEM_MOVEABLE flag." Use `GlobalAlloc(GMEM_MOVEABLE,
+      len)` → `GlobalLock` → `copy_nonoverlapping` → `GlobalUnlock`. After a
+      successful `SetClipboardData(h)`, **ownership transfers to the system** — do
+      NOT `GlobalFree` a submitted handle (the system frees it on next empty). Only
+      `GlobalFree` handles that were NOT successfully submitted.
+
+- [ ] **Build BOTH blobs BEFORE `EmptyClipboard`.** (a) UTF-16 NUL-terminated text:
+      `OsStr::encode_wide().chain(Some(0))`, byte-len = u16_count * 2. (b) CF_DIBV5
+      blob: `BITMAPV5HEADER` + BGRA pixel buffer (see layout below). If either build
+      fails, return Err — clipboard is untouched.
+
+- [ ] **CF_DIBV5 pixel layout (BITMAPV5HEADER):**
+      - `bV5Size` = `size_of::<BITMAPV5HEADER>()` (124)
+      - `bV5Width` = width; `bV5Height` = **-(height as i32)** (negative ⇒ top-down,
+        origin upper-left — matches our RGBA row-major source, no vertical flip)
+      - `bV5Planes` = 1; `bV5BitCount` = 32
+      - `bV5Compression` = `BI_BITFIELDS` (3) — required to honor the masks below
+      - `bV5SizeImage` = width*height*4
+      - `bV5RedMask` = 0x00FF0000, `bV5GreenMask` = 0x0000FF00,
+        `bV5BlueMask` = 0x000000FF, `bV5AlphaMask` = 0xFF000000 (BGRA byte order in
+        memory: B,G,R,A per pixel — Windows native, NOT RGBA)
+      - `bV5CSType` = `LCS_sRGB`; `bV5Intent` = `LCS_GM_IMAGES`; rest zeroed
+      - **Pixel conversion:** for each source RGBA pixel `(r,g,b,a)` emit BGRA bytes
+        `(b,g,r,a)`. Row stride = width*4 (no padding at 32bpp). This channel swap +
+        the alpha mask are what the test asserts (see test).
+
+- [ ] **Submit sequence + half-state cleanup (RAII):**
+      1. `OpenClipboard(hwnd_owner)` → must succeed; on fail, `GlobalFree` both
+         pre-built handles, return Err.
+      2. `EmptyClipboard()` → on fail, close + free both, return Err.
+      3. `SetClipboardData(CF_UNICODETEXT, h_text)` → on fail: free `h_dib`, close,
+         re-`EmptyClipboard()` (the text handle was NOT taken since the call failed),
+         return Err. (Half-state: only text submitted ⇒ re-empty to leave neither.)
+      4. `SetClipboardData(CF_DIBV5, h_dib)` → on fail: **`h_text` was already taken
+         by step 3 (do NOT free it — it's system-owned).** Re-`EmptyClipboard()` to
+         remove the orphaned text, `GlobalFree(h_dib)` (not taken), close, return Err.
+      5. Success: both submitted → both now system-owned. Just `CloseClipboard()`.
+      - Use a small RAII guard (`struct ClipGuard { hwnd, opened: bool }` impls Drop:
+        `if opened { CloseClipboard() }`) so `CloseClipboard` always runs even on
+        early-return / panic. The re-`EmptyClipboard` in the failure branches is the
+        explicit de-half-state step (the RAII close handles only CloseClipboard).
+
+- [ ] **windows-sys features** (add to the existing `windows-sys` dep): currently
+      `Win32_System_DataExchange` + `Win32_Foundation`. ADD:
+      - `Win32_System_Memory` (GlobalAlloc/GlobalLock/GlobalUnlock/GlobalFree,
+        GMEM_MOVEABLE)
+      - `Win32_Graphics_Gdi` (BITMAPV5HEADER, BI_BITFIELDS, LCS_sRGB, LCS_GM_IMAGES)
+      - `Win32_UI_WindowsAndMessaging` (CreateWindowExW, HWND_MESSAGE,
+        OpenClipboard, EmptyClipboard, SetClipboardData, CloseClipboard,
+        CF_UNICODETEXT, CF_DIBV5)
+      (Verify each symbol's module via `windows-docs-rs` during impl; the
+      `Win32_Security_Authorization`/`Win32_Security` from Task 2 are separate.)
+
+- [ ] Add `#[cfg(target_os = "windows")] fn restore_snapshot(...)` mirroring the
+      macOS signature, replacing the sequential-arboard cfg-arm for Windows. Keep the
+      non-mac/non-win sequential stub for unsupported targets.
+
+- [ ] **Test (Windows CI, `#[cfg(target_os="windows")]` integration test):**
+      1. Build a 2×2 all-red RGBA `ImageBlob` (R=255,G=0,B=0,A=255).
+      2. `restore_snapshot(Some("hi"), Some(&img))`.
+      3. `OpenClipboard(NULL)` (read path: NULL is fine for reading), assert
+         `IsClipboardFormatAvailable(CF_UNICODETEXT)` AND
+         `IsClipboardFormatAvailable(CF_DIBV5)`.
+      4. `GetClipboardData(CF_UNICODETEXT)` → decode UTF-16, assert == "hi".
+      5. `GetClipboardData(CF_DIBV5)` → lock, read BITMAPV5HEADER, assert width==2,
+         height==2 (abs), bitcount==32, compression==BI_BITFIELDS, redMask==
+         0x00FF0000, alphaMask==0xFF000000; read first pixel, assert BGRA ==
+         (0,0,255,255) (red in BGRA). This covers channel order, stride, alpha.
+      6. Negative test: invalid RGBA (len mismatch) returns Err AND clipboard is
+         unchanged (write a marker first, assert it survives).
+
 - [ ] Commit.
+
+**Refs:** [EmptyClipboard](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-emptyclipboard)
+(NULL owner ⇒ SetClipboardData fails), [Clipboard Operations](https://learn.microsoft.com/en-us/windows/win32/dataxchg/clipboard-operations)
+(GMEM_MOVEABLE; ownership transfer; system frees CF_UNICODETEXT/CF_DIBV5 via
+GlobalFree), [BITMAPV5HEADER](https://learn.microsoft.com/en-us/windows/win32/api/wingdi/ns-wingdi-bitmapv5header)
+(negative height ⇒ top-down; BI_BITFIELDS honors masks), [GlobalAlloc](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-globalalloc).
 
 ## Task 3: Release bundle config — CSP + env-driven signing
 
@@ -103,8 +202,14 @@ fn main() {
     security set-keychain-settings -t 3600 -u build.keychain
     security import "$CERT_PATH" -P "$APPLE_CERTIFICATE_PASSWORD" -k build.keychain -T /usr/bin/codesign
     security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
-    # Verify the identity matches APPLE_SIGNING_IDENTITY.
-    security find-identity -v -p codesigning build.keychain
+    # Verify the imported identity EXACTLY matches APPLE_SIGNING_IDENTITY — fail
+    # the build here (clear error) rather than later with a vague codesign failure.
+    # find-identity prints "  <SHA1> \"<Common Name>\""; grep -F anchors on the
+    # expected identity string so a mismatch exits non-zero.
+    security find-identity -v -p codesigning build.keychain > "$RUNNER_TEMP/identities.txt"
+    cat "$RUNNER_TEMP/identities.txt"
+    grep -F -- "$APPLE_SIGNING_IDENTITY" "$RUNNER_TEMP/identities.txt" \
+      || { echo "::error::APPLE_SIGNING_IDENTITY '$APPLE_SIGNING_IDENTITY' not found among imported codesigning identities"; exit 1; }
     pnpm tauri build --target ${{ matrix.target }}
 
 - name: Cleanup keychain + cert (macOS)
@@ -135,9 +240,11 @@ fn main() {
   if: always() && matrix.os == 'windows-latest'
   run: Remove-Item "$env:RUNNER_TEMP\islandpot-cert.pfx" -ErrorAction SilentlyContinue
 ```
-`TAURI_SIGNING_PRIVATE_KEY*` is the UPDATER signature only — do NOT conflate. If no Authenticode cert: build unsigned (document SmartScreen warning).
-```
-If no Authenticode cert: build unsigned (document the SmartScreen warning). `TAURI_SIGNING_PRIVATE_KEY*` is the UPDATER signature only (separate plugin).
+
+> `TAURI_SIGNING_PRIVATE_KEY*` is the UPDATER signature only (separate plugin) —
+> do NOT conflate it with Authenticode. If no Authenticode cert is configured,
+> build unsigned and document the resulting SmartScreen warning in the release notes.
+
 - [ ] Artifacts upload. Lint YAML. Commit.
 
 ## Task 6: README + E2E + final review
