@@ -12,6 +12,7 @@
 //! `enabled()` (AXIsProcessTrusted) is kept for the onboarding banner — it tells
 //! the user WHY capture may be failing before they hit the copy-fallback.
 
+#[cfg(target_os = "macos")]
 #[path = "../vendor/get-selected-text-ax/macos_ax.rs"]
 mod vendored_ax;
 
