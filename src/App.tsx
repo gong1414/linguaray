@@ -108,7 +108,7 @@ function App() {
           <button
             style={{ display: "inline" }}
             onClick={async () => {
-              if (confirm("Delete the keystore entirely? This cannot be undone.")) {
+              if (confirm("Reset the keystore? The current file is archived (recoverable) to keystore.json.broken-* and a fresh one starts on next key entry.")) {
                 await invoke("reset_keystore");
                 setKsHealth("");
               }
