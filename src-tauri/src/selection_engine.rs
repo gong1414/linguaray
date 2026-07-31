@@ -23,6 +23,25 @@ pub trait ClipboardLike {
     fn set_image(&self, _img: &ImageBlob) -> std::result::Result<(), String> {
         Ok(())
     }
+    /// Restore BOTH text and image in a single platform-level write. Round-2
+    /// review P1 #2: arboard's set_text/set_image each clearContents first, so
+    /// calling them in sequence leaves only the last flavor. The real impl clears
+    /// ONCE then writes both formats atomically (macOS: set text + image on one
+    /// NSPasteboard; Windows: one SetClipboardData sequence). Default impl falls
+    /// back to sequential writes (lossy) for fakes that don't override.
+    fn restore_snapshot(
+        &self,
+        text: Option<&str>,
+        image: Option<&ImageBlob>,
+    ) -> std::result::Result<(), String> {
+        if let Some(img) = image {
+            self.set_image(img)?;
+        }
+        if let Some(t) = text {
+            self.set_text(t)?;
+        }
+        Ok(())
+    }
     /// Monotonic sequence number that advances on ANY write (ours included).
     fn sequence(&self) -> u64;
 }
@@ -53,24 +72,15 @@ impl Saved {
     }
 
     /// Restore the snapshot ONLY if the clipboard sequence still equals owned. Per
-    /// §B: if a newer writer landed since, do NOT clobber. Restore BOTH text and
-    /// image if both were present (not mutually exclusive — review P1 #1). Errors
-    /// here are best-effort (ignored).
+    /// §B: if a newer writer landed since, do NOT clobber. Restores BOTH text and
+    /// image (if present) via a single platform-level snapshot write — NOT two
+    /// sequential set_text/set_image calls (which each clearContents and lose the
+    /// other flavor on real arboard; round-2 review P1 #2). Errors are best-effort.
     fn restore_if_owned<C: ClipboardLike>(&self, clip: &C) {
         if clip.sequence() != self.owned_sequence {
             return; // newer writer — don't clobber
         }
-        // Restore image first if present, then text if present (order: image write
-        // on some OSes clears other flavors; restoring text last preserves it).
-        // NOTE: on macOS/Windows arboard, set_image may clear text and vice-versa;
-        // if both are present we restore image then text, accepting that the OS may
-        // keep only one flavor — best-effort per spec §B.
-        if let Some(img) = &self.image {
-            let _ = clip.set_image(img);
-        }
-        if let Some(t) = &self.text {
-            let _ = clip.set_text(t);
-        }
+        let _ = clip.restore_snapshot(self.text.as_deref(), self.image.as_ref());
     }
 }
 

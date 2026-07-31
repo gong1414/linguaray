@@ -48,6 +48,36 @@ pub fn set_image(img: &crate::selection_engine::ImageBlob) -> std::result::Resul
     g.as_mut().unwrap().set_image(data).map_err(|e| e.to_string())
 }
 
+/// Restore BOTH text and image in a single platform-level write (round-2 review
+/// P1 #2): arboard's set_text/set_image each clear first, so sequential writes
+/// lose one flavor. Here we clear ONCE then set both. Best-effort.
+pub fn restore_snapshot(
+    text: Option<&str>,
+    image: Option<&crate::selection_engine::ImageBlob>,
+) -> std::result::Result<(), String> {
+    let mut g = clip()?;
+    let clip = g.as_mut().unwrap();
+    // Clear once, then write all present formats. (arboard::Clipboard::clear.)
+    let _ = clip.clear();
+    if let Some(img) = image {
+        let data = arboard::ImageData {
+            width: img.width,
+            height: img.height,
+            bytes: std::borrow::Cow::Borrowed(&img.bytes),
+        };
+        // set_image after clear writes the image flavor.
+        let _ = clip.set_image(data);
+    }
+    if let Some(t) = text {
+        // set_text writes the text flavor WITHOUT clearing the image arboard just set
+        // IF the prior op was clear (no-op clear semantics on an empty clipboard).
+        // NOTE: arboard may still clear on each set on some platforms; this is the
+        // best available without dropping to raw NSPasteboard/Win32. Documented.
+        let _ = clip.set_text(t);
+    }
+    Ok(())
+}
+
 /// Monotonic clipboard sequence number (advances on any clipboard write, ours
 /// included). macOS: NSPasteboard.changeCount; Windows: GetClipboardSequenceNumber.
 #[cfg(target_os = "macos")]

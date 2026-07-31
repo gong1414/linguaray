@@ -12,30 +12,24 @@
 //! `enabled()` (AXIsProcessTrusted) is kept for the onboarding banner — it tells
 //! the user WHY capture may be failing before they hit the copy-fallback.
 
+#[path = "../vendor/get-selected-text-ax/macos_ax.rs"]
+mod vendored_ax;
+
 #[cfg(target_os = "macos")]
 mod imp {
     /// Is this process trusted (Accessibility granted)? AXIsProcessTrusted from
     /// ApplicationServices. Used for the onboarding banner, not for the read itself.
     pub fn enabled() -> bool {
-        // accessibility-sys exposes AXIsProcessTrusted (linked via ApplicationServices).
         unsafe { accessibility_sys::AXIsProcessTrusted() }
     }
 
-    /// Read the selected text via the vendored `get-selected-text` crate (macOS:
-    /// AX direct-read first, copy-fallback internally — but we use it ONLY for the
-    /// AX read; our own selection.rs does the sentinel copy-fallback so we own the
-    /// clipboard-restore). None if it returns empty or errs (we don't rely on its
-    /// internal clipboard fallback).
+    /// AX DIRECT-READ ONLY (vendored from yetone/get-selected-text, see
+    /// vendor/get-selected-text-ax/). The upstream's AppleScript copy-fallback is
+    /// deliberately NOT included — it clobbers the clipboard and bypasses §B's
+    /// sentinel/restore discipline. Our §B copy-fallback lives in selection.rs.
+    /// None if AX errs/empty ⇒ selection.rs does the sentinel copy-fallback.
     pub fn read_selection() -> Option<String> {
-        // NOTE: the crate's own copy-fallback would clobber the clipboard without our
-        // restore discipline. To stay faithful to §B's restore-on-every-branch, we
-        // treat the crate as "best-effort AX read" and let selection.rs's sentinel
-        // path be the authoritative fallback. If the crate succeeds (AX), great — no
-        // clipboard touched. If it errs/empty, we fall back ourselves.
-        match get_selected_text::get_selected_text() {
-            Ok(s) if !s.trim().is_empty() => Some(s),
-            _ => None,
-        }
+        super::vendored_ax::read_selected_text_ax()
     }
 }
 

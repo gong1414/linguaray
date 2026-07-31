@@ -8,6 +8,13 @@ impl ClipboardLike for OsClipboard {
     fn set_text(&self, s: &str) -> Result<(), String> { clipboard::set_text(s) }
     fn get_image(&self) -> Result<Option<selection_engine::ImageBlob>, String> { clipboard::get_image() }
     fn set_image(&self, img: &selection_engine::ImageBlob) -> Result<(), String> { clipboard::set_image(img) }
+    fn restore_snapshot(
+        &self,
+        text: Option<&str>,
+        image: Option<&selection_engine::ImageBlob>,
+    ) -> Result<(), String> {
+        clipboard::restore_snapshot(text, image)
+    }
     fn sequence(&self) -> u64 { clipboard::sequence() }
 }
 
