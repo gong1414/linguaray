@@ -26,7 +26,8 @@ function InputPanel() {
   return (
     <main class="container" style={{ padding: "12px" }}>
       <textarea rows={4} placeholder="输入要翻译的文本…"
-        value={text()} onInput={(e) => setText(e.currentTarget.value)} />
+        value={text()} onInput={(e) => setText(e.currentTarget.value)}
+        onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); go(); } }} />
       <button onClick={go} disabled={busy() || !text().trim()}>{busy() ? "…" : "Translate"}</button>
       {out() && <div class="result">{out()}</div>}
       {err() && <div class="error">{err()}</div>}
