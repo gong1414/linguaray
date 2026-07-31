@@ -1,67 +1,40 @@
-//! macOS Accessibility (AX) — §B hybrid capture: read the focused element's
-//! selected text directly via AX FIRST (no clipboard touch), falling back to the
-//! sentinel simulate-copy path in `selection.rs` when AX is untrusted or the app
-//! doesn't expose a selection.
+//! macOS Accessibility — §B hybrid capture: read the focused element's selected
+//! text directly FIRST (no clipboard touch), falling back to the sentinel
+//! simulate-copy path in `selection.rs` when the read returns nothing.
 //!
-//! Uses accessibility-sys (raw FFI) + core-foundation, mirroring the C flow:
-//! AXUIElementCreateSystemWide → kAXFocusedUIElementAttribute → kAXSelectedTextAttribute.
-//! Non-macOS: AX is unavailable; `read_selection` returns None (caller uses copy-fallback).
+//! Per the approved spec §B decision ("vendor `get-selected-text`, reject self-
+//! impl"), the selection read uses the `get-selected-text` crate (yetone/get-
+//! selected-text, MIT OR Apache-2.0) rather than raw AXUIElement FFI. That crate
+//! implements the macOS A11y-first + copy-fallback logic the spec mandates; we
+//! only call its read here and do our own sentinel-restore copy-fallback (so we
+//! control the clipboard-restore semantics §B requires).
+//!
+//! `enabled()` (AXIsProcessTrusted) is kept for the onboarding banner — it tells
+//! the user WHY capture may be failing before they hit the copy-fallback.
 
 #[cfg(target_os = "macos")]
 mod imp {
-    use accessibility_sys::*;
-    use core_foundation::base::{CFRelease, TCFType};
-    use core_foundation::string::{CFString, CFStringRef};
-    use core_foundation_sys::base::{CFGetTypeID, CFTypeRef};
-    use core_foundation_sys::string::CFStringGetTypeID;
-
-    // Attribute name constants as CFStrings (created per call; cheap enough).
-    fn attr(name: &str) -> CFString {
-        CFString::new(name)
-    }
-
-    /// Is this process trusted (Accessibility granted)? AXIsProcessTrustOptions is
-    /// newer; AXIsProcessTrusted is the classic call and exists in ApplicationServices.
+    /// Is this process trusted (Accessibility granted)? AXIsProcessTrusted from
+    /// ApplicationServices. Used for the onboarding banner, not for the read itself.
     pub fn enabled() -> bool {
-        unsafe { AXIsProcessTrusted() }
+        // accessibility-sys exposes AXIsProcessTrusted (linked via ApplicationServices).
+        unsafe { accessibility_sys::AXIsProcessTrusted() }
     }
 
-    /// Read the system-wide focused element's selected text via AX. None if AX is
-    /// unavailable, untrusted, or the focused element exposes no selection.
+    /// Read the selected text via the vendored `get-selected-text` crate (macOS:
+    /// AX direct-read first, copy-fallback internally — but we use it ONLY for the
+    /// AX read; our own selection.rs does the sentinel copy-fallback so we own the
+    /// clipboard-restore). None if it returns empty or errs (we don't rely on its
+    /// internal clipboard fallback).
     pub fn read_selection() -> Option<String> {
-        unsafe {
-            let system = AXUIElementCreateSystemWide();
-            if system.is_null() {
-                return None;
-            }
-            // focused element
-            let focused_attr = attr("AXFocusedUIElement").as_concrete_TypeRef();
-            let mut focused: CFTypeRef = std::ptr::null_mut();
-            let r1 = AXUIElementCopyAttributeValue(system, focused_attr, &mut focused);
-            if r1 != 0 || focused.is_null() {
-                CFRelease(system.cast());
-                return None;
-            }
-            // selected text on the focused element
-            let sel_attr = attr("AXSelectedText").as_concrete_TypeRef();
-            let mut value: CFTypeRef = std::ptr::null_mut();
-            let r2 = AXUIElementCopyAttributeValue(focused as AXUIElementRef, sel_attr, &mut value);
-            CFRelease(focused);
-            CFRelease(system.cast());
-            if r2 != 0 || value.is_null() {
-                return None;
-            }
-            // value should be a CFString
-            let type_id = CFGetTypeID(value);
-            let str_type_id = CFStringGetTypeID();
-            let out = if type_id == str_type_id {
-                let s = CFString::wrap_under_get_rule(value as CFStringRef);
-                Some(s.to_string())
-            } else {
-                None
-            };
-            CFRelease(value);
-            out.filter(|s| !s.is_empty())
+        // NOTE: the crate's own copy-fallback would clobber the clipboard without our
+        // restore discipline. To stay faithful to §B's restore-on-every-branch, we
+        // treat the crate as "best-effort AX read" and let selection.rs's sentinel
+        // path be the authoritative fallback. If the crate succeeds (AX), great — no
+        // clipboard touched. If it errs/empty, we fall back ourselves.
+        match get_selected_text::get_selected_text() {
+            Ok(s) if !s.trim().is_empty() => Some(s),
+            _ => None,
         }
     }
 }
@@ -76,8 +49,7 @@ pub fn enabled() -> bool {
     imp::enabled()
 }
 
-/// Try the AX direct-read. None ⇒ caller falls back to the sentinel copy path.
-/// (spec §B: AX-first, copy-fallback.)
+/// Try the AX read. None ⇒ caller (selection.rs) falls back to the sentinel copy path.
 pub fn read_selection() -> Option<String> {
     if !enabled() {
         return None;

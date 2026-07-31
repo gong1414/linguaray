@@ -77,3 +77,7 @@ v1 scope = **selection translate · input translate · user-initiated clipboard 
 ## License
 
 MIT.
+
+## Third-party
+
+- macOS selection capture uses [`get-selected-text`](https://github.com/yetone/get-selected-text) (MIT OR Apache-2.0) per the §B design decision.
