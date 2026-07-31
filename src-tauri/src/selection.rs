@@ -6,11 +6,9 @@ struct OsClipboard;
 impl ClipboardLike for OsClipboard {
     fn get_text(&self) -> Result<String, String> { clipboard::get_text() }
     fn set_text(&self, s: &str) -> Result<(), String> { clipboard::set_text(s) }
+    fn get_image(&self) -> Result<Option<selection_engine::ImageBlob>, String> { clipboard::get_image() }
+    fn set_image(&self, img: &selection_engine::ImageBlob) -> Result<(), String> { clipboard::set_image(img) }
     fn sequence(&self) -> u64 { clipboard::sequence() }
-    // TODO(P2): wire real arboard image get/set so image-only clipboards are
-    // restored on the OS clipboard (currently the engine's image save/restore is
-    // exercised in tests but the OS impl uses the trait's no-op default). The
-    // restore-on-every-branch guard is correct regardless.
 }
 
 /// Simulate the platform copy keystroke: Cmd+C on macOS, Ctrl+C elsewhere.

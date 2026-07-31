@@ -91,7 +91,7 @@ fn concurrent_writer_prevents_restore() {
 /// A fake that can inject failures and has a real image slot.
 struct FakeImg {
     text: RefCell<String>,
-    image: RefCell<Option<Vec<u8>>>,
+    image: RefCell<Option<(usize, usize, Vec<u8>)>>, // (w, h, bytes)
     seq: RefCell<u64>,
     /// copy() closure-controlled behavior is via the capture() arg; this fake just
     /// tracks state. Set copy_fail / get_text_fail to inject errors.
@@ -117,11 +117,13 @@ impl ClipboardLike for FakeImg {
         self.bump();
         Ok(())
     }
-    fn get_image(&self) -> Result<Option<Vec<u8>>, String> {
-        Ok(self.image.borrow().clone())
+    fn get_image(&self) -> Result<Option<islandpot_lib::selection_engine::ImageBlob>, String> {
+        Ok(self.image.borrow().as_ref().map(|b| islandpot_lib::selection_engine::ImageBlob {
+            width: b.0, height: b.1, bytes: b.2.clone(),
+        }))
     }
-    fn set_image(&self, img: &[u8]) -> Result<(), String> {
-        *self.image.borrow_mut() = Some(img.to_vec());
+    fn set_image(&self, img: &islandpot_lib::selection_engine::ImageBlob) -> Result<(), String> {
+        *self.image.borrow_mut() = Some((img.width, img.height, img.bytes.clone()));
         // Setting an image replaces text on this fake (mirrors a real clipboard where
         // an image write clears the text flavor).
         *self.text.borrow_mut() = String::new();
@@ -164,13 +166,13 @@ fn image_only_clipboard_restored() {
     // Clipboard had ONLY an image (no text). sentinel write clears it; on success
     // the image must be restored (unwrap_or_default on text would have lost it).
     let f = FakeImg {
-        text: RefCell::new(String::new()), image: RefCell::new(Some(vec![1, 2, 3])),
+        text: RefCell::new(String::new()), image: RefCell::new(Some((1, 1, vec![1, 2, 3, 4]))),
         seq: RefCell::new(5), copy_fail: false, get_text_fail_on_second: false,
         get_text_calls: RefCell::new(0),
     };
     let res = capture(&f, || { f.set_text("selected").map(|_| ()) }, 50).unwrap();
     assert!(matches!(res, Capture::Selected(t) if t == "selected"));
-    assert_eq!(*f.image.borrow(), Some(vec![1, 2, 3]), "image restored");
+    assert_eq!(*f.image.borrow(), Some((1, 1, vec![1, 2, 3, 4])), "image restored");
 }
 
 #[test]
@@ -193,4 +195,23 @@ fn ax_empty_falls_back_to_copy() {
     use islandpot_lib::selection_engine::Capture;
     let res = capture_selection_with_ax(|| None, 1).unwrap();
     assert!(matches!(res, Capture::NoSelection), "AX-None routes to copy fallback (which NoSelections in test env)");
+}
+
+#[test]
+fn text_and_image_both_restored_when_present() {
+    // Review P1 #1: the old `else if` restored only the image when both text+image
+    // were present. Now BOTH should be restored. With this Fake, set_image clears
+    // text then set_text sets text — so after restore, text is present and the
+    // image is also present (FakeImg tracks both independently).
+    let f = FakeImg {
+        text: RefCell::new("hello".into()),
+        image: RefCell::new(Some((2, 2, vec![0; 16]))), // 2x2 RGBA
+        seq: RefCell::new(5), copy_fail: false, get_text_fail_on_second: false,
+        get_text_calls: RefCell::new(0),
+    };
+    let res = capture(&f, || { f.set_text("selected").map(|_| ()) }, 50).unwrap();
+    assert!(matches!(res, Capture::Selected(t) if t == "selected"));
+    // Per the Fake's set semantics, restore writes image then text — both fields set.
+    assert_eq!(f.text.borrow().as_str(), "hello", "text restored");
+    assert_eq!(*f.image.borrow(), Some((2, 2, vec![0; 16])), "image restored");
 }

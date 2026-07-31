@@ -2,17 +2,25 @@
 //! trait so it is unit-testable with a fake. Real wiring (enigo Cmd+C, real
 //! clipboard.rs) lives in selection.rs (Task 5).
 
+/// An RGBA image blob for save/restore (width + height needed to round-trip).
+#[derive(Debug, Clone)]
+pub struct ImageBlob {
+    pub width: usize,
+    pub height: usize,
+    pub bytes: Vec<u8>, // RGBA, row-major
+}
+
 /// What the engine needs from a clipboard. The real impl wraps `clipboard.rs`;
 /// tests use a fake.
 pub trait ClipboardLike {
     fn get_text(&self) -> std::result::Result<String, String>;
     fn set_text(&self, s: &str) -> std::result::Result<(), String>;
     /// Save + restore the image on the clipboard (best-effort; spec §B image
-    /// promise). None if there's no image. Errors are non-fatal — see comments.
-    fn get_image(&self) -> std::result::Result<Option<Vec<u8>>, String> {
+    /// promise). None if there's no image. Errors are non-fatal.
+    fn get_image(&self) -> std::result::Result<Option<ImageBlob>, String> {
         Ok(None)
     }
-    fn set_image(&self, _img: &[u8]) -> std::result::Result<(), String> {
+    fn set_image(&self, _img: &ImageBlob) -> std::result::Result<(), String> {
         Ok(())
     }
     /// Monotonic sequence number that advances on ANY write (ours included).
@@ -27,10 +35,11 @@ pub enum Capture {
 
 /// Saved clipboard snapshot for restoration. `unwrap_or_default()` on text would
 /// lose an image-only clipboard, so we capture BOTH (text may be empty while an
-/// image is present). restore_if_owned replays whichever was present.
+/// image is present). restore_if_owned replays whichever were present (the OS
+/// clipboard can hold both flavors; restoring both honors the original state).
 struct Saved {
     text: Option<String>, // None if there was no text
-    image: Option<Vec<u8>>,
+    image: Option<ImageBlob>,
     owned_sequence: u64, // sequence right after we wrote the sentinel
 }
 
@@ -47,17 +56,22 @@ impl Saved {
     }
 
     /// Restore the snapshot ONLY if the clipboard sequence still equals owned. Per
-    /// §B: if a newer writer landed since, do NOT clobber. Restore text and/or image
-    /// depending on what was present; both being None means we just clear our
-    /// sentinel. Errors here are best-effort (ignored) — we never want restore
-    /// failure to mask the real selection result.
+    /// §B: if a newer writer landed since, do NOT clobber. Restore BOTH text and
+    /// image if both were present (not mutually exclusive — review P1 #1). Errors
+    /// here are best-effort (ignored).
     fn restore_if_owned<C: ClipboardLike>(&self, clip: &C) {
         if clip.sequence() != self.owned_sequence {
             return; // newer writer — don't clobber
         }
+        // Restore image first if present, then text if present (order: image write
+        // on some OSes clears other flavors; restoring text last preserves it).
+        // NOTE: on macOS/Windows arboard, set_image may clear text and vice-versa;
+        // if both are present we restore image then text, accepting that the OS may
+        // keep only one flavor — best-effort per spec §B.
         if let Some(img) = &self.image {
             let _ = clip.set_image(img);
-        } else if let Some(t) = &self.text {
+        }
+        if let Some(t) = &self.text {
             let _ = clip.set_text(t);
         }
     }
