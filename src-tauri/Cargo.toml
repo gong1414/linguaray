@@ -6,6 +6,23 @@ authors = ["gong1414"]
 edition = "2021"
 default-run = "linguaray"
 
+[features]
+default = []
+# Test-only helper binary (keystore cross-process lock test). NOT included in release
+# builds — Tauri bundles only default-feature bins. Test CI passes --features xproc-test-helper.
+xproc-test-helper = []
+
+# Explicit bin declarations so the test helper is feature-gated (auto-discovery would
+# always include it). The main app bin has no required-features.
+[[bin]]
+name = "linguaray"
+path = "src/main.rs"
+
+[[bin]]
+name = "xproc-lock-holder"
+path = "src/bin/xproc-lock-holder.rs"
+required-features = ["xproc-test-helper"]
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
@@ -19,7 +36,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["macos-private-api"] }
 tauri-plugin-opener = "2"
 tauri-plugin-store = "2"
 tauri-plugin-single-instance = "2"

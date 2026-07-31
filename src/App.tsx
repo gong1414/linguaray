@@ -129,14 +129,14 @@ function App() {
         </div>
       </Show>
       <select value={selected()} onChange={(e) => setSelected(e.currentTarget.value)}>
-        <For each={engines()}>{(e) => <option value={e.id}>{e.label}{hasKey()[e.id] ? " ✓" : ""}</option>}</For>
+        <For each={engines().filter((e) => e.kind === "provider")}>{(e) => <option value={e.id}>{e.label}{hasKey()[e.id] ? " ✓" : ""}</option>}</For>
       </select>
       <input type="password" placeholder="API key…" value={keyInput()} onInput={(e) => setKeyInput(e.currentTarget.value)} />
       <button onClick={saveKey} disabled={!keyInput()}>Save key</button>
       <div class="settings-group">
         <label>Default provider</label>
         <select value={defaultProvider()} onChange={(e) => changeDefault(e.currentTarget.value)}>
-          <For each={engines()}>{(e) => <option value={e.id}>{e.label}</option>}</For>
+          <For each={engines().filter((e) => e.kind === "provider")}>{(e) => <option value={e.id}>{e.label}</option>}</For>
         </select>
         <label>Target language</label>
         <select value={targetLang()} onChange={(e) => changeTarget(e.currentTarget.value)}>

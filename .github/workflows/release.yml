@@ -210,7 +210,12 @@ jobs:
             echo "::error::linguaray executable not found or not executable in .app"
             exit 1
           fi
-          echo "✓ Bundle executable is linguaray"
+          # Assert the test helper is NOT in the release bundle.
+          if [ -f "$APP_DIR/Contents/MacOS/xproc-lock-holder" ]; then
+            echo "::error::xproc-lock-holder found in release .app — test helper leaked into production"
+            exit 1
+          fi
+          echo "✓ Bundle executable is linguaray, no test helper"
 
       - name: Verify bundle executable identity (Windows)
         if: matrix.os == 'windows-latest'
