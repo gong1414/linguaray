@@ -1,23 +1,27 @@
-# Phase 4: Windows Parity + Cross-Platform Packaging — Implementation Plan (rev 9)
+# Phase 4: Windows Parity + Cross-Platform Packaging — Implementation Plan (rev 10)
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** rev 9 — fixes round-8 review issues (all in Task 2b, all from the
-HWND decision not yet landing in the data flow): (a) **callchain + HWND threading**
-— files list now includes `lib.rs`/`selection.rs`/tests; `OsClipboard` carries a
-Windows-only owner HWND; `capture_selection` gains a Windows-only `owner` param;
-`on_hotkey` resolves `app.get_window("main").hwnd()` and threads it down; the
-windows-crate `HWND` (tauri's `windows` 0.61, newtype `HWND(pub *mut c_void)`)
-converts to windows-sys's `HWND` (`*mut c_void`) via a single `.0` field access
-(no isize round-trip); `ClipboardLike` trait and the pure FSM stay unchanged.
-(b) **single-close RAII** — `ClipGuard` constructed right after a successful
-`OpenClipboard` is the ONLY closer; no manual `CloseClipboard()` in any branch
-(prev rev double-closed); each branch just `return`s. (c) **failure-injection
-tests** — extract a `ClipOps` adapter; a fake forces open/empty/set1/set2 failures
-and asserts exact `free`/`empty`/`close` counts + order + no-leak/no-double-free
-via ownership bookkeeping (runs in `cargo test` on all platforms, no clipboard
-needed); the real Windows CI test is success-only with a 4-color image that proves
-stride + row direction.
+**Status:** rev 10 — fixes round-9 review issues (all P1: the rev-9 plan, if
+implemented as written, would NOT compile). (a) **callchain example compiles** —
+the `async move {}` returns `()` so `?` is illegal there; replaced with a `match`
+that folds HWND-resolution into the `captured` Result and `return`s on failure;
+`owner_from_tauri` helper deleted (it named the `windows` crate we don't depend on);
+the `.0` field access is inlined at the `get_webview_window("main").hwnd()` call
+site; `capture_selection`/`capture_selection_with_ax` now take `owner` on ALL
+targets (`()` placeholder off-Windows) so the existing AX unit test only needs its
+ONE call site updated to pass `()`. (b) **FSM is a real platform-neutral module** —
+`src/clipboard/fsm.rs` is always-compiled, references NO Win32 types, has an
+associated `type Handle`, `open(&mut self)` with no HWND arg (the real adapter
+stores the owner), and the fake lives in its OWN `#[cfg(test)] mod tests` (not a
+cross-crate integration test, which can't see private `submit`); only `Win32ClipOps`
++ the real CI test are `#[cfg(windows)]`. (c) **borrow-correct observable guard** —
+`OpenClip<'a, C>(&'a mut C)` forwards `empty/set/free` and its `Drop` calls
+`ClipOps::close` (so the fake observes close; no double-close; no `&mut` alias);
+public `restore_snapshot` is NON-generic, internal `submit<C: ClipOps>` is generic.
+Also: real Windows test owns its throwaway window with RAII `DestroyWindow` on the
+creating thread, draining the message pump before destroy; fake `empty()` marks
+system-transferred handles freed.
 
 **Goal:** Windows builds (real `atomic_replace` + ACL), correct signing (macOS notarization via cert-import; Windows Authenticode via PFX/signtool — distinct from the updater key), and a clean CI matrix (arm64 + Intel macOS via `macos-15-intel`, Windows).
 
@@ -45,9 +49,12 @@ stride + row direction.
 
 ## Task 2b: Windows compound clipboard restore (§B image promise)
 
-**Files:** `src-tauri/src/clipboard.rs`, `src-tauri/src/selection.rs`,
+**Files:** `src-tauri/src/clipboard.rs`, `src-tauri/src/clipboard/fsm.rs` (new,
+always-compiled private submodule — `ClipOps` trait, `OpenClip` guard, `submit`,
+in-module `#[cfg(test)]` fake tests), `src-tauri/src/selection.rs`,
 `src-tauri/src/lib.rs`, `src-tauri/Cargo.toml`, `src-tauri/tests/clipboard_win.rs`
-(new), `src-tauri/tests/clipboard_win_fsm.rs` (new, failure-injection unit tests).
+(new, real Windows CI integration test only), `src-tauri/tests/selection_engine.rs`
+(update the one AX test call to pass `owner: ()`).
 
 Windows mirrors the macOS compound write (one `EmptyClipboard`, both formats in one
 open window). "All-or-nothing" here means: **conversion-phase failures never touch
@@ -81,73 +88,94 @@ the clipboard is left with NEITHER format, matching the macOS single-item semant
       may exit, leaving a stale owner).
 
 - [ ] **Callchain + HWND threading (round-8 review P1: the HWND decision must land
-      in the actual data flow, not just be stated).** Today the path is
-      `lib.rs::on_hotkey` → `selection::capture_selection(timeout)` → unit
-      `OsClipboard` → `clipboard::restore_snapshot(text, image)`, with no
+      in the actual data flow; round-9 review P1: the example must compile).**
+      Today the path is `lib.rs::on_hotkey` → `selection::capture_selection(timeout)`
+      → unit `OsClipboard` → `clipboard::restore_snapshot(text, image)`, with no
       `AppHandle`/`Window`/HWND anywhere. Changes:
       - **`selection.rs`**: `OsClipboard` gains a Windows-only owner field.
         `capture_selection` / `capture_selection_with_ax` gain a Windows-only
         `owner: windows_sys::Win32::Foundation::HWND` param threaded into
-        `OsClipboard { #[cfg(windows)] owner }`:
+        `OsClipboard { #[cfg(windows)] owner }`. **Keep the cross-platform AX test
+        helper's signature unchanged** (see test-migration note below):
         ```rust
         // selection.rs
         #[cfg(target_os = "windows")]
-        type OwnerHwnd = windows_sys::Win32::Foundation::HWND; // *mut c_void
+        pub type OwnerHwnd = windows_sys::Win32::Foundation::HWND; // *mut c_void
+        #[cfg(not(target_os = "windows"))]
+        pub type OwnerHwnd = (); // unit placeholder so the cross-platform test path compiles
+
         struct OsClipboard {
             #[cfg(target_os = "windows")]
             owner: OwnerHwnd,
         }
-        // macOS path keeps OsClipboard as a unit struct (no HWND) — the cfg keeps
-        // the macOS build and its selection_engine unit tests unchanged.
+        // Both targets take `owner` so the SAME signature compiles everywhere; on
+        // non-Windows it's a unit () and ignored. This keeps the AX unit test
+        // (tests/selection_engine.rs:204 `capture_selection_with_ax(ax, 1)`) working
+        // WITHOUT a signature change — pass `()` as the owner on non-Windows. The
+        // macOS `restore_snapshot` ignores the extra arg via cfg.
         #[cfg(target_os = "windows")]
         pub fn capture_selection(timeout_ms: u64, owner: OwnerHwnd) -> Result<Capture, String> { … }
         #[cfg(not(target_os = "windows"))]
-        pub fn capture_selection(timeout_ms: u64) -> Result<Capture, String> { … }
+        pub fn capture_selection(timeout_ms: u64, _owner: OwnerHwnd) -> Result<Capture, String> { … }
+        // capture_selection_with_ax mirrors this (takes owner, threads into OsClipboard).
         ```
         `OsClipboard::restore_snapshot` passes `self.owner` to the Windows
         `clipboard::restore_snapshot`. The `ClipboardLike` trait itself is
         UNCHANGED — `OsClipboard` already implements it; only its concrete fields
         and the `restore_snapshot` body differ by cfg. `selection_engine::capture`
         (the pure FSM, unit-tested with a Fake) is untouched.
-      - **`lib.rs::on_hotkey`** (the only caller of `capture_selection`):
+      - **`lib.rs::on_hotkey`** — the `async move {}` block returns `()`, so `?` is
+        NOT usable there (round-9 review P1). Use a `match` to fold the HWND-resolution
+        error into the `captured: Result<_, String>` (no `owner_from_tauri` helper —
+        the `.0` field access is inlined at the call site, so no `windows`-crate path
+        is ever named in our code):
         ```rust
-        // Windows: resolve the main window's HWND on the event-loop-owned call and
-        // pass it down. macOS/other: unchanged signature.
-        #[cfg(target_os = "windows")]
-        let cap = {
-            let hwnd = app2.get_window("main")
+        // selection capture under the mutex, in on_hotkey's async block:
+        let (x, y, captured) = {
+            let _g = state.gen.selection_lock();
+            let pos = cursor::position();
+            // Windows: owner HWND from the main webview window; `.hwnd()` is
+            // #[cfg(windows)] and returns windows-crate HWND (newtype HWND(*mut c_void));
+            // `.0` is the raw *mut c_void == windows-sys HWND. Non-Windows: pass ().
+            #[cfg(target_os = "windows")]
+            let owner = match app2
+                .get_webview_window("main")
                 .ok_or_else(|| "main window unavailable".to_string())
-                .and_then(|w| w.hwnd().map_err(|e| e.to_string()))?;
-            selection::capture_selection(800, owner_from_tauri(hwnd))
+                .and_then(|w| w.hwnd().map(|h| h.0).map_err(|e| e.to_string()))
+            {
+                Ok(h) => h,
+                Err(e) => return, // best-effort: log + bail this trigger (no restore)
+            };
+            #[cfg(not(target_os = "windows"))]
+            let owner = ();
+            let cap = selection::capture_selection(800, owner);
+            (pos.0, pos.1, cap)
         };
-        #[cfg(not(target_os = "windows"))]
-        let cap = selection::capture_selection(800);
         ```
-      - **windows-crate HWND → windows-sys HWND conversion (round-8 review P1).**
-        `tauri::Window::hwnd()` returns the HIGH-LEVEL `windows` crate's
-        `HWND` (`windows::Win32::Foundation::HWND`, a newtype
-        `pub struct HWND(pub *mut c_void)` — tauri 2.11.5 depends on `windows`
-        0.61). Our code calls `windows-sys` 0.59, whose `HWND` is a type alias
-        `*mut c_void`. Same pointee type, so the conversion is a single field
-        access — NO `isize` round-trip, NO handle reinterpretation:
-        ```rust
-        // clipboard.rs (Windows)
-        fn owner_from_tauri(h: windows::Win32::Foundation::HWND) -> windows_sys::Win32::Foundation::HWND {
-            h.0 // *mut c_void  ==  windows-sys HWND
-        }
-        ```
-        (We do NOT add a `windows` crate dependency to islandpot — only the one
-        conversion site references the type, and it lives behind the cfg in the
-        `lib.rs` call site where `w.hwnd()` already returns it. If avoiding the
-        `windows` crate entirely is preferred, `w.hwnd().unwrap().0 as isize` then
-        `isize as *mut c_void` is equivalent but adds a redundant cast chain; the
-        `.0` direct access is cleaner and type-checked.)
-      - **`translate_clipboard`** (the other selection caller, lib.rs:142) does NOT
-        call `restore_snapshot` — it only reads text — so it needs no HWND change.
+        (On Windows, a HWND-resolution failure logs and `return`s — best-effort, no
+        restore, since we have no valid owner. This keeps the block `()->()` clean.)
+      - **windows-crate HWND → windows-sys HWND (round-8/9 review).** `WebviewWindow::hwnd()`
+        (tauri 2.11.5 `src/webview/webview_window.rs:1847`, `#[cfg(windows)]`) returns the
+        HIGH-LEVEL `windows` crate's `HWND` — `windows::Win32::Foundation::HWND`, a newtype
+        `pub struct HWND(pub *mut c_void)` (tauri 2.11.5 depends on `windows` 0.61). Our code
+        calls `windows-sys` 0.59, whose `HWND` is `*mut c_void`. Same pointee type, so the
+        conversion is the inline `.0` access shown above. We do NOT name the `windows` crate
+        anywhere, do NOT add it as a dependency, and do NOT introduce an `owner_from_tauri`
+        helper (round-9: that helper would have to live in clipboard.rs and name the `windows`
+        crate type, which we don't depend on).
+      - **`translate_clipboard`** (lib.rs:142) does NOT call `restore_snapshot` — it only
+        reads text — so its `capture_selection`/clipboard call needs no owner threading.
       - **`clipboard.rs`**: the Windows `restore_snapshot` signature becomes
-        `restore_snapshot(owner: OwnerHwnd, text: Option<&str>, image: Option<&ImageBlob>)`.
-        macOS signature is unchanged. The Win32 adapter (see FSM bullet below) is
-        injected here so the failure paths are unit-testable.
+        `pub fn restore_snapshot(owner: OwnerHwnd, text, image) -> Result<(), String>` — a
+        NON-generic public wrapper (round-9 review P1: do not make the public fn generic).
+        It builds the text/DIB blobs (preflight + BGRA), constructs the real `Win32ClipOps`
+        adapter (which stores `owner`), and calls the INTERNAL generic `restore_with(ops, …)`.
+        See the FSM bullet for the split. macOS `restore_snapshot` signature unchanged.
+      - **Test migration (round-9 review P1):** `tests/selection_engine.rs:204` calls
+        `capture_selection_with_ax(|| Some("ax-text".into()), 1)`. Since both targets now
+        take `owner`, update that ONE call to pass `()` as owner: `capture_selection_with_ax(ax,
+        1, ())`. No other change to that test. (The alternative — a Windows-only extra param —
+        was rejected because it would split the cross-platform AX test signature.)
 
 - [ ] **Memory: `GlobalAlloc(GMEM_MOVEABLE, len)` for EACH blob.** Verified: "A
       memory object that is to be placed on the clipboard should be allocated by
@@ -177,38 +205,72 @@ the clipboard is left with NEITHER format, matching the macOS single-item semant
         `(b,g,r,a)`. Row stride = width*4 (no padding at 32bpp). This channel swap +
         the alpha mask are what the test asserts (see test).
 
-- [ ] **Submit sequence + handle ownership (single-close RAII discipline).**
-      Round-8 review P1: the prev rev called `CloseClipboard()` manually in branches
-      2-4 AND in `ClipGuard::drop` — a double close. Fix: **the guard is the ONLY
-      closer.** Construct it immediately after a successful `OpenClipboard`; every
-      branch from then on does its handle work and then `return`s — the guard's
-      `Drop` closes exactly once, including on panic. No manual `CloseClipboard()`
-      appears anywhere after the guard exists.
-      ```text
-      1. build h_text, h_dib (GMEM_MOVEABLE + GlobalLock/copy/Unlock)   [clipboard UNTOUCHED on fail → return Err]
-      2. OpenClipboard(owner):
-           fail → GlobalFree(h_text); GlobalFree(h_dib); return Err     [never opened, no guard]
-           ok   → let _guard = ClipGuard::new();   // ONLY closer from here
-      3. EmptyClipboard():
-           fail → GlobalFree(h_text); GlobalFree(h_dib); return Err     [_guard drops → CloseClipboard once]
-      4. SetClipboardData(CF_UNICODETEXT, h_text):
-           fail → GlobalFree(h_text); GlobalFree(h_dib); return Err     [NOTHING submitted yet;
-                                                                       no half-state; no re-empty;
-                                                                       _guard drops → CloseClipboard once]
-           ok   → h_text is now system-owned (do NOT free)
-      5. SetClipboardData(CF_DIBV5, h_dib):
-           ok   → return Ok(())   [both system-owned; _guard drops → CloseClipboard once]
-           fail → h_text WAS taken (system-owned, do NOT free);
-                  GlobalFree(h_dib);                              // half-state: only text is live
-                  EmptyClipboard();                               // remove orphaned text — STILL OPEN (_guard alive)
-                  return Err                                      [_guard drops → CloseClipboard once]
+- [ ] **Submit sequence + handle ownership (single-close RAII, borrow-correct).**
+      Round-8 review: the prev rev called `CloseClipboard()` manually in branches AND
+      in `ClipGuard::drop` (double close). Round-9 review P1: a bare `ClipGuard` that
+      calls the real `CloseClipboard()` is invisible to the fake, and holding `&mut C`
+      in the guard while also calling `c.empty()/set()` mutably aliases. Fix: the guard
+      HOLDS the adapter and all post-open ops go THROUGH the guard; `Drop` calls
+      `ClipOps::close` (so the fake observes the close). The submit algorithm is a pure
+      generic fn over `impl ClipOps` (no Win32 types), living in an always-compiled
+      private module so the fake FSM test compiles + runs on ALL platforms.
+      ```rust
+      // clipboard::fsm — ALWAYS COMPILED (no cfg), platform-neutral. The fake lives
+      // in `#[cfg(test)] mod tests` HERE (same module → can see private submit + ClipOps).
+      pub(crate) trait ClipOps {
+          type Handle;            // platform-neutral: windows-sys HGLOBAL on Win, u32 id in fake
+          fn open(&mut self) -> Result<(), String>;          // real adapter stores owner; no HWND arg
+          fn close(&mut self);
+          fn empty(&mut self) -> Result<(), String>;
+          // set() transfers Handle ownership to the system on Ok. On Err it RETURNS the
+          // handle to the caller (ownership NOT transferred) so the caller can free it —
+          // this is what makes the failure paths writable without use-after-move.
+          fn set(&mut self, fmt: u32, h: Self::Handle) -> Result<(), (Self::Handle, String)>;
+          fn alloc(&mut self, bytes: &[u8]) -> Result<Self::Handle, String>;
+          fn free(&mut self, h: Self::Handle);
+      }
+      // Guard borrows the adapter mutably; all post-open ops go THROUGH it (so the
+      // fake observes close, and there's no second &mut to the adapter while it lives).
+      struct OpenClip<'a, C: ClipOps> { ops: &'a mut C }
+      impl<'a, C: ClipOps> OpenClip<'a, C> {
+          fn empty(&mut self) -> Result<(), String> { self.ops.empty() }
+          fn set(&mut self, fmt: u32, h: C::Handle) -> Result<(), (C::Handle, String)> { self.ops.set(fmt, h) }
+          fn free(&mut self, h: C::Handle) { self.ops.free(h) }
+      }
+      impl<C: ClipOps> Drop for OpenClip<'_, C> { fn drop(&mut self) { self.ops.close(); } }
+
+      // Pure submit FSM — no preflight, no conversion, only ownership transitions.
+      fn submit<C: ClipOps>(c: &mut C, h_text: C::Handle, h_dib: C::Handle) -> Result<(), String> {
+          // 1. open — fail: free BOTH directly (no guard yet, no close)
+          let mut clip = match c.open() {
+              Ok(()) => OpenClip { ops: c },                 // ONLY closer from here; Drop calls close()
+              Err(_) => { c.free(h_text); c.free(h_dib); return Err("open failed".into()); }
+          };
+          // 2. empty — fail: free BOTH via the guard, return → Drop closes once
+          if let Err(e) = clip.empty() {
+              clip.free(h_text); clip.free(h_dib); return Err(e);
+          }
+          // 3. set text — fail: set returns the handle back; free BOTH, no re-empty
+          if let Err((h, e)) = clip.set(CF_UNICODETEXT, h_text) {
+              clip.free(h); clip.free(h_dib); return Err(e);   // h_text NOT taken on Err
+          }
+          // h_text now system-owned (do not free)
+          // 4. set dib — ok: both system-owned; fail: re-empty WHILE OPEN, free h_dib only
+          match clip.set(CF_DIBV5, h_dib) {
+              Ok(()) => Ok(()),
+              Err((h, e)) => { let _ = clip.empty(); clip.free(h); Err(e) } // h_text stays system-owned
+          }
+          // clip drops → close() exactly once on every path (incl. panic)
+      }
       ```
-      `struct ClipGuard; impl Drop for ClipGuard { fn drop(&mut self) { unsafe { CloseClipboard(); } } }`
-      — no `opened` flag needed (it's only ever constructed right after a successful
-      open, so Drop always closes). The re-`EmptyClipboard` in step 5 runs while the
-      guard is alive (clipboard still open); steps 3-4 never re-empty because nothing
-      is on the clipboard until a submit succeeds. Handle ownership is trackable in
-      the fake FSM test (next bullet) by counting `GlobalAlloc`/`GlobalFree` pairs.
+      Key points: `set` returns `Err((Handle, String))` so the un-taken handle flows
+      back to the caller (avoids use-after-move and the borrow problem of calling
+      `c.free` while the guard holds `&mut c`); all post-open ops go through the guard;
+      after `open` succeeds, `close` runs exactly once via `OpenClip::drop` on success
+      AND every error path. The re-`empty` in step 4 runs while the guard is alive (still
+      open). The fake tracks `open`/`close` counts to PROVE single-close, and marks
+      system-transferred handles freed on `empty` (so a post-failure `empty` clears
+      residual ownership — round-9 small fix).
 
 - [ ] **windows-sys 0.59 features** — verified module paths by grepping the crate
       source (`~/.cargo/registry/.../windows-sys-0.59.0/src/`), NOT by guessing.
@@ -244,70 +306,79 @@ the clipboard is left with NEITHER format, matching the macOS single-item semant
       - Image byte count: `usize::try_from(total_u64)` as in the macOS preflight.
       Any conversion failure returns Err before any Win32 call (clipboard untouched).
 
-- [ ] Add `#[cfg(target_os = "windows")] fn restore_snapshot(owner, text, image)`
-      (owner-bearing signature per the callchain bullet), replacing the
-      sequential-arboard cfg-arm for Windows. macOS signature unchanged. Keep a
-      non-mac/non-win sequential stub for unsupported targets.
+- [ ] **Public `restore_snapshot` is NON-generic; only the internal submit is
+      generic** (round-9 review P1: the prev rev was contradictory — said the public
+      wrapper was generic in one place and non-generic in another).
+      - `#[cfg(windows)] pub fn restore_snapshot(owner: OwnerHwnd, text, image)`:
+        builds blobs (preflight + BGRA), constructs `Win32ClipOps { owner }`, calls
+        `crate::fsm::submit(&mut ops, h_text, h_dib)`. Not generic.
+      - macOS `restore_snapshot` unchanged. Non-mac/non-win sequential stub kept.
+      - `crate::fsm::submit<C: ClipOps>(...)` is the generic (see next bullet).
 
-- [ ] **Extract an injectable Win32 adapter so the failure branches are testable
-      without a real clipboard (round-8 review P1).** The submit logic is the
-      danger zone; isolate it behind a trait the real impl and a fake both satisfy:
-      ```rust
-      #[cfg(target_os = "windows")]
-      trait ClipOps {
-          fn open(&mut self, owner: OwnerHwnd) -> Result<()>;
-          fn empty(&mut self) -> Result<()>;
-          fn set(&mut self, fmt: u32, h: GlobalHandle) -> Result<()>; // ownership transfers on Ok
-          // GlobalAlloc/Lock/Free are also on the trait (or on a MemoryOps sibling)
-          // so the fake can count alloc/free pairs to prove no double-free / no leak.
-          fn alloc(&mut self, bytes: &[u8]) -> Result<GlobalHandle>;
-          fn free(&mut self, h: GlobalHandle);
-      }
-      ```
-      `restore_snapshot` takes a `&mut impl ClipOps` (the real impl wraps the
-      `windows-sys` calls; a fake records calls). This mirrors how
-      `selection_engine::capture` is already pure + tested via a `Fake` clipboard.
-      The submit algorithm lives in a `fn submit<C: ClipOps>(c: &mut C, h_text, h_dib)
-      -> Result<()>` that encodes ONLY the step-2..5 sequence above — no preflight,
-      no conversion, pure ownership transitions. (Preflight + BGRA conversion stay
-      in the non-generic `restore_snapshot` wrapper and get their own unit tests.)
+- [ ] **FSM module structure — ALWAYS COMPILED, platform-neutral (round-9 review
+      P1: the prev rev's `ClipOps` was `#[cfg(windows)]` + referenced `OwnerHwnd`/
+      `GlobalHandle`, so the "cross-platform fake test" could NOT compile on
+      macOS/Linux; and an integration test can't see private items / doesn't set
+      `cfg(test)` on the library).** Concrete structure:
+      - `src-tauri/src/clipboard/fsm.rs` — a **private, always-compiled** submodule
+        (`mod fsm;` with no cfg). Contains: the `ClipOps` trait (associated `type
+        Handle`, `open(&mut self)` with NO HWND arg — the real adapter stores the
+        owner), the `OpenClip<'a, C>` borrow-guard, and `fn submit<C: ClipOps>(…)`.
+        NONE of these reference any Win32 type → compiles everywhere.
+      - `#[cfg(test)] mod tests` **inside `fsm.rs`** (same module → can see private
+        `submit` + `ClipOps`; not an integration test). The `FakeClip` impls
+        `ClipOps` with `type Handle = u32` (an id), records `open/empty/set/free/close`
+        calls, and tracks handle ownership ("ours" → "system" on successful `set`;
+        `free` on a system-owned handle panics = double-free detector; `empty` marks
+        system-transferred handles freed so post-failure `empty` clears residual
+        ownership — round-9 small fix). These run in `cargo test` on ALL platforms.
+      - `#[cfg(windows)] struct Win32ClipOps { owner: windows_sys::Win32::Foundation::HWND }`
+        in `clipboard.rs` (or a `#[cfg(windows)] mod win;`) impls `ClipOps` by calling
+        the real `OpenClipboard(self.owner)` / `EmptyClipboard` / `SetClipboardData` /
+        `CloseClipboard` / `GlobalAlloc` / `GlobalFree`. Only THIS + the real CI test
+        are `#[cfg(windows)]`.
+      This mirrors how `selection_engine::capture` is already a pure fn tested via a
+      cross-platform `Fake` — same discipline, different layer.
 
-- [ ] **Failure-injection unit tests (`tests/clipboard_win_fsm.rs`).** The fake
-      needs no Win32 types (it just records calls against an in-memory ownership
-      map), so these are NOT cfg-gated to Windows — they run in `cargo test` on ALL
-      platforms (macOS dev, Linux CI, Windows CI), exactly like the existing
-      `selection_engine` FSM tests that use a cross-platform `Fake` clipboard. The
-      fake forces each API to fail and records the call sequence:
-      - `open_fails`: OpenClipboard errs → exactly 2 `free` (h_text, h_dib), zero
-        `empty`, zero `set`, zero `close` (guard never constructed). No leak.
-      - `empty_fails`: EmptyClipboard errs → 2 `free`, zero `set`, exactly 1
-        `close` (guard dropped). No re-empty.
-      - `first_set_fails`: Set(CF_UNICODETEXT) errs → 2 `free` (both unsubmitted),
-        zero `set` success, ZERO `empty` after the failure (nothing to remove),
+- [ ] **Failure-injection unit tests (`fsm::tests`, run on ALL platforms).** The
+      `FakeClip` forces each API to fail and the test asserts the exact call sequence:
+      - `open_fails`: open errs → exactly 2 `free` (h_text, h_dib), zero `empty`,
+        zero `set`, zero `close` (guard never constructed). No leak.
+      - `empty_fails`: empty errs → 2 `free`, zero `set`, exactly 1 `close`
+        (guard dropped). No re-empty (nothing was on the clipboard).
+      - `first_set_fails`: set(CF_UNICODETEXT) errs → 2 `free` (both unsubmitted),
+        zero successful `set`, ZERO `empty` after the failure (nothing to remove),
         exactly 1 `close`. Proves no re-empty on first-submit failure.
-      - `second_set_fails`: Set(CF_UNICODETEXT) ok, Set(CF_DIBV5) errs → exactly 1
-        `free` (h_dib only — h_text is system-owned, freeing it would double-free),
-        exactly 1 `empty` AFTER the failure (remove orphaned text) WHILE still open,
-        exactly 1 `close`. Proves the half-state cleanup + ownership transfer.
+      - `second_set_fails`: set(CF_UNICODETEXT) ok, set(CF_DIBV5) errs → exactly 1
+        `free` (h_dib only — h_text is system-owned, freeing it would double-free
+        → the fake's double-free detector guards this), exactly 1 `empty` AFTER the
+        failure (remove orphaned text) WHILE still open, exactly 1 `close`.
       - `success`: both sets ok → zero `free` (both system-owned), zero re-`empty`,
         exactly 1 `close`.
-      - **Ownership bookkeeping**: the fake tracks each `alloc`'d handle as
-        "owned-by-us" and flips it to "owned-by-system" on a successful `set`.
-        `free` on a system-owned handle panics (double-free detector). At end of
-        every test, assert every handle is either system-owned or freed — no leaks,
-        no double-frees. This is the core safety property the protocol must hold.
-      - Close count is asserted `== 1` in every branch that opened (the guard is
-        the only closer; these tests prove the single-close discipline directly).
+      - Ownership bookkeeping asserts no leaks / no double-frees at end of each test.
+      - `close` count is `== 1` in every branch that opened (the `OpenClip` guard is
+        the only closer; these tests prove single-close directly because the guard's
+        `Drop` calls `ClipOps::close`, which the fake records).
 
 - [ ] **Real Windows integration test (`tests/clipboard_win.rs`, Windows CI only).**
       This is the SUCCESS path only — the failure branches are covered by the fake
       FSM above (they can't be reliably forced against the real clipboard). It needs
       an owner HWND but has no Tauri window, so it creates a throwaway message-only
-      window FOR THE TEST (not the app): `CreateWindowExW(0, "STATIC", …,
-      HWND_MESSAGE, …)` on the test thread and runs a minimal `PeekMessage`/`Dispatch`
-      loop around the assertion (so a `WM_DESTROYCLIPBOARD` from a concurrent app
-      can't deadlock the test). This is acceptable in a test (short-lived, single
-      thread) precisely because it is NOT the app's permanent owner.
+      window FOR THE TEST (not the app). Lifecycle discipline (round-9 small fix —
+      "short-lived" must have an actual cleanup step):
+      - Create the owner on the TEST thread: `CreateWindowExW(0, "STATIC", …,
+        HWND_MESSAGE, …)`.
+      - Wrap it in an RAII guard whose `Drop` calls `DestroyWindow(hwnd)` — and
+        `DestroyWindow` must be called from the SAME thread that created the window
+        (MS requirement). So the test is single-threaded: create → run assertions →
+        destroy, all on one thread.
+      - ORDERING: finish ALL clipboard reads, any re-empty, and a final
+        `PeekMessage`/`DispatchMessage` pump (to drain a queued
+        `WM_DESTROYCLIPBOARD` from a concurrent app so the senders don't block)
+        BEFORE the guard drops and calls `DestroyWindow`. Destroying while pending
+        cross-thread sends are outstanding is undefined; pump first, then destroy.
+      - This is acceptable in a test (single short-lived thread) precisely because it
+        is NOT the app's permanent owner (the app reuses the Tauri main window).
       1. Build a **4-color 2×2 RGBA** image (not uniform red — round-8 review: a
          uniform image can't prove row stride or top-down vs bottom-up order):
          `[(255,0,0,255), (0,255,0,255),  (0,0,255,255), (255,255,0,255)]` —
