@@ -1,7 +1,17 @@
 //! Thin OS clipboard abstraction. `arboard` for get/set text; a per-platform
 //! sequence number (Win: GetClipboardSequenceNumber; macOS: NSPasteboard.changeCount).
 //! The sequence number is load-bearing for the §B restore guard.
+//!
+//! Submodules: `fsm` (platform-neutral compound-write ownership state machine, always
+//! compiled, Phase 4 Task 2b milestone 1); `windows` (the Win32 adapter + blob builder,
+//! `#[cfg(windows)]`, milestone 2).
 use std::sync::Mutex;
+
+// Milestone 1 (Task 2b): the FSM is complete + tested, but no caller wires it yet —
+// `windows.rs` (M2) impls `ClipOps` and calls `restore_with`. `#[allow(dead_code)]` is
+// scoped here and removed once M2 consumes these items.
+#[allow(dead_code)]
+mod fsm;
 
 // arboard::Clipboard is not safe to share raw across threads; guard it.
 static CLIP: Mutex<Option<arboard::Clipboard>> = Mutex::new(None);
