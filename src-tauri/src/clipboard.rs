@@ -57,13 +57,7 @@ pub fn restore_snapshot(
     text: Option<&str>,
     image: Option<&crate::selection_engine::ImageBlob>,
 ) -> std::result::Result<(), String> {
-    use objc2_app_kit::{
-        NSBitmapImageRep, NSPasteboard, NSPasteboardItem,
-        NSPasteboardTypeString, NSPasteboardTypeTIFF,
-    };
-    use objc2_foundation::{NSArray, NSString};
-    use objc2::rc::Retained;
-    use objc2::AnyThread;
+    use objc2_app_kit::NSPasteboard;
 
     match (text, image) {
         // Single-flavor: arboard is fine (only one write, no clear conflict).
@@ -80,62 +74,83 @@ pub fn restore_snapshot(
             g.as_mut().unwrap().set_image(data).map_err(|e| e.to_string())
         }
         (Some(t), Some(img)) => unsafe {
-            // Step 1: validate dimensions + overflow.
-            let expected = img.width.checked_mul(img.height)
-                .and_then(|n| n.checked_mul(4))
-                .ok_or_else(|| "image dimensions overflow".to_string())?;
-            if img.bytes.len() != expected {
-                return Err(format!(
-                    "image bytes {} != width*height*4 ({})", img.bytes.len(), expected
-                ));
-            }
-
-            // Step 2: convert RGBA → TIFF NSData via NSBitmapImageRep.
-            let w = img.width as isize;
-            let h = img.height as isize;
-            let color_space = objc2_foundation::NSString::from_str("NSCalibratedRGBColorSpace");
-            let rep = NSBitmapImageRep::initWithBitmapDataPlanes_pixelsWide_pixelsHigh_bitsPerSample_samplesPerPixel_hasAlpha_isPlanar_colorSpaceName_bytesPerRow_bitsPerPixel(
-                NSBitmapImageRep::alloc(),  // from Allocated trait
-                std::ptr::null_mut(),
-                w, h, 8, 4, true, false,
-                &color_space,
-                w * 4, 32,
-            ).ok_or_else(|| "NSBitmapImageRep init failed".to_string())?;
-            // Copy RGBA into the rep's bitmap data.
-            let data_ptr = NSBitmapImageRep::bitmapData(&rep);
-            if data_ptr.is_null() {
-                return Err("NSBitmapImageRep bitmapData null".into());
-            }
-            std::ptr::copy_nonoverlapping(img.bytes.as_ptr(), data_ptr, img.bytes.len());
-            // Get TIFF representation.
-            let tiff_data = NSBitmapImageRep::TIFFRepresentation(&rep)
-                .ok_or_else(|| "TIFF conversion failed".to_string())?;
-
-            // Step 3: build the NSPasteboardItem with BOTH types (BEFORE touching
-            // the pasteboard — all-or-nothing; any failure returns an error).
-            let item = NSPasteboardItem::new();
-            let text_ns = NSString::from_str(t);
-            if !item.setString_forType(&text_ns, NSPasteboardTypeString) {
-                return Err("setString_forType failed".into());
-            }
-            if !item.setData_forType(&tiff_data, NSPasteboardTypeTIFF) {
-                return Err("setData_forType(TIFF) failed".into());
-            }
-
-            // Step 4-6: all conversions succeeded — now clearContents + writeObjects.
+            // Delegate to the testable inner fn with the system pasteboard.
             let pb = NSPasteboard::generalPasteboard();
-            pb.clearContents();
-            // writeObjects takes NSArray<ProtocolObject<dyn NSPasteboardWriting>>.
-            let writing_item: Retained<objc2::runtime::ProtocolObject<dyn objc2_app_kit::NSPasteboardWriting>> =
-                objc2::runtime::ProtocolObject::from_retained(item);
-            let items = NSArray::arrayWithObject(&*writing_item);
-            if !pb.writeObjects(&items) {
-                return Err("writeObjects failed".into());
-            }
-            Ok(())
+            restore_compound_to(&pb, t, img)
         },
         (None, None) => Ok(()),
     }
+}
+
+/// Inner: compound text+image write to a GIVEN NSPasteboard (testable with
+/// `pasteboardWithUniqueName`). All conversion BEFORE clearContents; on any error
+/// the pasteboard is untouched. Returns Err on conversion failure.
+///
+/// # Safety
+/// Caller must ensure the NSPasteboard is valid and this runs on the main thread
+/// (NSPasteboard APIs are main-thread-only in practice).
+#[cfg(target_os = "macos")]
+pub unsafe fn restore_compound_to(
+    pb: &objc2_app_kit::NSPasteboard,
+    text: &str,
+    img: &crate::selection_engine::ImageBlob,
+) -> std::result::Result<(), String> {
+    use objc2_app_kit::{
+        NSBitmapImageRep, NSPasteboardItem,
+        NSPasteboardTypeString, NSPasteboardTypeTIFF,
+    };
+    use objc2_foundation::{NSArray, NSString};
+    use objc2::rc::Retained;
+    use objc2::AnyThread;
+
+    // Step 1: validate dimensions + overflow.
+    let expected = img.width.checked_mul(img.height)
+        .and_then(|n| n.checked_mul(4))
+        .ok_or_else(|| "image dimensions overflow".to_string())?;
+    if img.bytes.len() != expected {
+        return Err(format!(
+            "image bytes {} != width*height*4 ({})", img.bytes.len(), expected
+        ));
+    }
+
+    // Step 2: convert RGBA → TIFF NSData via NSBitmapImageRep.
+    let w = img.width as isize;
+    let h = img.height as isize;
+    let color_space = NSString::from_str("NSCalibratedRGBColorSpace");
+    let rep = NSBitmapImageRep::initWithBitmapDataPlanes_pixelsWide_pixelsHigh_bitsPerSample_samplesPerPixel_hasAlpha_isPlanar_colorSpaceName_bytesPerRow_bitsPerPixel(
+        NSBitmapImageRep::alloc(),
+        std::ptr::null_mut(),
+        w, h, 8, 4, true, false,
+        &color_space,
+        w * 4, 32,
+    ).ok_or_else(|| "NSBitmapImageRep init failed".to_string())?;
+    let data_ptr = NSBitmapImageRep::bitmapData(&rep);
+    if data_ptr.is_null() {
+        return Err("NSBitmapImageRep bitmapData null".into());
+    }
+    std::ptr::copy_nonoverlapping(img.bytes.as_ptr(), data_ptr, img.bytes.len());
+    let tiff_data = NSBitmapImageRep::TIFFRepresentation(&rep)
+        .ok_or_else(|| "TIFF conversion failed".to_string())?;
+
+    // Step 3: build the NSPasteboardItem with BOTH types (BEFORE touching pb).
+    let item = NSPasteboardItem::new();
+    let text_ns = NSString::from_str(text);
+    if !item.setString_forType(&text_ns, NSPasteboardTypeString) {
+        return Err("setString_forType failed".into());
+    }
+    if !item.setData_forType(&tiff_data, NSPasteboardTypeTIFF) {
+        return Err("setData_forType(TIFF) failed".into());
+    }
+
+    // Step 4-5: all conversions succeeded — now clearContents + writeObjects.
+    pb.clearContents();
+    let writing_item: Retained<objc2::runtime::ProtocolObject<dyn objc2_app_kit::NSPasteboardWriting>> =
+        objc2::runtime::ProtocolObject::from_retained(item);
+    let items = NSArray::arrayWithObject(&*writing_item);
+    if !pb.writeObjects(&items) {
+        return Err("writeObjects failed".into());
+    }
+    Ok(())
 }
 
 #[cfg(not(target_os = "macos"))]
