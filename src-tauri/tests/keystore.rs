@@ -111,63 +111,48 @@ fn with_locks_same_dir_concurrent_no_clobber() {
 
 #[test]
 fn different_dirs_do_not_block_each_other() {
-    // Round-3 review P1 #6 (second test): PROVE dir1's lock doesn't block dir2.
-    // Approach: child process holds dir1's lock (update_keys sleeps); parent calls
-    // load() on an EMPTY dir2 (no keystore file → load returns {} without KDF —
-    // deterministic, no Argon2). If locks were global/shared, dir2's load would
-    // block until dir1 releases; if independent, it completes instantly.
+    // Round-4 review: SAME-PROCESS two threads + two Keystores, channel sync.
+    // A process-global lock (the old OnceLock regression) WOULD serialize these
+    // within one process — this test catches that (the old child-process approach
+    // couldn't, since each process has its own statics).
     use islandpot_lib::keystore::Keystore;
-    use std::process::Command;
-    use std::time::Instant;
+    use std::sync::mpsc;
+    use std::thread;
+    use std::time::{Duration, Instant};
 
     let pid = std::process::id();
     let dir1 = std::env::temp_dir().join(format!("islandpot-ks-dd1-{}", pid));
     let dir2 = std::env::temp_dir().join(format!("islandpot-ks-dd2-{}", pid));
     let _ = std::fs::remove_dir_all(&dir1);
     let _ = std::fs::remove_dir_all(&dir2);
-    const HOLD_SECS: u64 = 3;
 
-    // Child holds dir1's lock for HOLD_SECS.
-    let bin = env!("CARGO_BIN_EXE_xproc-lock-holder");
-    if !std::path::Path::new(bin).exists() {
-        let status = std::process::Command::new(
-            std::env::var("CARGO").unwrap_or_else(|_| "cargo".into()),
-        )
-        .args(["build", "--bin", "xproc-lock-holder", "--tests"])
-        .status()
-        .expect("failed to build xproc-lock-holder");
-        assert!(status.success(), "building xproc-lock-holder failed");
-    }
-    let mut child = Command::new(bin)
-        .arg(&dir1)
-        .arg(HOLD_SECS.to_string())
-        .spawn()
-        .expect("spawn holder");
-
-    // Wait for child to confirm it's holding dir1's lock.
-    let flag1 = dir1.join("holding");
-    let mut waited = 0;
-    while !flag1.exists() && waited < 200 {
-        std::thread::sleep(std::time::Duration::from_millis(50));
-        waited += 1;
-    }
-    assert!(flag1.exists(), "holder did not signal it's holding dir1");
-
-    // dir2 is EMPTY (no keystore.json) → load() returns {} without KDF.
-    // Time it: if independent (per-dir lock), completes instantly (~0ms).
-    // If shared/global lock, blocks ~HOLD_SECS.
+    let ks1 = Keystore::new(dir1.clone()).unwrap();
     let ks2 = Keystore::new(dir2.clone()).unwrap();
+
+    // Thread A holds dir1's lock inside update_keys (sleeps), signals via channel.
+    // dir2 is empty (no keystore.json → load() returns {} without KDF → deterministic).
+    let (tx, rx) = mpsc::channel();
+    let h1 = thread::spawn(move || {
+        ks1.update_keys(|_k| {
+            tx.send(()).expect("signal held");
+            thread::sleep(Duration::from_secs(2));
+        }).unwrap();
+    });
+    rx.recv_timeout(Duration::from_secs(3)).expect("dir1 did not acquire lock");
+
+    // dir2's load() on an EMPTY dir — no KDF, no keystore.json. Must complete
+    // instantly if per-dir locks; blocks ~2s if a global lock shared them.
     let start = Instant::now();
     let result = ks2.load().expect("dir2 load should succeed (empty)");
     let elapsed = start.elapsed();
 
     assert!(result.as_object().unwrap().is_empty(), "dir2 should be empty");
     assert!(
-        elapsed < std::time::Duration::from_secs(1),
-        "dir2 load took {elapsed:?} — blocked by dir1's lock (shared/global lock bug)"
+        elapsed < Duration::from_millis(500),
+        "dir2 load took {elapsed:?} — blocked by dir1's lock (process-global lock bug)"
     );
 
-    let _ = child.wait();
+    h1.join().unwrap();
     let _ = std::fs::remove_dir_all(&dir1);
     let _ = std::fs::remove_dir_all(&dir2);
 }
@@ -218,22 +203,24 @@ fn cross_process_lock_mutual_exclusion() {
     }
     assert!(flag.exists(), "holder did not signal it's holding the lock");
 
-    // Now our update_keys must BLOCK until the holder releases (≈ HOLD_SECS).
+    // Now our load() on the SAME dir must BLOCK until the holder releases (≈ HOLD_SECS).
+    // The dir is empty (no keystore.json) so load() does NO KDF — the ONLY thing
+    // that can make it block is the fs2 flock. If the lock weren't cross-process,
+    // elapsed would be ~0 (instant load of empty {}).
     let ks = Keystore::new(dir.clone()).unwrap();
     let start = Instant::now();
-    ks.update_keys(|k| { k["parent"] = serde_json::json!("1"); }).unwrap();
+    let result = ks.load().expect("load should succeed");
     let elapsed = start.elapsed();
 
-    // It should have waited roughly HOLD_SECS (allow slack). If the lock weren't
-    // cross-process, elapsed would be ~0.
+    assert!(result.as_object().unwrap().is_empty(), "dir should be empty");
+    // It should have waited roughly HOLD_SECS (allow slack: the child acquires +
+    // signals + we start timing with some delay). If the lock weren't cross-process,
+    // elapsed would be ~0 (instant load of empty {}).
     assert!(
-        elapsed >= std::time::Duration::from_secs(HOLD_SECS),
-        "update_keys returned in {elapsed:?} — cross-process lock did NOT block (expected >= {HOLD_SECS}s)"
+        elapsed >= std::time::Duration::from_millis((HOLD_SECS * 1000).saturating_sub(500)),
+        "load returned in {elapsed:?} — cross-process lock did NOT block (expected ~{HOLD_SECS}s)"
     );
 
     let _ = child.wait();
-    // Our write landed after the holder released.
-    let loaded = Keystore::new(dir.clone()).unwrap().load().unwrap();
-    assert_eq!(loaded["parent"], serde_json::json!("1"));
     let _ = std::fs::remove_dir_all(&dir);
 }
