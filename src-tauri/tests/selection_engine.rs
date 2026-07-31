@@ -102,6 +102,9 @@ struct FakeImg {
     /// §B invariant that an empty original (None,None) snapshot still clears the
     /// sentinel on restore (round-11 review P1 #1).
     get_text_always_fails: bool,
+    /// Inject a restore_snapshot failure (round-14 review P1 #1: restore errors must
+    /// NOT be silenced). When true, restore_snapshot returns Err without changing state.
+    restore_fail: bool,
     get_text_calls: RefCell<u32>,
 }
 impl FakeImg {
@@ -147,6 +150,12 @@ impl ClipboardLike for FakeImg {
         text: Option<&str>,
         image: Option<&linguaray_lib::selection_engine::ImageBlob>,
     ) -> Result<(), String> {
+        // Inject a restore failure (round-14 review P1 #1): simulate a platform restore
+        // error (e.g. Windows SetPartial / writeObjects fail) WITHOUT changing state, so
+        // the caller can prove the error propagates instead of being silenced.
+        if self.restore_fail {
+            return Err("injected restore failure".into());
+        }
         // Single clear, then set BOTH (no per-set clearing here).
         *self.text.borrow_mut() = String::new();
         *self.image.borrow_mut() = None;
@@ -168,7 +177,7 @@ fn copy_failure_restores_saved() {
     let f = FakeImg {
         text: RefCell::new("original".into()), image: RefCell::new(None),
         seq: RefCell::new(5), copy_fail: true, get_text_fail_on_second: false,
-        get_text_always_fails: false, get_text_calls: RefCell::new(0),
+        get_text_always_fails: false, restore_fail: false, get_text_calls: RefCell::new(0),
     };
     let err = capture(&f, || if f.copy_fail { Err("copy failed".into()) } else { Ok(()) }, 50).unwrap_err();
     assert_eq!(err, "copy failed");
@@ -183,7 +192,7 @@ fn get_text_failure_restores_saved() {
     let f = FakeImg {
         text: RefCell::new("original".into()), image: RefCell::new(None),
         seq: RefCell::new(5), copy_fail: false, get_text_fail_on_second: true,
-        get_text_always_fails: false, get_text_calls: RefCell::new(0),
+        get_text_always_fails: false, restore_fail: false, get_text_calls: RefCell::new(0),
     };
     let res = capture(&f, || { f.set_text("hello").map(|_| ()) }, 50);
     assert!(res.is_err(), "get_text failure propagates");
@@ -197,7 +206,7 @@ fn image_only_clipboard_restored() {
     let f = FakeImg {
         text: RefCell::new(String::new()), image: RefCell::new(Some((1, 1, vec![1, 2, 3, 4]))),
         seq: RefCell::new(5), copy_fail: false, get_text_fail_on_second: false,
-        get_text_always_fails: false, get_text_calls: RefCell::new(0),
+        get_text_always_fails: false, restore_fail: false, get_text_calls: RefCell::new(0),
     };
     let res = capture(&f, || { f.set_text("selected").map(|_| ()) }, 50).unwrap();
     assert!(matches!(res, Capture::Selected(t) if t == "selected"));
@@ -219,7 +228,7 @@ fn empty_original_clipboard_noselection_clears_sentinel() {
     let f = FakeImg {
         text: RefCell::new(String::new()), image: RefCell::new(None),
         seq: RefCell::new(5), copy_fail: false, get_text_fail_on_second: false,
-        get_text_always_fails: true, get_text_calls: RefCell::new(0),
+        get_text_always_fails: true, restore_fail: false, get_text_calls: RefCell::new(0),
     };
     let res = capture(&f, || { Ok(()) }, 50).unwrap(); // copy does nothing → NoSelection
     assert!(matches!(res, Capture::NoSelection), "nothing selected");
@@ -271,11 +280,77 @@ fn text_and_image_both_restored_when_present() {
         text: RefCell::new("hello".into()),
         image: RefCell::new(Some((2, 2, vec![0; 16]))), // 2x2 RGBA
         seq: RefCell::new(5), copy_fail: false, get_text_fail_on_second: false,
-        get_text_always_fails: false, get_text_calls: RefCell::new(0),
+        get_text_always_fails: false, restore_fail: false, get_text_calls: RefCell::new(0),
     };
     let res = capture(&f, || { f.set_text("selected").map(|_| ()) }, 50).unwrap();
     assert!(matches!(res, Capture::Selected(t) if t == "selected"));
     // Per the Fake's set semantics, restore writes image then text — both fields set.
     assert_eq!(f.text.borrow().as_str(), "hello", "text restored");
     assert_eq!(*f.image.borrow(), Some((2, 2, vec![0; 16])), "image restored");
+}
+
+#[test]
+fn restore_failure_on_success_path_is_not_silenced() {
+    // Round-14 review P1 #1: a restore_snapshot failure during the success path must
+    // NOT be silenced. The capture SUCCEEDED (text was read), but restoring the user's
+    // prior clipboard failed → their prior content is lost → capture returns Err
+    // (carrying the restore error), NOT Ok(Selected(...)).
+    let f = FakeImg {
+        text: RefCell::new("original".into()), image: RefCell::new(None),
+        seq: RefCell::new(5), copy_fail: false, get_text_fail_on_second: false,
+        get_text_always_fails: false, restore_fail: true, get_text_calls: RefCell::new(0),
+    };
+    let res = capture(&f, || { f.set_text("selected").map(|_| ()) }, 50);
+    let err = res.expect_err("restore failure must propagate, not be silenced");
+    assert!(
+        err.contains("injected restore failure"),
+        "err must surface the restore cause; got: {err}"
+    );
+    assert!(
+        !err.contains("additionally"),
+        "no original error to combine on the success path; got: {err}"
+    );
+}
+
+#[test]
+fn restore_failure_combines_with_original_error() {
+    // When the ORIGINAL operation also failed (here: get_text fails on the 2nd call),
+    // the restore error is COMBINED with it — both surface, neither hides the other.
+    let f = FakeImg {
+        text: RefCell::new("original".into()), image: RefCell::new(None),
+        seq: RefCell::new(5), copy_fail: false, get_text_fail_on_second: true,
+        get_text_always_fails: false, restore_fail: true, get_text_calls: RefCell::new(0),
+    };
+    let res = capture(&f, || { f.set_text("hello").map(|_| ()) }, 50);
+    let err = res.expect_err("combined error must propagate");
+    assert!(
+        err.contains("injected get_text failure"),
+        "must surface the ORIGINAL cause; got: {err}"
+    );
+    assert!(
+        err.contains("injected restore failure"),
+        "must ALSO surface the restore cause; got: {err}"
+    );
+    assert!(
+        err.contains("additionally"),
+        "must use the combine form when both errors present; got: {err}"
+    );
+}
+
+#[test]
+fn restore_failure_on_noselection_path_is_not_silenced() {
+    // The NoSelection path (copy did nothing) also must propagate a restore failure
+    // rather than returning Ok(NoSelection) silently.
+    let f = FakeImg {
+        text: RefCell::new("original".into()), image: RefCell::new(None),
+        seq: RefCell::new(5), copy_fail: false, get_text_fail_on_second: false,
+        get_text_always_fails: false, restore_fail: true, get_text_calls: RefCell::new(0),
+    };
+    // copy() does nothing → sequence never advances → NoSelection path → restore fires.
+    let res = capture(&f, || Ok(()), 50);
+    let err = res.expect_err("NoSelection restore failure must propagate");
+    assert!(
+        err.contains("injected restore failure"),
+        "err must surface the restore cause; got: {err}"
+    );
 }
