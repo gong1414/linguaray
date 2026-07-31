@@ -1,24 +1,34 @@
-//! Test helper: acquire the keystore cross-process lock on a given dir, write a
-//! `holding` flag, sleep for N seconds WHILE holding the lock, then release+exit.
-//! Used by the child-process lock test to PROVE cross-process mutual exclusion
-//! (round-2 review P1 #6).
+//! Test helper: flock dir/keystore.lock DIRECTLY (no update_keys, no Argon2),
+//! write a `holding` flag, sleep N seconds, release. Round-4 review: the old
+//! version called update_keys which runs Argon2 inside the lock — polluting the
+//! timing assertion. This version is a pure flock hold so the parent's load()
+//! (on an empty dir, no KDF) can be timed cleanly.
 //!
 //! Usage: xproc-lock-holder <dir> <hold_seconds>
-//!
-//! The lock is held across the sleep because the sleep runs INSIDE update_keys'
-//! closure (with_locks holds the fs2 exclusive flock for the whole body).
-use islandpot_lib::keystore::Keystore;
+use fs2::FileExt;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let dir = std::path::PathBuf::from(args.get(1).expect("usage: <dir> <hold_seconds>"));
     let hold_secs: u64 = args.get(2).expect("usage: <dir> <hold_seconds>").parse().expect("secs");
-    let ks = Keystore::new(dir.clone()).expect("keystore init");
-    ks.update_keys(|_k| {
-        // We are now holding BOTH the in-proc mutex AND the fs2 exclusive flock.
-        let flag = dir.join("holding");
-        let _ = std::fs::write(&flag, b"1");
-        std::thread::sleep(std::time::Duration::from_secs(hold_secs));
-        let _ = std::fs::remove_file(&flag);
-    }).expect("update_keys (holds lock across sleep)");
+
+    std::fs::create_dir_all(&dir).ok();
+    let lock_path = dir.join("keystore.lock");
+    let f = std::fs::OpenOptions::new()
+        .create(true)
+        .read(true)
+        .write(true)
+        .truncate(false)
+        .open(&lock_path)
+        .expect("open lock file");
+    f.lock_exclusive().expect("lock_exclusive");
+
+    // Signal we're holding the lock.
+    let flag = dir.join("holding");
+    std::fs::write(&flag, b"1").ok();
+
+    std::thread::sleep(std::time::Duration::from_secs(hold_secs));
+
+    let _ = std::fs::remove_file(&flag);
+    let _ = f.unlock();
 }
