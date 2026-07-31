@@ -227,25 +227,6 @@ pub fn decrypt_with_identity(envelope: &Envelope, identity: &str) -> Result<serd
     serde_json::from_slice(&pt).map_err(|e| KeystoreError::Envelope(e.to_string()))
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn encrypt_produces_pinned_envelope() {
-        let env = encrypt("test-machine-uuid", IdentitySource::MacosIoplatformuuid, &serde_json::json!({"openai":"sk-test"})).unwrap();
-        assert_eq!(env.version, 1);
-        assert_eq!(env.aead, "aes-256-gcm");
-        assert_eq!(env.kdf, "argon2id");
-        assert_eq!(env.kdf_params.m_kib, 65536);
-        assert_eq!(env.kdf_params.t, 3);
-        assert_eq!(env.kdf_params.p, 1);
-        assert_eq!(env.kdf_params.output_len, 32);
-        // round-trip via the test helper
-        let out = decrypt_with_identity(&env, "test-machine-uuid").unwrap();
-        assert_eq!(out, serde_json::json!({"openai":"sk-test"}));
-    }
-}
-
 use std::path::{Path, PathBuf};
 use parking_lot::Mutex;
 
@@ -443,4 +424,23 @@ fn atomic_replace(src: &Path, dst: &Path) -> Result<(), KeystoreError> {
 #[cfg(not(target_os = "macos"))]
 fn atomic_replace(_src: &Path, _dst: &Path) -> Result<(), KeystoreError> {
     Err(KeystoreError::Envelope("atomic_replace not implemented on this platform".into()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn encrypt_produces_pinned_envelope() {
+        let env = encrypt("test-machine-uuid", IdentitySource::MacosIoplatformuuid, &serde_json::json!({"openai":"sk-test"})).unwrap();
+        assert_eq!(env.version, 1);
+        assert_eq!(env.aead, "aes-256-gcm");
+        assert_eq!(env.kdf, "argon2id");
+        assert_eq!(env.kdf_params.m_kib, 65536);
+        assert_eq!(env.kdf_params.t, 3);
+        assert_eq!(env.kdf_params.p, 1);
+        assert_eq!(env.kdf_params.output_len, 32);
+        // round-trip via the test helper
+        let out = decrypt_with_identity(&env, "test-machine-uuid").unwrap();
+        assert_eq!(out, serde_json::json!({"openai":"sk-test"}));
+    }
 }

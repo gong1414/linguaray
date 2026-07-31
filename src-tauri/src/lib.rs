@@ -27,7 +27,6 @@ pub mod settings;
 pub mod wire;
 
 use serde::{Deserialize, Serialize};
-use std::str::FromStr;
 use std::sync::Arc;
 use tauri::Manager;
 use tauri_plugin_global_shortcut::{Builder as GlobalShortcutBuilder, GlobalShortcutExt, ShortcutState};

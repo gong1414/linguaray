@@ -46,10 +46,7 @@ struct Saved {
 impl Saved {
     fn capture<C: ClipboardLike>(clip: &C) -> std::result::Result<Self, String> {
         // Text: None if absent/error (distinguish from empty-string text presence).
-        let text = match clip.get_text() {
-            Ok(t) => Some(t),
-            Err(_) => None,
-        };
+        let text = clip.get_text().ok();
         // Image: best-effort; errors → None.
         let image = clip.get_image().unwrap_or(None);
         Ok(Saved { text, image, owned_sequence: 0 })

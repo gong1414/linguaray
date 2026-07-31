@@ -7,6 +7,10 @@ pub struct GenerationToken {
     selection: Mutex<()>,
 }
 
+impl Default for GenerationToken {
+    fn default() -> Self { Self::new() }
+}
+
 impl GenerationToken {
     pub fn new() -> Self {
         Self { current: AtomicU64::new(0), selection: Mutex::new(()) }
