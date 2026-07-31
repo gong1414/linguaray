@@ -142,3 +142,66 @@ fn with_locks_different_dirs_independent() {
     let _ = std::fs::remove_dir_all(&dir1);
     let _ = std::fs::remove_dir_all(&dir2);
 }
+
+#[test]
+fn cross_process_lock_mutual_exclusion() {
+    // Round-2 review P1 #6: PROVE the fs2 flock provides cross-process mutual
+    // exclusion, not just same-process. Spawn the xproc-lock-holder binary (holds
+    // the lock for HOLD_SECS), wait for it to confirm it's holding, then time our
+    // own update_keys — it must block until the holder releases (≈ HOLD_SECS).
+    use islandpot_lib::keystore::Keystore;
+    use std::process::Command;
+    use std::time::Instant;
+
+    let dir = std::env::temp_dir().join(format!("islandpot-ks-xproc-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    const HOLD_SECS: u64 = 2;
+
+    // Locate the helper binary. cargo test puts the test exe at target/debug/deps/<hash>;
+    // the bin target lives at target/debug/xproc-lock-holder (parent of deps/).
+    let test_exe = std::env::current_exe().expect("test bin path");
+    let deps_dir = test_exe.parent().expect("parent");
+    let debug_dir = deps_dir.parent().expect("grandparent"); // target/debug
+    let bin = debug_dir.join("xproc-lock-holder");
+    if !bin.exists() {
+        // `cargo test` doesn't build bin targets by default. Skip rather than fail;
+        // CI runs `cargo test --bins` (or builds the bin first) to exercise this.
+        eprintln!("xproc-lock-holder not found at {bin:?} — skipping cross-process test");
+        return;
+    }
+
+    // Spawn the holder; it acquires the lock and sleeps HOLD_SECS.
+    let mut child = Command::new(&bin)
+        .arg(&dir)
+        .arg(HOLD_SECS.to_string())
+        .spawn()
+        .expect("spawn holder");
+
+    // Wait for the holder to confirm it's holding the lock (flag file appears).
+    let flag = dir.join("holding");
+    let mut waited = 0;
+    while !flag.exists() && waited < 200 {
+        std::thread::sleep(std::time::Duration::from_millis(50));
+        waited += 1;
+    }
+    assert!(flag.exists(), "holder did not signal it's holding the lock");
+
+    // Now our update_keys must BLOCK until the holder releases (≈ HOLD_SECS).
+    let ks = Keystore::new(dir.clone()).unwrap();
+    let start = Instant::now();
+    ks.update_keys(|k| { k["parent"] = serde_json::json!("1"); }).unwrap();
+    let elapsed = start.elapsed();
+
+    // It should have waited roughly HOLD_SECS (allow slack). If the lock weren't
+    // cross-process, elapsed would be ~0.
+    assert!(
+        elapsed >= std::time::Duration::from_secs(HOLD_SECS),
+        "update_keys returned in {elapsed:?} — cross-process lock did NOT block (expected >= {HOLD_SECS}s)"
+    );
+
+    let _ = child.wait();
+    // Our write landed after the holder released.
+    let loaded = Keystore::new(dir.clone()).unwrap().load().unwrap();
+    assert_eq!(loaded["parent"], serde_json::json!("1"));
+    let _ = std::fs::remove_dir_all(&dir);
+}
