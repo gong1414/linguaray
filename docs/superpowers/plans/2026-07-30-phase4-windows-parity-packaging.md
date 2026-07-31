@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** rev 3 — rewrites rev-2 after the 2026-07-31 round-2 review found it un-executable: (a) Windows `atomic_replace` is still a STUB (rev-2 falsely claimed it was done), (b) `TAURI_SIGNING_PRIVATE_KEY*` is the Tauri UPDATER key, not Windows Authenticode, (c) macOS CI YAML had two sibling `env:` blocks + invalid `mktemp` template, (d) `macos-13` runner retired 2025-12-04, (e) capabilities description was wrong (custom commands are global by default; per-window needs `AppManifest::commands`).
+**Status:** rev 4 — addresses the round-2 review's remaining plan issues: (a) `Win32_Storage_FileSystem` feature is NOT currently present (must add), (b) macOS signing steps pinned to the full keychain-import flow (no TBD), (c) Windows signing clarified as Authenticode via `certificateThumbprint` (NOT the `TAURI_SIGNING_PRIVATE_KEY*` updater key, NOT nonexistent `certificatePath`), (d) capabilities decided: `AppManifest::commands` per-window (no either/or), (e) CSP needs an explicit `devCsp` for Vite HMR (Tauri does NOT auto-relax in dev).
 
 **Goal:** Windows builds (real `atomic_replace` + ACL), correct signing (macOS notarization via cert-import; Windows Authenticode via PFX/signtool — distinct from the updater key), and a clean CI matrix (arm64 + Intel macOS via `macos-15-intel`, Windows).
 
@@ -15,10 +15,9 @@
 **Files:** `src-tauri/src/keystore.rs`, `src-tauri/Cargo.toml`
 
 - [ ] Replace the `#[cfg(not(target_os = "macos"))] fn atomic_replace(...) -> Err("not implemented")` STUB with platform-specific real impls:
-  - `#[cfg(target_os = "windows")]`: `MoveFileExW` (first-create, `MOVEFILE_REPLACE_EXISTING`) if dst absent, else `ReplaceFileW` (update). Needs `windows-sys` feature `Win32_Storage_FileSystem` (already present).
+  - `#[cfg(target_os = "windows")]`: `MoveFileExW` (first-create, `MOVEFILE_REPLACE_EXISTING`) if dst absent, else `ReplaceFileW` (update). ADD `windows-sys` feature `Win32_Storage_FileSystem` (NOT currently in Cargo.toml — the windows-sys dep currently has only `Win32_System_DataExchange` + `Win32_Foundation`; must add `Win32_Storage_FileSystem` for ReplaceFileW/MoveFileExW).
   - `#[cfg(not(any(target_os = "macos", target_os = "windows")))]`: keep the Err stub.
-- [ ] Test (Windows runner, Task 5 CI): keystore write → keystore.json replaced atomically; a concurrent writer can't observe a half-written file. Can't run locally on macOS.
-- [ ] Commit.
+- [ ] Tests (Windows runner, Task 5 CI): (a) first-create (MoveFileExW path, dst absent) — keystore.json created; (b) update-replace (ReplaceFileW path, dst exists) — content replaced atomically, no half-write observable; (c) failure path — canonical keystore.json stays intact if the tmp write fails. Can't run locally on macOS.
 
 ## Task 2: Windows file/dir ACL via SetNamedSecurityInfoW
 
@@ -33,18 +32,20 @@
 
 **Files:** `src-tauri/tauri.conf.json`
 
-- [ ] CSP: `app.security.csp` = `"default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https: http://localhost:* http://127.0.0.1:*"`. Verify dev + the three windows still work (Tauri relaxes CSP in dev).
+- [ ] CSP (production): `app.security.csp` = `"default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https: http://localhost:* http://127.0.0.1:*"`. **ALSO set `app.security.devCsp`** — round-3 review: Tauri does NOT auto-relax the production CSP in dev when devCsp is unset; the production CSP would block Vite's HMR WebSocket. Set `devCsp` to the production policy PLUS `connect-src ws: wss:` (Vite HMR) + `'unsafe-inline'` script (Vite dev injects inline). Verify dev (HMR works) + the three windows work.
 - [ ] Signing: drive purely via env vars (NO `${APPLE_SIGNING_IDENTITY}` in JSON). Keep `bundle.macOS.minimumSystemVersion: "11.0"`.
 - [ ] Commit.
 
-## Task 4: Capabilities (correct mechanism)
+## Task 4: Capabilities (decided: per-window via AppManifest::commands)
 
-**Files:** `src-tauri/capabilities/`
+**Files:** `src-tauri/build.rs` (AppManifest::commands), `src-tauri/capabilities/`
 
-- [ ] Per the round-2 review: custom `invoke_handler` commands are callable from ALL local windows by default; restricting them per-window requires defining them as **app commands** in `tauri.conf.json` `app.commands` (or a manifest) and scoping per capability. For v1, two acceptable options (pick one, document):
-  - **(a) Leave commands global** (v1 pragmatic), and instead harden via CSP + minimal PLUGIN permissions per window (drop `opener`/`global-shortcut` from windows that don't need them; keep `store` on main only). Document that command-level restriction is post-v1.
-  - **(b) Define app commands + scope per capability** (the rigorous path) — more work.
-  - Recommend (a) for v1 with a clear note; do (b) if time allows. Split `capabilities/default.json` into per-window files with the minimal plugin perms each.
+- [ ] Round-3 decision (no more either/or): use `build.rs` `tauri_build::try_build` with an `ApplicationInfo`/manifest that declares our custom commands via `AppManifest::commands`, then scope each window's capability to only the commands it needs:
+  - `main`: translate, translate_default, translate_clipboard, list_engines, set_key, delete_key, key_status, get_settings, set_setting, lookup_dictionary, a11y_status, keystore_health, archive_keystore, reset_keystore
+  - `popup`: (only listens to `popup-state` events — no commands; the popup hides via its own window API, not a command)
+  - `input`: translate_default, get_settings
+  - Drop `opener`/`global-shortcut` from window permissions (they're backend plugins, not window perms). Keep `store` only where settings are touched (main).
+- [ ] Verify the build.rs AppManifest approach is valid for the resolved Tauri 2.x (the `tauri_build::try_build` with `Attributes::new().app_manifest(...)` pattern). If `AppManifest::commands` isn't the right API name, use the equivalent in the resolved version. Each window's JS must still resolve its scoped commands — a missing scope = command rejected at runtime, so exercise all three windows in dev.
 - [ ] Commit.
 
 ## Task 5: GitHub Actions release workflow (correct signing + runner)
@@ -52,21 +53,34 @@
 **Files:** `.github/workflows/release.yml`
 
 - [ ] Matrix (current runners): `macos-latest` (arm64), **`macos-15-intel`** (NOT retired `macos-13`), `windows-latest` (x86_64-pc-windows-msvc).
-- [ ] macOS signing+notarization (official structure, single env block):
+- [ ] macOS signing+notarization — the FULL pinned steps (no "if Tauri doesn't auto-import" TBD):
 ```yaml
-- name: Build (macOS)
+- name: Import signing cert + build (macOS)
   if: startsWith(matrix.os, 'macos')
   env:
-    APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+    APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}            # base64 .p12
     APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-    APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+    KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+    APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }} # "Developer ID Application: ..."
     APPLE_ID: ${{ secrets.APPLE_ID }}
-    APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+    APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}                  # app-specific
     APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-  run: pnpm tauri build --target ${{ matrix.target }}
+  run: |
+    # Decode the p12, create a temp keychain, import the cert, allow codesign.
+    CERT_PATH=$(mktemp islandpot-cert.XXXXXX.p12)
+    echo "$APPLE_CERTIFICATE" | base64 --decode > "$CERT_PATH"
+    security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+    security default-keychain -s build.keychain
+    security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+    security import "$CERT_PATH" -P "$APPLE_CERTIFICATE_PASSWORD" -k build.keychain -T /usr/bin/codesign
+    security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+    rm -f "$CERT_PATH"
+    # Tauri reads APPLE_SIGNING_IDENTITY + the notarization creds from env.
+    pnpm tauri build --target ${{ matrix.target }}
+    # Cleanup.
+    security delete-keychain build.keychain || true
 ```
-  Tauri reads `APPLE_CERTIFICATE` (base64 p12) + `APPLE_CERTIFICATE_PASSWORD` and imports to a keychain itself when these are set (per Tauri docs) — verify against the resolved Tauri version's behavior; if Tauri does NOT auto-import, add the explicit `security create-keychain`/`import` step in the SAME job (one `env:` block, no `mktemp` template).
-- [ ] Windows signing (Authenticode, NOT the updater key): if a code-signing PFX is available, configure Tauri's bundle signing via a `signCommand` (signtool) or `certificateThumbprint`/`certificatePath` in `tauri.conf.json` bundle.windows. The `TAURI_SIGNING_PRIVATE_KEY*` is separate (updater only) — document both. If no cert, the build still produces an unsigned installer (note the Smartscreen warning for users).
+- [ ] Windows signing (Authenticode, NOT the Tauri updater key): import a PFX code-signing cert in CI, then configure Tauri's `bundle.windows` with **`certificateThumbprint`** (the imported cert's thumbprint) + `digestAlgorithm` (sha256) + `timestampUrl` (e.g. http://timestamp.digicert.com). `WindowsConfig` exposes `certificateThumbprint`, `certificatePath`/`certificatePassword` (alternative to thumbprint), `digestAlgorithm`, `timestampUrl`, and `signCommand` (fully custom). Pick: **PFX import → `certificateThumbprint`** (the documented path). `TAURI_SIGNING_PRIVATE_KEY*` is the UPDATER signature (separate plugin) — do NOT conflate. If no Authenticode cert, the installer builds unsigned (users see a SmartScreen warning — document it).
 - [ ] Artifacts upload. Lint YAML. Commit.
 
 ## Task 6: README + E2E + final review
