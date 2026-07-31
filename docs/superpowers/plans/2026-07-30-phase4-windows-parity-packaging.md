@@ -293,8 +293,9 @@ The public `restore_snapshot` takes two `Option`s, but the FSM itself operates o
       `fsm.rs` holds ONLY the ownership state machine (abstract format ids) + fake tests.
       ```rust
       // === src/clipboard/fsm.rs — ALWAYS COMPILED, platform-neutral. NO Win32 types.
-      // (module path crate::clipboard::fsm. restore_with is pub(super) so the parent
-      //  clipboard.rs / the windows.rs submodule can call it; trait + guard + submit private.)
+      // (module path crate::clipboard::fsm. restore_with AND ClipOps are pub(super) so the
+      //  windows.rs adapter can impl the trait and call restore_with; OpenClip guard private.
+      //  submit is folded into restore_with's loop — no separate submit fn.)
       pub(super) trait ClipOps {
           type Handle;
           fn open(&mut self) -> Result<(), String>;     // real adapter stores owner; no HWND arg
