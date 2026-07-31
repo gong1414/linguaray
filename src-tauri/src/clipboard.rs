@@ -48,32 +48,115 @@ pub fn set_image(img: &crate::selection_engine::ImageBlob) -> std::result::Resul
     g.as_mut().unwrap().set_image(data).map_err(|e| e.to_string())
 }
 
-/// Restore BOTH text and image in a single platform-level write (round-2 review
-/// P1 #2): arboard's set_text/set_image each clear first, so sequential writes
-/// lose one flavor. Here we clear ONCE then set both. Best-effort.
+/// Restore BOTH text and image in a SINGLE platform-level write (round-3 review
+/// P1). macOS: build one NSPasteboardItem carrying BOTH NSString + TIFF types,
+/// then clearContents + writeObjects once — all-or-nothing (any conversion failure
+/// returns an error BEFORE touching the system pasteboard).
+#[cfg(target_os = "macos")]
 pub fn restore_snapshot(
     text: Option<&str>,
     image: Option<&crate::selection_engine::ImageBlob>,
 ) -> std::result::Result<(), String> {
+    use objc2_app_kit::{
+        NSBitmapImageRep, NSPasteboard, NSPasteboardItem,
+        NSPasteboardTypeString, NSPasteboardTypeTIFF,
+    };
+    use objc2_foundation::{NSArray, NSData, NSString};
+    use objc2::rc::Retained;
+    use objc2::AnyThread;
+
+    match (text, image) {
+        // Single-flavor: arboard is fine (only one write, no clear conflict).
+        (Some(t), None) => {
+            let mut g = clip()?;
+            g.as_mut().unwrap().set_text(t).map_err(|e| e.to_string())
+        }
+        (None, Some(img)) => {
+            let mut g = clip()?;
+            let data = arboard::ImageData {
+                width: img.width, height: img.height,
+                bytes: std::borrow::Cow::Borrowed(&img.bytes),
+            };
+            g.as_mut().unwrap().set_image(data).map_err(|e| e.to_string())
+        }
+        (Some(t), Some(img)) => unsafe {
+            // Step 1: validate dimensions + overflow.
+            let expected = img.width.checked_mul(img.height)
+                .and_then(|n| n.checked_mul(4))
+                .ok_or_else(|| "image dimensions overflow".to_string())?;
+            if img.bytes.len() != expected {
+                return Err(format!(
+                    "image bytes {} != width*height*4 ({})", img.bytes.len(), expected
+                ));
+            }
+
+            // Step 2: convert RGBA → TIFF NSData via NSBitmapImageRep.
+            let w = img.width as isize;
+            let h = img.height as isize;
+            let color_space = objc2_foundation::NSString::from_str("NSCalibratedRGBColorSpace");
+            let rep = NSBitmapImageRep::initWithBitmapDataPlanes_pixelsWide_pixelsHigh_bitsPerSample_samplesPerPixel_hasAlpha_isPlanar_colorSpaceName_bytesPerRow_bitsPerPixel(
+                NSBitmapImageRep::alloc(),  // from Allocated trait
+                std::ptr::null_mut(),
+                w, h, 8, 4, true, false,
+                &color_space,
+                w * 4, 32,
+            ).ok_or_else(|| "NSBitmapImageRep init failed".to_string())?;
+            // Copy RGBA into the rep's bitmap data.
+            let data_ptr = NSBitmapImageRep::bitmapData(&rep);
+            if data_ptr.is_null() {
+                return Err("NSBitmapImageRep bitmapData null".into());
+            }
+            std::ptr::copy_nonoverlapping(img.bytes.as_ptr(), data_ptr, img.bytes.len());
+            // Get TIFF representation.
+            let tiff_data = NSBitmapImageRep::TIFFRepresentation(&rep)
+                .ok_or_else(|| "TIFF conversion failed".to_string())?;
+
+            // Step 3: build the NSPasteboardItem with BOTH types (BEFORE touching
+            // the pasteboard — all-or-nothing; any failure returns an error).
+            let item = NSPasteboardItem::new();
+            let text_ns = NSString::from_str(t);
+            if !item.setString_forType(&text_ns, NSPasteboardTypeString) {
+                return Err("setString_forType failed".into());
+            }
+            if !item.setData_forType(&tiff_data, NSPasteboardTypeTIFF) {
+                return Err("setData_forType(TIFF) failed".into());
+            }
+
+            // Step 4-6: all conversions succeeded — now clearContents + writeObjects.
+            let pb = NSPasteboard::generalPasteboard();
+            pb.clearContents();
+            // writeObjects takes NSArray<ProtocolObject<dyn NSPasteboardWriting>>.
+            let writing_item: Retained<objc2::runtime::ProtocolObject<dyn objc2_app_kit::NSPasteboardWriting>> =
+                objc2::runtime::ProtocolObject::from_retained(item);
+            let items = NSArray::arrayWithObject(&*writing_item);
+            if !pb.writeObjects(&items) {
+                return Err("writeObjects failed".into());
+            }
+            Ok(())
+        },
+        (None, None) => Ok(()),
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn restore_snapshot(
+    text: Option<&str>,
+    image: Option<&crate::selection_engine::ImageBlob>,
+) -> std::result::Result<(), String> {
+    // Non-macOS: single-flavor via arboard (sequential; both-present loses one —
+    // documented P2). Windows multi-format write is a P2 follow-up (Win32
+    // OpenClipboard/EmptyClipboard + SetClipboardData for CF_UNICODETEXT + CF_DIB).
     let mut g = clip()?;
-    let clip = g.as_mut().unwrap();
-    // Clear once, then write all present formats. (arboard::Clipboard::clear.)
-    let _ = clip.clear();
+    let c = g.as_mut().unwrap();
     if let Some(img) = image {
         let data = arboard::ImageData {
-            width: img.width,
-            height: img.height,
+            width: img.width, height: img.height,
             bytes: std::borrow::Cow::Borrowed(&img.bytes),
         };
-        // set_image after clear writes the image flavor.
-        let _ = clip.set_image(data);
+        let _ = c.set_image(data);
     }
     if let Some(t) = text {
-        // set_text writes the text flavor WITHOUT clearing the image arboard just set
-        // IF the prior op was clear (no-op clear semantics on an empty clipboard).
-        // NOTE: arboard may still clear on each set on some platforms; this is the
-        // best available without dropping to raw NSPasteboard/Win32. Documented.
-        let _ = clip.set_text(t);
+        let _ = c.set_text(t);
     }
     Ok(())
 }
