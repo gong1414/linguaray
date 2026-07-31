@@ -1,22 +1,26 @@
-# Phase 4: Windows Parity + Cross-Platform Packaging — Implementation Plan (rev 11)
+# Phase 4: Windows Parity + Cross-Platform Packaging — Implementation Plan (rev 12)
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** rev 11 — fixes round-10 review issues (three P1s, all plan-compilability
-/ correctness in Task 2b). (a) **AX test owner is cfg'd** — a single `()` does NOT
-typecheck on Windows (`OwnerHwnd` is `*mut c_void` there), so the AX test cfgs the
-owner value (`null_mut()` on Win / `()` else); the AX-Some path short-circuits
-before the owner is used, so `null_mut` is safe there. The on_hotkey example's
-`Err(e)` is now logged (no unused-variable warning). (b) **FSM references NO Win32
-symbol** — `submit` takes `text_fmt`/`dib_fmt` as params and `ClipOps` supplies them
-via `text_format()`/`dib_format()` (prev rev hard-coded CF_UNICODETEXT/CF_DIBV5,
-which don't exist on macOS); module path is `crate::clipboard::fsm` and `submit`/
-`restore_with` are `pub(super)`. (c) **three-layer split** — `build_blobs` (pure
-bytes), generic `restore_with<C>` (does BOTH allocs + submit, so the
-second-alloc-fail leak is testable), non-generic `restore_snapshot`; the remedial
-`empty` failure is surfaced as `RestoreError::SetPartial` (honest "may contain text
-only") instead of `let _ =`. Added `first_alloc_fails`, `second_alloc_fails`,
-`cleanup_empty_fails` fake tests.
+**Status:** rev 12 — fixes round-11 review issues. **One CODE defect landed + tested**
+(P1 #1: an empty original clipboard `(None,None)` left the §B sentinel on the pasteboard
+— `restore_snapshot(None,None)` now clears on macOS (`clearContents`) and non-mac
+(arboard `clear()`); new `empty_original_clipboard_noselection_clears_sentinel` test).
+**Three plan P1s:** (a) **FSM generalized to 0–N formats** — `restore_with` takes
+`&[(u32, Vec<u8>)]`; 0 entries = clear-only (the §B empty-original case on Windows),
+1 = text- or image-only, 2 = both. The public `restore_snapshot` still takes two
+`Option`s; the cfg(windows) `build_blobs` maps them to the right cardinality.
+(b) **`build_blobs` + `Win32ClipOps` moved out of `fsm.rs`** into a new
+`#[cfg(windows)] src/clipboard/windows.rs` (they use `OsStr::encode_wide`,
+`BITMAPV5HEADER`, `BI_BITFIELDS`, `LCS_sRGB` — none of which exist on macOS); the
+always-compiled `fsm.rs` keeps ONLY the ownership state machine + fake tests, with
+format ids as plain `u32`. (c) **borrow conflict fixed** — format ids are bound to
+locals / carried in the format-list entries before `c` is mutably borrowed. Smalls:
+`RestoreError` gets thiserror `Display`; `SetPartial.cleanup_err` is a `String`;
+top "both absent" claim corrected to "both absent IF remedial empty succeeds, else
+partial may remain"; `cleanup_empty_fails` asserts only app-owned handles cleared
+(not system-owned h_text, which may legitimately persist); file list no longer
+contradicts the cfg'd owner.
 
 **Goal:** Windows builds (real `atomic_replace` + ACL), correct signing (macOS notarization via cert-import; Windows Authenticode via PFX/signtool — distinct from the updater key), and a clean CI matrix (arm64 + Intel macOS via `macos-15-intel`, Windows).
 
@@ -44,19 +48,29 @@ only") instead of `let _ =`. Added `first_alloc_fails`, `second_alloc_fails`,
 
 ## Task 2b: Windows compound clipboard restore (§B image promise)
 
-**Files:** `src-tauri/src/clipboard.rs`, `src-tauri/src/clipboard/fsm.rs` (new,
-always-compiled private submodule — `ClipOps` trait, `OpenClip` guard, `submit`,
-in-module `#[cfg(test)]` fake tests), `src-tauri/src/selection.rs`,
-`src-tauri/src/lib.rs`, `src-tauri/Cargo.toml`, `src-tauri/tests/clipboard_win.rs`
-(new, real Windows CI integration test only), `src-tauri/tests/selection_engine.rs`
-(update the one AX test call to pass `owner: ()`).
+**Files:** `src-tauri/src/clipboard.rs` (macOS + non-mac/win paths; the empty-original
+`clear()` fix already landed in code), `src-tauri/src/clipboard/fsm.rs` (new,
+**always-compiled platform-neutral** submodule — `ClipOps` trait, `OpenClip` guard,
+`restore_with` over a 0–N format list, `RestoreError`, in-module `#[cfg(test)]` fake
+tests), `src-tauri/src/clipboard/windows.rs` (new, **`#[cfg(windows)]` only** —
+`build_blobs` returning `Vec<(u32, Vec<u8>)>`, `Win32ClipOps` adapter), `src-tauri/src/selection.rs`
+(`OsClipboard` gains a Windows-only owner; `capture_selection`/`capture_selection_with_ax`
+take `owner` on ALL targets — `()` off-Windows), `src-tauri/src/lib.rs` (`on_hotkey`
+resolves the main window HWND and threads it down), `src-tauri/Cargo.toml`,
+`src-tauri/tests/clipboard_win.rs` (new, real Windows CI integration test only),
+`src-tauri/tests/selection_engine.rs` (cfg the AX test's owner value —
+`null_mut()` on Win / `()` else — see callchain bullet).
 
-Windows mirrors the macOS compound write (one `EmptyClipboard`, both formats in one
-open window). "All-or-nothing" here means: **conversion-phase failures never touch
-the clipboard**; `EmptyClipboard` + the two `SetClipboardData` calls are NOT a
-transaction — if the second `SetClipboardData` fails we must explicitly re-empty so
-the clipboard is left with NEITHER format, matching the macOS single-item semantics
-(both present, or both absent).
+Windows mirrors the macOS compound write (one `EmptyClipboard`, then each format's
+`SetClipboardData` in one open window). "All-or-nothing" here means: **conversion/
+preflight failures never touch the clipboard**, and **`EmptyClipboard` + the
+`SetClipboardData` calls are NOT a transaction** — if a later `SetClipboardData`
+fails, we explicitly re-empty to remove the already-submitted formats. That re-empty
+SUCCEEDS ⇒ clipboard left with NEITHER format; FAILS ⇒ earlier-submitted formats MAY
+remain (surfaced as `RestoreError::SetPartial`, honest "may contain partial data").
+The public `restore_snapshot` takes two `Option`s, but the FSM itself operates on a
+0–2-element prepared-format list — so empty / text-only / image-only / both all work
+(0 = clear-only, which is the §B empty-original case).
 
 **Win32 protocol (verified against MS docs, refs at end of task):**
 
@@ -198,15 +212,8 @@ the clipboard is left with NEITHER format, matching the macOS single-item semant
       NOT `GlobalFree` a submitted handle (the system frees it on next empty). Only
       `GlobalFree` handles that were NOT successfully submitted.
 
-- [ ] **Build BOTH byte blobs BEFORE any clipboard/alloc call (LAYER A:
-      `build_blobs`).** (a) UTF-16 NUL-terminated text: `OsStr::encode_wide().chain(Some(0))`,
-      byte-len = u16_count * 2. (b) CF_DIBV5 blob: `BITMAPV5HEADER` + BGRA pixel buffer
-      (see layout below). Returns `(Vec<u8>, Vec<u8>)` — pure bytes, no handle, no
-      clipboard touch. If either build fails, return Err — clipboard is untouched. The
-      `GlobalAlloc` of these bytes happens later in LAYER B (`restore_with`), which is
-      why the second-alloc-failure path can free the first handle.
-
-- [ ] **CF_DIBV5 pixel layout (BITMAPV5HEADER):**
+- [ ] **CF_DIBV5 pixel layout (BITMAPV5HEADER)** (Windows-only, lives in the
+      `#[cfg(windows)]` blob builder — see three-layer split below):
       - `bV5Size` = `size_of::<BITMAPV5HEADER>()` (124)
       - `bV5Width` = width; `bV5Height` = **-(height as i32)** (negative ⇒ top-down,
         origin upper-left — matches our RGBA row-major source, no vertical flip)
@@ -221,16 +228,16 @@ the clipboard is left with NEITHER format, matching the macOS single-item semant
         `(b,g,r,a)`. Row stride = width*4 (no padding at 32bpp). This channel swap +
         the alpha mask are what the test asserts (see test).
 
-- [ ] **Three-layer structure (round-10 review P1): separate conversion, the alloc+
-      submit state machine, and the public entry point).** The previous design started
-      `submit` from pre-built handles, so it could NOT test the second `GlobalAlloc`/
-      `GlobalLock` failing while the first handle was live, and the cleanup `empty`
-      was `let _ =`-silenced. Split into three layers:
+- [ ] **Three-layer structure + correct module placement (round-11 review P1 #2 & #4:
+      the FSM must cover 0–2 formats, and the Windows-specific blob builder must NOT
+      live in the always-compiled platform-neutral module).** `build_blobs` uses
+      `OsStr::encode_wide`, `BITMAPV5HEADER`, `BI_BITFIELDS`, `LCS_sRGB` — all
+      Windows-only — so it stays in a `#[cfg(windows)]` module. The always-compiled
+      `fsm.rs` holds ONLY the ownership state machine (abstract format ids) + fake tests.
       ```rust
-      // === clipboard::fsm — ALWAYS COMPILED, platform-neutral (no Win32 types at all) ===
-      // (module path: src/clipboard/fsm.rs → reached as `super::fsm` from clipboard.rs,
-      //  or `crate::clipboard::fsm` from elsewhere. `submit`/`restore_with` are
-      //  `pub(super)` so clipboard.rs can call them; the trait + guard are private.)
+      // === src/clipboard/fsm.rs — ALWAYS COMPILED, platform-neutral. NO Win32 types.
+      // (module path crate::clipboard::fsm. restore_with is pub(super) so the parent
+      //  clipboard.rs / the windows.rs submodule can call it; trait + guard + submit private.)
       pub(super) trait ClipOps {
           type Handle;
           fn open(&mut self) -> Result<(), String>;     // real adapter stores owner; no HWND arg
@@ -240,9 +247,6 @@ the clipboard is left with NEITHER format, matching the macOS single-item semant
           fn set(&mut self, fmt: u32, h: Self::Handle) -> Result<(), (Self::Handle, String)>;
           fn alloc(&mut self, bytes: &[u8]) -> Result<Self::Handle, String>;
           fn free(&mut self, h: Self::Handle);
-          // format ids are NOT Win32 consts here — the adapter supplies them:
-          fn text_format(&self) -> u32;   // real: CF_UNICODETEXT; fake: a test id
-          fn dib_format(&self) -> u32;    // real: CF_DIBV5;     fake: a test id
       }
       struct OpenClip<'a, C: ClipOps> { ops: &'a mut C }
       impl<'a, C: ClipOps> OpenClip<'a, C> {
@@ -252,81 +256,115 @@ the clipboard is left with NEITHER format, matching the macOS single-item semant
       }
       impl<C: ClipOps> Drop for OpenClip<'_, C> { fn drop(&mut self) { self.ops.close(); } }
 
-      // LAYER A: build_blobs — pure conversion, returns Vec<u8> (no handle, no clipboard).
-      //   fn build_blobs(text, img) -> Result<(Vec<u8> text_utf16_nul, Vec<u8> dibv5), String>
-      //   (preflight + BGRA layout; unit-tested directly, no ClipOps.)
-
-      // LAYER B: restore_with — the alloc+submit state machine, generic over ClipOps.
-      //   Covers the failure paths the prev rev missed: second-alloc fail, cleanup-empty fail.
+      // A prepared format: (format-id, payload bytes). The PUBLIC wrapper decides how
+      // many to produce: 0 (empty original → clear-only), 1 (text-only OR image-only),
+      // or 2 (text+image). Format ids are plain u32 — the windows.rs builder fills in
+      // CF_UNICODETEXT/CF_DIBV5, the fake fills in test ids. fsm.rs names neither.
       pub(super) fn restore_with<C: ClipOps>(
-          c: &mut C, text_bytes: &[u8], dib_bytes: &[u8],
+          c: &mut C,
+          formats: &[(u32, Vec<u8>)],   // 0..=2 entries
       ) -> Result<(), RestoreError> {
-          // allocate text; if it fails, nothing to free yet.
-          let h_text = c.alloc(text_bytes).map_err(RestoreError::Alloc)?;
-          // allocate dib; on FAIL free h_text (round-10 P1: first handle leaked in prev rev).
-          let h_dib = match c.alloc(dib_bytes) {
-              Ok(h) => h,
-              Err(e) => { c.free(h_text); return Err(RestoreError::Alloc(e)); }
-          };
-          // submit (open/empty/set/set); on failure both handles are already freed
-          // inside submit per the ownership rules, so no double-free here. Pass through
-          // whatever submit returns — including SetPartial if the remedial empty failed.
-          submit(c, c.text_format(), c.dib_format(), h_text, h_dib)
-      }
-
-      // LAYER B helper: submit (open/empty/set/set) — formats are PARAMETERS (round-10
-      // P1: the prev rev hard-coded CF_UNICODETEXT/CF_DIBV5, which don't exist on macOS).
-      fn submit<C: ClipOps>(
-          c: &mut C, text_fmt: u32, dib_fmt: u32,
-          h_text: C::Handle, h_dib: C::Handle,
-      ) -> Result<(), RestoreError> {
-          let mut clip = match c.open() {                 // fail: free both, no guard, no close
-              Ok(()) => OpenClip { ops: c },
-              Err(e) => { c.free(h_text); c.free(h_dib); return Err(RestoreError::Open(e)); }
-          };
-          if let Err(e) = clip.empty() {                  // fail: free both via guard, no re-empty
-              clip.free(h_text); clip.free(h_dib); return Err(RestoreError::Empty(e));
-          }
-          if let Err((h, e)) = clip.set(text_fmt, h_text) {  // text fail: free both, no half-state
-              clip.free(h); clip.free(h_dib); return Err(RestoreError::Set(e));
-          }
-          // h_text now system-owned
-          match clip.set(dib_fmt, h_dib) {                // dib ok: done; fail: re-empty + free h_dib
-              Ok(()) => Ok(()),
-              Err((h, e)) => {
-                  // re-empty to remove orphaned text — BUT report if it fails (round-10 P1:
-                  // prev rev did `let _ = clip.empty()` and still claimed "both absent").
-                  match clip.empty() {
-                      Ok(()) => { clip.free(h); Err(RestoreError::Set(e)) }
-                      // cleanup failed: text MAY remain. Surface BOTH errors honestly.
-                      Err(ce) => { clip.free(h); Err(RestoreError::SetPartial { cause: e, cleanup_err: Some(ce) }) }
+          // 1. Allocate ALL payloads up front. Slot them in Option<C::Handle> so we can
+          //    drain them one at a time (clean ownership, no take_or_clone pseudo-method).
+          //    On any alloc failure, free the ones already held (reverse) and return.
+          let mut handles: Vec<Option<C::Handle>> = Vec::with_capacity(formats.len());
+          for (_, bytes) in formats {
+              match c.alloc(bytes) {
+                  Ok(h) => handles.push(Some(h)),
+                  Err(e) => {
+                      for slot in handles.into_iter().rev() { c.free(slot.unwrap()); }
+                      return Err(RestoreError::Alloc(e));
                   }
               }
           }
-          // clip drops → close() exactly once on every path (incl. panic)
-      }
-      pub(super) enum RestoreError {
-          Alloc(String), Open(String), Empty(String), Set(String),
-          // second set failed AND the remedial EmptyClipboard failed — text MAY be on the
-          // clipboard. The public wrapper maps this to an error string that says so.
-          SetPartial { cause: String, cleanup_err: Option<String> },
+          // 2. open. On FAILURE: free all allocated handles via `c` DIRECTLY (no guard
+          //    exists yet → no second mutable borrow of C → borrow-checks). On success,
+          //    hand `c` to the guard; from here all ops go through `clip` (single borrow).
+          let mut clip = match c.open() {
+              Ok(()) => OpenClip { ops: c },
+              Err(e) => {
+                  for slot in handles.into_iter().rev() { c.free(slot.unwrap()); }
+                  return Err(RestoreError::Open(e));
+              }
+          };
+          // 3. empty (always — 0 formats too: this clears the §B sentinel; round-11 P1 #1/#2).
+          if let Err(e) = clip.empty() {
+              for slot in handles.into_iter().rev().flatten() { clip.free(slot); }
+              return Err(RestoreError::Empty(e));
+          }
+          // 4. submit each format in order, draining its slot. On a set FAILURE: the
+          //    returned handle + all REMAINING un-drained handles are app-owned → free them
+          //    via `clip`. Already-submitted handles are system-owned (NOT freed).
+          //    - submitted == 0 at failure → nothing was on the clipboard (no re-empty).
+          //    - submitted > 0 at failure → some formats ARE live → remedial empty; if THAT
+          //      fails, surface SetPartial (partial data MAY remain — honest, round-11 small).
+          let mut submitted = 0usize;
+          for (i, (fmt, _)) in formats.iter().enumerate() {
+              let h = handles[i].take().unwrap();
+              match clip.set(*fmt, h) {
+                  Ok(()) => { submitted += 1; }
+                  Err((h_back, e)) => {
+                      clip.free(h_back);
+                      for slot in handles[i+1..].iter_mut().rev() { clip.free(slot.take().unwrap()); }
+                      if submitted == 0 {
+                          return Err(RestoreError::Set(e));
+                      }
+                      return match clip.empty() {
+                          Ok(()) => Err(RestoreError::Set(e)),
+                          Err(ce) => Err(RestoreError::SetPartial { cause: e, cleanup_err: ce }),
+                      };
+                  }
+              }
+          }
+          Ok(())   // clip drops → close() exactly once on every path (incl. panic)
       }
 
+      #[derive(Debug)]   // Display via thiserror below — round-11 small fix.
+      pub(super) enum RestoreError {
+          Alloc(String), Open(String), Empty(String), Set(String),
+          // a later set failed AND the remedial EmptyClipboard failed: earlier-submitted
+          // formats MAY still be on the clipboard. cleanup_err is a String (always present
+          // in this variant — not an Option that's forever Some). Honest user message:
+          // "clipboard restore failed and cleanup also failed; clipboard may contain partial data".
+          SetPartial { cause: String, cleanup_err: String },
+      }
+      // thiserror is already a dep — derive Display so err.to_string() is meaningful and
+      // the cross-platform fake tests can assert on it (NOT on the Windows-only public wrapper).
+      //   #[derive(thiserror::Error)]
+      //   impl Display for RestoreError { ... "set failed: {cause}; cleanup also failed: {cleanup_err}" ... }
+
+      // === src/clipboard/windows.rs — #[cfg(windows)] ONLY (build_blobs + Win32ClipOps) ===
+      // build_blobs returns Vec<(u32, Vec<u8>)>: 0/1/2 entries based on text/image Options:
+      //   - (None, None) → empty Vec  → restore_with clears only (§B empty-original fix)
+      //   - (Some(t), None) → [(CF_UNICODETEXT, utf16_nul_bytes)]
+      //   - (None, Some(img)) → [(CF_DIBV5, bitmapv5_bytes)]
+      //   - (Some, Some) → both, in that order
+      // fn build_blobs(text: Option<&str>, image: Option<&ImageBlob>) -> Result<Vec<(u32, Vec<u8>)>, String>
+      //   (uses OsStr::encode_wide, BITMAPV5HEADER, BI_BITFIELDS, LCS_sRGB — hence cfg(windows).)
+      //
+      // struct Win32ClipOps { owner: windows_sys::Win32::Foundation::HWND }
+      //   impl ClipOps (open→OpenClipboard(self.owner), close→CloseClipboard, empty→EmptyClipboard,
+      //   set→SetClipboardData(fmt,h), alloc→GlobalAlloc(GMEM_MOVEABLE)+Lock+copy+Unlock,
+      //   free→GlobalFree)
+      //
       // === LAYER C: public, NON-generic, Windows-only ===
       // #[cfg(windows)] pub fn restore_snapshot(owner, text, image) -> Result<(), String> {
-      //     let (t, d) = build_blobs(text, image)?;                 // LAYER A
-      //     let mut ops = Win32ClipOps { owner };                   // real adapter (#[cfg(windows)])
-      //     restore_with(&mut ops, &t, &d)                          // LAYER B
-      //         .map_err(|e| e.to_string())                         // incl. the honest SetPartial text
+      //     let formats = windows::build_blobs(text, image)?;       // LAYER A (cfg(windows))
+      //     let mut ops = Win32ClipOps { owner };                   // real adapter (cfg(windows))
+      //     fsm::restore_with(&mut ops, &formats)                   // LAYER B (platform-neutral)
+      //         .map_err(|e| e.to_string())
       // }
       ```
-      Why three layers: LAYER A is pure bytes → unit-tested without any clipboard/adapter.
-      LAYER B is the only generic code, owns ALL handle lifetimes (both allocs + submit),
-      and is where the leak/cleanup failures live — fake-testable. LAYER C is thin,
-      non-generic, Windows-only. `RestoreError::SetPartial` carries the cleanup error so
-      the user-visible message can honestly state "clipboard may contain text only" rather
-      than silently `let _ =` it. Format ids are adapter-supplied (`text_format`/`dib_format`)
-      or passed as params (`submit`), so the always-compiled module references NO Win32 symbol.
+      Why this shape: the always-compiled `fsm.rs` references NO Win32 symbol (format ids
+      are plain `u32` params) and models 0–N formats generically (0 = clear-only, covering
+      the §B empty-original case). `windows.rs` holds every Windows-only piece (blob builder
+      + adapter). `restore_with` owns ALL handle lifetimes (alloc-all → open → empty →
+      submit-loop) so the alloc-leak and cleanup-empty failures are fake-testable. `submit`
+      is folded into `restore_with`'s loop (no separate borrow of `c`). `RestoreError` uses
+      thiserror `Display`; `SetPartial.cleanup_err` is a `String` (always present in that
+      variant). Honest semantics: the top-of-task "both absent" claim is corrected to
+      "both absent IF the remedial empty succeeds; otherwise earlier-submitted formats may
+      remain" (round-11 small fix).
 
 - [ ] **windows-sys 0.59 features** — verified module paths by grepping the crate
       source (`~/.cargo/registry/.../windows-sys-0.59.0/src/`), NOT by guessing.
@@ -364,29 +402,36 @@ the clipboard is left with NEITHER format, matching the macOS single-item semant
       `FakeClip` impls `ClipOps` with `type Handle = u32`, records
       `open/empty/set/alloc/free/close`, tracks ownership ("ours" → "system" on a
       successful `set`; `free` on a system-owned handle panics = double-free detector;
-      `empty` marks system-transferred handles freed). Round-10 adds the alloc +
-      cleanup-empty paths:
-      - `open_fails`: → 2 `free` (both pre-allocated by restore_with), zero `empty`,
-        zero `set`, zero `close` (guard never built). No leak.
-      - `empty_fails`: → 2 `free`, zero `set`, exactly 1 `close`. No re-empty.
-      - `first_set_fails` (text): → 2 `free` (both unsubmitted — set returns h_text),
-        zero `empty` after, exactly 1 `close`.
-      - `second_set_fails` (dib): text set ok, dib set errs → 1 `free` (h_dib; h_text
+      `empty` marks system-transferred handles freed). The FSM now takes a 0–N format
+      list, so tests cover each cardinality:
+      - **`zero_formats_clears`** (round-11 P1 #1/#2): empty Vec → `open`/`empty`/`close`,
+        zero `alloc`/`set`/`free`. Proves the §B empty-original path clears (no sentinel).
+      - **`one_format_success`** (round-11): 1 entry → 1 `alloc`, 1 `set`, zero re-`empty`,
+        exactly 1 `close`, zero `free` (system-owned).
+      - `two_formats_success`: 2 entries → 2 `alloc`, 2 `set`, zero re-`empty`, 1 `close`.
+      - `open_fails` (2 fmts): → 2 `free` (pre-allocated), zero `empty`/`set`, zero `close`.
+      - `empty_fails` (2 fmts): → 2 `free`, zero `set`, exactly 1 `close`. No re-empty.
+      - `first_set_fails` (2 fmts): → 2 `free` (both unsubmitted), zero `empty` after,
+        exactly 1 `close`.
+      - `second_set_fails` (2 fmts): set#1 ok, set#2 errs → 1 `free` (h_dib; h_text
         system-owned → double-free detector guards it), 1 remedial `empty` WHILE OPEN,
         exactly 1 `close`.
-      - `success`: both sets ok → zero `free`, zero re-`empty`, exactly 1 `close`.
-      - **`first_alloc_fails`** (round-10): restore_with's first `alloc(text)` errs →
-        zero `free` (no handle yet), zero of everything else, no `open`. RestoreError::Alloc.
-      - **`second_alloc_fails`** (round-10): first `alloc` ok, second `alloc(dib)` errs →
-        EXACTLY 1 `free` (h_text, the previously-leaked handle), zero `open`/`empty`/`set`.
-        RestoreError::Alloc. This is the leak the prev rev could not catch.
-      - **`cleanup_empty_fails`** (round-10): text set ok, dib set errs, AND the remedial
-        `empty` errs → 1 `free` (h_dib), result is `RestoreError::SetPartial { cleanup_err: Some(_) }`,
-        and the test asserts the PUBLIC message contains "may contain text only" — i.e. the
-        cleanup failure is NOT silenced (prev rev did `let _ = clip.empty()`).
-      - Ownership bookkeeping asserts no leaks / no double-frees at end of EVERY test.
-      - `close` count is `== 1` in every branch that opened (the `OpenClip` guard is the
-        only closer; its `Drop` calls `ClipOps::close`, which the fake records).
+      - **`first_alloc_fails`** (2 fmts): alloc#1 errs → zero `free` (none held), no `open`.
+        RestoreError::Alloc.
+      - **`second_alloc_fails`** (2 fmts): alloc#1 ok, alloc#2 errs → EXACTLY 1 `free`
+        (h_text — the previously-leaked handle), no `open`. RestoreError::Alloc.
+      - **`cleanup_empty_fails`** (2 fmts): set#1 ok, set#2 errs, remedial `empty` errs →
+        1 `free` (h_dib), result is `RestoreError::SetPartial { cleanup_err: <str> }`.
+        The test asserts `err.to_string()` mentions the cleanup failure AND partial data
+        (NOT silenced — prev rev did `let _ = clip.empty()`). **Ownership assertion is
+        narrow here (round-11 small): assert only that the APP-OWNED handle (h_dib) was
+        freed and no app handle leaked — do NOT assert all handles are gone, because the
+        system-owned h_text may legitimately still exist on the clipboard after a failed
+        cleanup empty.**
+      - `close` count is `== 1` in every branch that opened (the `OpenClip` guard's `Drop`
+        calls `ClipOps::close`, which the fake records). `RestoreError`'s `Display`
+        (thiserror) is asserted via `to_string()` in the cross-platform fake tests — these
+        do NOT exercise the Windows-only public `restore_snapshot` wrapper.
 
 - [ ] **Real Windows integration test (`tests/clipboard_win.rs`, Windows CI only).**
       This is the SUCCESS path only — the failure branches are covered by the fake
