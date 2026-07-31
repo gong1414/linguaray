@@ -6,6 +6,10 @@ use crate::error::{Error, FallbackKind};
 
 pub struct Google { base_url: String }
 
+impl Default for Google {
+    fn default() -> Self { Self::new() }
+}
+
 impl Google {
     pub fn new() -> Self { Self { base_url: "https://translate.google.com".into() } }
     pub fn with_base(base_url: impl Into<String>) -> Self { Self { base_url: base_url.into() } }

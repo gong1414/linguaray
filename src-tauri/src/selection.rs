@@ -56,5 +56,5 @@ pub fn capture_selection_with_ax<A: FnOnce() -> Option<String>>(
     }
     // Copy-fallback.
     let iters = (timeout_ms / 20) as usize;
-    selection_engine::capture(&OsClipboard, || simulate_copy(), iters)
+    selection_engine::capture(&OsClipboard, simulate_copy, iters)
 }
