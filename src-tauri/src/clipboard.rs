@@ -54,8 +54,9 @@ pub fn set_image(img: &crate::selection_engine::ImageBlob) -> std::result::Resul
 /// CONVERSION-PHASE failure (RGBA→TIFF, setString/setData) returns Err BEFORE
 /// clearContents is ever called — the pasteboard is untouched. clearContents and
 /// writeObjects are NOT themselves transactional: if writeObjects returns false
-/// after clearContents the clipboard is left empty. In practice writeObjects only
-/// fails on invalid item shape, which the pre-checks above rule out.
+/// after clearContents the pasteboard is left empty. (No guarantee is made that
+/// writeObjects cannot fail; callers must treat a writeObjects failure as
+/// "clipboard now empty", same as any other app clearing it.)
 #[cfg(target_os = "macos")]
 pub fn restore_snapshot(
     text: Option<&str>,
@@ -91,8 +92,8 @@ pub fn restore_snapshot(
 /// conversion happen BEFORE clearContents, so a preflight or conversion error
 /// leaves the pasteboard untouched. This does NOT cover a `writeObjects` failure:
 /// that runs AFTER clearContents, so the pasteboard would already be empty if it
-/// returned false (in practice writeObjects only fails on a malformed item, which
-/// the preceding setString/setData calls rule out).
+/// returned false (no guarantee that writeObjects cannot fail — treat such a
+/// failure as "pasteboard now empty").
 ///
 /// This is a SAFE function: the only FFI invariants are "the pasteboard pointer is
 /// a valid NSPasteboard" (guaranteed by the `&NSPasteboard` borrow) and the
