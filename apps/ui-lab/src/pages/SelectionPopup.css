@@ -1,0 +1,87 @@
+/* Selection Popup lab content. The shell supplies the sized frame; this styles
+ * the popup body, error card, and side-by-side result layout.
+ *
+ * MASTER §8.2: single = 400×300, expanded = 600×400. Cards side-by-side, min
+ * 200px each; 3+ cards scroll horizontally inside the clamped window.
+ */
+
+.sel-popup__body {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--color-bg-elevated);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  box-shadow: var(--shadow-md);
+}
+
+/* Loading: small centered card at cursor */
+.sel-popup__loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* Error card */
+.sel-popup__error-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+  flex: 1 1 auto;
+  min-height: 0;
+  text-align: center;
+  padding: var(--space-xl);
+}
+
+.sel-popup__error-icon {
+  color: var(--color-destructive-fg);
+  flex: 0 0 auto;
+}
+
+.sel-popup__error-text {
+  font-size: var(--text-base);
+  line-height: var(--text-base--line-height);
+  color: var(--color-destructive-fg);
+}
+
+.sel-popup__error-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+/* Results: side-by-side for multi, single column for single. */
+.sel-popup__results {
+  display: flex;
+  flex-direction: row;
+  gap: var(--space-md);
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+}
+
+/* When only one card, let it fill width. */
+.sel-popup__results:not([data-scroll]) .lr-result-card:only-child {
+  flex: 1 1 auto;
+}
+
+/* Multi: each card min 200px; horizontal scroll when overflowing the window. */
+.sel-popup__results--scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.sel-popup__results--scroll .lr-result-card {
+  flex: 0 0 200px;
+  max-height: 100%;
+}
+
+/* Single (non-scroll): card fills available width. */
+.sel-popup__results:not(.sel-popup__results--scroll) .lr-result-card {
+  flex: 1 1 auto;
+}

@@ -1,0 +1,238 @@
+/* UI Lab shell — the harness around the prototype frames. This is NOT a
+ * production surface; it only exists to drive theme/locale/motion/state and
+ * render popup windows at their real Tauri sizes.
+ */
+
+.lab {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    "header header"
+    "nav    main";
+  height: 100vh;
+  min-height: 0;
+}
+
+/* Header: global controls */
+.lab__header {
+  grid-area: header;
+  display: flex;
+  align-items: center;
+  gap: var(--space-xl);
+  padding: var(--space-lg) var(--space-xl);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg);
+  flex-wrap: wrap;
+}
+
+.lab__brand {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.lab__title {
+  font-size: var(--text-md);
+  font-weight: var(--text-md--weight);
+  line-height: var(--text-md--line-height);
+  color: var(--color-fg);
+}
+
+.lab__subtitle {
+  font-size: var(--text-xs);
+  line-height: var(--text-xs--line-height);
+  color: var(--color-fg-muted);
+}
+
+.lab__controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+
+.lab__control {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.lab__control-label {
+  font-size: var(--text-xs);
+  line-height: var(--text-xs--line-height);
+  color: var(--color-fg-muted);
+}
+
+/* Segmented control (locale/theme/motion/size) */
+.lab__segmented {
+  display: inline-flex;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.lab__segmented button {
+  padding: 0 var(--space-md);
+  height: var(--height-sm);
+  font-size: var(--text-sm);
+  line-height: 1;
+  color: var(--color-fg-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+
+.lab__segmented button:hover {
+  background: var(--color-bg-hover);
+}
+
+.lab__segmented button[aria-pressed="true"] {
+  background: var(--color-bg-selected);
+  color: var(--color-selected-fg);
+}
+
+/* Sidebar nav */
+.lab__nav {
+  grid-area: nav;
+  border-right: 1px solid var(--color-border);
+  background: var(--color-bg);
+  padding: var(--space-lg) 0;
+  overflow-y: auto;
+}
+
+.lab__nav-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.lab__nav button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  width: 100%;
+  padding: var(--space-md) var(--space-xl);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+  color: var(--color-fg);
+  background: transparent;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+
+.lab__nav button:hover {
+  background: var(--color-bg-hover);
+}
+
+.lab__nav button[aria-current="page"] {
+  background: var(--color-bg-selected);
+  color: var(--color-selected-fg);
+}
+
+/* Main stage */
+.lab__main {
+  grid-area: main;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--color-bg-hover);
+}
+
+.lab__stage {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xl);
+  padding: var(--space-2xl);
+  min-height: 0;
+  overflow: auto;
+}
+
+/* The sized popup frame — simulates the real Tauri window at exact CSS px. */
+.lab__frame {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--color-bg);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+}
+
+.lab__frame-meta {
+  font-size: var(--text-xs);
+  line-height: var(--text-xs--line-height);
+  color: var(--color-fg-muted);
+}
+
+/* State selector strip below the stage */
+.lab__state-bar {
+  flex: 0 0 auto;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-bg);
+  padding: var(--space-md) var(--space-xl);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+  overflow-x: auto;
+}
+
+/* Placeholder for not-yet-implemented slices */
+.lab__frame-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  text-align: center;
+  color: var(--color-fg-muted);
+  font-size: var(--text-md);
+}
+
+.lab__frame-placeholder-sub {
+  font-size: var(--text-sm);
+  color: var(--color-fg-muted);
+}
+
+.lab__state-label {
+  font-size: var(--text-xs);
+  line-height: var(--text-xs--line-height);
+  color: var(--color-fg-muted);
+  margin-right: var(--space-sm);
+}
+
+.lab__state-chip {
+  padding: 0 var(--space-md);
+  height: var(--height-sm);
+  font-size: var(--text-xs);
+  line-height: 1;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-fg-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard);
+}
+
+.lab__state-chip:hover {
+  background: var(--color-bg-hover);
+}
+
+.lab__state-chip[aria-pressed="true"] {
+  background: var(--color-bg-selected);
+  color: var(--color-selected-fg);
+  border-color: transparent;
+}
