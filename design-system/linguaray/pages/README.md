@@ -14,7 +14,7 @@ This directory contains page-specific design overrides. Each file (e.g.
 ## What page files may NOT override
 
 - ❌ Global color tokens (MASTER.md §1)
-- ❌ Contrast and keyboard accessibility rules (MASTER.md §6, §10)
+- ❌ Contrast and keyboard accessibility rules (MASTER.md §1, §6, §10)
 - ❌ Component contracts (MASTER.md §7)
 - ❌ Motion / reduced-motion rules (MASTER.md §5)
 - ❌ Window base behavior (MASTER.md §8)

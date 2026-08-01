@@ -22,7 +22,7 @@ native macOS/Windows tool: compact, unobtrusive, fast.
 |---|---|---|
 | Overall style | Flat Design + Micro-interactions (skill "Translator App" result) | `product` domain |
 | Density | Dense/desktop (8/10) | Design dial `--density 8` |
-| Motion | Subtle (3/10): 150–200ms transitions only; no scroll choreography | Design dial `--motion 3` |
+| Motion | Subtle (3/10): short transitions, no scroll choreography (final durations in MASTER.md §5) | Design dial `--motion 3` |
 | Variance | Centered/minimal (3/10): symmetric, predictable | Design dial `--variance 3` |
 
 ---
@@ -97,19 +97,8 @@ All final values in **MASTER.md §1, §5, §6, §10**. Rationale only here:
 **Lucide via `lucide-solid`** (SolidJS binding; standard outline icons — no filled
 variants). S1 design decision (skill recommended Phosphor; overridden). Key icons:
 
-| Action | Lucide name | Usage |
-|---|---|---|
-| Translate | `languages` | Primary translate button |
-| Copy | `copy` | Copy result to clipboard |
-| Pin | `pin` | Pin popup (stays visible) |
-| Speaker | `volume-2` | TTS speak |
-| History | `history` | Open history |
-| Provider | `server` / `cloud` | Provider management |
-| Settings | `settings` | Settings |
-| Delete | `trash-2` | Destructive actions |
-| Check | `check` | Key saved, connection OK |
-| Alert | `alert-triangle` | Error, warning |
-| Loader | `loader-2` (spin) | Loading states |
+Icon names use the Lucide component export name (PascalCase). Full mapping in
+**MASTER.md §3**.
 
 ---
 

@@ -249,7 +249,7 @@ Every interactive component must implement:
 | **Pressed** | `opacity: 0.8` or slightly darker fill |
 | **Focus** | `outline: 2px solid var(--color-ring); outline-offset: 2px;` — `:focus-visible` only; never `outline: none` without replacement |
 | **Disabled** | `opacity: 0.5; cursor: not-allowed;` — no hover/pressed/focus effects |
-| **Loading** | Replace button content with spinner (12px `Loader2`) + `pointer-events: none`. Under reduced-motion: static icon + "Loading…" text. |
+| **Loading** | Set native `disabled` + `aria-busy="true"`; preserve accessible name. Show spinner (12px `Loader2`) + visually-hidden "Loading…" text for screen readers. Under reduced-motion: static icon + visible "Loading…" text. `tabindex=-1` is redundant on native disabled elements — do not add it. |
 | **Selected** | `--color-bg-selected` bg + `--color-selected-fg` text |
 | **Destructive** | `--color-destructive-fill` + `--color-on-destructive-fill`; or `--color-destructive-fg` text variant |
 
@@ -272,9 +272,8 @@ props:     disabled, loading, leftIcon, rightIcon, fullWidth
 - `secondary`: transparent bg + `--color-border-strong` border + `--color-fg` text.
 - `ghost`: transparent bg + `--color-fg` text; hover = `--color-bg-hover`.
 - `destructive`: `--color-destructive-fill` bg + `--color-on-destructive-fill`.
-- `loading`: replace children with 12px spinner (or static icon + "Loading…" under
-  reduced-motion); set `disabled` + `aria-disabled="true"` + `aria-busy="true"` +
-  `tabindex="-1"` to block keyboard activation; keep width to prevent layout shift.
+- `loading`: per §6 Loading state — native `disabled` + `aria-busy="true"`,
+  spinner + visually-hidden "Loading…". Keep width to prevent layout shift.
 
 ### IconButton
 
@@ -294,7 +293,11 @@ props:     label (always visible, not placeholder-only), value, placeholder,
            helperText, errorText, disabled, type, monospace
 ```
 - Border: `--color-border-strong` default; `--color-ring` on focus (2px outline + offset).
-- `errorText` present → border = `--color-destructive-fg`; helper hidden; error text below in `--color-destructive-fg`.
+- `label` is associated via `<label for=id>`; input has matching `id`.
+- `errorText` present → `aria-invalid="true"`; border = `--color-destructive-fg`;
+  helper hidden; error text below in `--color-destructive-fg`; `aria-describedby`
+  points to the error text element ID.
+- `helperText` present (no error) → `aria-describedby` points to helper text element ID.
 - `monospace` → `--font-mono`.
 
 ### TextArea
@@ -322,9 +325,9 @@ props:     checked, disabled, label, indeterminate
 ```
 props:     checked, disabled, label
 ```
-- On: `--color-primary-fill` track + `--color-on-primary-fill` thumb.
-- Off: `--color-border-strong` track (NOT `--color-border` — decorative border is
-  too low contrast to identify the off state) + `--color-fg-muted` thumb.
+- On: `--color-primary-fill` track + `--color-on-primary-fill` thumb (white).
+- Off: `--color-border-strong` track + `--color-on-primary-fill` thumb (white —
+  same thumb color in both states; white on strong track passes 4.759:1).
 - Uses Kobalte `Switch`.
 
 ### Tabs / SegmentedControl
@@ -354,9 +357,12 @@ Confirm:   title, message, confirmLabel, cancelLabel, variant (primary|destructi
 
 ```
 Banner:    variant (info|success|warning|destructive), title, description, action?, onDismiss?
-Toast:     variant, message, duration (default 3s), onDismiss
+Toast:     variant, message, duration?, onDismiss
 ```
-- Banner = full-width, top of content area. Toast = bottom-right, auto-dismiss.
+- Banner = full-width, top of content area. Toast = bottom-right.
+- **Toast roles:** info/success → `role="status"`; warning/destructive → `role="alert"`.
+- **Toast auto-dismiss:** info/success/warning auto-dismiss after 3s (default).
+  **Destructive toasts do NOT auto-dismiss** — require explicit user dismissal.
 - Colors: `*-fill` bg + `on-*-fill` text.
 
 ### Tooltip
@@ -372,21 +378,26 @@ props:     content, children, side (top|bottom|left|right)
 props:     children, padding (default md), interactive, onClick
 ```
 - `--color-bg-elevated` + `--radius-md` + `--shadow-sm`.
-- Interactive: render as `<button role="button">` (or `<a>` if navigates). Tabbable.
-  Enter/Space triggers `onClick`. Hover = `--shadow-md`; `cursor: pointer`.
-  `:focus-visible` ring per §6. NOT a bare `<div onClick>` — must have button/link
-  semantics for keyboard and screen-reader access.
+- Interactive (has `onClick`, no nested buttons/links): render as `<button>` (or
+  `<a>` if navigates). Tabbable. Enter/Space triggers `onClick`. Hover =
+  `--shadow-md`; `cursor: pointer`. `:focus-visible` ring per §6. NOT a bare
+  `<div onClick>`.
+- Non-interactive (has nested buttons/links): render as `<div>`; inner elements
+  handle their own interaction.
 
 ### ListRow
 
 ```
-props:     leading (icon|avatar), title, subtitle, trailing (badge|action), onClick
+props:     leading (icon|avatar), title, subtitle, trailing (badge|action), onClick?
 ```
-- **Single-line:** height 36px (`--height-lg`). Title only (no subtitle).
+- **Single-line:** height 36px. Title only.
 - **Two-line:** height 52px minimum. Title (14px) + subtitle (12px `--color-fg-muted`).
 - Padding: `--space-md` horizontal.
-- If `onClick` present: render as `<button>` with full-row click target; Tab + Enter
-  supported. NOT a bare `<div onClick>`.
+- **No trailing action + has `onClick`:** entire row renders as `<button>`. Full-row
+  click target. Tab + Enter supported.
+- **Has trailing action:** row renders as non-interactive `<div>`. The title/leading
+  area is a separate `<button>` (the primary action); the trailing action is its own
+  `<button>`. No nested interactive elements inside a button.
 - Selected: `--color-bg-selected` bg + `--color-selected-fg` text.
 
 ### ProviderCard
@@ -426,7 +437,7 @@ All sizes are Tauri/CSS logical pixels.
 | Window | Default | Minimum | Max | Resizable | Z-order |
 |---|---|---|---|---|---|
 | Settings (main) | 800×600 | 600×400 | — | ✅ | Normal |
-| Selection popup | Auto | 200×40 | 400×300 (single) / 480×400 (expanded) | ❌ | Always-on-top |
+| Selection popup | Auto | 200×40 | 400×300 (single) / 600×400 (expanded) | ❌ | Always-on-top |
 | Input window | 420×280 | 360×200 | — | ✅ | Always-on-top |
 | OCR overlay | Full-screen per monitor | — | — | ❌ | Above all |
 
@@ -439,10 +450,16 @@ All sizes are Tauri/CSS logical pixels.
   §2.1 "results from N providers shown side-by-side"), in provider sort order.
   Cards do not jump position as results arrive.
   - 2 providers: 2 columns, each min 200px wide.
-  - 3+ providers: horizontal scroll if total width exceeds popup max (600px).
+  - 3+ providers: horizontal scroll if total width exceeds popup max.
   - Each card is independently scrollable vertically if its text overflows.
-  - At screen edge: popup shifts left so its right edge aligns with screen edge
-    (same cursor-anchored logic as single-result, clamped to screen bounds).
+- **Work-area clamping (both single and expanded):**
+  - `width = min(maxWidth, workArea.width - margin×2)` where margin = 8px.
+  - `height = min(maxHeight, workArea.height - margin×2)`.
+  - `x = clamp(x, workArea.x + margin, workArea.x + workArea.width - width - margin)`.
+  - `y = clamp(y, workArea.y + margin, workArea.y + workArea.height - height - margin)`.
+  - All four edges clamped, not just the right. The native window never extends
+    beyond the screen work area. If available width is less than two 200px cards,
+    horizontal internal scroll handles overflow within the clamped window.
 - **Pinned:** popup stays visible regardless of blur. Only unpinned popups hide on blur.
 
 ### 8.3 Settings Adaptive Behavior
@@ -481,7 +498,7 @@ Min width = 600px (enforced by Tauri). Within 600–800px:
 `pages/<page>.md` files may NOT override:
 
 - ❌ Global color tokens (§1)
-- ❌ Contrast and keyboard accessibility rules (§6 states, §10 checklist)
+- ❌ Contrast and keyboard accessibility rules (§1, §6, §10)
 - ❌ Component contracts (§7)
 - ❌ Motion / reduced-motion rules (§5)
 - ❌ Window base behavior (§8)
