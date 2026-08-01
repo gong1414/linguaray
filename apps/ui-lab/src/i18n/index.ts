@@ -192,6 +192,20 @@ export type LabStrings = {
     disabled: string;
     endpoint: string;
     name: string;
+    // ProviderCard label templates
+    cardKeySaved: string;
+    cardKeyMissing: string;
+    cardEdit: string; // {name} substituted
+    cardDelete: string; // {name} substituted
+    // aria-labels
+    providerListLabel: string;
+    detailLabel: string;
+    loadingModels: string;
+    toastDismiss: string;
+    movedUp: string;
+    movedDown: string;
+    consentLocal: string;
+    consentRemote: string;
   };
 };
 
@@ -367,6 +381,18 @@ export const strings: Record<Locale, LabStrings> = {
       disabled: "Disabled",
       endpoint: "Endpoint",
       name: "Name",
+      cardKeySaved: "Key saved",
+      cardKeyMissing: "Key missing",
+      cardEdit: "Edit {name}",
+      cardDelete: "Delete {name}",
+      providerListLabel: "Provider list",
+      detailLabel: "Provider detail",
+      loadingModels: "Loading models…",
+      toastDismiss: "Dismiss",
+      movedUp: "moved up",
+      movedDown: "moved down",
+      consentLocal: "local",
+      consentRemote: "remote",
     },
   },
   zh: {
@@ -540,6 +566,18 @@ export const strings: Record<Locale, LabStrings> = {
       disabled: "已禁用",
       endpoint: "端点",
       name: "名称",
+      cardKeySaved: "密钥已保存",
+      cardKeyMissing: "缺少密钥",
+      cardEdit: "编辑{name}",
+      cardDelete: "删除{name}",
+      providerListLabel: "服务商列表",
+      detailLabel: "服务商详情",
+      loadingModels: "正在加载模型…",
+      toastDismiss: "关闭",
+      movedUp: "已上移",
+      movedDown: "已下移",
+      consentLocal: "本地",
+      consentRemote: "远程",
     },
   },
 };

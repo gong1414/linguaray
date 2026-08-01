@@ -1,5 +1,5 @@
 import { Dialog as KobalteDialog } from "@kobalte/core/dialog";
-import { type Component } from "solid-js";
+import { Show, type Component, type JSX } from "solid-js";
 import Button from "./Button";
 import "./Dialog.css";
 
@@ -15,6 +15,9 @@ export type ConfirmProps = {
   variant?: ConfirmVariant;
   onConfirm: () => void;
   onCancel: () => void;
+  /** Optional extra content rendered between message and footer (e.g. consent
+   *  recipient list). */
+  children?: JSX.Element;
 };
 
 /**
@@ -60,6 +63,9 @@ const Confirm: Component<ConfirmProps> = (props) => {
           <KobalteDialog.Description class="lr-dialog__description">
             {props.message}
           </KobalteDialog.Description>
+          <Show when={props.children}>
+            <div class="lr-dialog__body">{props.children}</div>
+          </Show>
           <div class="lr-dialog__footer">
             <Button
               variant="secondary"

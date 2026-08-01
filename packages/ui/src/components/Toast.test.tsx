@@ -51,4 +51,16 @@ describe("Toast", () => {
     fireEvent.click(getByRole("button", { name: "Dismiss" }));
     expect(dismissed).toBe(true);
   });
+
+  it("timer is cleaned up on unmount (no callback after dispose)", () => {
+    let dismissed = false;
+    const { unmount } = render(() => (
+      <Toast variant="info" message="Hi" onDismiss={() => (dismissed = true)} />
+    ));
+    // Unmount BEFORE the timer fires
+    unmount();
+    vi.advanceTimersByTime(5000);
+    // onDismiss should NOT have been called after unmount
+    expect(dismissed).toBe(false);
+  });
 });

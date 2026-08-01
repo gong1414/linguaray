@@ -119,6 +119,7 @@ const App: Component = () => {
   const [nav, setNav] = createSignal<NavKey>("selection-popup");
   const [selState, setSelState] = createSignal<SelectionState>("success-single");
   const [provState, setProvState] = createSignal<ProviderState>("empty");
+  const [settingsSize, setSettingsSize] = createSignal<"min" | "default">("default");
 
   const t = createMemo(() => strings[locale()]);
   const selT = createMemo(() => t().selection);
@@ -278,7 +279,10 @@ const App: Component = () => {
             <Match when={nav() === "provider-center"}>
               <div
                 class="lab__frame lab__frame--settings"
-                style={{ width: "800px", height: "600px", "max-width": "100%" }}
+                style={{
+                  width: settingsSize() === "min" ? "600px" : "800px",
+                  height: settingsSize() === "min" ? "400px" : "600px",
+                }}
               >
                 <ProviderCenter
                   state={provState()}
@@ -287,7 +291,8 @@ const App: Component = () => {
                 />
               </div>
               <span class="lab__frame-meta">
-                800×600 · {t().provider.states[provState()]}
+                {settingsSize() === "min" ? "600×400" : "800×600"} ·{" "}
+                {t().provider.states[provState()]}
               </span>
             </Match>
 
@@ -335,6 +340,14 @@ const App: Component = () => {
                 </button>
               )}
             </For>
+            <button
+              type="button"
+              class="lab__state-chip lr-focusable"
+              aria-pressed={settingsSize() === "min" ? "true" : "false"}
+              onClick={() => setSettingsSize((v) => (v === "min" ? "default" : "min"))}
+            >
+              {settingsSize() === "min" ? "600×400 (min)" : "800×600 (default)"}
+            </button>
           </div>
         </Show>
       </main>

@@ -78,7 +78,10 @@ const Select: Component<SelectProps> = (props) => {
         {props.label}
       </KobalteSelect.Label>
 
-      <KobalteSelect.Trigger class="lr-select__trigger">
+      <KobalteSelect.Trigger
+        class="lr-select__trigger"
+        aria-busy={props.loading ? "true" : undefined}
+      >
         <span
           class="lr-select__value"
           classList={{ "lr-select__value--placeholder": !selectedOption() }}
