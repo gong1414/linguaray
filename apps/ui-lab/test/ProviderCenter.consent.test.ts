@@ -1,9 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
-  validateActiveSelection,
+  resolveConsentKey,
   buildConsentScope,
   consentScopeKey,
-  isConsentValid,
   type MockProvider,
   type ActiveSelection,
 } from "../src/pages/provider-domain";
@@ -25,49 +24,67 @@ const mkProvider = (over: Partial<MockProvider> = {}): MockProvider => ({
 const providers: MockProvider[] = [
   mkProvider({ uuid: "a", template: "openai", endpoint: "https://a.example.com" }),
   mkProvider({ uuid: "b", template: "deepseek", endpoint: "https://b.example.com" }),
-  mkProvider({ uuid: "c", template: "google", endpoint: "https://c.example.com" }), // traditional
+  mkProvider({ uuid: "c", template: "google", endpoint: "https://c.example.com" }),
 ];
 
-describe("Consent mint-prevention regression", () => {
-  it("null consent stays null after scope-unchanged profile save", () => {
-    const sel: ActiveSelection = { primaryUuid: "a", parallelUuids: ["b"], fallbackUuid: "c" };
-    const scope = buildConsentScope(sel, providers);
-    const key = consentScopeKey(scope);
-    // Previous consent is null (never approved)
-    // After profile save with same scope: should still be null
-    expect(isConsentValid(sel, providers, null)).toBe(false);
-    // Even if we compute the key, without prior approval it's not valid
-    expect(isConsentValid(sel, providers, key)).toBe(true); // key matches, but that just means the scope matches
+function scopeKey(sel: ActiveSelection, provs: MockProvider[]): string {
+  return consentScopeKey(buildConsentScope(sel, provs));
+}
+
+describe("resolveConsentKey — production consent transition", () => {
+  it("null consent stays null when scope unchanged (no auto-mint)", () => {
+    const sel = { primaryUuid: "a", parallelUuids: ["b"], fallbackUuid: "c" };
+    const key = scopeKey(sel, providers);
+    // Profile save: previous=null, old=new=key, no approved → should stay null
+    const result = resolveConsentKey(null, key, key);
+    expect(result).toBeNull();
   });
 
-  it("approved consent A+B → remove B → consent invalidates", () => {
-    const selAB: ActiveSelection = { primaryUuid: "a", parallelUuids: ["b"], fallbackUuid: "c" };
-    const keyAB = consentScopeKey(buildConsentScope(selAB, providers));
-    expect(isConsentValid(selAB, providers, keyAB)).toBe(true);
-
-    // Remove B from parallel
-    const selA: ActiveSelection = { primaryUuid: "a", parallelUuids: [], fallbackUuid: "c" };
-    const keyA = consentScopeKey(buildConsentScope(selA, providers));
-    // The old key should NOT match the new scope
-    expect(keyAB).not.toBe(keyA);
-    expect(isConsentValid(selA, providers, keyAB)).toBe(false);
+  it("approved consent preserved when scope unchanged", () => {
+    const sel = { primaryUuid: "a", parallelUuids: ["b"], fallbackUuid: "c" };
+    const key = scopeKey(sel, providers);
+    // Previous was approved for this scope, scope unchanged → preserve
+    const result = resolveConsentKey(key, key, key);
+    expect(result).toBe(key);
   });
 
-  it("scope unchanged → valid consent preserved", () => {
-    const sel: ActiveSelection = { primaryUuid: "a", parallelUuids: ["b"], fallbackUuid: "c" };
-    const key = consentScopeKey(buildConsentScope(sel, providers));
-    // Same selection, same providers → key still valid
-    expect(isConsentValid(sel, providers, key)).toBe(true);
+  it("approved consent invalidated when recipient removed", () => {
+    const selAB = { primaryUuid: "a", parallelUuids: ["b"], fallbackUuid: "c" };
+    const keyAB = scopeKey(selAB, providers);
+    const selA = { primaryUuid: "a", parallelUuids: [], fallbackUuid: "c" };
+    const keyA = scopeKey(selA, providers);
+    // handleRemoveParallel: previous=keyAB, old=keyAB, new=keyA → null
+    const result = resolveConsentKey(keyAB, keyAB, keyA);
+    expect(result).toBeNull();
   });
 
-  it("endpoint origin change invalidates consent even if UUID unchanged", () => {
-    const sel: ActiveSelection = { primaryUuid: "a", parallelUuids: [], fallbackUuid: null };
-    const key1 = consentScopeKey(buildConsentScope(sel, providers));
-    const changedProviders = providers.map((p) =>
+  it("approved consent invalidated when endpoint origin changes", () => {
+    const sel = { primaryUuid: "a", parallelUuids: [], fallbackUuid: null };
+    const key1 = scopeKey(sel, providers);
+    const changed = providers.map((p) =>
       p.uuid === "a" ? { ...p, endpoint: "https://different.example.com" } : p,
     );
-    const key2 = consentScopeKey(buildConsentScope(sel, changedProviders));
-    expect(key1).not.toBe(key2);
-    expect(isConsentValid(sel, changedProviders, key1)).toBe(false);
+    const key2 = scopeKey(sel, changed);
+    // Profile save: previous=key1, old=key1, new=key2 → null
+    const result = resolveConsentKey(key1, key1, key2);
+    expect(result).toBeNull();
+  });
+
+  it("Consent Confirm creates approved key only if it matches new scope", () => {
+    const sel = { primaryUuid: "a", parallelUuids: ["b"], fallbackUuid: null };
+    const key = scopeKey(sel, providers);
+    // Approved key matches new scope → use it
+    expect(resolveConsentKey(null, "different", key, key)).toBe(key);
+    // Approved key does NOT match new scope → null (reject arbitrary key)
+    expect(resolveConsentKey(null, "different", key, "arbitrary")).toBeNull();
+  });
+
+  it("null consent with scope change stays null (not auto-minted)", () => {
+    const sel1 = { primaryUuid: "a", parallelUuids: ["b"], fallbackUuid: null };
+    const key1 = scopeKey(sel1, providers);
+    const sel2 = { primaryUuid: "a", parallelUuids: [], fallbackUuid: null };
+    const key2 = scopeKey(sel2, providers);
+    // previous=null, old=key1, new=key2 → null
+    expect(resolveConsentKey(null, key1, key2)).toBeNull();
   });
 });

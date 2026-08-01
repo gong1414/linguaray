@@ -51,10 +51,12 @@ const Confirm: Component<ConfirmProps> = (props) => {
   // provider) — fall back to the next focusable element in the document.
   const restoreFocus = () => {
     const trigger = props.triggerRef?.current;
-    // Trigger is invalid if: not in DOM, disabled, OR inside a deleting row
-    // (pointer-events:none, not operable even without explicit disabled attr)
+    // Trigger is invalid if: not in DOM, disabled, aria-disabled, OR inside
+    // a deleting row (pointer-events:none, not operable)
     const isTriggerValid = (el: HTMLElement | undefined): el is HTMLElement => {
-      if (!el || !document.contains(el) || el.hasAttribute("disabled")) return false;
+      if (!el || !document.contains(el)) return false;
+      if (el.hasAttribute("disabled")) return false;
+      if (el.getAttribute("aria-disabled") === "true") return false;
       const deletingAncestor = el.closest('[data-status="deleting"]');
       return !deletingAncestor;
     };
@@ -68,9 +70,9 @@ const Confirm: Component<ConfirmProps> = (props) => {
       fallback.focus();
       return;
     }
-    // Last resort: first focusable in the provider list area
-    const listArea = document.querySelector<HTMLElement>(".pc__sidebar, .pc__provider-list");
-    listArea?.focus();
+    // No last-resort selector — caller MUST provide fallbackFocusRef for
+    // disappearing-trigger dialogs. This avoids coupling the shared component
+    // to consumer-specific CSS classes.
   };
 
   return (
