@@ -147,6 +147,20 @@ Every UI surface must handle these states. "—" means not applicable to that su
 | **Key saved** | "✓" badge on provider card |
 | **Key missing** | Warning badge; "Enter key" prompt |
 | **Duplicate** | New card with "(copy)" suffix |
+| **Saving** | Spinner on save button; inputs disabled |
+| **Save failed** | Error toast: "Failed to save: {reason}" |
+| **Save conflict** | Error: "This provider was modified elsewhere. Reload?" |
+| **Delete confirm** | Dialog: "Delete {name}? History references are preserved." |
+| **Deleting** | Card greyed out + spinner; disabled |
+| **Delete retry** | Card shows "Delete failed — retry?" |
+| **Drag-to-reorder** | Drag handle; visual indicator on hover/drag |
+| **Reorder persist failed** | Toast: "Failed to save order — reverted" |
+| **Balance loading** | Spinner where balance would show |
+| **Balance unsupported** | "—" (no balance for this provider) |
+| **Balance rate-limited** | "Rate limited — try later" |
+| **Balance error** | "Error fetching balance" |
+| **Endpoint invalid** | Red border on endpoint field: "Must be HTTPS (or localhost)" |
+| **Model manual entry** | Text input visible when fetch fails or is unsupported |
 
 ### 4.4 OCR Overlay
 
@@ -199,7 +213,7 @@ Every UI surface must handle these states. "—" means not applicable to that su
 |---|---|
 | **Loading** | N spinner cards (one per parallel provider) |
 | **Partial success** | Filled results for successful engines + error badges on failed ones |
-| **All success** | All cards filled, sorted by elapsed time or user preference |
+| **All success** | All cards filled, displayed in the user's Provider sort order (NOT by elapsed time); completed cards do not jump position as others arrive |
 | **All failed** | All cards show error; fallback (if configured) shown as a separate result |
 | **Error (consent revoked)** | "Multi-engine consent required" — link to re-consent |
 
@@ -291,7 +305,7 @@ categories. The existing flat `{"provider_id": "key"}` map is migrated to:
 ```
 KeystoreData {
     version: u32,                          // 2 (v1 = legacy flat map)
-    provider_keys: Map<String, String>,    // keyed by ProviderProfile UUID
+    provider_keys: Map<String, String>,    // keyed by secret_ref (legacy_id for migrated, "provider/<uuid>" for new)
     history_key: Option<[u8; 32]>,         // opt-in history encryption key
     external_api_token: Option<String>,    // opt-in external API bearer token
 }
@@ -315,7 +329,8 @@ ProviderProfile {
     enabled: bool             // appears in active selection
     sort_order: i32           // display order
     is_local: bool            // Ollama etc. (no key needed, localhost)
-    secret_ref: String        // = provider UUID; keystore.provider_keys[uuid] holds the key
+    secret_ref: String        // keystore key name. Migrated profiles: = legacy_id (e.g. "openai").
+                              // New profiles: "provider/<uuid>". NOT necessarily == uuid.
     capabilities: ProviderCapabilities  // balance, quota, model_list, etc.
 }
 ```
@@ -344,8 +359,11 @@ ResultOutcome =
 
 ErrorClassification {
     kind: ErrorKind           // Network | Timeout | RateLimit | ServerError | AuthFailed | InvalidRequest | ParseError
-    fallback_eligible: bool   // true for Network/Timeout/RateLimit/ServerError/ParseError
     message: String
+    // fallback_eligible is DERIVED from kind via ErrorKind::is_fallback_eligible(),
+    // not an independent field. Network/Timeout/RateLimit/ServerError/ParseError → true;
+    // AuthFailed/InvalidRequest → false. This prevents a contradiction between
+    // kind and fallback_eligible.
 }
 ```
 
@@ -365,35 +383,48 @@ history_sessions {
     is_favorite: bool
     source_text_encrypted: Vec<u8>    // AES-256-GCM (ciphertext || tag concatenated)
     source_text_nonce: [u8; 12]
-    source_text_aad: String           // = session_uuid (bound to ciphertext)
     crypto_version: u32               // 1 (AES-256-GCM); allows future algorithm changes
-    provider_name_snapshot: String    // display name at time of translation
-                              // (survives provider deletion; no dangling blank)
 }
 
 history_results {
+    result_uuid: String       // app-generated UUID v4, created BEFORE encryption
     session_uuid: String      // FK → history_sessions.session_uuid
-    provider_uuid: String     // may dangle if provider deleted (name snapshot in session)
+    provider_uuid: String     // may dangle if provider deleted
+    provider_name_snapshot: String  // display name captured at translation time
+                                    // (survives provider deletion; no dangling blank)
     engine_id: String
     elapsed_ms: u64
     outcome_tag: String       // "success" | "failure"
     result_text_encrypted: Option<Vec<u8>>   // Some on success
     result_text_nonce: Option<[u8; 12]>
-    error_kind: Option<String>              // Some on failure
+    error_kind: Option<String>              // Some on failure (plaintext; derived from ErrorKind)
     error_message_encrypted: Option<Vec<u8>> // encrypted error detail
     error_message_nonce: Option<[u8; 12]>
     crypto_version: u32
 }
 ```
 
+**AAD domain separation (prevents ciphertext swap within or across sessions):**
+Each encrypted field uses a domain-specific AAD string:
+- Session source text: `"linguaray-history-v1|session|<session_uuid>|source"`
+- Result success text: `"linguaray-history-v1|result|<result_uuid>|text"`
+- Result error message: `"linguaray-history-v1|result|<result_uuid>|error"`
+- Vocabulary word: `"linguaray-vocab-v1|item|<item_uuid>|word"`
+- Vocabulary definition: `"linguaray-vocab-v1|item|<item_uuid>|definition"`
+
+This ensures a ciphertext from one field/context cannot be swapped into another
+and still pass GCM authentication.
+
 **Key design decisions:**
-- `session_uuid` is generated **before** encryption and used as AAD — never use
+- UUIDs are generated **before** encryption and used as AAD — never use
   auto-increment DB IDs for crypto binding (they don't exist until after insert).
-- AES-GCM tag is **appended** to ciphertext (`ciphertext || 16-byte tag`), as is
-  standard for `aes_gcm::Aes256Gcm::encrypt`.
+- AES-GCM tag is **appended** to ciphertext (`ciphertext || 16-byte tag`).
 - `crypto_version` field allows future algorithm migration without schema change.
-- `provider_name_snapshot` in the session ensures history never shows a blank or
-  dangling name after a provider is deleted.
+- `provider_name_snapshot` is on **each result** (not the session), because a
+  multi-engine session has results from different providers.
+- `fallback_eligible` is **derived from `ErrorKind`** at the wire layer
+  (`ErrorKind::is_fallback_eligible()`), never an independent input field that
+  could contradict `kind`.
 
 ### 5.4 VocabularyItem
 
@@ -449,13 +480,19 @@ ProviderPatch {
 }
 ```
 
-**Provider delete cascade:**
-- Keystore: `provider_keys[uuid]` is removed (key erased).
-- History: `history_sessions.provider_name_snapshot` is retained (already captured
-  at translation time); `history_results.provider_uuid` may dangle but the session
-  display uses the snapshot, not a live lookup.
-- Active settings: if the deleted provider was primary/parallel/fallback, the
-  corresponding slot is cleared (primary falls back to the first enabled provider).
+**Provider delete state machine (crash-safe):**
+1. DB: mark profile `status = 'deleting'`, set `enabled = false`. Immediately remove
+   from `primary`, `parallel`, `fallback` in preferences (so it can't be invoked).
+   Commit DB.
+2. Keystore: remove `provider_keys[secret_ref]`. Commit keystore.
+3. DB: convert profile to **tombstone** (`status = 'deleted'`, name retained as
+   `"deleted: <original_name>"` for any UI reference). Commit DB.
+4. History: no action needed — `history_results.provider_name_snapshot` already
+   captured the display name at translation time.
+5. **Crash recovery:** on startup, any profile with `status = 'deleting'` resumes
+   at step 2 (re-attempt keystore removal). A profile in `deleting` state is never
+   callable (enabled=false, removed from active slots). It cannot revert to a
+   usable state — the state machine only progresses forward.
 
 **Multi-engine consent:**
 - `preferences.parallel_consent_version` tracks the user's consent to send text to
@@ -472,19 +509,39 @@ translate_ocr(image: ImageData) → TranslationSession
 
 ### Content commands
 ```
-history_query(filter: HistoryFilter) → Vec<HistoryRecord>
-history_delete(ids: Vec<i64>) → ()
-history_toggle_favorite(id) → ()
-history_clear(before: Option<i64>) → ()
+history_search(query: String, cursor: Option<String>, batch_size: u32) → HistoryPage
+history_list(cursor: Option<String>, batch_size: u32, favorites_only: bool) → HistoryPage
+history_delete(session_uuids: Vec<String>) → ()
+history_toggle_favorite(session_uuid: String) → ()
+history_clear(before_timestamp: Option<i64>) → ()
 history_export(format: ExportFormat, filter: HistoryFilter) → FilePath
 history_set_enabled(enabled: bool) → ()
 history_set_retention(days: u32) → ()
 
+// HistoryPage: cursor-based pagination for both search and list.
+// `next_cursor` = None when all matching records have been scanned.
+// `scan_complete` = false means more batches MAY contain matches (search only).
+HistoryPage {
+    items: Vec<HistorySessionSummary>,
+    next_cursor: Option<String>,
+    scan_complete: bool,       // true when all retained records + favorites scanned
+}
+
 vocabulary_add(word, definition, source_lang, target_lang) → ()
-vocabulary_list() → Vec<VocabularyItem>
-vocabulary_delete(id) → ()
+vocabulary_list(cursor: Option<String>) → VocabularyPage
+vocabulary_delete(item_uuid: String) → ()
 vocabulary_export(format: ExportFormat) → FilePath
 ```
+
+**History search normalization:** Unicode NFKC normalization + Unicode case folding
+(`String::to_lowercase()` after NFKC). Batch size is fixed at **200** (not
+configurable). Search covers all records within the retention period + all
+favorites regardless of age.
+
+**AnkiConnect export:** Sends decrypted vocabulary items to `127.0.0.1:8765` via
+the AnkiConnect API. Decrypted content exists only in memory during the export
+request; no temporary plaintext file is written. If the request fails, the error
+is surfaced to the user; no plaintext persists.
 
 ### System commands
 ```
@@ -511,17 +568,38 @@ reset_keystore() → Option<String>
 
 ### External API token commands
 ```
-external_api_enable() → String          // generates 32-byte token, stores in keystore; returns token ONCE
-external_api_status() → { enabled: bool, port: u16 }  // never returns the token
-external_api_disable() → ()             // removes token from keystore, stops server
-external_api_regenerate_token() → String // invalidates old token, returns new one ONCE
+external_api_enable(port: Option<u16>) → String  // bind socket → write token+prefs → start server; returns token ONCE
+external_api_status() → ExternalApiStatus        // never returns the token
+external_api_disable() → ()                      // removes token from keystore, stops server
+external_api_regenerate_token() → String         // invalidates old token, returns new one ONCE
 ```
 
-**Token lifecycle:** The token is created by `external_api_enable` or
-`external_api_regenerate_token` and returned **exactly once**. It is never
-readable again — `external_api_status` returns only enabled/port, never the token.
-The token is stored in `keystore.external_api_token` and compared in constant time
-on every request.
+```
+ExternalApiStatus =
+    | Disabled
+    | Enabled { port: u16 }
+    | PortInUse { configured_port: u16 }  // token retained; user must change port
+```
+
+**Token format:** 32 random bytes, base64url-encoded (no padding).
+
+**Enable sequence (crash-safe ordering):**
+1. Validate and bind the TCP socket to `127.0.0.1:<port>` (default 61742).
+   If bind fails → return error; do NOT write to keystore or preferences.
+2. Write token to `keystore.external_api_token` + port to `preferences`.
+3. Start the HTTP server on the bound socket.
+4. If keystore write fails → close the socket; return error; no "enabled" state persists.
+
+**Port-in-use recovery:** on restart, if the configured port is occupied, the
+server does NOT start. `external_api_status()` returns `PortInUse`. The token is
+retained in the keystore. The user calls `external_api_enable(new_port)` to rebind.
+
+**Token lifecycle:** Created by `external_api_enable` or `external_api_regenerate_token`,
+returned **exactly once**. Never readable again — `external_api_status` returns only
+status + port, never the token. Compared in constant time on every request.
+
+**Origin policy:** **Reject any request with an `Origin` header.** No CORS support.
+LinguaRay's external API is for local scripts/tools, not browser clients.
 
 ---
 
@@ -649,49 +727,66 @@ searchable ciphertext. Search is performed as follows:
 
 ### 8.5 Crash-Safe Idempotent Migration Protocol
 
-Migration from Phase 4 (`settings.json` + flat-map keystore) to the new schema:
+Migration from Phase 4 (`settings.json` + flat-map keystore) to the new schema.
+The key principle: **`secret_ref` is stable across the migration** — the legacy
+key name IS the `secret_ref`, so the DB and keystore never need a coordinated
+rename. The keystore's atomic rewrite changes the envelope format, not the key names.
 
 **Phase 1 — Backup:**
 - Copy `settings.json` → `settings.json.bak-pre-migration`.
 - Copy keystore → `keystore.json.bak-pre-migration`.
-- These backups are never deleted by the app; user can manually remove after verifying.
+- These backups are never deleted by the app.
 
-**Phase 2 — DB migration (idempotent):**
-- Create tables if not exist (`CREATE TABLE IF NOT EXISTS`).
-- If `providers` is empty and `settings.json` exists: parse `default_provider`,
-  `target_language` → insert into `preferences`.
-- No provider profiles are created here (they are created in Phase 3 which links keys).
+**Phase 2 — DB schema (idempotent):**
+- `CREATE TABLE IF NOT EXISTS` for all tables.
+- If `preferences` is empty and `settings.json` exists: parse `default_provider`,
+  `target_language`, `fallback_engine` → insert into `preferences`.
 
-**Phase 3 — Keystore migration (crash-safe, idempotent):**
-- Load keystore. If `version` field is absent (legacy flat map):
-  1. Read `settings.json` to get the list of provider template IDs the user configured.
-  2. For each template ID that has a key in the legacy flat map:
-     - Generate a **deterministic UUID v5** from `(NAMESPACE, template_id)` —
-       same input always produces the same UUID, so re-running after a crash
-       produces the same UUID, making the migration idempotent.
-     - Create a `ProviderProfile` row in the DB with this UUID.
-     - **Add** the key to `provider_keys[uuid]` in the keystore (copy from legacy key).
-     - **Commit** the keystore (write + flush).
-     - **Commit** the DB row (transaction).
-  3. After ALL profiles + keys are committed: remove legacy template-id keys from
-     the keystore flat map and set `version = 2`. Commit keystore.
-  4. If a crash occurs at any point: on restart, the migration detects `version`
-     is still absent (or partially done). It re-runs: existing UUIDs already in
-     `provider_keys` are skipped (idempotent check); profiles already in DB are
-     skipped (idempotent check). The cleanup step (3) only runs when all profiles
-     are confirmed present.
-  5. **key_status()** returns results keyed by profile UUID (not template ID).
+**Phase 3 — Profile + key migration (crash-safe, idempotent):**
 
-**Phase 4 — Verify:**
-- Assert: every profile in DB has a matching key in `provider_keys`.
-- Assert: no legacy template-id keys remain in the keystore.
-- If verification fails: do NOT clean up; leave both backups + partial state; show
-  an error banner directing the user to manual recovery.
+The key insight: enumerate **all** keys in the legacy flat map (not just
+`settings.json` defaults — a user may have saved a key for a provider they
+haven't set as default). For each legacy key:
+
+1. `legacy_id` = the key name in the flat map (e.g. `"openai"`, `"anthropic"`).
+2. Generate a **deterministic UUID v5**: `UUIDv5(NAMESPACE_LINGUARAY, "linguaray:legacy-provider:" + legacy_id)`.
+   - Re-running after a crash produces the same UUID → idempotent.
+3. `secret_ref = legacy_id` (unchanged — the keystore key name stays the same).
+   - New user-created profiles use `secret_ref = "provider/<uuid>"`.
+4. Insert the `ProviderProfile` row in a single DB transaction (with
+   `secret_ref = legacy_id`). If the row already exists (crash recovery),
+   the insert is skipped (`INSERT OR IGNORE`).
+5. **Crash safety:** at this point the DB has the profile, and the keystore still
+   has the key under the legacy flat map under the same name. A reader can find
+   the key via `secret_ref` whether the keystore is v1 (flat map) or v2
+   (`provider_keys`). There is no half-state window.
+
+**Phase 4 — Keystore atomic rewrite (single operation):**
+- After ALL profiles are committed to the DB:
+- Load the keystore. If `version` is absent (legacy flat map):
+  1. Copy every `{key: value}` from the flat map into `provider_keys` under the
+     **same key name** (no rename). `secret_ref` in the DB already matches.
+  2. Set `version = 2`. Clear the legacy flat map fields.
+  3. **Atomic write** the keystore (the existing atomic-replace + fs2 flock from
+     Phase 4 applies). This is a single indivisible operation — the keystore is
+     either fully v1 or fully v2, never mixed.
+  4. A crash before this write: keystore is still v1 flat map; DB profiles have
+     `secret_ref = legacy_id`; reader finds keys in the flat map. Re-run detects
+     `version` absent → re-runs Phase 3 (idempotent) → re-attempts Phase 4.
+  5. A crash after this write: keystore is v2; `provider_keys[legacy_id]` has
+     the key; DB `secret_ref = legacy_id` matches. Migration is structurally
+     complete.
+
+**Phase 5 — Verify + complete flag:**
+- Read the v2 keystore back. Assert every DB profile's `secret_ref` exists in
+  `provider_keys`.
+- Write `_schema_migrations.migration_complete = true`.
+- If verification fails: leave both backups + partial state; show error banner.
 
 | Scenario | Behavior |
 |---|---|
 | Fresh install | Empty DB; no keystore; onboarding flow |
-| Upgrade from Phase 4 | Run Phase 1–4 migration (above); idempotent; crash-safe |
+| Upgrade from Phase 4 | Run Phase 1–5 (above); idempotent; crash-safe; no mixed-state window |
 | DB corrupt | Archive `.broken-*`; start fresh; keystore intact (re-link profiles manually or re-migrate from settings) |
 | Keystore corrupt | Archive `.broken-*`; DB intact but keys dangling; re-enter keys; history undecryptable |
 | Both corrupt | Archive both; fresh start |
@@ -705,10 +800,12 @@ Migration from Phase 4 (`settings.json` + flat-map keystore) to the new schema:
 | Source text (translation) | User selection/input/clipboard/API | Active provider endpoint(s) | Implicit (user triggered translate) | Only if history opt-in (encrypted) | **Never** |
 | Translated text | Provider response | Shown in UI / returned via API | Implicit | Only if history opt-in (encrypted) | **Never** |
 | API key | User enters in settings | Provider endpoint (as auth header) | Implicit (user configured) | Keystore (encrypted) | **Never** |
+| External API token | Generated by app (32 random bytes) | Compared in constant time on each API request | Explicit enable | Keystore (encrypted) | **Never** |
 | History content | Translation results | Nowhere (local only) | Explicit opt-in | SQLite (encrypted) | **Never** |
 | OCR text | Screen capture / image | OCR engine (local unless cloud configured) | Screen Recording permission (macOS) | Only if history opt-in (encrypted) | **Never** |
 | TTS audio | System speech synthesis | Local audio output | Implicit | Nowhere | **Never** |
 | External API requests | HTTP client | Local server processes them | Explicit enable + token | Nowhere | **Never** (rate/size only) |
+| AnkiConnect export | Vocabulary items | `127.0.0.1:8765` (user-initiated only) | Implicit (user clicked export) | Nowhere (in-memory only during request) | **Never** |
 | Provider metadata | User configuration | Nowhere | Implicit | SQLite (plaintext metadata) | OK (uuid, name, template only) |
 | Usage analytics | — | — | — | — | **None collected** |
 
@@ -729,24 +826,32 @@ Migration from Phase 4 (`settings.json` + flat-map keystore) to the new schema:
 | TTS | `AVSpeechSynthesizer` | `SpeechSynthesizer` | Same voice list / speak / stop |
 | Dictionary | System dict + StarDict/MDX | StarDict/MDX only | Same offline package format |
 | Shortcuts | Global hotkey (same engine) | Global hotkey | Same conflict detection |
-| Screen capture permission | Screen Recording prompt (TCC) | GraphicsCaptureAccess (programmatic, requires `GraphicsCaptureAccess.requestAccessAsync`) or GraphicsCapturePicker (system picker) | See Windows capture note below |
-| Screen capture approach | ScreenCaptureKit (direct frame access) | GraphicsCaptureItem (programmatic) or GraphicsCapturePicker (user picks a window/screen) | Custom overlay draws on top; capture via the chosen API |
+| Screen capture permission | Screen Recording prompt (TCC) | DXGI Desktop Duplication (no picker; overlay-based region select) | See Windows capture note below |
+| Screen capture approach | ScreenCaptureKit (direct frame access) | DXGI Desktop Duplication API + transparent overlay per monitor | Custom overlay draws on top; capture via DXGI |
 
-**Windows capture note:** Windows.Graphics.Capture has three access paths:
-1. **GraphicsCapturePicker** — system UI, user picks a window or display. Most reliable, least intrusive.
-2. **GraphicsCaptureAccess.requestAccessAsync** — programmatic borderless access. Requires package identity (MSIX) or a manifest capability; may not be available for a Tauri (non-MSIX) app.
-3. **HWND-based direct capture** — requires `SetWindowDisplayAffinity` exemption or undocumented APIs; not recommended.
+**Windows capture note:** GraphicsCapturePicker only lets the user select a whole
+window or display — it cannot provide Bob/Pot-style arbitrary rectangular region
+selection. For the baseline:
 
-LinguaRay uses path **1 (GraphicsCapturePicker)** for the first release: the OCR
-overlay triggers the picker, the user selects the screen, and the app captures the
-selected region. This avoids identity/manifest complexity. Path 2 is a v1.x
-improvement if Tauri's MSIX packaging supports it.
+1. **Tauri creates a transparent overlay window on each monitor.** The user draws
+   a rectangle directly on the overlay (same UX as macOS).
+2. **Overlay hides after selection.** The app captures the selected monitor(s)
+   using **DXGI Desktop Duplication API** (`IDXGIOutputDuplication`), which provides
+   per-monitor frame buffers without requiring GraphicsCapturePicker or MSIX identity.
+3. **Cross-monitor selection:** if the rectangle spans multiple monitors, each
+   monitor's frame is captured separately and cropped to the intersection, then
+   stitched by physical-pixel coordinates.
+4. **Output:** all frames are converted to BGRA8/sRGB before being passed to
+   Windows OCR (`Windows.Media.Ocr`).
+5. **Error cases:** DRM-protected content, remote desktop sessions, or capture-unavailable
+   drivers return a clear error message to the user. No fabricated persistent permission
+   prompt is shown (DXGI Desktop Duplication does not require a user-grant dialog).
+6. **GraphicsCapturePicker** may be added in a future version as a separate
+   "capture window/screen" mode, but it is NOT used for region OCR in the baseline.
 
 **Per-slice acceptance:** each slice (S3–S6) must be verified on **both** macOS
 and Windows — each platform's automated tests (CI) **and** real-machine E2E —
 before moving to the next slice.
-
-**Per-slice acceptance:** each slice (S3–S6) must be verified on **both** macOS and Windows before moving to the next slice. Windows CI is a mandatory gate; real-machine testing follows.
 
 ---
 
@@ -807,19 +912,20 @@ S0 (Spec) ──freeze──▶ S1 (Design) ──design gate──▶ S2a (Data
 | Source | [github.com/nextlevelbuilder/ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) |
 | Pinned commit | `14ddef5c05e52d7c253b8f0129de7bcd1045ae5b` |
 | Root license | MIT (© 2024 Next Level Builder) — `LICENSE` file |
-| **Upstream conflict** | `cli/README.md` states CC-BY-NC-4.0 for the CLI tool. The skill data/scripts (used by LinguaRay) are under the root MIT license, but the CC-BY-NC-4.0 clause on the CLI tool means **skill files must NOT be distributed inside LinguaRay release artifacts**. The skill is a development-time tool only, not a runtime dependency. |
+| **Upstream license conflict** | `cli/README.md` states CC-BY-NC-4.0 for the CLI tool. Upstream metadata is inconsistent; the legal status is not self-adjudicated here. The skill is **development-time only, installed on the developer's machine, and never distributed inside LinguaRay release artifacts**. |
 | Install path | `~/.zcode/cli/skills/ui-ux-pro-max/` |
-| Install source dir | `.claude/skills/ui-ux-pro-max/` (the actual skill directory in the repo, NOT `src/ui-ux-pro-max/` which is the CLI development source) |
-| Install method | Cloned repo at pinned SHA → copied `.claude/skills/ui-ux-pro-max/` contents to skills dir (no floating `main`) |
-| SKILL.md | Present at install path (`~/.zcode/cli/skills/ui-ux-pro-max/SKILL.md`); ZCode discovers skills via `SKILL.md` in `~/.zcode/cli/skills/<name>/` |
-| Smoke test | `python3 ~/.zcode/cli/skills/ui-ux-pro-max/scripts/search.py "translation" --domain product -n 1` → returned "Translator App" result with style recommendation ✅ |
-| Files installed | `SKILL.md`, `data/` (CSV databases), `scripts/` (search.py, core.py, design_system.py), `references/` (quick-reference.md, pro-rules.md) |
+| Install source dir | `.claude/skills/ui-ux-pro-max/` (the actual skill directory in the repo) |
+| Install method | Cloned repo at pinned SHA → copied `.claude/skills/ui-ux-pro-max/` contents to skills dir |
+| Platform adaptation | The original `SKILL.md` uses `${CLAUDE_PLUGIN_ROOT}` (a Claude Code variable ZCode does not set). A **path-adapted copy** was generated: all `${CLAUDE_PLUGIN_ROOT}/.claude/skills/ui-ux-pro-max` references replaced with the absolute install path `$HOME/.zcode/cli/skills/ui-ux-pro-max`. Original preserved as `SKILL.md.orig`. |
+| Adapted SKILL.md SHA | `e28f987cf4230eb3ade0a339bf8530bebcfd4fc8` |
+| Original SKILL.md SHA | `1358d9cf81e9a7ee973508b1744bd0938a009a93` |
+| Adaptation scope | Path substitution only (11 occurrences of `${CLAUDE_PLUGIN_ROOT}`); no logic, data, or structural changes |
+| Smoke test (repo root) | `python3 ~/.zcode/cli/skills/ui-ux-pro-max/scripts/search.py "desktop productivity" --domain product -n 1` → "Productivity Tool" result ✅ |
+| Smoke test (/tmp) | `python3 ~/.zcode/cli/skills/ui-ux-pro-max/scripts/search.py "minimal" --domain style -n 1` → "Minimalism" result ✅ |
+| Files installed | `SKILL.md` (adapted), `SKILL.md.orig` (upstream), `data/` (CSV databases), `scripts/` (search.py, core.py, design_system.py), `references/` (quick-reference.md, pro-rules.md) |
 
-**Note on `${CLAUDE_PLUGIN_ROOT}`:** The SKILL.md references this variable for script
-paths. ZCode does not set this variable. The scripts use relative paths internally
-(they locate `data/` relative to the script file via `__file__`), so invoking them
-by absolute path from any working directory works. S1 will verify this when
-generating the design system.
+**Skill discovery:** ZCode discovers skills via `SKILL.md` in `~/.zcode/cli/skills/<name>/`.
+The adapted `SKILL.md` has valid frontmatter (`name: ui-ux-pro-max`, `description: ...`).
 
 **Constraint:** S0 only installs + audits the skill. No `MASTER.md`, design tokens,
 mockups, or UI code generated until the state matrix is frozen and S1 begins.
