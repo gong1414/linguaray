@@ -346,7 +346,7 @@ const App: Component = () => {
               aria-pressed={settingsSize() === "min" ? "true" : "false"}
               onClick={() => setSettingsSize((v) => (v === "min" ? "default" : "min"))}
             >
-              {settingsSize() === "min" ? "600×400 (min)" : "800×600 (default)"}
+              {settingsSize() === "min" ? t().provider.frameMin : t().provider.frameDefault}
             </button>
           </div>
         </Show>

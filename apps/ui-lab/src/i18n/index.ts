@@ -206,6 +206,13 @@ export type LabStrings = {
     movedDown: string;
     consentLocal: string;
     consentRemote: string;
+    // Settings nav rail
+    navProviderCenter: string;
+    navShortcuts: string;
+    navPrivacy: string;
+    presetOllama: string;
+    frameMin: string;
+    frameDefault: string;
   };
 };
 
@@ -393,6 +400,12 @@ export const strings: Record<Locale, LabStrings> = {
       movedDown: "moved down",
       consentLocal: "local",
       consentRemote: "remote",
+      navProviderCenter: "Provider Center",
+      navShortcuts: "Shortcuts",
+      navPrivacy: "Privacy & Data",
+      presetOllama: "Ollama",
+      frameMin: "600×400 (min)",
+      frameDefault: "800×600 (default)",
     },
   },
   zh: {
@@ -578,6 +591,12 @@ export const strings: Record<Locale, LabStrings> = {
       movedDown: "已下移",
       consentLocal: "本地",
       consentRemote: "远程",
+      navProviderCenter: "服务商中心",
+      navShortcuts: "快捷键",
+      navPrivacy: "隐私与数据",
+      presetOllama: "Ollama",
+      frameMin: "600×400（最小）",
+      frameDefault: "800×600（默认）",
     },
   },
 };
