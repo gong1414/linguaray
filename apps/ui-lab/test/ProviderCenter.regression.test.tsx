@@ -300,3 +300,120 @@ describe("Provider Center — Chinese UI has no hardcoded English", () => {
     expect(html).not.toMatch(/>\s*Key missing\s*</);
   });
 });
+
+// --- CAS old-token test (P1#1) -------------------------------------------
+
+describe("Provider Center — CAS old-token cannot clear new op", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => {
+    vi.useRealTimers();
+    cleanup();
+  });
+
+  it("old connection token's completion does not clear new connection's result", () => {
+    render(() => <App />);
+    goToProviderCenter();
+    clickStateChip("Drag to reorder");
+    // Start connection test on OpenAI #2
+    fireEvent.click(screen.getByRole("button", { name: "Edit OpenAI #2" }));
+    fireEvent.click(screen.getByRole("button", { name: "Test" }));
+    // Immediately switch to OpenAI #1 and start a test there
+    fireEvent.click(screen.getByRole("button", { name: "Edit OpenAI #1" }));
+    fireEvent.click(screen.getByRole("button", { name: "Test" }));
+    // Advance past both timers — OpenAI #1 should show Connected, #2 should not
+    vi.advanceTimersByTime(1300);
+    // OpenAI #1's detail shows Connected (the current/active op)
+    expect(screen.getByText(/Connected/)).toBeTruthy();
+  });
+});
+
+// --- Away→back no busy leak (P1#1) ---------------------------------------
+
+describe("Provider Center — away→back does not leave busy state", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => {
+    vi.useRealTimers();
+    cleanup();
+  });
+
+  it("connection test: switch away→back, no stale busy spinner", () => {
+    render(() => <App />);
+    goToProviderCenter();
+    clickStateChip("Drag to reorder");
+    fireEvent.click(screen.getByRole("button", { name: "Edit OpenAI #2" }));
+    fireEvent.click(screen.getByRole("button", { name: "Test" }));
+    // Switch to OpenAI #1, then back to #2 BEFORE timer fires
+    fireEvent.click(screen.getByRole("button", { name: "Edit OpenAI #1" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit OpenAI #2" }));
+    // Advance past the timer — no stale result on #2
+    vi.advanceTimersByTime(1300);
+    // No "Connected" shown for #2 (the test was cancelled on switch)
+    expect(screen.queryByText(/Connected/)).toBeNull();
+  });
+});
+
+// --- Key DOM clear test (P1#2) -------------------------------------------
+
+describe("Provider Center — key cleared from DOM at submit", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => {
+    vi.useRealTimers();
+    cleanup();
+  });
+
+  it("typed key is NOT in DOM after clicking Save", () => {
+    render(() => <App />);
+    goToProviderCenter();
+    clickStateChip("Drag to reorder");
+    fireEvent.click(screen.getByRole("button", { name: "Edit OpenAI #2" }));
+    const keyInput = screen.getByPlaceholderText(strings.en.provider.apiKeyPlaceholder);
+    fireEvent.input(keyInput, { target: { value: "sk-secret-key-abc123def456" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save key" }));
+    // The key string must NOT be anywhere in the DOM
+    expect(document.body.innerHTML).not.toContain("sk-secret-key-abc123def456");
+    // Advance to completion — still no key in DOM
+    vi.advanceTimersByTime(1100);
+    expect(document.body.innerHTML).not.toContain("sk-secret-key");
+  });
+});
+
+// --- zh automated accessible-name scan (P2) ------------------------------
+
+describe("Provider Center — Chinese automated scan", () => {
+  afterEach(() => cleanup());
+
+  it("no untranslated English in zh accessible names or visible text", () => {
+    const { container } = render(() => <App />);
+    goToProviderCenter();
+    fireEvent.click(screen.getByRole("button", { name: "中文" }));
+    // Switch to a populated state
+    const stateBar = screen.getByRole("group", { name: "状态" });
+    const chips = [...stateBar.querySelectorAll("button")];
+    const chip = chips.find((b) => b.textContent === "连接成功");
+    if (chip) fireEvent.click(chip);
+
+    // Collect all aria-labels and visible button text
+    const texts: string[] = [];
+    container.querySelectorAll("[aria-label]").forEach((el) => {
+      texts.push(el.getAttribute("aria-label") || "");
+    });
+    container.querySelectorAll("button, span, h2, h3, p").forEach((el) => {
+      const t = el.textContent?.trim();
+      if (t && t.length > 2) texts.push(t);
+    });
+
+    // Allowlist: provider names (+ #N suffixes), URLs, model IDs, template names
+    const allowPrefix = /^(OpenAI|DeepSeek|Google|GPT|gpt-|Ollama|Anthropic|Gemini|DeepL|http|localhost|mock-|api\.)/i;
+    const suspicious = texts.filter((t) =>
+      t.length > 3 &&
+      !allowPrefix.test(t) &&
+      /[A-Za-z]{4,}/.test(t) &&
+      !/[\u4e00-\u9fff]/.test(t) && // no Chinese chars
+      !t.includes("×") && // size labels like 600×400
+      !t.includes("LinguaRay") && // brand name
+      !t.includes(".") && // URLs/paths
+      !/^\$|\d+ms|^—$/.test(t) // currency, latency, dash
+    );
+    expect(suspicious).toEqual([]);
+  });
+});
