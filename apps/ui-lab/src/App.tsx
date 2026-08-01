@@ -12,7 +12,12 @@ import "./App.css";
 
 type Theme = "light" | "dark";
 type Motion = "full" | "reduced";
-type WindowSize = { w: number; h: number; key: "single" | "expanded"; label: string };
+type WindowSize = {
+  w: number;
+  h: number;
+  key: "single" | "expanded";
+  label: string;
+};
 
 type NavKey =
   | "selection-popup"
@@ -20,6 +25,7 @@ type NavKey =
   | "provider-center"
   | "ocr-overlay"
   | "history"
+  | "tray-menubar"
   | "onboarding"
   | "multi-result"
   | "shortcuts"
@@ -31,28 +37,37 @@ type NavKey =
   | "external-api"
   | "updater";
 
+// Complete S0 §4.1 state matrix.
 const SELECTION_STATES: SelectionState[] = [
+  "initial-hidden",
   "loading",
   "success-single",
   "success-dual",
   "success-multi",
   "partial",
   "error-network",
-  "error-config",
+  "error-config-key",
+  "error-config-401",
   "error-no-selection",
   "error-no-provider",
   "error-no-permission",
   "keystore-corrupt",
-  "offline",
+  "offline-fallback",
+  "offline-error",
   "pinned",
 ];
 
-const NAV_ITEMS: { key: NavKey; labelKey: keyof (typeof strings)["en"]["nav"] }[] = [
+// All S0 §4.1–§4.16 surfaces (16 total, including §4.6 Tray/Menu-bar).
+const NAV_ITEMS: {
+  key: NavKey;
+  labelKey: keyof (typeof strings)["en"]["nav"];
+}[] = [
   { key: "selection-popup", labelKey: "selectionPopup" },
   { key: "input-window", labelKey: "inputWindow" },
   { key: "provider-center", labelKey: "providerCenter" },
   { key: "ocr-overlay", labelKey: "ocrOverlay" },
   { key: "history", labelKey: "history" },
+  { key: "tray-menubar", labelKey: "trayMenubar" },
   { key: "onboarding", labelKey: "onboarding" },
   { key: "multi-result", labelKey: "multiResult" },
   { key: "shortcuts", labelKey: "shortcuts" },
@@ -65,8 +80,7 @@ const NAV_ITEMS: { key: NavKey; labelKey: keyof (typeof strings)["en"]["nav"] }[
   { key: "updater", labelKey: "updater" },
 ];
 
-// Only selection-popup is implemented in this first vertical slice; the rest
-// are nav placeholders for upcoming slices.
+// Only selection-popup is implemented in this first vertical slice.
 const IMPLEMENTED: NavKey[] = ["selection-popup"];
 
 const App: Component = () => {
@@ -80,6 +94,8 @@ const App: Component = () => {
   const selT = createMemo(() => t().selection);
 
   // Window size follows MASTER §8.2: multi-engine states use the expanded max.
+  // Compact states (loading, initial-hidden) render a small card at the cursor;
+  // the frame still reserves 400×300 but the body shrinks to content.
   const isMultiState = () =>
     selState() === "success-dual" ||
     selState() === "success-multi" ||
@@ -110,6 +126,7 @@ const App: Component = () => {
           <div class="lab__control">
             <span class="lab__control-label">{t().controls.locale}</span>
             <Segmented
+              ariaLabel={t().controls.localeGroup}
               value={locale()}
               options={[
                 { value: "en", label: "EN" },
@@ -122,6 +139,7 @@ const App: Component = () => {
           <div class="lab__control">
             <span class="lab__control-label">{t().controls.theme}</span>
             <Segmented
+              ariaLabel={t().controls.themeGroup}
               value={theme()}
               options={[
                 { value: "light", label: t().controls.themeLight },
@@ -134,6 +152,7 @@ const App: Component = () => {
           <div class="lab__control">
             <span class="lab__control-label">{t().controls.motion}</span>
             <Segmented
+              ariaLabel={t().controls.motionGroup}
               value={motion()}
               options={[
                 { value: "full", label: t().controls.motionFull },
@@ -146,13 +165,13 @@ const App: Component = () => {
           <div class="lab__control">
             <span class="lab__control-label">{t().controls.windowSize}</span>
             <Segmented
+              ariaLabel={t().controls.windowSizeGroup}
               value={windowSize().key}
               options={[
                 { value: "single", label: t().controls.size400x300 },
                 { value: "expanded", label: t().controls.size600x400 },
               ]}
               onChange={(v) => {
-                // Manual size override: jump to a representative state.
                 if (v === "expanded") setSelState("success-dual");
                 else setSelState("success-single");
               }}
@@ -161,29 +180,30 @@ const App: Component = () => {
         </div>
       </header>
 
-      <nav class="lab__nav" aria-label="Prototypes">
+      <nav class="lab__nav" aria-label={t().navGroupLabel}>
         <ul class="lab__nav-list">
           <For each={NAV_ITEMS}>
-            {(item) => (
-              <li>
-                <button
-                  class="lr-focusable"
-                  aria-current={nav() === item.key ? "page" : undefined}
-                  disabled={!IMPLEMENTED.includes(item.key)}
-                  onClick={() => setNav(item.key)}
-                  title={
-                    IMPLEMENTED.includes(item.key)
-                      ? undefined
-                      : "Upcoming slice"
-                  }
-                >
-                  {t().nav[item.labelKey]}
-                  <Show when={!IMPLEMENTED.includes(item.key)}>
-                    <span class="lr-visually-hidden"> (not yet implemented)</span>
-                  </Show>
-                </button>
-              </li>
-            )}
+            {(item) => {
+              const implemented = IMPLEMENTED.includes(item.key);
+              return (
+                <li>
+                  <button
+                    class="lr-focusable"
+                    aria-current={nav() === item.key ? "page" : undefined}
+                    disabled={!implemented}
+                    onClick={() => setNav(item.key)}
+                  >
+                    {t().nav[item.labelKey]}
+                    <Show when={!implemented}>
+                      <span class="lr-visually-hidden">
+                        {" "}
+                        ({t().notImplemented})
+                      </span>
+                    </Show>
+                  </button>
+                </li>
+              );
+            }}
           </For>
         </ul>
       </nav>
@@ -199,7 +219,7 @@ const App: Component = () => {
                     NAV_ITEMS.find((i) => i.key === nav())!.labelKey
                   ]}
                 </p>
-                <p class="lab__frame-placeholder-sub">Upcoming slice</p>
+                <p class="lab__frame-placeholder-sub">{t().upcomingSlice}</p>
               </div>
             }
           >
@@ -224,7 +244,11 @@ const App: Component = () => {
         </div>
 
         <Show when={nav() === "selection-popup"}>
-          <div class="lab__state-bar" role="group" aria-label={t().controls.state}>
+          <div
+            class="lab__state-bar"
+            role="group"
+            aria-label={t().controls.state}
+          >
             <span class="lab__state-label">{t().controls.state}</span>
             <For each={SELECTION_STATES}>
               {(s) => (
@@ -245,25 +269,25 @@ const App: Component = () => {
   );
 };
 
-// --- Small Segmented control ----------------------------------------------
+// --- Segmented control ----------------------------------------------------
 
 type SegmentedProps = {
   value: string;
   options: { value: string; label: string }[];
   onChange: (v: string) => void;
-  disabled?: boolean;
+  /** Required accessible name for the group. */
+  ariaLabel: string;
 };
 
 const Segmented: Component<SegmentedProps> = (props) => {
   return (
-    <div class="lab__segmented" role="group">
+    <div class="lab__segmented" role="group" aria-label={props.ariaLabel}>
       <For each={props.options}>
         {(opt) => (
           <button
             type="button"
             class="lr-focusable"
             aria-pressed={props.value === opt.value ? "true" : "false"}
-            disabled={props.disabled}
             onClick={() => props.onChange(opt.value)}
           >
             {opt.label}

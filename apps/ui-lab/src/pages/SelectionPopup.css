@@ -16,13 +16,60 @@
   box-shadow: var(--shadow-md);
 }
 
-/* Loading: small centered card at cursor */
+/* Compact mode: loading + initial-hidden render a small card at the cursor
+   (~200×40), NOT the full frame. Shrink to content, center the frame's space. */
+.sel-popup__body--compact {
+  height: auto;
+  width: max-content;
+  min-width: 200px;
+  max-width: 240px;
+  padding: var(--space-md) var(--space-lg);
+  align-self: center;
+  justify-self: center;
+  margin: auto;
+}
+
+/* Initial hidden: invisible body; show only a muted hint so the frame isn't
+   a confusing blank rectangle. */
+.sel-popup__hidden {
+  font-size: var(--text-xs);
+  line-height: var(--text-xs--line-height);
+  color: var(--color-fg-muted);
+  text-align: center;
+}
+
+/* Loading: compact pill "… Translating…" */
 .sel-popup__loading {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  flex: 1 1 auto;
-  min-height: 0;
+  gap: var(--space-sm);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+  color: var(--color-fg);
+}
+
+.sel-popup__loading-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-primary-fg);
+  animation: lr-pulse 0.9s var(--ease-standard) infinite;
+}
+
+@keyframes lr-pulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+
+/* Settings-opened toast */
+.sel-popup__toast {
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+  color: var(--color-success-fg);
+  background: var(--color-bg-hover);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-sm);
+  align-self: flex-start;
 }
 
 /* Error card */
@@ -55,7 +102,7 @@
   gap: var(--space-sm);
 }
 
-/* Results: side-by-side for multi, single column for single. */
+/* Results: side-by-side for multi. */
 .sel-popup__results {
   display: flex;
   flex-direction: row;
@@ -65,23 +112,28 @@
   height: 100%;
 }
 
-/* When only one card, let it fill width. */
-.sel-popup__results:not([data-scroll]) .lr-result-card:only-child {
-  flex: 1 1 auto;
+/* Exactly 2 results: two EQUAL flexible columns filling the width.
+   min-width 200px preserves MASTER §8.2 floor; flex:1 1 0 makes them share
+   the container evenly instead of leaving a blank third of the frame. */
+.sel-popup__results--dual .lr-result-card {
+  flex: 1 1 0;
+  min-width: 200px;
+  max-height: 100%;
 }
 
-/* Multi: each card min 200px; horizontal scroll when overflowing the window. */
+/* 3+ results: fixed min-width cards, horizontal scroll when overflowing. */
 .sel-popup__results--scroll {
   overflow-x: auto;
   overflow-y: hidden;
 }
-
 .sel-popup__results--scroll .lr-result-card {
   flex: 0 0 200px;
   max-height: 100%;
 }
 
-/* Single (non-scroll): card fills available width. */
-.sel-popup__results:not(.sel-popup__results--scroll) .lr-result-card {
+/* Single (non-multi): card fills available width. */
+.sel-popup__results:not(.sel-popup__results--dual):not(
+    .sel-popup__results--scroll
+  ) .lr-result-card:only-child {
   flex: 1 1 auto;
 }
