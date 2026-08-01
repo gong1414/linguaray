@@ -19,6 +19,8 @@ export type SelectProps = {
   placeholder?: string;
   /** Loading: trigger becomes disabled + aria-busy + spinner (§4.3 Loading models). */
   loading?: boolean;
+  /** Accessible label for the loading spinner (i18n). Default: "Loading…". */
+  loadingLabel?: string;
   /** When present, shows Select.ErrorMessage + validationState=invalid. */
   errorText?: string;
   /** Optional helper description below the trigger. */
@@ -96,7 +98,7 @@ const Select: Component<SelectProps> = (props) => {
             <ChevronDown class="lr-select__icon" size={16} aria-hidden="true" />
           }
         >
-          <Spinner size={12} label="Loading options…" />
+          <Spinner size={12} label={props.loadingLabel ?? "Loading…"} />
         </Show>
       </KobalteSelect.Trigger>
 

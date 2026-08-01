@@ -10,6 +10,8 @@ export type BannerProps = {
   description?: string;
   action?: JSX.Element;
   onDismiss?: () => void;
+  /** Accessible label for the dismiss button (i18n). Default: "Dismiss". */
+  dismissLabel?: string;
   class?: string;
 };
 
@@ -37,7 +39,7 @@ const Banner: Component<BannerProps> = (props) => {
         <button
           type="button"
           class="lr-banner__dismiss lr-focusable"
-          aria-label="Dismiss"
+          aria-label={props.dismissLabel ?? "Dismiss"}
           onClick={() => props.onDismiss?.()}
         >
           <X size={16} aria-hidden="true" />

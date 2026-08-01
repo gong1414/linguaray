@@ -82,7 +82,7 @@ describe("Confirm", () => {
     expect(open).toBe(false);
   });
 
-  it("Cancel initial focus on destructive (Cancel is focused, not Confirm)", () => {
+  it("Cancel initial focus on destructive (Cancel is focused, not Confirm)", async () => {
     render(() => (
       <Confirm
         open={true}
@@ -96,9 +96,12 @@ describe("Confirm", () => {
         onCancel={() => {}}
       />
     ));
-    // The Cancel button should be in the DOM and focusable
-    const cancelBtn = screen.getByRole("button", { name: "Cancel" });
-    expect(cancelBtn).toBeTruthy();
+    // Kobante moves focus into the dialog on open. Assert the actual
+    // activeElement is the Cancel button, not the Delete button.
+    await new Promise((r) => setTimeout(r, 100));
+    const active = document.activeElement;
+    expect(active).toBeTruthy();
+    expect(active?.textContent).toContain("Cancel");
   });
 
   it("Enter key does not confirm destructive (Cancel is default-focused)", () => {

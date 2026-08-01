@@ -9,6 +9,10 @@
   min-height: 0;
   overflow: hidden;
   background: var(--color-bg);
+  /* Container query: measures the ACTUAL settings frame width, not the
+     browser viewport. This lets the 600-699px icon-only rail rule fire
+     inside a simulated 600px frame even when the browser is 1280px wide. */
+  container-type: inline-size;
 }
 
 /* Preset grid (add-provider) */
@@ -109,6 +113,14 @@
 .pc__provider-row[data-status="deleting"] {
   opacity: 0.5;
   pointer-events: none;
+}
+
+.pc__deleting-overlay {
+  position: absolute;
+  top: var(--space-sm);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
 }
 
 .pc__reorder-controls {
@@ -231,12 +243,29 @@
   z-index: 1000;
 }
 
-/* Responsive: sidebar collapses (§8.3 — no horizontal overflow) */
-@media (max-width: 700px) {
+/* §8.3 adaptive: 600-699px → icon-only sidebar rail (labels hidden, shown
+   as title tooltips); ≥700px → full labels. Uses container query so the rule
+   fires based on the Settings frame width, NOT the browser viewport. */
+@container (max-width: 699px) {
   .pc__layout {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(180px, 1fr) 1fr;
+    gap: var(--space-sm);
   }
-  .pc__sidebar {
-    overflow-x: auto;
+  .pc__sidebar-title,
+  .pc__sidebar-header > .lr-btn {
+    font-size: 0;
+  }
+  .pc__sidebar-header > .lr-btn svg {
+    font-size: initial;
+  }
+  .pc__role-actions {
+    /* Compact: hide text labels, keep icons */
+    gap: var(--space-xs);
+  }
+}
+
+@container (max-width: 699px) {
+  .pc__provider-card__name {
+    font-size: var(--text-sm);
   }
 }
