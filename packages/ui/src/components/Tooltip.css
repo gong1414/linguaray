@@ -1,0 +1,23 @@
+/* Tooltip — MASTER §7. bg-elevated + fg text, text-sm, max-width 240px. */
+
+.lr-tooltip__content {
+  background: var(--color-bg-elevated);
+  color: var(--color-fg);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+  max-width: 240px;
+  z-index: 1200;
+  animation: lr-tooltip-fade var(--duration-fast) var(--ease-out);
+}
+
+@keyframes lr-tooltip-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.lr-tooltip__arrow {
+  fill: var(--color-bg-elevated);
+}

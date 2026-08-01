@@ -1,0 +1,86 @@
+import { Dialog as KobalteDialog } from "@kobalte/core/dialog";
+import { type Component } from "solid-js";
+import Button from "./Button";
+import "./Dialog.css";
+
+export type ConfirmVariant = "primary" | "destructive";
+
+export type ConfirmProps = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: string;
+  message: string;
+  confirmLabel: string;
+  cancelLabel: string;
+  variant?: ConfirmVariant;
+  onConfirm: () => void;
+  onCancel: () => void;
+};
+
+/**
+ * MASTER §7 Confirm. Destructive variant: initial focus lands on Cancel
+ * (NOT Confirm) to prevent accidental destructive action via Enter. Achieved
+ * by intercepting onOpenAutoFocus → preventDefault + ref-focus Cancel.
+ */
+const Confirm: Component<ConfirmProps> = (props) => {
+  const variant = () => props.variant ?? "primary";
+  let cancelRef: HTMLButtonElement | undefined;
+
+  const handleConfirm = () => {
+    props.onConfirm();
+    props.onOpenChange(false);
+  };
+
+  const handleCancel = () => {
+    props.onCancel();
+    props.onOpenChange(false);
+  };
+
+  return (
+    <KobalteDialog open={props.open} onOpenChange={props.onOpenChange}>
+      <KobalteDialog.Portal>
+        <KobalteDialog.Overlay class="lr-dialog__overlay" />
+        <KobalteDialog.Content
+          class="lr-dialog__content"
+          onOpenAutoFocus={(e) => {
+            // Destructive: force focus onto Cancel (never Confirm) so Enter
+            // can't accidentally trigger the destructive action.
+            if (variant() === "destructive") {
+              e.preventDefault();
+              cancelRef?.focus();
+            }
+          }}
+        >
+          {/* Destructive: override auto-focus to land on Cancel, not the
+              default first-focusable (which would be Cancel here anyway since
+              it's first in DOM, but we make it explicit + robust). */}
+          <KobalteDialog.Title class="lr-dialog__title">
+            {props.title}
+          </KobalteDialog.Title>
+          <KobalteDialog.Description class="lr-dialog__description">
+            {props.message}
+          </KobalteDialog.Description>
+          <div class="lr-dialog__footer">
+            <Button
+              variant="secondary"
+              size="md"
+              ref={cancelRef}
+              onClick={handleCancel}
+            >
+              {props.cancelLabel}
+            </Button>
+            <Button
+              variant={variant() === "destructive" ? "destructive" : "primary"}
+              size="md"
+              onClick={handleConfirm}
+            >
+              {props.confirmLabel}
+            </Button>
+          </div>
+        </KobalteDialog.Content>
+      </KobalteDialog.Portal>
+    </KobalteDialog>
+  );
+};
+
+export default Confirm;

@@ -1,0 +1,99 @@
+/* Banner + Toast — MASTER §7.
+ * Banner = full-width, top of content. Toast = bottom-right.
+ * Colors: *-fill bg + on-*-fill text. */
+
+.lr-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+  width: 100%;
+  padding: var(--space-md) var(--space-lg);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+}
+
+.lr-banner__content {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.lr-banner__title {
+  font-weight: var(--text-md--weight);
+}
+
+.lr-banner__description {
+  opacity: 0.9;
+}
+
+.lr-banner__action {
+  flex: 0 0 auto;
+}
+
+.lr-banner__dismiss {
+  flex: 0 0 auto;
+}
+
+/* Variant fills */
+.lr-banner--info {
+  background: var(--color-info-fill);
+  color: var(--color-on-info-fill);
+}
+.lr-banner--success {
+  background: var(--color-success-fill);
+  color: var(--color-on-success-fill);
+}
+.lr-banner--warning {
+  background: var(--color-warning-fill);
+  color: var(--color-on-warning-fill);
+}
+.lr-banner--destructive {
+  background: var(--color-destructive-fill);
+  color: var(--color-on-destructive-fill);
+}
+
+/* Toast */
+.lr-toast {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+  max-width: 360px;
+  animation: lr-toast-in var(--duration-base) var(--ease-out);
+}
+
+@keyframes lr-toast-in {
+  from { opacity: 0; transform: translateX(16px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.lr-toast__message {
+  flex: 1 1 auto;
+}
+
+.lr-toast__dismiss {
+  flex: 0 0 auto;
+}
+
+.lr-toast--info {
+  background: var(--color-info-fill);
+  color: var(--color-on-info-fill);
+}
+.lr-toast--success {
+  background: var(--color-success-fill);
+  color: var(--color-on-success-fill);
+}
+.lr-toast--warning {
+  background: var(--color-warning-fill);
+  color: var(--color-on-warning-fill);
+}
+.lr-toast--destructive {
+  background: var(--color-destructive-fill);
+  color: var(--color-on-destructive-fill);
+}
