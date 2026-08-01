@@ -108,32 +108,31 @@ Final window specs are in **`MASTER.md` §8**. Key decisions recorded here:
   separate panel/window (eliminates the "expand or open separate" ambiguity).
 - **Pinned popup:** does NOT hide on blur. Only unpinned popups auto-dismiss.
 - **Settings adaptive:** tested at 600×400 min. Sidebar collapses to icon-only
-  rail at <700px; hamburger overlay at <500px. No horizontal overflow on the window.
+  rail at 600–699px. No hamburger path (min is 600px). No horizontal overflow.
 - **Onboarding:** uses 600×400 min (same as settings); single-column flow.
 
 ---
 
-## 6. Focus, Keyboard, Contrast, Reduced-Motion
+## 6. Focus, Keyboard, Motion, Contrast — See MASTER.md
 
-Adopted from skill UX rules (priority 1: Accessibility):
+All final values, contrast ratios, and rules are in **`MASTER.md` §1, §5, §6, §10**.
+This section records only the decision rationale:
 
-- **Focus rings:** always visible; `--color-ring` 3px box-shadow on `:focus-visible`.
-  Never `outline: none` without a replacement.
-- **Keyboard navigation:** Tab order follows visual order. All actions reachable
-  via keyboard. Input window: Enter = translate, Shift+Enter = newline, Esc = close.
-- **Contrast:** WCAG AA minimum (4.5:1 body text, 3:1 large text). Both light and
-  dark themes verified.
-- **Reduced motion:** `@media (prefers-reduced-motion: reduce)` → all transitions
-  reduced to `opacity` only (no `transform`), duration ≤ 100ms. Popup show/hide
-  uses fade, not slide.
-- **Icon-only buttons:** must have `aria-label` (skill anti-pattern rule).
+- **Focus:** skill recommended focus rings; we adopt opaque `--color-ring` + `outline`
+  (not box-shadow). Details in MASTER.md §6.
+- **Keyboard:** adopted from skill UX priority-1 rules. Details in MASTER.md §10.
+- **Motion:** adopted subtle tier from skill. Durations/easing in MASTER.md §5.
+  Reduced-motion: 1ms for transitions, but spinners get a static + text fallback
+  (not a freeze). See MASTER.md §5 exception.
+- **Contrast:** all ratios independently computed via WCAG formula and recorded
+  in MASTER.md §1 tables.
 
 ---
 
 ## 7. Icon Set
 
-**Lucide Solid** (per spec §S1 tech stack). The skill recommended Phosphor, but
-the spec already fixed Lucide. Key icons:
+**Lucide via `lucide-solid`** (SolidJS binding; standard outline icons — no filled
+variants). The skill recommended Phosphor; overridden to Lucide per spec. Key icons:
 
 | Action | Lucide name | Usage |
 |---|---|---|
