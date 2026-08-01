@@ -35,20 +35,23 @@ const Confirm: Component<ConfirmProps> = (props) => {
   const handleConfirm = () => {
     props.onConfirm();
     props.onOpenChange(false);
-    restoreFocus();
   };
 
   const handleCancel = () => {
     props.onCancel();
     props.onOpenChange(false);
-    restoreFocus();
   };
 
+  // Unified focus restore: called by onCloseAutoFocus for ALL close paths
+  // (Cancel click, Esc, overlay dismiss, controlled open=false).
+  // Trigger may be disabled (e.g. after destructive Confirm deletes the
+  // provider) — fall back to the next focusable element in the document.
   const restoreFocus = () => {
-    if (props.triggerRef?.current) {
-      const el = props.triggerRef.current;
-      setTimeout(() => el.focus(), 0);
-    }
+    const trigger = props.triggerRef?.current;
+    const target = (trigger && document.contains(trigger) && !trigger.hasAttribute("disabled"))
+      ? trigger
+      : document.querySelector<HTMLElement>("button:not([disabled]):not([aria-disabled='true'])");
+    target?.focus();
   };
 
   return (
@@ -62,6 +65,10 @@ const Confirm: Component<ConfirmProps> = (props) => {
               e.preventDefault();
               cancelRef?.focus();
             }
+          }}
+          onCloseAutoFocus={(e: Event) => {
+            e.preventDefault();
+            restoreFocus();
           }}
         >
           {/* Destructive: override auto-focus to land on Cancel, not the

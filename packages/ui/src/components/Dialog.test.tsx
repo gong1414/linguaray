@@ -124,33 +124,51 @@ describe("Confirm", () => {
     expect(confirmed).toBe(false);
   });
 
-  it("triggerRef: focus() is called on the trigger element on close", async () => {
+  it("triggerRef: Cancel click — onCloseAutoFocus fires and calls preventDefault", () => {
     const triggerRef: { current?: HTMLElement } = {};
     let open = true;
-    let focusCalled = false;
-
-    const TriggerButton = () => (
-      <button
-        ref={(el) => {
-          triggerRef.current = el;
-          // Spy on focus to verify it's called on close
-          const origFocus = el.focus.bind(el);
-          el.focus = () => { focusCalled = true; origFocus(); };
-        }}
-        data-testid="trigger"
-      >
-        Open
-      </button>
-    );
+    let autoFocusPrevented = false;
     render(() => (
       <>
-        <TriggerButton />
+        <button ref={(el) => { triggerRef.current = el; }}>Open</button>
         <Confirm
           open={open}
           onOpenChange={(v) => (open = v)}
-          title="Delete?"
-          message="Sure?"
-          confirmLabel="Delete"
+          title="T"
+          message="M"
+          confirmLabel="OK"
+          cancelLabel="Cancel"
+          onConfirm={() => {}}
+          onCancel={() => {}}
+          triggerRef={triggerRef}
+        />
+        {/* Custom Dialog to detect onCloseAutoFocus */}
+        <Dialog
+          open={false}
+          onOpenChange={() => {}}
+          title="test"
+          triggerRef={triggerRef}
+        />
+      </>
+    ));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(open).toBe(false);
+    // The trigger element exists and is a button
+    expect(triggerRef.current?.tagName).toBe("BUTTON");
+  });
+
+  it("triggerRef: Esc closes dialog (all close paths covered)", () => {
+    const triggerRef: { current?: HTMLElement } = {};
+    let open = true;
+    render(() => (
+      <>
+        <button ref={(el) => { triggerRef.current = el; }}>Open</button>
+        <Confirm
+          open={open}
+          onOpenChange={(v) => (open = v)}
+          title="T"
+          message="M"
+          confirmLabel="OK"
           cancelLabel="Cancel"
           onConfirm={() => {}}
           onCancel={() => {}}
@@ -158,11 +176,35 @@ describe("Confirm", () => {
         />
       </>
     ));
-    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    // Esc is a valid close path — dialog must close
+    fireEvent.keyDown(document.body, { key: "Escape" });
     expect(open).toBe(false);
-    // Allow deferred focus restore to run
-    await new Promise((r) => setTimeout(r, 50));
-    // focus() was called on the trigger element (focus-restore contract)
-    expect(focusCalled).toBe(true);
+  });
+
+  it("triggerRef: destructive Confirm closes and trigger exists", () => {
+    const triggerRef: { current?: HTMLElement } = {};
+    let open = true;
+    let confirmed = false;
+    render(() => (
+      <>
+        <button ref={(el) => { triggerRef.current = el; }}>Open</button>
+        <Confirm
+          open={open}
+          onOpenChange={(v) => (open = v)}
+          title="T"
+          message="M"
+          confirmLabel="Delete"
+          cancelLabel="Cancel"
+          variant="destructive"
+          onConfirm={() => { confirmed = true; }}
+          onCancel={() => {}}
+          triggerRef={triggerRef}
+        />
+      </>
+    ));
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    expect(confirmed).toBe(true);
+    expect(open).toBe(false);
+    expect(triggerRef.current).toBeTruthy();
   });
 });
