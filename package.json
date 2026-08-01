@@ -9,7 +9,11 @@
     "dev": "vite",
     "build": "vite build",
     "serve": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "test:ui": "pnpm --filter @linguaray/ui test",
+    "test:ui-lab": "pnpm --filter @linguaray/ui-lab test"
   },
   "license": "MIT",
   "dependencies": {
