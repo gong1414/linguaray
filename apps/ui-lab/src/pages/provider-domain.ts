@@ -235,6 +235,41 @@ export function isConsentValid(
   return currentKey === storedKey;
 }
 
+/**
+ * Pure consent transition function. Used by commitProviderState and
+ * handleSaveProfile to determine the next consent key after a state change.
+ *
+ * Rules:
+ * - If an approved key is provided AND it matches the new scope → use it.
+ *   (Only Consent Confirm provides approvedKey.)
+ * - If previous consent matched the OLD scope AND the new scope is identical
+ *   → preserve (scope unchanged).
+ * - Otherwise → null (invalidated). NEVER auto-mint.
+ *
+ * @param previous    The current consent key (may be null = never approved).
+ * @param oldScopeKey The canonical key of the OLD provider/selection state.
+ * @param newScopeKey The canonical key of the NEW provider/selection state.
+ * @param approved    Optional approved key from Consent Confirm.
+ * @returns The next consent key (null if invalidated/unapproved).
+ */
+export function resolveConsentKey(
+  previous: string | null,
+  oldScopeKey: string,
+  newScopeKey: string,
+  approved?: string,
+): string | null {
+  // Approved key: only valid if it matches the new scope exactly
+  if (approved !== undefined) {
+    return approved === newScopeKey ? approved : null;
+  }
+  // Preserve: previous was valid for the old scope, and scope hasn't changed
+  if (previous !== null && previous === oldScopeKey && newScopeKey === oldScopeKey) {
+    return previous;
+  }
+  // Otherwise: invalidate (null). Never auto-mint.
+  return null;
+}
+
 // --- Endpoint validator ---------------------------------------------------
 
 /**

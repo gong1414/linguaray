@@ -34,6 +34,7 @@ import {
   validateActiveSelection,
   buildConsentScope,
   consentScopeKey,
+  resolveConsentKey,
   validateEndpoint,
   TRADITIONAL_TEMPLATES,
 } from "./provider-domain";
@@ -176,14 +177,7 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
     const oldScopeKey = consentScopeKey(buildConsentScope(selection(), providers()));
     const newScope = buildConsentScope(nextSelection, nextProviders);
     const newKey = consentScopeKey(newScope);
-    const previousConsent = consentKey();
-    // If an approved key is provided, use it. Otherwise preserve only if
-    // the scope hasn't changed and consent was already valid.
-    const nextConsent = approvedConsentKey !== undefined
-      ? approvedConsentKey
-      : (previousConsent !== null && previousConsent === oldScopeKey && newKey === oldScopeKey
-          ? previousConsent
-          : null);
+    const nextConsent = resolveConsentKey(consentKey(), oldScopeKey, newKey, approvedConsentKey);
     batch(() => {
       setProviders(nextProviders);
       setSelection(nextSelection);
@@ -1233,6 +1227,7 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
         onConfirm={confirmConsent}
         onCancel={cancelConsent}
         triggerRef={consentTriggerRef}
+        fallbackFocusRef={sidebarFallbackRef}
       >
         <ul class="pc__consent-list">
           <For each={consentRecipients()}>
