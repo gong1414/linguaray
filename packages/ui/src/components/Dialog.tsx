@@ -9,6 +9,8 @@ export type DialogProps = {
   description?: string;
   children?: JSX.Element;
   footer?: JSX.Element;
+  /** Ref to the trigger element. On close, focus is restored to it. */
+  triggerRef?: { current?: HTMLElement };
   class?: string;
 };
 
@@ -24,6 +26,11 @@ const Dialog: Component<DialogProps> = (props) => {
         <KobalteDialog.Overlay class="lr-dialog__overlay" />
         <KobalteDialog.Content
           class={`lr-dialog__content${props.class ? ` ${props.class}` : ""}`}
+          onCloseAutoFocus={() => {
+            if (props.triggerRef?.current) {
+              props.triggerRef.current.focus();
+            }
+          }}
         >
           <KobalteDialog.Title class="lr-dialog__title">
             {props.title}

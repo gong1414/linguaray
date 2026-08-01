@@ -336,7 +336,7 @@ describe("Provider Center — away→back does not leave busy state", () => {
     cleanup();
   });
 
-  it("connection test: switch away→back, no stale busy spinner", () => {
+  it("connection test: switch away→back, no stale result AND no residual busy", () => {
     render(() => <App />);
     goToProviderCenter();
     clickStateChip("Drag to reorder");
@@ -349,30 +349,38 @@ describe("Provider Center — away→back does not leave busy state", () => {
     vi.advanceTimersByTime(1300);
     // No "Connected" shown for #2 (the test was cancelled on switch)
     expect(screen.queryByText(/Connected/)).toBeNull();
+    // No residual spinner (busy state cleared on provider switch)
+    const testBtn = screen.queryByRole("button", { name: "Test" });
+    expect(testBtn?.hasAttribute("disabled")).toBe(false);
+    expect(testBtn?.getAttribute("aria-busy")).toBeNull();
   });
 });
 
 // --- Key DOM clear test (P1#2) -------------------------------------------
 
 describe("Provider Center — key cleared from DOM at submit", () => {
-  beforeEach(() => vi.useFakeTimers());
-  afterEach(() => {
-    vi.useRealTimers();
-    cleanup();
-  });
+  afterEach(() => cleanup());
 
-  it("typed key is NOT in DOM after clicking Save", () => {
+  it("typed key is cleared from input.value at submit (not just innerHTML)", async () => {
+    // Use real timers for this test — we need Solid's microtask render flush.
     render(() => <App />);
     goToProviderCenter();
     clickStateChip("Drag to reorder");
     fireEvent.click(screen.getByRole("button", { name: "Edit OpenAI #2" }));
-    const keyInput = screen.getByPlaceholderText(strings.en.provider.apiKeyPlaceholder);
+    const keyInput = screen.getByPlaceholderText(strings.en.provider.apiKeyPlaceholder) as HTMLInputElement;
+    // Type a key — assert input.value actually received it
     fireEvent.input(keyInput, { target: { value: "sk-secret-key-abc123def456" } });
+    expect(keyInput.value).toBe("sk-secret-key-abc123def456");
+    // Click Save
     fireEvent.click(screen.getByRole("button", { name: "Save key" }));
-    // The key string must NOT be anywhere in the DOM
-    expect(document.body.innerHTML).not.toContain("sk-secret-key-abc123def456");
-    // Advance to completion — still no key in DOM
-    vi.advanceTimersByTime(1100);
+    // Allow Solid's reactive render to flush (microtask)
+    await new Promise((r) => setTimeout(r, 10));
+    // input.value must be cleared at submit start
+    const remainingInput = screen.queryByPlaceholderText(strings.en.provider.apiKeyPlaceholder) as HTMLInputElement | null;
+    if (remainingInput) {
+      expect(remainingInput.value).toBe("");
+    }
+    // If provider now has key (save completed), input is gone — still no key
     expect(document.body.innerHTML).not.toContain("sk-secret-key");
   });
 });
@@ -382,37 +390,47 @@ describe("Provider Center — key cleared from DOM at submit", () => {
 describe("Provider Center — Chinese automated scan", () => {
   afterEach(() => cleanup());
 
-  it("no untranslated English in zh accessible names or visible text", () => {
+  // Strict allowlist: only propnoun provider/brand names, URLs, model IDs,
+  // version numbers, and numeric values. NO broad "." inclusion.
+  const isAllowed = (t: string): boolean => {
+    if (/^(OpenAI|DeepSeek|Google|GPT|gpt-|Ollama|Anthropic|Gemini|DeepL|LinguaRay)/i.test(t)) return true;
+    if (/^https?:\/\//.test(t)) return true; // URLs
+    if (/^localhost(:\d+)?/.test(t)) return true;
+    if (/^mock-/.test(t)) return true;
+    if (/^\$[\d.]+/.test(t)) return true; // currency
+    if (/^\d+ms$/.test(t)) return true; // latency
+    if (t === "—") return true;
+    return false;
+  };
+
+  // Parametrize across representative states to catch state-specific English.
+  const zhStates = ["连接成功", "密钥已保存", "缺少密钥", "删除确认", "删除中", "余额错误"];
+
+  it.each(zhStates)("zh state '%s' has no untranslated English", (zhLabel) => {
     const { container } = render(() => <App />);
     goToProviderCenter();
     fireEvent.click(screen.getByRole("button", { name: "中文" }));
-    // Switch to a populated state
     const stateBar = screen.getByRole("group", { name: "状态" });
     const chips = [...stateBar.querySelectorAll("button")];
-    const chip = chips.find((b) => b.textContent === "连接成功");
+    const chip = chips.find((b) => b.textContent === zhLabel);
     if (chip) fireEvent.click(chip);
 
-    // Collect all aria-labels and visible button text
+    // Collect all aria-labels + visible text
     const texts: string[] = [];
     container.querySelectorAll("[aria-label]").forEach((el) => {
       texts.push(el.getAttribute("aria-label") || "");
     });
-    container.querySelectorAll("button, span, h2, h3, p").forEach((el) => {
+    container.querySelectorAll("button, span, h2, h3, p, li").forEach((el) => {
       const t = el.textContent?.trim();
       if (t && t.length > 2) texts.push(t);
     });
 
-    // Allowlist: provider names (+ #N suffixes), URLs, model IDs, template names
-    const allowPrefix = /^(OpenAI|DeepSeek|Google|GPT|gpt-|Ollama|Anthropic|Gemini|DeepL|http|localhost|mock-|api\.)/i;
     const suspicious = texts.filter((t) =>
       t.length > 3 &&
-      !allowPrefix.test(t) &&
+      !isAllowed(t) &&
       /[A-Za-z]{4,}/.test(t) &&
       !/[\u4e00-\u9fff]/.test(t) && // no Chinese chars
-      !t.includes("×") && // size labels like 600×400
-      !t.includes("LinguaRay") && // brand name
-      !t.includes(".") && // URLs/paths
-      !/^\$|\d+ms|^—$/.test(t) // currency, latency, dash
+      !t.includes("×") // size labels
     );
     expect(suspicious).toEqual([]);
   });
