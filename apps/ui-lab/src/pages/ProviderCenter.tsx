@@ -34,6 +34,8 @@ import {
   validateActiveSelection,
   buildConsentScope,
   consentScopeKey,
+  validateEndpoint,
+  normalizeOrigin,
   TRADITIONAL_TEMPLATES,
 } from "./provider-domain";
 import { OpRegistry, type OpKind } from "./op-registry";
@@ -99,9 +101,11 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
   // Detail panel state — all per-UUID to prevent cross-provider leakage
   const [selectedUuid, setSelectedUuid] = createSignal<string | null>("mock-openai-1");
   const [keyInputByUuid, setKeyInputByUuid] = createSignal<Record<string, string>>({});
-  const [manualModel, setManualModel] = createSignal("");
-  const [modelOverride, setModelOverride] = createSignal<Record<string, string>>({});
+  // Per-UUID profile drafts (endpoint + model). Not committed to provider
+  // fixture until handleSaveProfile. Unsaved drafts NEVER participate in
+  // consent scope — only committed providers do.
   const [endpointDraft, setEndpointDraft] = createSignal<Record<string, string>>({});
+  const [modelDraftByUuid, setModelDraftByUuid] = createSignal<Record<string, string>>({});
   // Per-UUID busy states (no globals)
   const [balanceByUuid, setBalanceByUuid] = createSignal<Record<string, "idle" | "loading" | "done" | "unsupported" | "rate-limited" | "error">>({});
   const [conflictResolved, setConflictResolved] = createSignal(false);
@@ -197,14 +201,15 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
     opRegistry.cancelAll();
     clearTrackedTimers();
     setKeyInputByUuid({});
-    setManualModel("");
+    setModelDraftByUuid({});
     setModelFetchByUuid({});
     setConnStatus({});
     setConnLatency({});
     setSaveByUuid({});
+    setProfileSaveByUuid({});
+    setEndpointErrorByUuid({});
     setBalanceByUuid({});
     setEndpointDraft({});
-    setModelOverride({});
     setConflictResolved(false);
     setRetryTargetUuid(null);
     setDeleteConfirmUuid(null);
@@ -389,6 +394,70 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
     commitProviderState(providers(), candidate);
   };
 
+  // --- profile save: validate endpoint, commit draft to provider, recalc consent ---
+  // Only committed providers participate in consent scope. Unsaved drafts
+  // never enter the recipient set.
+  const [profileSaveByUuid, setProfileSaveByUuid] = createSignal<Record<string, "idle" | "saving" | "saved" | "failed">>({});
+  const [endpointErrorByUuid, setEndpointErrorByUuid] = createSignal<Record<string, string>>({});
+
+  const handleSaveProfile = (uuid: string) => {
+    const draftEndpoint = endpointDraft()[uuid];
+    const draftModel = modelDraftByUuid()[uuid];
+    const provider = providers().find((p) => p.uuid === uuid);
+    if (!provider) return;
+
+    // Validate endpoint if changed
+    const effectiveEndpoint = draftEndpoint ?? provider.endpoint;
+    const epCheck = validateEndpoint(effectiveEndpoint);
+    if (!epCheck.ok) {
+      setEndpointErrorByUuid((prev) => ({ ...prev, [uuid]: epCheck.error! }));
+      return;
+    }
+    setEndpointErrorByUuid((prev) => {
+      const next = { ...prev };
+      delete next[uuid];
+      return next;
+    });
+
+    setProfileSaveByUuid((prev) => ({ ...prev, [uuid]: "saving" }));
+    const token = opRegistry.startOp(
+      "save" as OpKind,
+      uuid,
+      () => setProfileSaveByUuid((prev) => ({ ...prev, [uuid]: "idle" })),
+      () => {
+        // Commit: write drafts into the provider fixture
+        const oldOrigin = normalizeOrigin(provider.endpoint);
+        const newOrigin = normalizeOrigin(effectiveEndpoint);
+        const nextProviders = providers().map((p) =>
+          p.uuid === uuid
+            ? { ...p, endpoint: effectiveEndpoint, model: draftModel ?? p.model }
+            : p,
+        );
+        const sel = selection();
+        // Recompute consent scope from committed providers
+        const newScope = buildConsentScope(sel, nextProviders);
+        const newKey = consentScopeKey(newScope);
+        // Atomic batch: providers + selection + consent together
+        batch(() => {
+          setProviders(nextProviders);
+          // Only invalidate consent if origin actually changed
+          if (oldOrigin !== newOrigin && newKey !== consentKey()) {
+            setConsentKey(null);
+          } else {
+            setConsentKey(newKey);
+          }
+        });
+        // Clear the committed drafts
+        setEndpointDraft((prev) => { const n = { ...prev }; delete n[uuid]; return n; });
+        setModelDraftByUuid((prev) => { const n = { ...prev }; delete n[uuid]; return n; });
+        setProfileSaveByUuid((prev) => ({ ...prev, [uuid]: "saved" }));
+        pushToast("success", props.t.keySaved);
+      },
+      1000,
+    );
+    void token;
+  };
+
   // --- save key: CAS registry (per-UUID) ---
   // Key input cleared at SUBMISSION START (before async), regardless of outcome.
   const handleSaveKey = () => {
@@ -517,7 +586,7 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
     // (key cannot be read back from backend — only clear, never backfill)
     const provs = initialProviders();
     setEndpointDraft({});
-    setModelOverride({});
+    setModelDraftByUuid({});
     setKeyInputByUuid({});
     commitProviderState(provs, { ...DEFAULT_SELECTION });
     selectProvider(DEFAULT_SELECTION.primaryUuid);
@@ -657,7 +726,7 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
   const selectedModel = createMemo(() => {
     const uuid = selectedUuid();
     if (!uuid) return null;
-    return modelOverride()[uuid] ?? selectedProvider()?.model ?? null;
+    return modelDraftByUuid()[uuid] ?? selectedProvider()?.model ?? null;
   });
 
   // --- fetch balance: CAS registry (per-UUID) ---
@@ -918,20 +987,32 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
                 <TextField
                   label={props.t.endpoint}
                   value={endpointDraft()[p().uuid] ?? p().endpoint}
-                  disabled={isSaving()}
+                  disabled={isSaving() || (profileSaveByUuid()[p().uuid] === "saving")}
                   onInput={(e) => setEndpointDraft((prev) => ({ ...prev, [p().uuid]: e.currentTarget.value }))}
-                  errorText={props.state === "endpoint-invalid" ? props.t.endpointInvalid : undefined}
+                  errorText={endpointErrorByUuid()[p().uuid] ?? (props.state === "endpoint-invalid" ? props.t.endpointInvalid : undefined)}
                 />
+                {/* Profile Save button — commits endpoint+model draft */}
+                <Show when={endpointDraft()[p().uuid] || modelDraftByUuid()[p().uuid]}>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    loading={profileSaveByUuid()[p().uuid] === "saving"}
+                    loadingLabel={props.t.saving}
+                    onClick={() => handleSaveProfile(p().uuid)}
+                  >
+                    {props.t.saveKey}
+                  </Button>
+                </Show>
 
                 {/* Model select / manual entry */}
                 <FlowSwitch>
                   <Match when={modelFetchForSelected() === "error" || props.state === "model-manual-entry"}>
                     <TextField
                       label={props.t.manualModelEntry}
-                      value={manualModel()}
+                      value={modelDraftByUuid()[p().uuid] ?? ""}
                       placeholder={props.t.manualModelPlaceholder}
                       disabled={isSaving()}
-                      onInput={(e) => setManualModel(e.currentTarget.value)}
+                      onInput={(e) => setModelDraftByUuid((prev) => ({ ...prev, [p().uuid]: e.currentTarget.value }))}
                       helperText={modelFetchForSelected() === "error" || props.state === "model-fetch-error" ? props.t.modelFetchError : undefined}
                     />
                   </Match>
@@ -942,7 +1023,7 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
                       options={MODEL_OPTIONS}
                       onChange={(v) => {
                         const uuid = selectedUuid();
-                        if (uuid) setModelOverride((prev) => ({ ...prev, [uuid]: v }));
+                        if (uuid) setModelDraftByUuid((prev) => ({ ...prev, [uuid]: v }));
                       }}
                       disabled={isSaving()}
                       loading={modelFetchForSelected() === "loading" || props.state === "loading-models"}
