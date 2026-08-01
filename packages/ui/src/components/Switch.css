@@ -1,0 +1,50 @@
+/* Switch — MASTER §7. Wraps Kobante Switch.
+ * On: primary-fill track + white thumb. Off: border-strong track + white thumb. */
+
+.lr-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-md);
+  cursor: pointer;
+}
+
+.lr-switch--disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.lr-switch__control {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  width: 36px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--color-border-strong);
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+
+.lr-switch__control[data-checked] {
+  background: var(--color-primary-fill);
+}
+
+.lr-switch__thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-on-primary-fill);
+  transition: transform var(--duration-fast) var(--ease-standard);
+}
+
+.lr-switch__control[data-checked] .lr-switch__thumb {
+  transform: translateX(16px);
+}
+
+.lr-switch__label {
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+  color: var(--color-fg);
+}

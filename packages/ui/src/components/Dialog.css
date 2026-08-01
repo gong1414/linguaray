@@ -1,0 +1,67 @@
+/* Dialog / Confirm — MASTER §7.
+ * Overlay: bg-overlay. Dialog: bg-elevated + radius-lg + shadow-lg. */
+
+.lr-dialog__overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--color-bg-overlay);
+  z-index: 1100;
+  animation: lr-dialog-overlay var(--duration-base) var(--ease-standard);
+}
+
+@keyframes lr-dialog-overlay {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.lr-dialog__content {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--color-bg-elevated);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-xl);
+  min-width: 340px;
+  max-width: 480px;
+  z-index: 1101;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  animation: lr-dialog-content var(--duration-base) var(--ease-out);
+}
+
+@keyframes lr-dialog-content {
+  from { opacity: 0; transform: translate(-50%, -48%); }
+  to { opacity: 1; transform: translate(-50%, -50%); }
+}
+
+.lr-dialog__title {
+  font-size: var(--text-md);
+  font-weight: var(--text-md--weight);
+  line-height: var(--text-md--line-height);
+  color: var(--color-fg);
+  margin: 0;
+}
+
+.lr-dialog__description {
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+  color: var(--color-fg-muted);
+  margin: 0;
+}
+
+.lr-dialog__body {
+  font-size: var(--text-base);
+  line-height: var(--text-base--line-height);
+  color: var(--color-fg);
+}
+
+.lr-dialog__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+}
