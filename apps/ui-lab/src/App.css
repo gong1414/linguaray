@@ -170,6 +170,15 @@
   flex-direction: column;
 }
 
+/* initial-hidden: no window. A muted note replaces the frame entirely. */
+.lab__hidden-note {
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+  color: var(--color-fg-muted);
+  text-align: center;
+  max-width: 320px;
+}
+
 .lab__frame-meta {
   font-size: var(--text-xs);
   line-height: var(--text-xs--line-height);

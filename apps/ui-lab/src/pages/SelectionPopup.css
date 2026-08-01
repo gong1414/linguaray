@@ -16,29 +16,25 @@
   box-shadow: var(--shadow-md);
 }
 
-/* Compact mode: loading + initial-hidden render a small card at the cursor
-   (~200×40), NOT the full frame. Shrink to content, center the frame's space. */
+/* Pinned bar: S0 §4.1 requires Pinned to support copy/retry/TTS/favorite. */
+.sel-popup__pinned-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+  flex: 0 0 auto;
+}
+
+/* Compact mode: loading renders inside a compact ~200×40 native window (the
+   lab frame itself is sized to 200×40 by App). The body fills that frame. */
 .sel-popup__body--compact {
-  height: auto;
-  width: max-content;
-  min-width: 200px;
-  max-width: 240px;
-  padding: var(--space-md) var(--space-lg);
-  align-self: center;
-  justify-self: center;
-  margin: auto;
+  height: 100%;
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  justify-content: center;
 }
 
-/* Initial hidden: invisible body; show only a muted hint so the frame isn't
-   a confusing blank rectangle. */
-.sel-popup__hidden {
-  font-size: var(--text-xs);
-  line-height: var(--text-xs--line-height);
-  color: var(--color-fg-muted);
-  text-align: center;
-}
-
-/* Loading: compact pill "… Translating…" */
+/* Loading: compact pill "• Translating…" centered in the small window */
 .sel-popup__loading {
   display: inline-flex;
   align-items: center;

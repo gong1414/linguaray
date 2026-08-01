@@ -4,9 +4,10 @@ import {
   createSignal,
   createMemo,
   createEffect,
+  onCleanup,
   type Component,
 } from "solid-js";
-import { Copy, Volume2, Pin, PinOff, Star, AlertTriangle } from "lucide-solid";
+import { Copy, Check, Volume2, Square, Pin, PinOff, Star, AlertTriangle } from "lucide-solid";
 import {
   ResultCard,
   Button,
@@ -25,19 +26,16 @@ export type SelectionPopupProps = {
 /**
  * S0 §4.1 Selection Popup — complete state matrix.
  *
- * All actions are interactive mock state with visible feedback:
- *  - Copy → "Copied" state (label swap) for 1.5s
- *  - Pin/Unpin → toggles aria-pressed + visual selected style
- *  - Favorite → toggles aria-pressed + filled star
- *  - Retry → loading 1.2s then jumps to success-single (observable transition)
- *  - Open settings → "Opening…" → "Settings opened (mock)" toast
+ * Async-safety: every delayed mock callback (copy revert, retry→success,
+ * settings-open) is guarded by a generation token that increments on state
+ * change, AND its timer ID is tracked and cleared on state change + onCleanup.
+ * An old callback whose generation no longer matches exits without touching
+ * state, so a retry fired on "network error" can never overwrite a later
+ * switch to "401".
  *
- * The popup is rendered inside a sized frame (400×300 / 600×400) controlled by
- * the shell. Loading and initial-hidden use a COMPACT mode (~200×40 / empty)
- * per S0 §4.1: "Small card at cursor: … spinner".
+ * Pinned: the initial pinned value derives from state==="pinned" but is stored
+ * in an override map the user can flip, so Unpin actually works.
  */
-
-// --- Mock data (lab only) -------------------------------------------------
 
 type MockResult = {
   engineId: string;
@@ -54,28 +52,62 @@ const zhText = "敏捷的棕色狐狸跳过了懒狗。";
 const SelectionPopup: Component<SelectionPopupProps> = (props) => {
   // --- interactive mock state ---
   const [copiedEngine, setCopiedEngine] = createSignal<string | null>(null);
-  const [pinnedEngines, setPinnedEngines] = createSignal<Set<string>>(new Set());
+  // pin/favorite overrides: undefined = use state default; true/false = user choice
+  const [pinOverride, setPinOverride] = createSignal<Record<string, boolean>>({});
   const [favoritedEngines, setFavoritedEngines] = createSignal<Set<string>>(
     new Set(),
   );
+  const [speakingEngine, setSpeakingEngine] = createSignal<string | null>(null);
   const [retrying, setRetrying] = createSignal(false);
   const [retriedDone, setRetriedDone] = createSignal(false);
   const [settingsStatus, setSettingsStatus] = createSignal<
     "idle" | "opening" | "opened"
   >("idle");
 
-  // Reset transient mock interaction state whenever the selected state changes,
-  // so feedback from one state (e.g. a successful retry) does not leak into a
-  // different state and mask its real appearance.
+  // --- async-safety: generation token + tracked timer IDs ---
+  let generation = 0;
+  const timers = new Set<number>();
+
+  const schedule = (fn: () => void, ms: number): void => {
+    const myGen = generation;
+    const id = window.setTimeout(() => {
+      timers.delete(id);
+      // Stale guard: if the state changed since this was scheduled, do nothing.
+      if (myGen !== generation) return;
+      fn();
+    }, ms);
+    timers.add(id);
+  };
+
+  const clearAllTimers = (): void => {
+    for (const id of timers) window.clearTimeout(id);
+    timers.clear();
+  };
+
+  // On state change: bump generation (pending callbacks self-invalidate),
+  // cancel tracked timers, and reset transient mock signals. This runs before
+  // render so a stale retry callback can never overwrite the new state.
   createEffect(() => {
-    props.state; // track
+    void props.state; // track
+    generation += 1;
+    clearAllTimers();
     setCopiedEngine(null);
+    setSpeakingEngine(null);
     setRetrying(false);
     setRetriedDone(false);
     setSettingsStatus("idle");
-    setPinnedEngines(new Set<string>());
+    setPinOverride({});
     setFavoritedEngines(new Set<string>());
   });
+
+  // Also cancel timers if the component is destroyed.
+  onCleanup(() => clearAllTimers());
+
+  const isPinnedFor = (engineId: string): boolean => {
+    const ov = pinOverride();
+    if (engineId in ov) return ov[engineId];
+    return props.state === "pinned";
+  };
 
   const isMulti = createMemo(
     () =>
@@ -84,11 +116,9 @@ const SelectionPopup: Component<SelectionPopupProps> = (props) => {
       props.state === "partial",
   );
 
-  // true when the state wants the full-size window frame; loading/hidden use
-  // a compact card at the cursor instead.
-  const isCompact = createMemo(
-    () => props.state === "loading" || props.state === "initial-hidden",
-  );
+  // true when the body should fill a compact ~200×40 frame (loading only;
+  // initial-hidden is not rendered by App at all).
+  const isCompact = createMemo(() => props.state === "loading");
 
   const baseResults = createMemo<MockResult[]>(() => {
     const t = props.t;
@@ -122,12 +152,16 @@ const SelectionPopup: Component<SelectionPopupProps> = (props) => {
           { engineId: "openai", engineLabel: t.engineB, outcome: "failure" as ResultOutcome, errorText: t.networkError },
           { engineId: "google", engineLabel: t.engineC, text: props.locale === "zh" ? "The fast brown fox jumps over the lazy dog." : "敏捷的棕狐越过那只懒狗。", elapsedMs: 290, outcome: "success" as ResultOutcome },
         ];
+      // §4.1 Offline: if a traditional engine is available → fallback result.
+      // This is a selected traditional MT engine (Google), NOT a dictionary
+      // lookup (dictionary is a separate capability per S0 §4.13).
       case "offline-fallback":
         return [
           {
-            engineId: "dict",
-            engineLabel: t.engineFallback,
-            text: props.locale === "zh" ? "fox n. 狐狸" : "狐狸 n. fox",
+            engineId: "google",
+            engineLabel: `${t.engineC} · ${t.fallbackSuffix}`,
+            text: props.locale === "zh" ? "The quick brown fox jumps over the lazy dog." : "敏捷的棕色狐狸跳过了懒狗。",
+            elapsedMs: 120,
             outcome: "success" as ResultOutcome,
           },
         ];
@@ -136,43 +170,32 @@ const SelectionPopup: Component<SelectionPopupProps> = (props) => {
     }
   });
 
-  // Retry transitions the single error → success after a delay.
-  const effectiveState = createMemo<SelectionState>(() => {
-    if (retrying()) return "loading";
-    return props.state;
-  });
+  // Retry transitions a single error → success after a delay.
   const effectiveResults = createMemo<MockResult[]>(() => {
     if (retrying()) return [];
-    // If we just retried a single-result error, show success.
     const isSingleError =
       props.state === "error-network" ||
       props.state === "error-config-key" ||
       props.state === "error-config-401";
-    if (isSingleError && settingsStatus() === "idle") {
-      // After a successful retry we show a success result. We detect "retried"
-      // via a dedicated signal to avoid conflating with settings.
-      if (retriedDone()) {
-        return [
-          {
-            engineId: "deepseek",
-            engineLabel: props.t.engineA,
-            text: props.locale === "zh" ? enText : zhText,
-            elapsedMs: 380,
-            outcome: "success" as ResultOutcome,
-          },
-        ];
-      }
+    if (isSingleError && retriedDone()) {
+      return [
+        {
+          engineId: "deepseek",
+          engineLabel: props.t.engineA,
+          text: props.locale === "zh" ? enText : zhText,
+          elapsedMs: 380,
+          outcome: "success" as ResultOutcome,
+        },
+      ];
     }
     return baseResults();
   });
 
   const togglePin = (engineId: string) => {
-    setPinnedEngines((prev) => {
-      const next = new Set(prev);
-      if (next.has(engineId)) next.delete(engineId);
-      else next.add(engineId);
-      return next;
-    });
+    setPinOverride((prev) => ({
+      ...prev,
+      [engineId]: !isPinnedFor(engineId),
+    }));
   };
 
   const toggleFavorite = (engineId: string) => {
@@ -186,13 +209,17 @@ const SelectionPopup: Component<SelectionPopupProps> = (props) => {
 
   const doCopy = (engineId: string) => {
     setCopiedEngine(engineId);
-    window.setTimeout(() => setCopiedEngine(null), 1500);
+    schedule(() => setCopiedEngine(null), 1500);
+  };
+
+  const toggleSpeak = (engineId: string) => {
+    setSpeakingEngine((prev) => (prev === engineId ? null : engineId));
   };
 
   const doRetry = () => {
     setRetriedDone(false);
     setRetrying(true);
-    window.setTimeout(() => {
+    schedule(() => {
       setRetrying(false);
       setRetriedDone(true);
     }, 1200);
@@ -200,28 +227,32 @@ const SelectionPopup: Component<SelectionPopupProps> = (props) => {
 
   const doOpenSettings = () => {
     setSettingsStatus("opening");
-    window.setTimeout(() => setSettingsStatus("opened"), 1000);
+    schedule(() => setSettingsStatus("opened"), 1000);
   };
 
   const toActions = (m: MockResult): ResultAction[] => {
     if (m.outcome === "failure") return [];
-    const isPinned = pinnedEngines().has(m.engineId) || props.state === "pinned";
+    const pinned = isPinnedFor(m.engineId);
     const isFav = favoritedEngines().has(m.engineId);
     const isCopied = copiedEngine() === m.engineId;
+    const isSpeaking = speakingEngine() === m.engineId;
     return [
       {
         label: isCopied ? props.t.copied : props.t.copy,
-        icon: <Copy size={14} />,
+        icon: isCopied ? <Check size={14} /> : <Copy size={14} />,
+        active: isCopied,
         onClick: () => doCopy(m.engineId),
       },
       {
-        label: props.t.speak,
-        icon: <Volume2 size={14} />,
+        label: isSpeaking ? props.t.stop : props.t.speak,
+        icon: isSpeaking ? <Square size={14} /> : <Volume2 size={14} />,
+        active: isSpeaking,
+        onClick: () => toggleSpeak(m.engineId),
       },
       {
-        label: isPinned ? props.t.unpin : props.t.pin,
-        icon: isPinned ? <PinOff size={14} /> : <Pin size={14} />,
-        active: isPinned,
+        label: pinned ? props.t.unpin : props.t.pin,
+        icon: pinned ? <PinOff size={14} /> : <Pin size={14} />,
+        active: pinned,
         onClick: () => togglePin(m.engineId),
       },
       {
@@ -235,16 +266,12 @@ const SelectionPopup: Component<SelectionPopupProps> = (props) => {
 
   // Single-card error states (no ResultCards).
   const singleError = createMemo<
-    | {
-        title: string;
-        retry?: boolean;
-        settings?: boolean;
-      }
+    | { title: string; retry?: boolean; settings?: boolean }
     | null
   >(() => {
     if (retriedDone()) return null;
     const t = props.t;
-    switch (effectiveState()) {
+    switch (props.state) {
       case "error-no-selection":
         return { title: t.noSelection };
       case "error-network":
@@ -276,13 +303,8 @@ const SelectionPopup: Component<SelectionPopupProps> = (props) => {
         isMulti() ? props.t.multiTitle : props.t.states[props.state]
       }
     >
-      {/* Initial hidden */}
-      <Show when={props.state === "initial-hidden"}>
-        <div class="sel-popup__hidden">{props.t.initialHidden}</div>
-      </Show>
-
-      {/* Loading — compact card */}
-      <Show when={effectiveState() === "loading"}>
+      {/* Loading — fills the compact ~200×40 frame */}
+      <Show when={props.state === "loading"}>
         <div class="sel-popup__loading">
           <span class="sel-popup__loading-dot" aria-hidden="true" />
           <span>{props.t.loading}</span>
@@ -330,15 +352,29 @@ const SelectionPopup: Component<SelectionPopupProps> = (props) => {
         )}
       </Show>
 
-      {/* Success / multi: side-by-side ResultCards */}
+      {/* Success / multi: side-by-side ResultCards. Pinned cards also offer
+          Retry (per S0 §4.1 "supports copy/retry/TTS/favorite"). */}
       <Show when={effectiveResults().length > 0}>
+        {/* Pinned retry affordance */}
+        <Show when={props.state === "pinned"}>
+          <div class="sel-popup__pinned-bar">
+            <Button
+              variant="ghost"
+              size="sm"
+              loading={retrying()}
+              loadingLabel={props.t.retrying}
+              onClick={doRetry}
+            >
+              {props.t.retry}
+            </Button>
+          </div>
+        </Show>
+
         <div
           class="sel-popup__results"
           classList={{
-            "sel-popup__results--dual":
-              effectiveResults().length === 2,
-            "sel-popup__results--scroll":
-              effectiveResults().length >= 3,
+            "sel-popup__results--dual": effectiveResults().length === 2,
+            "sel-popup__results--scroll": effectiveResults().length >= 3,
           }}
         >
           <For each={effectiveResults()}>
