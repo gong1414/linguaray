@@ -188,12 +188,19 @@ describe("Provider Center — live transitions (click → intermediate → resul
     expect(screen.getByText("$12.50")).toBeTruthy();
   });
 
-  it("save failed: save button → failed toast", () => {
+  it("save failed: type key → Save → saving → failed toast", () => {
     render(() => <App />);
     goToProviderCenter();
     clickStateChip("Save failed");
-    // The save-failed toast should be visible
+    // OpenAI #2 is selected (no key). Type a key and save.
+    const keyInput = screen.getByPlaceholderText(strings.en.provider.apiKeyPlaceholder);
+    fireEvent.input(keyInput, { target: { value: "sk-fake-test-key-1234567890" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save key" }));
+    // Advance past save timer → failed toast appears (key cleared at submit start)
+    vi.advanceTimersByTime(1100);
     expect(screen.getByText(strings.en.provider.saveFailed)).toBeTruthy();
+    // Verify the test key is NOT in the DOM (cleared at submit)
+    expect(document.body.innerHTML).not.toContain("sk-fake-test-key");
   });
 });
 
@@ -230,7 +237,7 @@ describe("Provider Center — 23 states have unique semantic contracts", () => {
     { state: "Key missing", check: () => expect(screen.getAllByText(strings.en.provider.keyMissing).length).toBeGreaterThan(0) },
     { state: "Duplicate", check: () => expect(screen.getAllByText(/copy/).length).toBeGreaterThan(0) },
     { state: "Saving", check: () => expect(document.querySelector(".lr-spinner")).toBeTruthy() },
-    { state: "Save failed", check: () => expect(screen.getByText(strings.en.provider.saveFailed)).toBeTruthy() },
+    { state: "Save failed", check: () => expect(screen.getByPlaceholderText(strings.en.provider.apiKeyPlaceholder)).toBeTruthy() },
     { state: "Save conflict", check: () => expect(screen.getByText(strings.en.provider.saveConflict)).toBeTruthy() },
     { state: "Delete confirm", check: () => expect(screen.getByText(strings.en.provider.deleteConfirmTitle)).toBeTruthy() },
     { state: "Deleting", check: () => expect(document.querySelector('[data-status="deleting"]')).toBeTruthy() },
@@ -251,7 +258,7 @@ describe("Provider Center — 23 states have unique semantic contracts", () => {
   const needsDetailPanel = new Set([
     "Loading models", "Model fetch error", "Model manual entry",
     "Connection testing", "Connection OK", "Connection failed",
-    "Key saved", "Key missing", "Save failed",
+    "Key saved", "Key missing",
     "Balance loading", "Balance unsupported", "Balance rate-limited",
     "Balance error", "Endpoint invalid",
   ]);

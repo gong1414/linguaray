@@ -7,6 +7,8 @@ import {
   createMemo,
   createEffect,
   onCleanup,
+  on,
+  untrack,
   batch,
   type Component,
 } from "solid-js";
@@ -163,11 +165,13 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
-  // Reset transient mock state on ProviderState change, with state-specific
-  // fixtures so each state demonstrates its unique contract.
-  createEffect(() => {
-    const state = props.state;
-    void state;
+  // Reset transient mock state on ProviderState change ONLY.
+  // Uses on(() => props.state) + untrack so selecting a provider does NOT
+  // re-trigger the fixture reset (which would wipe user interactions).
+  createEffect(
+    on(
+      () => props.state,
+      (state) => untrack(() => {
     // Cancel ALL async operations (CAS registry: delete → clearBusy per op)
     opRegistry.cancelAll();
     setKeyInputByUuid({});
@@ -193,6 +197,7 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
 
     if (state === "empty") {
       provs = [];
+      sel = { primaryUuid: null, parallelUuids: [], fallbackUuid: null };
     } else if (state === "duplicate") {
       const orig = provs.find((p) => p.uuid === "mock-openai-1")!;
       provs = [...provs, { ...orig, uuid: "mock-openai-dup", name: "OpenAI #1 (copy)", hasKey: false, sortOrder: provs.length }];
@@ -255,7 +260,9 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
     }
 
     setConsentKey(consentScopeKey(buildConsentScope(sel, provs)));
-  });
+    }),
+    ),
+  );
 
   onCleanup(() => opRegistry.cancelAll());
 
@@ -373,17 +380,15 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
       "save" as OpKind,
       targetUuid,
       () => setSaveByUuid((prev) => ({ ...prev, [targetUuid]: "idle" })),
-      (t) => {
-        opRegistry.finishOpIfCurrent("save" as OpKind, targetUuid, t, () => {
-          if (props.state === "save-failed") {
-            setSaveByUuid((prev) => ({ ...prev, [targetUuid]: "failed" }));
-            pushToast("destructive", props.t.saveFailed);
-          } else {
-            setProviders((prev) => prev.map((p) => (p.uuid === targetUuid ? { ...p, hasKey: true } : p)));
-            setSaveByUuid((prev) => ({ ...prev, [targetUuid]: "saved" }));
-            pushToast("success", props.t.keySaved);
-          }
-        });
+      () => {
+        if (props.state === "save-failed") {
+          setSaveByUuid((prev) => ({ ...prev, [targetUuid]: "failed" }));
+          pushToast("destructive", props.t.saveFailed);
+        } else {
+          setProviders((prev) => prev.map((p) => (p.uuid === targetUuid ? { ...p, hasKey: true } : p)));
+          setSaveByUuid((prev) => ({ ...prev, [targetUuid]: "saved" }));
+          pushToast("success", props.t.keySaved);
+        }
       },
       1000,
     );
@@ -399,15 +404,13 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
       "test" as OpKind,
       targetUuid,
       () => setConnStatus((prev) => ({ ...prev, [targetUuid]: "idle" })),
-      (t) => {
-        opRegistry.finishOpIfCurrent("test" as OpKind, targetUuid, t, () => {
-          if (props.state === "connection-failed") {
-            setConnStatus((prev) => ({ ...prev, [targetUuid]: "failed" }));
-          } else {
-            setConnLatency((prev) => ({ ...prev, [targetUuid]: 42 }));
-            setConnStatus((prev) => ({ ...prev, [targetUuid]: "ok" }));
-          }
-        });
+      () => {
+        if (props.state === "connection-failed") {
+          setConnStatus((prev) => ({ ...prev, [targetUuid]: "failed" }));
+        } else {
+          setConnLatency((prev) => ({ ...prev, [targetUuid]: 42 }));
+          setConnStatus((prev) => ({ ...prev, [targetUuid]: "ok" }));
+        }
       },
       1200,
     );
@@ -423,14 +426,12 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
       "fetch" as OpKind,
       targetUuid,
       () => setModelFetchByUuid((prev) => ({ ...prev, [targetUuid]: "idle" })),
-      (t) => {
-        opRegistry.finishOpIfCurrent("fetch" as OpKind, targetUuid, t, () => {
-          if (props.state === "model-fetch-error") {
-            setModelFetchByUuid((prev) => ({ ...prev, [targetUuid]: "error" }));
-          } else {
-            setModelFetchByUuid((prev) => ({ ...prev, [targetUuid]: "idle" }));
-          }
-        });
+      () => {
+        if (props.state === "model-fetch-error") {
+          setModelFetchByUuid((prev) => ({ ...prev, [targetUuid]: "error" }));
+        } else {
+          setModelFetchByUuid((prev) => ({ ...prev, [targetUuid]: "idle" }));
+        }
       },
       1000,
     );
@@ -624,15 +625,13 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
       "balance" as OpKind,
       targetUuid,
       () => setBalanceByUuid((prev) => ({ ...prev, [targetUuid]: "idle" })),
-      (t) => {
-        opRegistry.finishOpIfCurrent("balance" as OpKind, targetUuid, t, () => {
-          // Result depends on the state fixture
-          const st = props.state;
-          if (st === "balance-unsupported") setBalanceByUuid((prev) => ({ ...prev, [targetUuid]: "unsupported" }));
-          else if (st === "balance-rate-limited") setBalanceByUuid((prev) => ({ ...prev, [targetUuid]: "rate-limited" }));
-          else if (st === "balance-error") setBalanceByUuid((prev) => ({ ...prev, [targetUuid]: "error" }));
-          else setBalanceByUuid((prev) => ({ ...prev, [targetUuid]: "done" }));
-        });
+      () => {
+        // Result depends on the state fixture
+        const st = props.state;
+        if (st === "balance-unsupported") setBalanceByUuid((prev) => ({ ...prev, [targetUuid]: "unsupported" }));
+        else if (st === "balance-rate-limited") setBalanceByUuid((prev) => ({ ...prev, [targetUuid]: "rate-limited" }));
+        else if (st === "balance-error") setBalanceByUuid((prev) => ({ ...prev, [targetUuid]: "error" }));
+        else setBalanceByUuid((prev) => ({ ...prev, [targetUuid]: "done" }));
       },
       1000,
     );
@@ -950,19 +949,22 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
                   </Show>
                 </div>
 
-                {/* Balance — fetch button + loading→result transition */}
+                {/* Balance — fetch button + loading→result transition.
+                    Reads per-UUID balanceForSelected only (no props.state
+                    static branches). The state fixture pre-sets the result
+                    for demo states; user Fetch triggers loading→result. */}
                 <div class="pc__balance-section">
                   <FlowSwitch>
                     <Match when={balanceForSelected() === "loading"}>
                       <span class="pc__balance">{props.t.balanceLoading}</span>
                     </Match>
-                    <Match when={props.state === "balance-unsupported"}>
+                    <Match when={balanceForSelected() === "unsupported"}>
                       <span class="pc__balance">{props.t.balanceUnsupported}</span>
                     </Match>
-                    <Match when={props.state === "balance-rate-limited"}>
+                    <Match when={balanceForSelected() === "rate-limited"}>
                       <span class="pc__balance">{props.t.balanceRateLimited}</span>
                     </Match>
-                    <Match when={props.state === "balance-error"}>
+                    <Match when={balanceForSelected() === "error"}>
                       <span class="pc__balance">{props.t.balanceError}</span>
                     </Match>
                     <Match when={balanceForSelected() === "done"}>
@@ -972,7 +974,6 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
                       <Button
                         variant="ghost"
                         size="sm"
-                        loading={balanceForSelected() === "loading"}
                         loadingLabel={props.t.balanceLoading}
                         onClick={handleFetchBalance}
                         disabled={isSaving()}
