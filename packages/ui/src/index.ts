@@ -54,4 +54,6 @@ export type {
   ProviderCardProps,
   ProviderRole,
   ProviderProfile,
+  ProviderCardLabels,
 } from "./components/ProviderCard";
+export { defaultProviderCardLabels } from "./components/ProviderCard";

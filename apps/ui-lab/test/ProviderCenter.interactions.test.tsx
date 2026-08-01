@@ -48,7 +48,7 @@ describe("Provider Center — async transitions (fake timers)", () => {
     goToProviderCenter();
     fireEvent.click(screen.getByRole("button", { name: "Connection OK" }));
     // Select OpenAI #2 which has no key → shows the key input
-    selectProvider("OpenAI #2 (copy)");
+    selectProvider("OpenAI #2");
     const keyInput = screen.getByPlaceholderText(strings.en.provider.apiKeyPlaceholder);
     fireEvent.input(keyInput, { target: { value: "sk-fake-test-key-1234567890" } });
     fireEvent.click(screen.getByRole("button", { name: "Save key" }));

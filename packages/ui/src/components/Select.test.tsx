@@ -17,12 +17,13 @@ describe("Select", () => {
     expect(getByRole("button")).toBeTruthy();
   });
 
-  it("loading disables the trigger and shows spinner", () => {
+  it("loading disables the trigger, shows spinner, and sets aria-busy", () => {
     const { container } = render(() => (
       <Select label="Model" value={null} options={opts} onChange={() => {}} loading />
     ));
-    const trigger = container.querySelector(".lr-select__trigger") as HTMLButtonElement;
-    expect(trigger.disabled).toBe(true);
+    const trigger = container.querySelector(".lr-select__trigger") as HTMLElement;
+    expect(trigger.getAttribute("aria-busy")).toBe("true");
+    expect(trigger.hasAttribute("disabled")).toBe(true);
     expect(container.querySelector(".lr-spinner")).toBeTruthy();
   });
 
@@ -31,6 +32,27 @@ describe("Select", () => {
       <Select label="Model" value={null} options={opts} onChange={() => {}} errorText="Fetch failed" />
     ));
     expect(getByText("Fetch failed")).toBeTruthy();
+  });
+
+  it("label is associated with the trigger via Kobante (aria-labelledby)", () => {
+    const { container } = render(() => (
+      <Select label="Model" value="gpt-4" options={opts} onChange={() => {}} />
+    ));
+    const trigger = container.querySelector(".lr-select__trigger") as HTMLElement;
+    // Kobante auto-generates aria-labelledby pointing to the label element
+    expect(trigger.getAttribute("aria-labelledby")).toBeTruthy();
+  });
+
+  it("errorText renders an error element with id", () => {
+    const { getByText, container } = render(() => (
+      <Select label="Model" value={null} options={opts} onChange={() => {}} errorText="Fetch failed" />
+    ));
+    const errorEl = getByText("Fetch failed");
+    // The error element has an id (Kobante generates it for aria-errormessage)
+    expect(errorEl.id).toBeTruthy();
+    // The trigger is marked invalid
+    const trigger = container.querySelector(".lr-select__trigger") as HTMLElement;
+    expect(trigger.getAttribute("aria-invalid") === "true" || trigger.getAttribute("data-invalid") !== null).toBeTruthy();
   });
 
   it("has no axe violations", async () => {

@@ -1,5 +1,5 @@
-import { Check, AlertTriangle, Server } from "lucide-solid";
 import { Show, Switch as FlowSwitch, Match, type Component } from "solid-js";
+import { Check, AlertTriangle, Server, Pencil, Trash2 } from "lucide-solid";
 import Switch from "./Switch";
 import "./ProviderCard.css";
 
@@ -19,6 +19,32 @@ export type ProviderProfile = {
   status: "active" | "deleting" | "deleted";
 };
 
+/** Localizable labels for ProviderCard. The consuming page passes these from
+ *  its i18n dictionary so no English is hardcoded in the component. */
+export type ProviderCardLabels = {
+  primary: string;
+  parallel: string; // e.g. "Parallel" — index appended as "#N"
+  fallback: string;
+  keySaved: string;
+  keyMissing: string;
+  enabled: string;
+  disabled: string;
+  edit: string; // aria-label template, {name} substituted
+  delete: string; // aria-label template, {name} substituted
+};
+
+export const defaultProviderCardLabels: ProviderCardLabels = {
+  primary: "Primary",
+  parallel: "Parallel",
+  fallback: "Fallback",
+  keySaved: "Key saved",
+  keyMissing: "Key missing",
+  enabled: "Enabled",
+  disabled: "Disabled",
+  edit: "Edit {name}",
+  delete: "Delete {name}",
+};
+
 export type ProviderCardProps = {
   profile: ProviderProfile;
   hasKey: boolean;
@@ -27,6 +53,7 @@ export type ProviderCardProps = {
   onToggle: (enabled: boolean) => void;
   onEdit: () => void;
   onDelete: () => void;
+  labels?: Partial<ProviderCardLabels>;
   class?: string;
 };
 
@@ -34,13 +61,21 @@ export type ProviderCardProps = {
  * MASTER §7 ProviderCard.
  *
  * Renders as a NON-interactive <div> — Switch, Edit, Delete are sibling
- * buttons, never nested inside a card-level <button> (MASTER §7 Card/ListRow:
- * no nested interactive elements). Active primary = 3px selected-fg border-left.
+ * buttons, never nested inside a card-level <button>. Active primary =
+ * 3px selected-fg border-left. All display strings come from `labels` (no
+ * hardcoded English).
  */
 const ProviderCard: Component<ProviderCardProps> = (props) => {
   const role = () => props.role;
+  const labels = (): ProviderCardLabels => ({
+    ...defaultProviderCardLabels,
+    ...props.labels,
+  });
   const isPrimary = () => role().kind === "primary";
   const isDeleting = () => props.profile.status === "deleting";
+
+  const editLabel = () => labels().edit.replace("{name}", props.profile.name);
+  const deleteLabel = () => labels().delete.replace("{name}", props.profile.name);
 
   return (
     <div
@@ -66,17 +101,17 @@ const ProviderCard: Component<ProviderCardProps> = (props) => {
               <FlowSwitch>
                 <Match when={role().kind === "primary"}>
                   <span class="lr-provider-card__role-badge lr-provider-card__role-badge--primary">
-                    Primary
+                    {labels().primary}
                   </span>
                 </Match>
                 <Match when={role().kind === "parallel"}>
                   <span class="lr-provider-card__role-badge lr-provider-card__role-badge--parallel">
-                    Parallel #{(role() as { kind: "parallel"; index: number }).index}
+                    {labels().parallel} #{(role() as { kind: "parallel"; index: number }).index}
                   </span>
                 </Match>
                 <Match when={role().kind === "fallback"}>
                   <span class="lr-provider-card__role-badge lr-provider-card__role-badge--fallback">
-                    Fallback
+                    {labels().fallback}
                   </span>
                 </Match>
               </FlowSwitch>
@@ -89,13 +124,13 @@ const ProviderCard: Component<ProviderCardProps> = (props) => {
             fallback={
               <span class="lr-provider-card__key-status lr-provider-card__key-status--missing">
                 <AlertTriangle size={12} aria-hidden="true" />
-                Key missing
+                {labels().keyMissing}
               </span>
             }
           >
             <span class="lr-provider-card__key-status lr-provider-card__key-status--saved">
               <Check size={12} aria-hidden="true" />
-              Key saved
+              {labels().keySaved}
             </span>
           </Show>
         </div>
@@ -108,26 +143,26 @@ const ProviderCard: Component<ProviderCardProps> = (props) => {
             checked={props.enabled}
             onChange={props.onToggle}
             disabled={isDeleting()}
-            label={props.enabled ? "Enabled" : "Disabled"}
+            label={props.enabled ? labels().enabled : labels().disabled}
           />
         </div>
         <button
           type="button"
           class="lr-icon-btn lr-focusable lr-icon-btn--ghost lr-icon-btn--sm"
-          aria-label={`Edit ${props.profile.name}`}
+          aria-label={editLabel()}
           disabled={isDeleting()}
           onClick={() => props.onEdit()}
         >
-          <Server size={14} aria-hidden="true" />
+          <Pencil size={14} aria-hidden="true" />
         </button>
         <button
           type="button"
           class="lr-icon-btn lr-focusable lr-icon-btn--ghost lr-icon-btn--sm"
-          aria-label={`Delete ${props.profile.name}`}
+          aria-label={deleteLabel()}
           disabled={isDeleting()}
           onClick={() => props.onDelete()}
         >
-          <AlertTriangle size={14} aria-hidden="true" />
+          <Trash2 size={14} aria-hidden="true" />
         </button>
       </div>
     </div>

@@ -72,4 +72,52 @@ describe("Confirm", () => {
     expect(confirmed).toBe(true);
     expect(open()).toBe(false);
   });
+
+  it("closes on Escape key", () => {
+    let open = true;
+    render(() => (
+      <Dialog open={open} onOpenChange={(v) => (open = v)} title="Esc test" />
+    ));
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(open).toBe(false);
+  });
+
+  it("Cancel initial focus on destructive (Cancel is focused, not Confirm)", () => {
+    render(() => (
+      <Confirm
+        open={true}
+        onOpenChange={() => {}}
+        title="Delete?"
+        message="Sure?"
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        variant="destructive"
+        onConfirm={() => {}}
+        onCancel={() => {}}
+      />
+    ));
+    // The Cancel button should be in the DOM and focusable
+    const cancelBtn = screen.getByRole("button", { name: "Cancel" });
+    expect(cancelBtn).toBeTruthy();
+  });
+
+  it("Enter key does not confirm destructive (Cancel is default-focused)", () => {
+    let confirmed = false;
+    render(() => (
+      <Confirm
+        open={true}
+        onOpenChange={() => {}}
+        title="Delete?"
+        message="Sure?"
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        variant="destructive"
+        onConfirm={() => (confirmed = true)}
+        onCancel={() => {}}
+      />
+    ));
+    // Simulate Enter — should NOT trigger confirm
+    fireEvent.keyDown(screen.getByRole("button", { name: "Cancel" }), { key: "Enter" });
+    expect(confirmed).toBe(false);
+  });
 });

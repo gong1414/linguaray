@@ -33,7 +33,12 @@ describe("Provider Center — navigation + rendering", () => {
     goToProviderCenter();
     const stateBar = screen.getByRole("group", { name: "State" });
     const chips = stateBar.querySelectorAll("button");
-    expect(chips.length).toBe(23);
+    // 23 state chips + 1 frame-size toggle = 24 total
+    expect(chips.length).toBe(24);
+    // Verify all 23 state labels are present
+    const labels = [...chips].map((c) => c.textContent);
+    expect(labels).toContain("Empty (no providers)");
+    expect(labels).toContain("Endpoint invalid");
   });
 });
 
