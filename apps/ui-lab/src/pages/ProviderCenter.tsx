@@ -120,6 +120,7 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
   const [toasts, setToasts] = createSignal<{ id: number; variant: "info" | "success" | "warning" | "destructive"; message: string }[]>([]);
   const [reorderAnnouncement, setReorderAnnouncement] = createSignal("");
   const [showPresetGrid, setShowPresetGrid] = createSignal(false);
+  const [deleteRetryPending, setDeleteRetryPending] = createSignal(false);
   // Reorder persist pending — disables further reorder/drag until resolved
   const [reorderPending, setReorderPending] = createSignal(false);
   // Drag state
@@ -223,6 +224,7 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
     setConflictResolved(false);
     setRetryTargetUuid(null);
     setDeleteConfirmUuid(null);
+    setDeleteRetryPending(false);
     setReorderAnnouncement("");
     setShowPresetGrid(false);
     setReorderPending(false);
@@ -613,7 +615,6 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
   };
 
   // --- delete retry: re-attempt the delete for the stuck provider ---
-  const [deleteRetryPending, setDeleteRetryPending] = createSignal(false);
   const handleDeleteRetry = () => {
     const uuid = retryTargetUuid();
     if (!uuid || deleteRetryPending()) return;
@@ -1183,7 +1184,7 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
       <Show when={props.state === "delete-retry" && retryTargetUuid()}>
         <div class="pc__delete-retry">
           <span>{props.t.deleteRetry}</span>
-          <Button variant="destructive" size="sm" onClick={handleDeleteRetry}>
+          <Button variant="destructive" size="sm" loading={deleteRetryPending()} loadingLabel={props.t.deleting} onClick={handleDeleteRetry}>
             {props.t.delete}
           </Button>
         </div>
