@@ -117,6 +117,7 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
   // Trigger refs for focus-restore on dialog close
   const deleteTriggerRef: { current?: HTMLElement } = {};
   const consentTriggerRef: { current?: HTMLElement } = {};
+  const sidebarFallbackRef: { current?: HTMLElement } = {};
   const [toasts, setToasts] = createSignal<{ id: number; variant: "info" | "success" | "warning" | "destructive"; message: string }[]>([]);
   const [reorderAnnouncement, setReorderAnnouncement] = createSignal("");
   const [showPresetGrid, setShowPresetGrid] = createSignal(false);
@@ -389,9 +390,10 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
       ...selection(),
       parallelUuids: selection().parallelUuids.filter((u) => u !== uuid),
     };
-    if (commitProviderState(providers(), candidate)) {
-      setConsentKey(consentScopeKey(buildConsentScope(candidate, providers())));
-    }
+    // commitProviderState already handles consent correctly:
+    // scope change → null (invalidated), scope unchanged → preserved.
+    // Do NOT write consentKey here — that would mint approval without Confirm.
+    commitProviderState(providers(), candidate);
   };
 
   const handleSetFallback = (uuid: string) => {
@@ -859,7 +861,7 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
         <div class="pc__content">
       <div class="pc__layout">
         {/* Sidebar: provider list */}
-        <aside class="pc__sidebar" aria-label={props.t.providerListLabel}>
+        <aside class="pc__sidebar" aria-label={props.t.providerListLabel} tabindex="-1" ref={(el) => { sidebarFallbackRef.current = el; }}>
           <div class="pc__sidebar-header">
             <h2 class="pc__sidebar-title">{props.t.addProvider}</h2>
             <Button
@@ -1216,6 +1218,7 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
         onConfirm={confirmDelete}
         onCancel={cancelDelete}
         triggerRef={deleteTriggerRef}
+        fallbackFocusRef={sidebarFallbackRef}
       />
 
       {/* Consent dialog */}
