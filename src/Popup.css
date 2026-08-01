@@ -1,0 +1,30 @@
+/*
+ * Popup-only overrides: make the WebView root transparent so the native
+ * window's transparency (macOSPrivateApi) shows through. App.css's :root
+ * sets background-color: #f6f6f6, which fills the entire popup WebView.
+ * This file is imported AFTER App.css in Popup.tsx, so it wins the cascade.
+ *
+ * Without this, the popup has a solid rectangle background even though the
+ * native window is transparent — the card-looking popup is meant to float
+ * with no visible window chrome or background.
+ */
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  background: transparent;
+}
+
+body {
+  overflow: hidden;
+}
+
+/* The popup card itself keeps a visible background (the translation result card),
+   but the AREA OUTSIDE the card is transparent. The .container in App.css has
+   padding; the card is the inner div. */
+.container {
+  background: transparent;
+}

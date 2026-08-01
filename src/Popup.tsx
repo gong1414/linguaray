@@ -1,6 +1,7 @@
 import { createSignal, onMount } from "solid-js";
 import { listen } from "@tauri-apps/api/event";
 import "./App.css";
+import "./Popup.css";
 
 type Payload = { status: string; text: string; engine: string };
 
