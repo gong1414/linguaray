@@ -10,6 +10,8 @@ export type ToastProps = {
   /** Auto-dismiss after N ms. Default 3000. Destructive NEVER auto-dismisses. */
   duration?: number;
   onDismiss: () => void;
+  /** Accessible label for the dismiss button (i18n). Default: "Dismiss". */
+  dismissLabel?: string;
   class?: string;
 };
 
@@ -51,7 +53,7 @@ const Toast: Component<ToastProps> = (props) => {
       <button
         type="button"
         class="lr-toast__dismiss lr-focusable"
-        aria-label="Dismiss"
+        aria-label={props.dismissLabel ?? "Dismiss"}
         onClick={() => props.onDismiss()}
       >
         <X size={16} aria-hidden="true" />

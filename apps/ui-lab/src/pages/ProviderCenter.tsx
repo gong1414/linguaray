@@ -19,6 +19,7 @@ import {
   Toast,
   Banner,
   EmptyState,
+  Spinner,
   type ProviderRole,
   type SelectOption,
   type ProviderCardLabels,
@@ -96,6 +97,10 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
   const [selectedUuid, setSelectedUuid] = createSignal<string | null>("mock-openai-1");
   const [keyInput, setKeyInput] = createSignal("");
   const [manualModel, setManualModel] = createSignal("");
+  const [modelOverride, setModelOverride] = createSignal<Record<string, string>>({});
+  const [balanceStatus, setBalanceStatus] = createSignal<"idle" | "loading" | "done">("idle");
+  const [conflictResolved, setConflictResolved] = createSignal(false);
+  const [retryTargetUuid, setRetryTargetUuid] = createSignal<string | null>(null);
   const [modelFetchStatus, setModelFetchStatus] = createSignal<"idle" | "loading" | "error">("idle");
   const [connStatus, setConnStatus] = createSignal<Record<string, "idle" | "testing" | "ok" | "failed">>({});
   const [connLatency, setConnLatency] = createSignal<Record<string, number>>({});
@@ -105,8 +110,12 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
   const [reorderAnnouncement, setReorderAnnouncement] = createSignal("");
   const [showPresetGrid, setShowPresetGrid] = createSignal(false);
 
-  // --- async-safety: generation token + tracked timers ---
+  // --- async-safety: generation token + selection sequence + tracked timers ---
+  // generation invalidates ALL pending ops on state change.
+  // selectionSeq invalidates a specific op when the user switches providers
+  // (even away→back ABA: the seq won't match because it incremented twice).
   let generation = 0;
+  let selectionSeq = 0;
   const timers = new Set<number>();
   const schedule = (fn: () => void, ms: number): void => {
     const myGen = generation;
@@ -122,12 +131,20 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
     timers.clear();
   };
 
+  // selectProvider increments selectionSeq so an async op captured at seq=N
+  // is invalidated if the user switches away and back (seq becomes N+2).
+  const selectProvider = (uuid: string | null): void => {
+    selectionSeq += 1;
+    setSelectedUuid(uuid);
+  };
+
   // Reset transient mock state on ProviderState change, with state-specific
   // fixtures so each state demonstrates its unique contract.
   createEffect(() => {
     const state = props.state;
     void state;
     generation += 1;
+    selectionSeq += 1;
     clearAllTimers();
     setKeyInput("");
     setManualModel("");
@@ -135,27 +152,53 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
     setConnStatus({});
     setConnLatency({});
     setSaveStatus("idle");
+    setBalanceStatus("idle");
+    setConflictResolved(false);
+    setRetryTargetUuid(null);
+    setModelOverride({});
     setDeleteConfirmUuid(null);
     setReorderAnnouncement("");
     setShowPresetGrid(false);
 
     // State-specific fixtures
     let provs = initialProviders();
+    let sel: ActiveSelection = { ...DEFAULT_SELECTION };
+
     if (state === "empty") {
       provs = [];
     } else if (state === "duplicate") {
-      // Pre-create a duplicate copy
       const orig = provs.find((p) => p.uuid === "mock-openai-1")!;
       provs = [...provs, { ...orig, uuid: "mock-openai-dup", name: "OpenAI #1 (copy)", hasKey: false, sortOrder: provs.length }];
     } else if (state === "deleting") {
-      // Mark OpenAI #1 as deleting
+      // Mark OpenAI #1 as deleting + disabled, and CLEAR its primary role
+      // so the selection is valid (a deleting/disabled provider cannot hold
+      // any role per the invariant).
       provs = provs.map((p) => (p.uuid === "mock-openai-1" ? { ...p, status: "deleting" as const, enabled: false } : p));
-    } else if (state === "key-missing") {
-      // Select a provider with no key for the detail panel
-      setSelectedUuid("mock-openai-2");
+      sel = {
+        primaryUuid: null, // OpenAI #1 was primary; now cleared
+        parallelUuids: sel.parallelUuids.filter((u) => u !== "mock-openai-1"),
+        fallbackUuid: sel.fallbackUuid,
+      };
+    } else if (state === "delete-retry") {
+      // A provider stuck in deleting state with a retry affordance
+      provs = provs.map((p) => (p.uuid === "mock-openai-1" ? { ...p, status: "deleting" as const, enabled: false } : p));
+      sel = {
+        primaryUuid: null,
+        parallelUuids: sel.parallelUuids.filter((u) => u !== "mock-openai-1"),
+        fallbackUuid: sel.fallbackUuid,
+      };
+      setRetryTargetUuid("mock-openai-1");
     }
 
     setProviders(provs);
+    setSelection(sel);
+
+    // Validate the fixture selection — if invalid, don't silently keep it
+    const selResult = validateActiveSelection(sel, provs);
+    if (!selResult.ok) {
+      // Clear to a safe empty selection
+      setSelection({ primaryUuid: null, parallelUuids: [], fallbackUuid: null });
+    }
 
     // State-specific model/connection/save status
     if (state === "loading-models") setModelFetchStatus("loading");
@@ -163,7 +206,14 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
 
     if (state === "saving") {
       setSaveStatus("saving");
-      setSelectedUuid("mock-openai-2"); // no key → shows save button
+      selectProvider("mock-openai-2"); // no key → shows save button
+    } else if (state === "key-missing") {
+      selectProvider("mock-openai-2");
+    } else {
+      // Select the primary if it exists and is callable; else null
+      const primary = sel.primaryUuid;
+      const primaryProvider = provs.find((p) => p.uuid === primary);
+      selectProvider(primary && primaryProvider?.enabled && primaryProvider?.status === "active" ? primary : (provs.find((p) => p.enabled && p.status === "active")?.uuid ?? null));
     }
 
     if (state === "connection-ok") {
@@ -174,11 +224,11 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
       setConnStatus({ "mock-openai-1": "failed" });
     }
 
-    if (state !== "key-missing" && state !== "saving") {
-      setSelectedUuid(DEFAULT_SELECTION.primaryUuid);
+    if (state === "balance-loading") {
+      setBalanceStatus("loading");
     }
-    setSelection({ ...DEFAULT_SELECTION });
-    setConsentKey(consentScopeKey(buildConsentScope(DEFAULT_SELECTION, initialProviders())));
+
+    setConsentKey(consentScopeKey(buildConsentScope(sel, provs)));
   });
 
   onCleanup(() => clearAllTimers());
@@ -308,32 +358,39 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
     tryCommitSelection(candidate);
   };
 
-  // --- save key: capture UUID+generation at submission ---
+  // --- save key: capture {uuid, seq} at submission (ABA-safe) ---
   const handleSaveKey = () => {
     const targetUuid = selectedUuid();
     if (!targetUuid) return;
     const opGen = generation;
+    const opSeq = selectionSeq;
     // Clear input IMMEDIATELY (don't wait for success callback)
     setKeyInput("");
     setSaveStatus("saving");
     schedule(() => {
-      // Validate this operation still applies to the same provider
-      if (selectedUuid() !== targetUuid || opGen !== generation) return;
+      // Invalidate if provider changed OR seq changed (away→back ABA)
+      if (selectedUuid() !== targetUuid || opSeq !== selectionSeq || opGen !== generation) return;
+      // Simulate failure for save-failed state
+      if (props.state === "save-failed") {
+        setSaveStatus("failed");
+        pushToast("destructive", props.t.saveFailed);
+        return;
+      }
       setProviders((prev) => prev.map((p) => (p.uuid === targetUuid ? { ...p, hasKey: true } : p)));
       setSaveStatus("saved");
       pushToast("success", props.t.keySaved);
     }, 1000);
   };
 
-  // --- connection test: capture UUID+generation ---
+  // --- connection test: capture {uuid, seq} (ABA-safe) ---
   const handleTestConnection = () => {
     const targetUuid = selectedUuid();
     if (!targetUuid) return;
     const opGen = generation;
+    const opSeq = selectionSeq;
     setConnStatus((prev) => ({ ...prev, [targetUuid]: "testing" }));
     schedule(() => {
-      if (selectedUuid() !== targetUuid || opGen !== generation) return;
-      // Simulate success or failure based on state
+      if (selectedUuid() !== targetUuid || opSeq !== selectionSeq || opGen !== generation) return;
       const fail = props.state === "connection-failed";
       if (fail) {
         setConnStatus((prev) => ({ ...prev, [targetUuid]: "failed" }));
@@ -344,15 +401,15 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
     }, 1200);
   };
 
-  // --- fetch models ---
+  // --- fetch models: capture {uuid, seq} (ABA-safe) ---
   const handleFetchModels = () => {
     const targetUuid = selectedUuid();
     if (!targetUuid) return;
     const opGen = generation;
+    const opSeq = selectionSeq;
     setModelFetchStatus("loading");
     schedule(() => {
-      if (selectedUuid() !== targetUuid || opGen !== generation) return;
-      // Simulate fetch error for the error state
+      if (selectedUuid() !== targetUuid || opSeq !== selectionSeq || opGen !== generation) return;
       if (props.state === "model-fetch-error") {
         setModelFetchStatus("error");
       } else {
@@ -396,6 +453,35 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
 
   const cancelDelete = () => {
     setDeleteConfirmUuid(null);
+  };
+
+  // --- save conflict: reload re-fetches (resets to fixtures), cancel keeps local ---
+  const handleConflictReload = () => {
+    setConflictResolved(true);
+    // Simulate re-loading from backend
+    const provs = initialProviders();
+    setProviders(provs);
+    setSelection({ ...DEFAULT_SELECTION });
+    selectProvider(DEFAULT_SELECTION.primaryUuid);
+    pushToast("info", props.t.reload);
+  };
+
+  const handleConflictCancel = () => {
+    setConflictResolved(true);
+    // Keep local edits — no change to providers/selection
+  };
+
+  // --- delete retry: re-attempt the delete for the stuck provider ---
+  const handleDeleteRetry = () => {
+    const uuid = retryTargetUuid();
+    if (!uuid) return;
+    const opGen = generation;
+    schedule(() => {
+      if (opGen !== generation) return;
+      setProviders((prev) => prev.filter((p) => p.uuid !== uuid));
+      setRetryTargetUuid(null);
+      pushToast("success", props.t.delete);
+    }, 1500);
   };
 
   // --- add provider from preset ---
@@ -449,6 +535,25 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
   const selectedProvider = createMemo(() =>
     providers().find((p) => p.uuid === selectedUuid()),
   );
+  // Effective model = override if set, else provider's stored model
+  const selectedModel = createMemo(() => {
+    const uuid = selectedUuid();
+    if (!uuid) return null;
+    return modelOverride()[uuid] ?? selectedProvider()?.model ?? null;
+  });
+
+  // --- fetch balance: loading → result transition ---
+  const handleFetchBalance = () => {
+    const targetUuid = selectedUuid();
+    if (!targetUuid) return;
+    const opGen = generation;
+    const opSeq = selectionSeq;
+    setBalanceStatus("loading");
+    schedule(() => {
+      if (selectedUuid() !== targetUuid || opSeq !== selectionSeq || opGen !== generation) return;
+      setBalanceStatus("done");
+    }, 1000);
+  };
   const isSaving = createMemo(() => saveStatus() === "saving" || props.state === "saving");
   const connForSelected = createMemo(() => {
     const uuid = selectedUuid();
@@ -524,13 +629,18 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
               <For each={sortedProviders()}>
                 {(p, index) => (
                   <div class="pc__provider-row" data-status={p.status}>
+                    <Show when={p.status === "deleting"}>
+                      <div class="pc__deleting-overlay">
+                        <Spinner size={16} label={props.t.deleting} />
+                      </div>
+                    </Show>
                     <ProviderCard
                       profile={{ name: p.name, template: p.template, status: p.status }}
                       hasKey={p.hasKey}
                       role={roleFor(p.uuid)}
                       enabled={p.enabled}
                       onToggle={(en) => handleToggle(p.uuid, en)}
-                      onEdit={() => setSelectedUuid(p.uuid)}
+                      onEdit={() => selectProvider(p.uuid)}
                       onDelete={() => handleDelete(p.uuid)}
                       labels={cardLabels()}
                     />
@@ -615,17 +725,22 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
                       value={manualModel()}
                       placeholder={props.t.manualModelPlaceholder}
                       disabled={isSaving()}
+                      onChange={(e) => setManualModel(e.currentTarget.value)}
                       helperText={modelFetchStatus() === "error" || props.state === "model-fetch-error" ? props.t.modelFetchError : undefined}
                     />
                   </Match>
                   <Match when={true}>
                     <Select
                       label={props.t.models}
-                      value={p().model}
+                      value={selectedModel()}
                       options={MODEL_OPTIONS}
-                      onChange={() => {}}
+                      onChange={(v) => {
+                        const uuid = selectedUuid();
+                        if (uuid) setModelOverride((prev) => ({ ...prev, [uuid]: v }));
+                      }}
                       disabled={isSaving()}
                       loading={modelFetchStatus() === "loading" || props.state === "loading-models"}
+                      loadingLabel={props.t.loadingModels}
                       errorText={modelFetchStatus() === "error" || props.state === "model-fetch-error" ? props.t.modelFetchError : undefined}
                     />
                     <Button variant="ghost" size="sm" onClick={handleFetchModels} disabled={isSaving()}>
@@ -645,6 +760,7 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
                         value={keyInput()}
                         placeholder={props.t.apiKeyPlaceholder}
                         disabled={isSaving()}
+                        onChange={(e) => setKeyInput(e.currentTarget.value)}
                       />
                       <Button
                         variant="primary"
@@ -690,10 +806,10 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
                   </Show>
                 </div>
 
-                {/* Balance */}
+                {/* Balance — fetch button + loading→result transition */}
                 <div class="pc__balance-section">
                   <FlowSwitch>
-                    <Match when={props.state === "balance-loading"}>
+                    <Match when={balanceStatus() === "loading"}>
                       <span class="pc__balance">{props.t.balanceLoading}</span>
                     </Match>
                     <Match when={props.state === "balance-unsupported"}>
@@ -705,6 +821,21 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
                     <Match when={props.state === "balance-error"}>
                       <span class="pc__balance">{props.t.balanceError}</span>
                     </Match>
+                    <Match when={balanceStatus() === "done"}>
+                      <span class="pc__balance">$12.50</span>
+                    </Match>
+                    <Match when={true}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        loading={balanceStatus() === "loading"}
+                        loadingLabel={props.t.balanceLoading}
+                        onClick={handleFetchBalance}
+                        disabled={isSaving()}
+                      >
+                        {props.t.balanceLoading.replace("…", "")}
+                      </Button>
+                    </Match>
                   </FlowSwitch>
                 </div>
               </div>
@@ -714,16 +845,16 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
       </div>
 
       {/* Save conflict banner (uses Banner component) */}
-      <Show when={props.state === "save-conflict"}>
+      <Show when={props.state === "save-conflict" && !conflictResolved()}>
         <Banner
           variant="warning"
           title={props.t.saveConflict}
           action={
             <>
-              <Button variant="secondary" size="sm" onClick={() => {}}>
+              <Button variant="secondary" size="sm" onClick={handleConflictReload}>
                 {props.t.reload}
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => {}}>
+              <Button variant="ghost" size="sm" onClick={handleConflictCancel}>
                 {props.t.cancel}
               </Button>
             </>
@@ -732,10 +863,10 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
       </Show>
 
       {/* Delete retry */}
-      <Show when={props.state === "delete-retry"}>
+      <Show when={props.state === "delete-retry" && retryTargetUuid()}>
         <div class="pc__delete-retry">
           <span>{props.t.deleteRetry}</span>
-          <Button variant="destructive" size="sm" onClick={confirmDelete}>
+          <Button variant="destructive" size="sm" onClick={handleDeleteRetry}>
             {props.t.delete}
           </Button>
         </div>
@@ -748,12 +879,13 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
             <Toast
               variant={toast.variant}
               message={toast.message}
+              dismissLabel={props.t.toastDismiss}
               onDismiss={() => dismissToast(toast.id)}
             />
           )}
         </For>
         <Show when={props.state === "save-failed"}>
-          <Toast variant="destructive" message={props.t.saveFailed} onDismiss={() => {}} />
+          <Toast variant="destructive" message={props.t.saveFailed} dismissLabel={props.t.toastDismiss} onDismiss={() => {}} />
         </Show>
       </div>
 

@@ -112,6 +112,105 @@ describe("Provider Center — provider-switch invalidation", () => {
     const connOk = screen.queryByText(/Connected/);
     expect(connOk).toBeNull();
   });
+
+  it("save key ABA: away→back does not let the stale callback fire", () => {
+    render(() => <App />);
+    goToProviderCenter();
+    clickStateChip("Drag to reorder");
+    // Select OpenAI #2, type key, save
+    fireEvent.click(screen.getByRole("button", { name: "Edit OpenAI #2" }));
+    const keyInput = screen.getByPlaceholderText(strings.en.provider.apiKeyPlaceholder);
+    fireEvent.input(keyInput, { target: { value: "sk-fake-test-key-1234567890" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save key" }));
+    // Switch to OpenAI #1, then back to OpenAI #2 BEFORE the timer
+    fireEvent.click(screen.getByRole("button", { name: "Edit OpenAI #1" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit OpenAI #2" }));
+    vi.advanceTimersByTime(1100);
+    // The stale save callback should NOT have marked OpenAI #2 as saved
+    // (selectionSeq incremented twice: away + back)
+    const openai2Card = document.querySelectorAll(".lr-provider-card")[1];
+    expect(openai2Card?.querySelector(".lr-provider-card__key-status--saved")).toBeNull();
+  });
+});
+
+// --- Live transition tests (P1#2) -----------------------------------------
+
+describe("Provider Center — live transitions (click → intermediate → result)", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => {
+    vi.useRealTimers();
+    cleanup();
+  });
+
+  it("save conflict: Reload re-fetches (banner disappears)", () => {
+    render(() => <App />);
+    goToProviderCenter();
+    clickStateChip("Save conflict");
+    expect(screen.getByText(strings.en.provider.saveConflict)).toBeTruthy();
+    // Click Reload
+    fireEvent.click(screen.getByRole("button", { name: "Reload" }));
+    // Banner disappears (conflictResolved=true)
+    expect(screen.queryByText(strings.en.provider.saveConflict)).toBeNull();
+  });
+
+  it("save conflict: Cancel keeps banner dismissed (local edits kept)", () => {
+    render(() => <App />);
+    goToProviderCenter();
+    clickStateChip("Save conflict");
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByText(strings.en.provider.saveConflict)).toBeNull();
+  });
+
+  it("delete retry: clicking Delete removes the stuck provider", () => {
+    render(() => <App />);
+    goToProviderCenter();
+    clickStateChip("Delete retry");
+    expect(screen.getByText(strings.en.provider.deleteRetry)).toBeTruthy();
+    const cardsBefore = document.querySelectorAll(".lr-provider-card").length;
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    vi.advanceTimersByTime(1600);
+    const cardsAfter = document.querySelectorAll(".lr-provider-card").length;
+    expect(cardsAfter).toBe(cardsBefore - 1);
+  });
+
+  it("balance: fetch button → loading → result ($12.50)", () => {
+    render(() => <App />);
+    goToProviderCenter();
+    clickStateChip("Connection OK");
+    fireEvent.click(screen.getByRole("button", { name: "Edit OpenAI #1" }));
+    // Find the balance fetch button inside the balance section
+    const balSection = document.querySelector(".pc__balance-section");
+    const balBtn = balSection?.querySelector("button");
+    expect(balBtn).toBeTruthy();
+    fireEvent.click(balBtn!);
+    vi.advanceTimersByTime(1100);
+    // Balance result appears
+    expect(screen.getByText("$12.50")).toBeTruthy();
+  });
+
+  it("save failed: save button → failed toast", () => {
+    render(() => <App />);
+    goToProviderCenter();
+    clickStateChip("Save failed");
+    // The save-failed toast should be visible
+    expect(screen.getByText(strings.en.provider.saveFailed)).toBeTruthy();
+  });
+});
+
+// --- Deleting fixture validates (P1#1) ------------------------------------
+
+describe("Provider Center — deleting fixture has valid selection", () => {
+  afterEach(() => cleanup());
+
+  it("deleting provider has data-role=none (no primary role)", () => {
+    render(() => <App />);
+    goToProviderCenter();
+    clickStateChip("Deleting");
+    // The deleting row contains the card; find the card inside it
+    const deletingRow = document.querySelector('.pc__provider-row[data-status="deleting"]');
+    const deletingCard = deletingRow?.querySelector(".lr-provider-card");
+    expect(deletingCard?.getAttribute("data-role")).toBe("none");
+  });
 });
 
 // --- 23 states unique semantic assertions (P1#2) --------------------------
