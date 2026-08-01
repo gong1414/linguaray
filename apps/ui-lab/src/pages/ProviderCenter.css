@@ -1,6 +1,6 @@
-/* ProviderCenter — S0 §4.3.
- * Layout: sidebar (provider list) + detail panel side-by-side.
- * Per §8.3: 600×400 min, sidebar collapses to icon-only rail at <700px. */
+/* ProviderCenter — S0 §4.3 + §8.3.
+ * Settings shell: nav rail (icon-only at 600-699px) + content area.
+ * Content area: provider sidebar + detail panel side-by-side. */
 
 .pc__body {
   display: flex;
@@ -9,10 +9,92 @@
   min-height: 0;
   overflow: hidden;
   background: var(--color-bg);
-  /* Container query: measures the ACTUAL settings frame width, not the
-     browser viewport. This lets the 600-699px icon-only rail rule fire
-     inside a simulated 600px frame even when the browser is 1280px wide. */
+}
+
+/* Settings shell — the container query target */
+.pc__settings-shell {
+  display: flex;
+  flex-direction: row;
+  flex: 1 1 auto;
+  min-height: 0;
   container-type: inline-size;
+}
+
+/* Settings nav rail */
+.pc__settings-rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-md) var(--space-sm);
+  width: 180px;
+  flex: 0 0 auto;
+  border-right: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+  overflow-y: auto;
+}
+
+.pc__rail-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  color: var(--color-fg-muted);
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+
+.pc__rail-item:hover {
+  background: var(--color-bg-hover);
+}
+
+.pc__rail-item--active {
+  background: var(--color-bg-selected);
+  color: var(--color-selected-fg);
+}
+
+.pc__rail-item[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.pc__rail-item__label {
+  font-size: var(--text-sm);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.pc__content {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Container query: 600-699px → icon-only rail */
+@container (max-width: 699px) {
+  .pc__settings-rail {
+    width: 48px;
+    padding: var(--space-md) var(--space-xs);
+    align-items: center;
+  }
+  .pc__rail-item {
+    justify-content: center;
+    padding: var(--space-sm);
+  }
+  .pc__rail-item__label {
+    display: none;
+  }
+}
+
+/* Container query: ≥700px → full labels */
+@container (min-width: 700px) {
+  .pc__settings-rail {
+    width: 180px;
+  }
+  .pc__rail-item__label {
+    display: inline;
+  }
 }
 
 /* Preset grid (add-provider) */
@@ -243,29 +325,30 @@
   z-index: 1000;
 }
 
-/* §8.3 adaptive: 600-699px → icon-only sidebar rail (labels hidden, shown
-   as title tooltips); ≥700px → full labels. Uses container query so the rule
-   fires based on the Settings frame width, NOT the browser viewport. */
-@container (max-width: 699px) {
-  .pc__layout {
-    grid-template-columns: minmax(180px, 1fr) 1fr;
-    gap: var(--space-sm);
-  }
-  .pc__sidebar-title,
-  .pc__sidebar-header > .lr-btn {
-    font-size: 0;
-  }
-  .pc__sidebar-header > .lr-btn svg {
-    font-size: initial;
-  }
-  .pc__role-actions {
-    /* Compact: hide text labels, keep icons */
-    gap: var(--space-xs);
-  }
+/* Provider list drag handle + indicators */
+.pc__drag-handle {
+  position: absolute;
+  left: -20px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: grab;
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-standard);
 }
 
-@container (max-width: 699px) {
-  .pc__provider-card__name {
-    font-size: var(--text-sm);
-  }
+.pc__provider-row:hover .pc__drag-handle,
+.pc__provider-row:focus-within .pc__drag-handle {
+  opacity: 1;
+}
+
+.pc__provider-row--dragging {
+  opacity: 0.4;
+}
+
+.pc__provider-row--drag-over-before {
+  border-top: 2px solid var(--color-primary-fill);
+}
+
+.pc__provider-row--drag-over-after {
+  border-bottom: 2px solid var(--color-primary-fill);
 }
