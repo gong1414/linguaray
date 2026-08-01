@@ -1,3 +1,10 @@
+> ⚠️ **SUPERSEDED** — This v1 translation-core spec is replaced by the full product baseline:
+> [**2026-08-01-linguaray-product-baseline.md**](./2026-08-01-linguaray-product-baseline.md)
+>
+> The security, clipboard, CI, and signing implementations described here are **retained**
+> as the engineering base for the new spec. The product scope (translation-only v1) is
+> superseded by the Bob/Pot-aligned full capability baseline.
+
 # LinguaRay v1 — Design Spec
 
 **Status:** Approved (rev 4 — three closing fixes: A atomic-write semantics + pre-decrypt validation, B sentinel-marker state machine, wire option-wording) · **Date:** 2026-07-30
