@@ -35,6 +35,7 @@
 }
 
 /* Loading: compact pill "• Translating…" centered in the small window */
+/* Loading: spinner (the shared Spinner component) + label. */
 .sel-popup__loading {
   display: inline-flex;
   align-items: center;
@@ -42,19 +43,6 @@
   font-size: var(--text-sm);
   line-height: var(--text-sm--line-height);
   color: var(--color-fg);
-}
-
-.sel-popup__loading-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--color-primary-fg);
-  animation: lr-pulse 0.9s var(--ease-standard) infinite;
-}
-
-@keyframes lr-pulse {
-  0%, 100% { opacity: 0.3; }
-  50% { opacity: 1; }
 }
 
 /* Settings-opened toast */

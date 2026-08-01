@@ -11,6 +11,7 @@ import { Copy, Check, Volume2, Square, Pin, PinOff, Star, AlertTriangle } from "
 import {
   ResultCard,
   Button,
+  Spinner,
   type ResultAction,
   type ResultOutcome,
 } from "@linguaray/ui";
@@ -170,14 +171,21 @@ const SelectionPopup: Component<SelectionPopupProps> = (props) => {
     }
   });
 
-  // Retry transitions a single error → success after a delay.
+  // Retry behavior differs by state:
+  //  - single-error states (network/config-key/config-401): retry clears the
+  //    error content while loading, then swaps to a success card.
+  //  - success states including Pinned: retry KEEPS the existing result cards
+  //    visible (the pinned bar + cards must remain, only the Retry button
+  //    shows loading). Returning [] here would blank the whole popup.
+  const isSingleErrorState = () =>
+    props.state === "error-network" ||
+    props.state === "error-config-key" ||
+    props.state === "error-config-401";
+
   const effectiveResults = createMemo<MockResult[]>(() => {
-    if (retrying()) return [];
-    const isSingleError =
-      props.state === "error-network" ||
-      props.state === "error-config-key" ||
-      props.state === "error-config-401";
-    if (isSingleError && retriedDone()) {
+    // Only single-error retry blanks content; success/pinned retry preserves it.
+    if (retrying() && isSingleErrorState()) return [];
+    if (isSingleErrorState() && retriedDone()) {
       return [
         {
           engineId: "deepseek",
@@ -302,12 +310,14 @@ const SelectionPopup: Component<SelectionPopupProps> = (props) => {
       aria-label={
         isMulti() ? props.t.multiTitle : props.t.states[props.state]
       }
+      aria-busy={retrying() ? "true" : undefined}
     >
-      {/* Loading — fills the compact ~200×40 frame */}
+      {/* Loading — fills the compact ~200×40 frame. Uses the frozen Spinner
+          (MASTER §7) so reduced-motion text fallback is consistent with the
+          component package, not a second loading implementation here. */}
       <Show when={props.state === "loading"}>
         <div class="sel-popup__loading">
-          <span class="sel-popup__loading-dot" aria-hidden="true" />
-          <span>{props.t.loading}</span>
+          <Spinner size={12} label={props.t.loading} />
         </div>
       </Show>
 
@@ -352,24 +362,25 @@ const SelectionPopup: Component<SelectionPopupProps> = (props) => {
         )}
       </Show>
 
-      {/* Success / multi: side-by-side ResultCards. Pinned cards also offer
-          Retry (per S0 §4.1 "supports copy/retry/TTS/favorite"). */}
-      <Show when={effectiveResults().length > 0}>
-        {/* Pinned retry affordance */}
-        <Show when={props.state === "pinned"}>
-          <div class="sel-popup__pinned-bar">
-            <Button
-              variant="ghost"
-              size="sm"
-              loading={retrying()}
-              loadingLabel={props.t.retrying}
-              onClick={doRetry}
-            >
-              {props.t.retry}
-            </Button>
-          </div>
-        </Show>
+      {/* Pinned retry affordance — rendered independently of the results Show
+          so it stays visible even if results are momentarily empty. S0 §4.1
+          requires Pinned to support copy/retry/TTS/favorite. */}
+      <Show when={props.state === "pinned"}>
+        <div class="sel-popup__pinned-bar">
+          <Button
+            variant="ghost"
+            size="sm"
+            loading={retrying()}
+            loadingLabel={props.t.retrying}
+            onClick={doRetry}
+          >
+            {props.t.retry}
+          </Button>
+        </div>
+      </Show>
 
+      {/* Success / multi: side-by-side ResultCards. */}
+      <Show when={effectiveResults().length > 0}>
         <div
           class="sel-popup__results"
           classList={{
