@@ -1,6 +1,6 @@
 # LinguaRay — Product Baseline Spec (S0 Freeze)
 
-**Status:** Draft (S0 — awaiting freeze approval) · **Date:** 2026-08-01
+**Status:** Approved — S0 Frozen · **Date:** 2026-08-01
 **Supersedes:** [2026-07-30-linguaray-v1-design.md](./2026-07-30-linguaray-v1-design.md) (the v1 translation-core scope; its security/clipboard/CI/signing implementations are retained as the engineering base)
 
 ---
@@ -934,7 +934,7 @@ S0 (Spec) ──freeze──▶ S1 (Design) ──design gate──▶ S2a (Data
 | Install path | `~/.zcode/cli/skills/ui-ux-pro-max/` |
 | Install source dir | `.claude/skills/ui-ux-pro-max/` (the actual skill directory in the repo) |
 | Install method | Cloned repo at pinned SHA → copied `.claude/skills/ui-ux-pro-max/` contents to skills dir |
-| Platform adaptation | The original `SKILL.md` uses `${CLAUDE_PLUGIN_ROOT}` (a Claude Code variable ZCode does not set). A **path-adapted copy** was generated: all `${CLAUDE_PLUGIN_ROOT}/.claude/skills/ui-ux-pro-max` references replaced with the absolute install path `$HOME/.zcode/cli/skills/ui-ux-pro-max`. Original preserved as `SKILL.md.orig`. |
+| Platform adaptation | The original `SKILL.md` uses `${CLAUDE_PLUGIN_ROOT}` (a Claude Code variable ZCode does not set). A **path-adapted copy** was generated: all `${CLAUDE_PLUGIN_ROOT}/.claude/skills/ui-ux-pro-max` references replaced with the absolute install path `/Users/daoyu/.zcode/cli/skills/ui-ux-pro-max`. Original preserved as `SKILL.md.orig`. |
 | Adapted SKILL.md SHA | `e28f987cf4230eb3ade0a339bf8530bebcfd4fc8` |
 | Original SKILL.md SHA | `1358d9cf81e9a7ee973508b1744bd0938a009a93` |
 | Adaptation scope | Path substitution only (11 occurrences of `${CLAUDE_PLUGIN_ROOT}` → `/Users/daoyu/.zcode/cli/skills/ui-ux-pro-max`); no logic, data, or structural changes |
