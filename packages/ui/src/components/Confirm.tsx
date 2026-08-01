@@ -51,7 +51,14 @@ const Confirm: Component<ConfirmProps> = (props) => {
   // provider) — fall back to the next focusable element in the document.
   const restoreFocus = () => {
     const trigger = props.triggerRef?.current;
-    if (trigger && document.contains(trigger) && !trigger.hasAttribute("disabled")) {
+    // Trigger is invalid if: not in DOM, disabled, OR inside a deleting row
+    // (pointer-events:none, not operable even without explicit disabled attr)
+    const isTriggerValid = (el: HTMLElement | undefined): el is HTMLElement => {
+      if (!el || !document.contains(el) || el.hasAttribute("disabled")) return false;
+      const deletingAncestor = el.closest('[data-status="deleting"]');
+      return !deletingAncestor;
+    };
+    if (isTriggerValid(trigger)) {
       trigger.focus();
       return;
     }

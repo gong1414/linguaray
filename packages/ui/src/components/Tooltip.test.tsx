@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { render, screen } from "@solidjs/testing-library";
+import { render } from "@solidjs/testing-library";
 import Tooltip from "./Tooltip";
 import { assertNoAxeViolations } from "../../test/setup";
 
@@ -13,15 +13,28 @@ describe("Tooltip", () => {
     expect(getByText("Hover me")).toBeTruthy();
   });
 
-  it("trigger is keyboard-focusable (keyboard path contract)", async () => {
-    render(() => (
+  it("default span trigger wraps children (non-interactive)", () => {
+    const { container } = render(() => (
       <Tooltip content="Helpful tip">
         <span>Info</span>
       </Tooltip>
     ));
-    const trigger = screen.getByText("Info");
-    // The Tooltip.Trigger renders as a focusable element (button by default)
-    expect(trigger.closest("button")).toBeTruthy();
+    const trigger = container.querySelector(".lr-tooltip__trigger");
+    expect(trigger?.tagName).toBe("SPAN");
+  });
+
+  it("as={Button} renders single button (no nested interactive)", () => {
+    const { container } = render(() => (
+      <Tooltip content="Tip" as="button">
+        <span>Click me</span>
+      </Tooltip>
+    ));
+    // Exactly one button in the trigger area
+    const triggers = container.querySelectorAll(".lr-tooltip__trigger");
+    expect(triggers.length).toBe(1);
+    expect(triggers[0]?.tagName).toBe("BUTTON");
+    // No nested button-in-button
+    expect(triggers[0]?.querySelector("button")).toBeNull();
   });
 
   it("has no axe violations", async () => {
