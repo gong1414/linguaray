@@ -33,6 +33,35 @@ export type SelectionState =
   | "offline-error"
   | "pinned";
 
+/**
+ * S0 §4.3 Provider Center — all 23 states (model-fetch-error and
+ * model-manual-entry are separate rows, not merged).
+ */
+export type ProviderState =
+  | "empty"
+  | "loading-models"
+  | "model-fetch-error"
+  | "model-manual-entry"
+  | "connection-testing"
+  | "connection-ok"
+  | "connection-failed"
+  | "key-saved"
+  | "key-missing"
+  | "duplicate"
+  | "saving"
+  | "save-failed"
+  | "save-conflict"
+  | "delete-confirm"
+  | "deleting"
+  | "delete-retry"
+  | "drag-reorder"
+  | "reorder-failed"
+  | "balance-loading"
+  | "balance-unsupported"
+  | "balance-rate-limited"
+  | "balance-error"
+  | "endpoint-invalid";
+
 export type LabStrings = {
   appTitle: string;
   appSubtitle: string;
@@ -106,6 +135,63 @@ export type LabStrings = {
     engineA: string;
     engineB: string;
     engineC: string;
+  };
+  provider: {
+    states: Record<ProviderState, string>;
+    addFirst: string;
+    addFirstDesc: string;
+    addProvider: string;
+    models: string;
+    fetchModels: string;
+    modelFetchError: string;
+    manualModelEntry: string;
+    manualModelPlaceholder: string;
+    testConnection: string;
+    testing: string;
+    connectionOk: string;
+    connectionFailed: string;
+    keySaved: string;
+    keyMissing: string;
+    enterKey: string;
+    apiKey: string;
+    apiKeyPlaceholder: string;
+    saveKey: string;
+    saving: string;
+    saveFailed: string;
+    saveConflict: string;
+    reload: string;
+    cancel: string;
+    deleteConfirmTitle: string;
+    deleteConfirmMsg: string;
+    delete: string;
+    deleting: string;
+    deleteRetry: string;
+    moveUp: string;
+    moveDown: string;
+    dragHandle: string;
+    reorderReverted: string;
+    balanceLoading: string;
+    balanceUnsupported: string;
+    balanceRateLimited: string;
+    balanceError: string;
+    endpointInvalid: string;
+    setPrimary: string;
+    addParallel: string;
+    removeParallel: string;
+    setFallback: string;
+    consentTitle: string;
+    consentMsg: string;
+    consentConfirm: string;
+    consentCancel: string;
+    selectPrimary: string;
+    duplicate: string;
+    primary: string;
+    fallback: string;
+    parallel: string;
+    enabled: string;
+    disabled: string;
+    endpoint: string;
+    name: string;
   };
 };
 
@@ -201,6 +287,87 @@ export const strings: Record<Locale, LabStrings> = {
       engineB: "OpenAI",
       engineC: "Google",
     },
+    provider: {
+      states: {
+        empty: "Empty (no providers)",
+        "loading-models": "Loading models",
+        "model-fetch-error": "Model fetch error",
+        "model-manual-entry": "Model manual entry",
+        "connection-testing": "Connection testing",
+        "connection-ok": "Connection OK",
+        "connection-failed": "Connection failed",
+        "key-saved": "Key saved",
+        "key-missing": "Key missing",
+        duplicate: "Duplicate",
+        saving: "Saving",
+        "save-failed": "Save failed",
+        "save-conflict": "Save conflict",
+        "delete-confirm": "Delete confirm",
+        deleting: "Deleting",
+        "delete-retry": "Delete retry",
+        "drag-reorder": "Drag to reorder",
+        "reorder-failed": "Reorder failed",
+        "balance-loading": "Balance loading",
+        "balance-unsupported": "Balance unsupported",
+        "balance-rate-limited": "Balance rate-limited",
+        "balance-error": "Balance error",
+        "endpoint-invalid": "Endpoint invalid",
+      },
+      addFirst: "Add your first provider",
+      addFirstDesc: "Pick a preset, enter your API key, and start translating.",
+      addProvider: "Add provider",
+      models: "Model",
+      fetchModels: "Fetch models",
+      modelFetchError: "Failed to fetch models — enter manually",
+      manualModelEntry: "Enter model manually",
+      manualModelPlaceholder: "e.g. gpt-4o",
+      testConnection: "Test",
+      testing: "Testing…",
+      connectionOk: "Connected",
+      connectionFailed: "Connection failed",
+      keySaved: "Key saved",
+      keyMissing: "Key missing",
+      enterKey: "Enter key",
+      apiKey: "API key",
+      apiKeyPlaceholder: "sk-…",
+      saveKey: "Save key",
+      saving: "Saving…",
+      saveFailed: "Failed to save: network error",
+      saveConflict: "This provider was modified elsewhere. Reload?",
+      reload: "Reload",
+      cancel: "Cancel",
+      deleteConfirmTitle: "Delete provider?",
+      deleteConfirmMsg: "History references are preserved.",
+      delete: "Delete",
+      deleting: "Deleting…",
+      deleteRetry: "Delete failed — retry?",
+      moveUp: "Move up",
+      moveDown: "Move down",
+      dragHandle: "Drag to reorder",
+      reorderReverted: "Failed to save order — reverted",
+      balanceLoading: "Loading balance…",
+      balanceUnsupported: "—",
+      balanceRateLimited: "Rate limited — try later",
+      balanceError: "Error fetching balance",
+      endpointInvalid: "Must be HTTPS (or localhost)",
+      setPrimary: "Set as primary",
+      addParallel: "Add to parallel",
+      removeParallel: "Remove from parallel",
+      setFallback: "Set as fallback",
+      consentTitle: "Send text to multiple providers?",
+      consentMsg: "Your text will be sent to the following providers:",
+      consentConfirm: "Confirm",
+      consentCancel: "Cancel",
+      selectPrimary: "Select a primary provider",
+      duplicate: "Duplicate",
+      primary: "Primary",
+      fallback: "Fallback",
+      parallel: "Parallel",
+      enabled: "Enabled",
+      disabled: "Disabled",
+      endpoint: "Endpoint",
+      name: "Name",
+    },
   },
   zh: {
     appTitle: "LinguaRay · UI 实验室",
@@ -292,6 +459,87 @@ export const strings: Record<Locale, LabStrings> = {
       engineA: "DeepSeek",
       engineB: "OpenAI",
       engineC: "Google",
+    },
+    provider: {
+      states: {
+        empty: "空（无服务商）",
+        "loading-models": "加载模型",
+        "model-fetch-error": "模型获取失败",
+        "model-manual-entry": "手动输入模型",
+        "connection-testing": "连接测试中",
+        "connection-ok": "连接成功",
+        "connection-failed": "连接失败",
+        "key-saved": "密钥已保存",
+        "key-missing": "缺少密钥",
+        duplicate: "复制",
+        saving: "保存中",
+        "save-failed": "保存失败",
+        "save-conflict": "保存冲突",
+        "delete-confirm": "删除确认",
+        deleting: "删除中",
+        "delete-retry": "删除重试",
+        "drag-reorder": "拖拽排序",
+        "reorder-failed": "排序失败",
+        "balance-loading": "余额加载中",
+        "balance-unsupported": "不支持余额",
+        "balance-rate-limited": "余额限流",
+        "balance-error": "余额错误",
+        "endpoint-invalid": "端点无效",
+      },
+      addFirst: "添加你的第一个服务商",
+      addFirstDesc: "选择预设，输入 API 密钥，即可开始翻译。",
+      addProvider: "添加服务商",
+      models: "模型",
+      fetchModels: "获取模型",
+      modelFetchError: "获取模型失败 —— 请手动输入",
+      manualModelEntry: "手动输入模型",
+      manualModelPlaceholder: "例如 gpt-4o",
+      testConnection: "测试",
+      testing: "测试中…",
+      connectionOk: "已连接",
+      connectionFailed: "连接失败",
+      keySaved: "密钥已保存",
+      keyMissing: "缺少密钥",
+      enterKey: "输入密钥",
+      apiKey: "API 密钥",
+      apiKeyPlaceholder: "sk-…",
+      saveKey: "保存密钥",
+      saving: "保存中…",
+      saveFailed: "保存失败：网络错误",
+      saveConflict: "此服务商已在其他位置修改。重新加载？",
+      reload: "重新加载",
+      cancel: "取消",
+      deleteConfirmTitle: "删除服务商？",
+      deleteConfirmMsg: "历史引用将被保留。",
+      delete: "删除",
+      deleting: "删除中…",
+      deleteRetry: "删除失败 —— 重试？",
+      moveUp: "上移",
+      moveDown: "下移",
+      dragHandle: "拖拽排序",
+      reorderReverted: "排序保存失败 —— 已恢复",
+      balanceLoading: "正在加载余额…",
+      balanceUnsupported: "—",
+      balanceRateLimited: "限流 —— 请稍后重试",
+      balanceError: "获取余额出错",
+      endpointInvalid: "必须为 HTTPS（或 localhost）",
+      setPrimary: "设为主引擎",
+      addParallel: "加入并行",
+      removeParallel: "移出并行",
+      setFallback: "设为回退",
+      consentTitle: "将文本发送给多个服务商？",
+      consentMsg: "你的文本将发送给以下服务商：",
+      consentConfirm: "确认",
+      consentCancel: "取消",
+      selectPrimary: "请选择主引擎",
+      duplicate: "复制",
+      primary: "主引擎",
+      fallback: "回退",
+      parallel: "并行",
+      enabled: "已启用",
+      disabled: "已禁用",
+      endpoint: "端点",
+      name: "名称",
     },
   },
 };
