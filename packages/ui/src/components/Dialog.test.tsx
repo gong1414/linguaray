@@ -127,7 +127,6 @@ describe("Confirm", () => {
   it("triggerRef: Cancel click — onCloseAutoFocus fires and calls preventDefault", () => {
     const triggerRef: { current?: HTMLElement } = {};
     let open = true;
-    let autoFocusPrevented = false;
     render(() => (
       <>
         <button ref={(el) => { triggerRef.current = el; }}>Open</button>
