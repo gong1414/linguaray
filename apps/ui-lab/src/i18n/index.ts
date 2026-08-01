@@ -151,11 +151,13 @@ export type LabStrings = {
     connectionOk: string;
     connectionFailed: string;
     keySaved: string;
+    profileSaved: string;
     keyMissing: string;
     enterKey: string;
     apiKey: string;
     apiKeyPlaceholder: string;
     saveKey: string;
+    saveProfile: string;
     saving: string;
     saveFailed: string;
     saveConflict: string;
@@ -348,11 +350,13 @@ export const strings: Record<Locale, LabStrings> = {
       connectionOk: "Connected",
       connectionFailed: "Connection failed",
       keySaved: "Key saved",
+      profileSaved: "Profile saved",
       keyMissing: "Key missing",
       enterKey: "Enter key",
       apiKey: "API key",
       apiKeyPlaceholder: "sk-…",
       saveKey: "Save key",
+      saveProfile: "Save profile",
       saving: "Saving…",
       saveFailed: "Failed to save: network error",
       saveConflict: "This provider was modified elsewhere. Reload?",
@@ -540,11 +544,13 @@ export const strings: Record<Locale, LabStrings> = {
       connectionOk: "已连接",
       connectionFailed: "连接失败",
       keySaved: "密钥已保存",
+      profileSaved: "配置已保存",
       keyMissing: "缺少密钥",
       enterKey: "输入密钥",
       apiKey: "API 密钥",
       apiKeyPlaceholder: "sk-…",
       saveKey: "保存密钥",
+      saveProfile: "保存配置",
       saving: "保存中…",
       saveFailed: "保存失败：网络错误",
       saveConflict: "此服务商已在其他位置修改。重新加载？",
