@@ -35,11 +35,20 @@ const Confirm: Component<ConfirmProps> = (props) => {
   const handleConfirm = () => {
     props.onConfirm();
     props.onOpenChange(false);
+    restoreFocus();
   };
 
   const handleCancel = () => {
     props.onCancel();
     props.onOpenChange(false);
+    restoreFocus();
+  };
+
+  const restoreFocus = () => {
+    if (props.triggerRef?.current) {
+      const el = props.triggerRef.current;
+      setTimeout(() => el.focus(), 0);
+    }
   };
 
   return (
@@ -49,17 +58,9 @@ const Confirm: Component<ConfirmProps> = (props) => {
         <KobalteDialog.Content
           class="lr-dialog__content"
           onOpenAutoFocus={(e) => {
-            // Destructive: force focus onto Cancel (never Confirm) so Enter
-            // can't accidentally trigger the destructive action.
             if (variant() === "destructive") {
               e.preventDefault();
               cancelRef?.focus();
-            }
-          }}
-          onCloseAutoFocus={() => {
-            // Restore focus to the trigger element that opened this dialog.
-            if (props.triggerRef?.current) {
-              props.triggerRef.current.focus();
             }
           }}
         >
