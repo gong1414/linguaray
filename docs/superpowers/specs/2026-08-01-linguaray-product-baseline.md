@@ -172,7 +172,7 @@ Every UI surface must handle these states. "—" means not applicable to that su
 | **OCR processing** | Small spinner at selection |
 | **Success** | Translation popup at selection |
 | **Error (no text)** | "No text recognized" |
-| **Error (permission)** | "Grant Screen Recording permission" (macOS) / "Grant capture permission" (Windows) |
+| **Error (permission)** | macOS: "Grant Screen Recording permission". Windows: "Capture unavailable" (protected content / unsupported session / remote desktop) |
 | **Cancelled** | Overlay dismissed (Esc / right-click) |
 
 ### 4.5 History
@@ -233,7 +233,7 @@ Every UI surface must handle these states. "—" means not applicable to that su
 | **History disabled** | Toggle off; explanation of what's not stored |
 | **History enabled** | Toggle on; retention period selector; "Clear all" button |
 | **External API off** | Toggle off; explanation |
-| **External API on** | Toggle on; port display; "Regenerate token" (shows token once); "Copy token" |
+| **External API on** | Toggle on; port display; "Regenerate token" (shows new token once in a modal); "Disable" (token NOT copyable from this view) |
 
 ### 4.11 Settings — Keystore Recovery
 
@@ -277,7 +277,7 @@ Every UI surface must handle these states. "—" means not applicable to that su
 |---|---|
 | **Disabled** | "External API: Off" + "Enable" |
 | **Enabling** | Spinner → token shown once → "Copy now — you won't see it again" |
-| **Enabled** | "External API: On (port {port})" + "Regenerate token" + "Disable" |
+| **Enabled** | "External API: On (port {port})" + "Regenerate token" + "Disable" (token NOT shown or copyable from this state) |
 | **Regenerating** | Warning: "Old token will stop working immediately" → new token shown once |
 
 ### 4.16 Updater
@@ -307,20 +307,20 @@ KeystoreData {
     version: u32,                          // 2 (v1 = legacy flat map)
     provider_keys: Map<String, String>,    // keyed by secret_ref (legacy_id for migrated, "provider/<uuid>" for new)
     history_key: Option<[u8; 32]>,         // opt-in history encryption key
-    external_api_token: Option<String>,    // opt-in external API bearer token
+    external_api_token: Option<String>,    // opt-in; base64url (no padding) of 32 random bytes
 }
 ```
 
 **Legacy flat-map migration:** On first load after upgrade, if `version` is absent
 (legacy), the flat map is treated as `provider_keys` with template-id keys. The
-migration protocol (§8.4) renames them to UUID keys as profiles are created.
+migration protocol (§8.5) converts the flat map to `provider_keys` without renaming keys.
 
 ### 5.1 ProviderProfile
 
 ```
 ProviderProfile {
-    uuid: String              // deterministic UUID v5 (namespace + template_id + name)
-                              // for migrated profiles; UUID v4 for user-created
+    uuid: String              // deterministic UUID v5 for migrated: UUIDv5(NAMESPACE_LINGUARAY,
+                              //   "linguaray:legacy-provider:" + legacy_id); UUID v4 for user-created
     template_id: String       // "openai", "anthropic", "google", "custom", etc.
     name: String              // user-editable display name
     protocol: Protocol        // openai_chat | anthropic | gemini | google_translate | custom_http
@@ -332,6 +332,9 @@ ProviderProfile {
     secret_ref: String        // keystore key name. Migrated profiles: = legacy_id (e.g. "openai").
                               // New profiles: "provider/<uuid>". NOT necessarily == uuid.
     capabilities: ProviderCapabilities  // balance, quota, model_list, etc.
+    status: ProviderStatus    // Active | Deleting | Deleted (tombstone)
+                              // provider_list() returns only Active by default;
+                              // Deleted profiles retained for history name_snapshot.
 }
 ```
 
@@ -436,10 +439,10 @@ vocabulary {
     target_language: String   // plaintext metadata
     word_encrypted: Vec<u8>   // AES-256-GCM (ciphertext || tag)
     word_nonce: [u8; 12]
-    word_aad: String           // = item_uuid
+    // AAD = "linguaray-vocab-v1|item|<item_uuid>|word" (domain-separated, see §5.3)
     definition_encrypted: Vec<u8>
     definition_nonce: [u8; 12]
-    definition_aad: String     // = item_uuid
+    // AAD = "linguaray-vocab-v1|item|<item_uuid>|definition" (domain-separated, see §5.3)
     crypto_version: u32
 }
 ```
@@ -459,7 +462,7 @@ provider_duplicate(uuid) → ProviderProfile
 provider_delete(uuid) → ()
 provider_reorder(uuids: Vec<String>) → ()
 provider_toggle(uuid, enabled) → ()
-provider_set_key(uuid, key) → ()       // writes to keystore.provider_keys[uuid] only
+provider_set_key(uuid, key) → ()       // writes to keystore.provider_keys[<profile.secret_ref>] only
 provider_get_models(uuid) → Vec<ModelInfo>
 provider_test_connection(uuid) → ConnectionResult
 provider_set_active(
@@ -509,8 +512,8 @@ translate_ocr(image: ImageData) → TranslationSession
 
 ### Content commands
 ```
-history_search(query: String, cursor: Option<String>, batch_size: u32) → HistoryPage
-history_list(cursor: Option<String>, batch_size: u32, favorites_only: bool) → HistoryPage
+history_search(query: String, cursor: Option<String>) → HistoryPage
+history_list(cursor: Option<String>, favorites_only: bool) → HistoryPage
 history_delete(session_uuids: Vec<String>) → ()
 history_toggle_favorite(session_uuid: String) → ()
 history_clear(before_timestamp: Option<i64>) → ()
@@ -533,10 +536,14 @@ vocabulary_delete(item_uuid: String) → ()
 vocabulary_export(format: ExportFormat) → FilePath
 ```
 
-**History search normalization:** Unicode NFKC normalization + Unicode case folding
-(`String::to_lowercase()` after NFKC). Batch size is fixed at **200** (not
-configurable). Search covers all records within the retention period + all
-favorites regardless of age.
+**History search normalization:** Unicode NFKC + case folding (NFKC_Casefold
+semantics; the specific Rust crate is decided at S2a implementation). Batch size
+is fixed at **200** (not configurable; not a parameter). Search covers all records
+within the retention period + all favorites regardless of age.
+
+**`HistoryPage.next_cursor`:** opaque cursor encoding the last scanned
+`(timestamp, session_uuid)` pair. The frontend must not parse or construct it;
+it passes it back verbatim to fetch the next batch.
 
 **AnkiConnect export:** Sends decrypted vocabulary items to `127.0.0.1:8765` via
 the AnkiConnect API. Decrypted content exists only in memory during the export
@@ -586,9 +593,11 @@ ExternalApiStatus =
 **Enable sequence (crash-safe ordering):**
 1. Validate and bind the TCP socket to `127.0.0.1:<port>` (default 61742).
    If bind fails → return error; do NOT write to keystore or preferences.
-2. Write token to `keystore.external_api_token` + port to `preferences`.
+2. Write token to `keystore.external_api_token` + port + `enabled = true` to `preferences`.
 3. Start the HTTP server on the bound socket.
 4. If keystore write fails → close the socket; return error; no "enabled" state persists.
+5. If server start fails → close the socket; remove token from keystore; set
+   `enabled = false` in preferences; return error. State reverts to Disabled.
 
 **Port-in-use recovery:** on restart, if the configured port is occupied, the
 server does NOT start. `external_api_status()` returns `PortInUse`. The token is
@@ -597,6 +606,14 @@ retained in the keystore. The user calls `external_api_enable(new_port)` to rebi
 **Token lifecycle:** Created by `external_api_enable` or `external_api_regenerate_token`,
 returned **exactly once**. Never readable again — `external_api_status` returns only
 status + port, never the token. Compared in constant time on every request.
+
+**Regenerate sequence:** generate new 32-byte token → write to keystore (atomic) →
+atomically replace the in-memory token used by the running server. If keystore
+write fails, the old token continues to be accepted (no disruption). The new token
+is returned to the caller only on success.
+
+**Token format in keystore:** stored as base64url-encoded string (no padding) in
+`keystore.external_api_token`.
 
 **Origin policy:** **Reject any request with an `Origin` header.** No CORS support.
 LinguaRay's external API is for local scripts/tools, not browser clients.
@@ -685,15 +702,16 @@ See §6 "External API token commands" — `external_api_enable`,
 
 - **Protocol:** AES-256-GCM + Argon2id, self-encrypted JSON, machine-bound identity, fail-closed, per-dir fs2 flock.
 - **Inner structure:** versioned (§5.0): `provider_keys` (by UUID), `history_key` (opt-in 32 bytes), `external_api_token` (opt-in).
-- **Database link:** DB `providers.secret_ref` = provider UUID → keystore `provider_keys[uuid]`. No plaintext key in DB.
+- **Database link:** DB `providers.secret_ref` is the stable lookup key into `keystore.provider_keys[secret_ref]`. No plaintext key in DB.
 
 ### 8.3 History Encryption
 
 - **Consent gate:** First launch → explicit prompt: "Enable history?" — no history written until agreed.
 - **Key:** On opt-in, generate 32-byte random key → store in `keystore.history_key`.
-- **Per-record encryption:** AES-256-GCM with fresh nonce per record. Session UUID
-  (generated **before** encryption, not auto-increment DB ID) is used as AAD.
-  AES-GCM tag is appended to ciphertext (`ciphertext || 16-byte tag`).
+- **Per-record encryption:** AES-256-GCM with fresh nonce per record. Each encrypted
+  field uses a domain-separated AAD string (see §5.3 for the exact AAD formats).
+  UUIDs are generated **before** encryption (not auto-increment DB IDs) and embedded
+  in the AAD. AES-GCM tag is appended to ciphertext (`ciphertext || 16-byte tag`).
   `crypto_version` field (currently 1) allows future algorithm migration.
 - **Encrypted fields:** `source_text` (session), `result_text` + `error_message` (results);
   vocabulary: `word`, `definition`.
@@ -710,7 +728,7 @@ See §6 "External API token commands" — `external_api_enable`,
 All history content is encrypted at rest — no plaintext index, no blind index, no
 searchable ciphertext. Search is performed as follows:
 
-1. Rust reads candidate records from SQLite in **fixed batches** (e.g. 200 rows)
+1. Rust reads candidate records from SQLite in **fixed batches** (200 rows)
    using cursor-based pagination (ordered by `timestamp DESC`).
 2. Each batch is **decrypted in memory** (using `keystore.history_key`).
 3. The search query is matched against decrypted `source_text` and `result_text`
@@ -822,7 +840,7 @@ haven't set as default). For each legacy key:
 | Keystore atomic replace | `rename()` | `MoveFileExW` / `ReplaceFileW` | Both atomic (verified) |
 | Keystore file ACL | `chmod 600` | `SetNamedSecurityInfoW` (protected DACL) | Both owner-only (verified) |
 | Tray / menu-bar | `NSStatusItem` | `SystemTray` (Tauri) | Same menu items, same actions |
-| OCR | ScreenCaptureKit + Vision | Windows.Graphics.Capture + Windows OCR | Same UX (region select → OCR → translate) |
+| OCR | ScreenCaptureKit + Vision | DXGI Desktop Duplication + Windows.Media.Ocr | Same UX (region select → OCR → translate) |
 | TTS | `AVSpeechSynthesizer` | `SpeechSynthesizer` | Same voice list / speak / stop |
 | Dictionary | System dict + StarDict/MDX | StarDict/MDX only | Same offline package format |
 | Shortcuts | Global hotkey (same engine) | Global hotkey | Same conflict detection |
@@ -896,7 +914,7 @@ S0 (Spec) ──freeze──▶ S1 (Design) ──design gate──▶ S2a (Data
   - macOS automated: ScreenCaptureKit permission flow mocked; Vision OCR pipeline tested.
   - macOS real-machine: region select → OCR → translate; image/drag/clipboard input.
   - Windows CI: cargo check/clippy/test green for OCR module.
-  - Windows real-machine: GraphicsCapturePicker → capture → Windows OCR → translate; permission flow.
+  - Windows real-machine: overlay → DXGI capture/crop/stitch → Windows.Media.Ocr → translate; protected-content/remote-desktop error handling.
 - **S6:**
   - Both platforms automated: TTS voice list/speak/stop; external API endpoints with auth + rate limit + body limits; updater manifest generation.
   - Both platforms real-machine: TTS playback; external API from another process; signed update install.
@@ -919,7 +937,7 @@ S0 (Spec) ──freeze──▶ S1 (Design) ──design gate──▶ S2a (Data
 | Platform adaptation | The original `SKILL.md` uses `${CLAUDE_PLUGIN_ROOT}` (a Claude Code variable ZCode does not set). A **path-adapted copy** was generated: all `${CLAUDE_PLUGIN_ROOT}/.claude/skills/ui-ux-pro-max` references replaced with the absolute install path `$HOME/.zcode/cli/skills/ui-ux-pro-max`. Original preserved as `SKILL.md.orig`. |
 | Adapted SKILL.md SHA | `e28f987cf4230eb3ade0a339bf8530bebcfd4fc8` |
 | Original SKILL.md SHA | `1358d9cf81e9a7ee973508b1744bd0938a009a93` |
-| Adaptation scope | Path substitution only (11 occurrences of `${CLAUDE_PLUGIN_ROOT}`); no logic, data, or structural changes |
+| Adaptation scope | Path substitution only (11 occurrences of `${CLAUDE_PLUGIN_ROOT}` → `/Users/daoyu/.zcode/cli/skills/ui-ux-pro-max`); no logic, data, or structural changes |
 | Smoke test (repo root) | `python3 ~/.zcode/cli/skills/ui-ux-pro-max/scripts/search.py "desktop productivity" --domain product -n 1` → "Productivity Tool" result ✅ |
 | Smoke test (/tmp) | `python3 ~/.zcode/cli/skills/ui-ux-pro-max/scripts/search.py "minimal" --domain style -n 1` → "Minimalism" result ✅ |
 | Files installed | `SKILL.md` (adapted), `SKILL.md.orig` (upstream), `data/` (CSV databases), `scripts/` (search.py, core.py, design_system.py), `references/` (quick-reference.md, pro-rules.md) |
