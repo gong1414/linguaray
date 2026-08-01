@@ -210,6 +210,7 @@ export type LabStrings = {
     navProviderCenter: string;
     navShortcuts: string;
     navPrivacy: string;
+    navSettings: string;
     presetOllama: string;
     frameMin: string;
     frameDefault: string;
@@ -403,6 +404,7 @@ export const strings: Record<Locale, LabStrings> = {
       navProviderCenter: "Provider Center",
       navShortcuts: "Shortcuts",
       navPrivacy: "Privacy & Data",
+      navSettings: "Settings navigation",
       presetOllama: "Ollama",
       frameMin: "600×400 (min)",
       frameDefault: "800×600 (default)",
@@ -594,6 +596,7 @@ export const strings: Record<Locale, LabStrings> = {
       navProviderCenter: "服务商中心",
       navShortcuts: "快捷键",
       navPrivacy: "隐私与数据",
+      navSettings: "设置导航",
       presetOllama: "Ollama",
       frameMin: "600×400（最小）",
       frameDefault: "800×600（默认）",
