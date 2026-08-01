@@ -125,6 +125,22 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
   // --- CAS operation registry ---
   const opRegistry = new OpRegistry();
 
+  // --- Tracked timers for non-op delayed callbacks (delete, retry, rollback).
+  // These are cancelled on state-change reset and onCleanup to prevent
+  // cross-state pollution (old delete callback removing new fixture's provider).
+  const trackedTimers = new Set<number>();
+  const scheduleTracked = (fn: () => void, ms: number): void => {
+    const id = window.setTimeout(() => {
+      trackedTimers.delete(id);
+      fn();
+    }, ms);
+    trackedTimers.add(id);
+  };
+  const clearTrackedTimers = (): void => {
+    for (const id of trackedTimers) window.clearTimeout(id);
+    trackedTimers.clear();
+  };
+
   // selectProvider cancels ALL selection-scoped ops for the OLD provider
   // synchronously (not waiting for timers), then sets the new selection.
   const selectProvider = (uuid: string | null): void => {
@@ -177,6 +193,7 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
       (state) => untrack(() => {
     // Cancel ALL async operations (CAS registry: delete → clearBusy per op)
     opRegistry.cancelAll();
+    clearTrackedTimers();
     setKeyInputByUuid({});
     setManualModel("");
     setModelFetchByUuid({});
@@ -268,7 +285,7 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
     ),
   );
 
-  onCleanup(() => opRegistry.cancelAll());
+  onCleanup(() => { opRegistry.cancelAll(); clearTrackedTimers(); });
 
   // --- card labels from i18n ---
   const cardLabels = (): ProviderCardLabels => ({
@@ -463,6 +480,10 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
     setDeleteConfirmUuid(uuid);
   };
 
+  const handleEdit = (uuid: string) => {
+    selectProvider(uuid);
+  };
+
   const confirmDelete = () => {
     const uuid = deleteConfirmUuid();
     if (!uuid) return;
@@ -476,8 +497,8 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
     };
     commitProviderState(nextProviders, nextSel);
     setDeleteConfirmUuid(null);
-    // Schedule removal via CAS registry (per-UUID delete op)
-    window.setTimeout(() => {
+    // Schedule removal via tracked timer (cancelled on state change/unmount)
+    scheduleTracked(() => {
       setProviders((prev) => prev.filter((p) => p.uuid !== uuid));
     }, 1500);
   };
@@ -511,7 +532,7 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
   const handleDeleteRetry = () => {
     const uuid = retryTargetUuid();
     if (!uuid) return;
-    window.setTimeout(() => {
+    scheduleTracked(() => {
       setProviders((prev) => prev.filter((p) => p.uuid !== uuid));
       setRetryTargetUuid(null);
       pushToast("success", props.t.delete);
@@ -575,7 +596,7 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
   // preserving all other provider modifications (endpoint, key, roles, etc.)
   const maybeRevertReorder = (preReorderProviders: MockProvider[]) => {
     if (props.state === "reorder-failed") {
-      window.setTimeout(() => {
+      scheduleTracked(() => {
         // Restore the original sort orders without losing other state
         const sortOrderSnapshot = new Map(preReorderProviders.map((p) => [p.uuid, p.sortOrder]));
         setProviders((prev) => prev.map((p) => ({
@@ -794,8 +815,8 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
                       role={roleFor(p.uuid)}
                       enabled={p.enabled}
                       onToggle={(en) => handleToggle(p.uuid, en)}
-                      onEdit={() => selectProvider(p.uuid)}
-                      onDelete={() => handleDelete(p.uuid, document.activeElement as HTMLElement)}
+                      onEdit={() => handleEdit(p.uuid)}
+                      onDelete={(triggerEl) => handleDelete(p.uuid, triggerEl)}
                       labels={cardLabels()}
                     />
                     {/* Reorder controls — buttons with aria-label (accessible

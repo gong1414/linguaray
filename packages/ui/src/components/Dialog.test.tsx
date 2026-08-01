@@ -124,12 +124,21 @@ describe("Confirm", () => {
     expect(confirmed).toBe(false);
   });
 
-  it("triggerRef: focus restores to the trigger element on close", () => {
+  it("triggerRef: focus() is called on the trigger element on close", async () => {
     const triggerRef: { current?: HTMLElement } = {};
     let open = true;
-    // Create a trigger button and capture its ref
+    let focusCalled = false;
+
     const TriggerButton = () => (
-      <button ref={(el) => { triggerRef.current = el; }} data-testid="trigger">
+      <button
+        ref={(el) => {
+          triggerRef.current = el;
+          // Spy on focus to verify it's called on close
+          const origFocus = el.focus.bind(el);
+          el.focus = () => { focusCalled = true; origFocus(); };
+        }}
+        data-testid="trigger"
+      >
         Open
       </button>
     );
@@ -149,11 +158,11 @@ describe("Confirm", () => {
         />
       </>
     ));
-    // Close the dialog
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(open).toBe(false);
-    // The trigger element should exist and be focusable
-    expect(triggerRef.current).toBeTruthy();
-    expect(triggerRef.current?.tagName).toBe("BUTTON");
+    // Allow deferred focus restore to run
+    await new Promise((r) => setTimeout(r, 50));
+    // focus() was called on the trigger element (focus-restore contract)
+    expect(focusCalled).toBe(true);
   });
 });

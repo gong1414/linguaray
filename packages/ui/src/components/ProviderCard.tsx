@@ -51,8 +51,8 @@ export type ProviderCardProps = {
   role: ProviderRole;
   enabled: boolean;
   onToggle: (enabled: boolean) => void;
-  onEdit: () => void;
-  onDelete: () => void;
+  onEdit: (triggerEl?: HTMLElement) => void;
+  onDelete: (triggerEl?: HTMLElement) => void;
   labels?: Partial<ProviderCardLabels>;
   class?: string;
 };
@@ -151,7 +151,7 @@ const ProviderCard: Component<ProviderCardProps> = (props) => {
           class="lr-icon-btn lr-focusable lr-icon-btn--ghost lr-icon-btn--sm"
           aria-label={editLabel()}
           disabled={isDeleting()}
-          onClick={() => props.onEdit()}
+          onClick={(e) => props.onEdit(e.currentTarget as HTMLElement)}
         >
           <Pencil size={14} aria-hidden="true" />
         </button>
@@ -160,7 +160,7 @@ const ProviderCard: Component<ProviderCardProps> = (props) => {
           class="lr-icon-btn lr-focusable lr-icon-btn--ghost lr-icon-btn--sm"
           aria-label={deleteLabel()}
           disabled={isDeleting()}
-          onClick={() => props.onDelete()}
+          onClick={(e) => props.onDelete(e.currentTarget as HTMLElement)}
         >
           <Trash2 size={14} aria-hidden="true" />
         </button>

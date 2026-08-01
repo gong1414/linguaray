@@ -26,8 +26,9 @@ const Dialog: Component<DialogProps> = (props) => {
         <KobalteDialog.Overlay class="lr-dialog__overlay" />
         <KobalteDialog.Content
           class={`lr-dialog__content${props.class ? ` ${props.class}` : ""}`}
-          onCloseAutoFocus={() => {
+          onCloseAutoFocus={(e) => {
             if (props.triggerRef?.current) {
+              e.preventDefault();
               props.triggerRef.current.focus();
             }
           }}
