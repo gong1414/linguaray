@@ -1,13 +1,16 @@
 import {
   For,
   Show,
+  Switch,
+  Match,
   createSignal,
   createMemo,
   createEffect,
   type Component,
 } from "solid-js";
-import { strings, type Locale, type SelectionState } from "./i18n";
+import { strings, type Locale, type SelectionState, type ProviderState } from "./i18n";
 import SelectionPopup from "./pages/SelectionPopup";
+import ProviderCenter from "./pages/ProviderCenter";
 import "./App.css";
 
 type Theme = "light" | "dark";
@@ -80,8 +83,34 @@ const NAV_ITEMS: {
   { key: "updater", labelKey: "updater" },
 ];
 
-// Only selection-popup is implemented in this first vertical slice.
-const IMPLEMENTED: NavKey[] = ["selection-popup"];
+// Implemented surfaces.
+const IMPLEMENTED: NavKey[] = ["selection-popup", "provider-center"];
+
+const PROVIDER_STATES: ProviderState[] = [
+  "empty",
+  "loading-models",
+  "model-fetch-error",
+  "model-manual-entry",
+  "connection-testing",
+  "connection-ok",
+  "connection-failed",
+  "key-saved",
+  "key-missing",
+  "duplicate",
+  "saving",
+  "save-failed",
+  "save-conflict",
+  "delete-confirm",
+  "deleting",
+  "delete-retry",
+  "drag-reorder",
+  "reorder-failed",
+  "balance-loading",
+  "balance-unsupported",
+  "balance-rate-limited",
+  "balance-error",
+  "endpoint-invalid",
+];
 
 const App: Component = () => {
   const [locale, setLocale] = createSignal<Locale>("en");
@@ -89,9 +118,11 @@ const App: Component = () => {
   const [motion, setMotion] = createSignal<Motion>("full");
   const [nav, setNav] = createSignal<NavKey>("selection-popup");
   const [selState, setSelState] = createSignal<SelectionState>("success-single");
+  const [provState, setProvState] = createSignal<ProviderState>("empty");
 
   const t = createMemo(() => strings[locale()]);
   const selT = createMemo(() => t().selection);
+  const provT = createMemo(() => t().provider);
 
   // Window size follows MASTER §8.2 + S0 §4.1:
   //  - multi-engine states → expanded 600×400
@@ -217,55 +248,62 @@ const App: Component = () => {
 
       <main class="lab__main">
         <div class="lab__stage">
-          <Show
-            when={nav() === "selection-popup"}
-            fallback={
-              <div class="lab__frame-placeholder">
-                <p>
-                  {t().nav[
-                    NAV_ITEMS.find((i) => i.key === nav())!.labelKey
-                  ]}
-                </p>
-                <p class="lab__frame-placeholder-sub">{t().upcomingSlice}</p>
-              </div>
-            }
-          >
-            {/* initial-hidden: the popup does not exist. Render NO frame and
-                NO popup region — only a muted stage note explaining the state,
-                so the lab doesn't fake a window that shouldn't be there. */}
-            <Show
-              when={!isHidden()}
-              fallback={
-                <p class="lab__hidden-note">{selT().initialHidden}</p>
-              }
-            >
-              <div
-                class="lab__frame"
-                style={{
-                  width: `${windowSize().w}px`,
-                  height: `${windowSize().h}px`,
-                  "max-width": "100%",
-                }}
+          <Switch>
+            <Match when={nav() === "selection-popup"}>
+              {/* initial-hidden: the popup does not exist. Render NO frame. */}
+              <Show
+                when={!isHidden()}
+                fallback={<p class="lab__hidden-note">{selT().initialHidden}</p>}
               >
-                <SelectionPopup
-                  state={selState()}
+                <div
+                  class="lab__frame"
+                  style={{
+                    width: `${windowSize().w}px`,
+                    height: `${windowSize().h}px`,
+                    "max-width": "100%",
+                  }}
+                >
+                  <SelectionPopup
+                    state={selState()}
+                    locale={locale()}
+                    t={selT()}
+                  />
+                </div>
+                <span class="lab__frame-meta">
+                  {windowSize().label} · {t().selection.states[selState()]}
+                </span>
+              </Show>
+            </Match>
+
+            <Match when={nav() === "provider-center"}>
+              <div
+                class="lab__frame lab__frame--settings"
+                style={{ width: "800px", height: "600px", "max-width": "100%" }}
+              >
+                <ProviderCenter
+                  state={provState()}
                   locale={locale()}
-                  t={selT()}
+                  t={provT()}
                 />
               </div>
               <span class="lab__frame-meta">
-                {windowSize().label} · {t().selection.states[selState()]}
+                800×600 · {t().provider.states[provState()]}
               </span>
-            </Show>
-          </Show>
+            </Match>
+
+            <Match when={!IMPLEMENTED.includes(nav())}>
+              <div class="lab__frame-placeholder">
+                <p>
+                  {t().nav[NAV_ITEMS.find((i) => i.key === nav())!.labelKey]}
+                </p>
+                <p class="lab__frame-placeholder-sub">{t().upcomingSlice}</p>
+              </div>
+            </Match>
+          </Switch>
         </div>
 
         <Show when={nav() === "selection-popup"}>
-          <div
-            class="lab__state-bar"
-            role="group"
-            aria-label={t().controls.state}
-          >
+          <div class="lab__state-bar" role="group" aria-label={t().controls.state}>
             <span class="lab__state-label">{t().controls.state}</span>
             <For each={SELECTION_STATES}>
               {(s) => (
@@ -276,6 +314,24 @@ const App: Component = () => {
                   onClick={() => setSelState(s)}
                 >
                   {t().selection.states[s]}
+                </button>
+              )}
+            </For>
+          </div>
+        </Show>
+
+        <Show when={nav() === "provider-center"}>
+          <div class="lab__state-bar" role="group" aria-label={t().controls.state}>
+            <span class="lab__state-label">{t().controls.state}</span>
+            <For each={PROVIDER_STATES}>
+              {(s) => (
+                <button
+                  type="button"
+                  class="lab__state-chip lr-focusable"
+                  aria-pressed={provState() === s ? "true" : "false"}
+                  onClick={() => setProvState(s)}
+                >
+                  {t().provider.states[s]}
                 </button>
               )}
             </For>
