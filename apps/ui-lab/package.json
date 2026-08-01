@@ -1,0 +1,23 @@
+{
+  "name": "@linguaray/ui-lab",
+  "version": "0.0.0",
+  "description": "LinguaRay UI Lab — clickable mock prototypes for all S0 §4.1-4.16 windows/states (mock data only)",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@linguaray/ui": "workspace:*",
+    "lucide-solid": "^1.0.0",
+    "solid-js": "^1.9.3"
+  },
+  "devDependencies": {
+    "typescript": "~5.6.2",
+    "vite": "^6.0.3",
+    "vite-plugin-solid": "^2.11.0"
+  }
+}
