@@ -90,6 +90,7 @@ export type LabStrings = {
     copy: string;
     copied: string;
     speak: string;
+    stop: string;
     pin: string;
     unpin: string;
     favorite: string;
@@ -99,6 +100,7 @@ export type LabStrings = {
     goSettings: string;
     openingSettings: string;
     settingsOpened: string;
+    fallbackSuffix: string;
     dualTitle: string;
     multiTitle: string;
     engineA: string;
@@ -165,7 +167,7 @@ export const strings: Record<Locale, LabStrings> = {
         "error-no-provider": "Error · no provider",
         "error-no-permission": "Error · no permission",
         "keystore-corrupt": "Keystore corrupt",
-        "offline-fallback": "Offline · dictionary fallback",
+        "offline-fallback": "Offline · engine fallback",
         "offline-error": "Offline · no fallback",
         pinned: "Pinned",
       },
@@ -184,6 +186,7 @@ export const strings: Record<Locale, LabStrings> = {
       copy: "Copy",
       copied: "Copied",
       speak: "Speak",
+      stop: "Stop",
       pin: "Pin",
       unpin: "Unpin",
       favorite: "Add to vocabulary",
@@ -193,6 +196,7 @@ export const strings: Record<Locale, LabStrings> = {
       goSettings: "Open settings",
       openingSettings: "Opening settings…",
       settingsOpened: "Settings opened (mock)",
+      fallbackSuffix: "offline fallback",
       dualTitle: "Dual-engine result",
       multiTitle: "Multi-engine result",
       engineA: "DeepSeek",
@@ -257,7 +261,7 @@ export const strings: Record<Locale, LabStrings> = {
         "error-no-provider": "错误 · 无可用服务商",
         "error-no-permission": "错误 · 缺少权限",
         "keystore-corrupt": "密钥库损坏",
-        "offline-fallback": "离线 · 词典回退",
+        "offline-fallback": "离线 · 引擎回退",
         "offline-error": "离线 · 无回退",
         pinned: "已固定",
       },
@@ -276,6 +280,7 @@ export const strings: Record<Locale, LabStrings> = {
       copy: "复制",
       copied: "已复制",
       speak: "朗读",
+      stop: "停止",
       pin: "固定",
       unpin: "取消固定",
       favorite: "加入生词本",
@@ -285,6 +290,7 @@ export const strings: Record<Locale, LabStrings> = {
       goSettings: "打开设置",
       openingSettings: "正在打开设置…",
       settingsOpened: "设置已打开（模拟）",
+      fallbackSuffix: "离线回退",
       dualTitle: "双引擎结果",
       multiTitle: "多引擎结果",
       engineA: "DeepSeek",

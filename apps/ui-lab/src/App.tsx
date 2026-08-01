@@ -15,7 +15,7 @@ type Motion = "full" | "reduced";
 type WindowSize = {
   w: number;
   h: number;
-  key: "single" | "expanded";
+  key: "single" | "expanded" | "compact";
   label: string;
 };
 
@@ -93,18 +93,25 @@ const App: Component = () => {
   const t = createMemo(() => strings[locale()]);
   const selT = createMemo(() => t().selection);
 
-  // Window size follows MASTER §8.2: multi-engine states use the expanded max.
-  // Compact states (loading, initial-hidden) render a small card at the cursor;
-  // the frame still reserves 400×300 but the body shrinks to content.
+  // Window size follows MASTER §8.2 + S0 §4.1:
+  //  - multi-engine states → expanded 600×400
+  //  - loading → the native popup window itself is a compact card (~200×40)
+  //    at the cursor, NOT a 400×300 frame with a small body inside
+  //  - initial-hidden → no popup window exists at all (rendered elsewhere)
+  //  - everything else → single 400×300
   const isMultiState = () =>
     selState() === "success-dual" ||
     selState() === "success-multi" ||
     selState() === "partial";
-  const windowSize = createMemo<WindowSize>(() =>
-    isMultiState()
-      ? { w: 600, h: 400, key: "expanded", label: "600×400" }
-      : { w: 400, h: 300, key: "single", label: "400×300" },
-  );
+  const isHidden = () => selState() === "initial-hidden";
+  const isLoadingCompact = () => selState() === "loading";
+  const windowSize = createMemo<WindowSize>(() => {
+    if (isMultiState())
+      return { w: 600, h: 400, key: "expanded", label: "600×400" };
+    if (isLoadingCompact())
+      return { w: 200, h: 40, key: "compact", label: "200×40" };
+    return { w: 400, h: 300, key: "single", label: "400×300" };
+  });
 
   // Sync theme + motion onto <html> so token + base rules apply globally.
   createEffect(() => {
@@ -223,23 +230,33 @@ const App: Component = () => {
               </div>
             }
           >
-            <div
-              class="lab__frame"
-              style={{
-                width: `${windowSize().w}px`,
-                height: `${windowSize().h}px`,
-                "max-width": "100%",
-              }}
+            {/* initial-hidden: the popup does not exist. Render NO frame and
+                NO popup region — only a muted stage note explaining the state,
+                so the lab doesn't fake a window that shouldn't be there. */}
+            <Show
+              when={!isHidden()}
+              fallback={
+                <p class="lab__hidden-note">{selT().initialHidden}</p>
+              }
             >
-              <SelectionPopup
-                state={selState()}
-                locale={locale()}
-                t={selT()}
-              />
-            </div>
-            <span class="lab__frame-meta">
-              {windowSize().label} · {t().selection.states[selState()]}
-            </span>
+              <div
+                class="lab__frame"
+                style={{
+                  width: `${windowSize().w}px`,
+                  height: `${windowSize().h}px`,
+                  "max-width": "100%",
+                }}
+              >
+                <SelectionPopup
+                  state={selState()}
+                  locale={locale()}
+                  t={selT()}
+                />
+              </div>
+              <span class="lab__frame-meta">
+                {windowSize().label} · {t().selection.states[selState()]}
+              </span>
+            </Show>
           </Show>
         </div>
 
