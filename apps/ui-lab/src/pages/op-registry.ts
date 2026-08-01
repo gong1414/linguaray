@@ -14,7 +14,7 @@
  *    bug.
  */
 
-export type OpKind = "save" | "test" | "fetch" | "balance";
+export type OpKind = "save" | "profile-save" | "test" | "fetch" | "balance";
 
 export type OpKey = `${OpKind}:${string}`;
 

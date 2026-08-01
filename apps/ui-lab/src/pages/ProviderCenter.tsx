@@ -35,7 +35,6 @@ import {
   buildConsentScope,
   consentScopeKey,
   validateEndpoint,
-  normalizeOrigin,
   TRADITIONAL_TEMPLATES,
 } from "./provider-domain";
 import { OpRegistry, type OpKind } from "./op-registry";
@@ -158,24 +157,35 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
   };
 
   // --- commitProviderState: atomic transaction (batch) ---
-  // Validates nextSelection against nextProviders, computes consent, commits
-  // all three in a single batch so observers never see intermediate state.
+  // Validates nextSelection against nextProviders, commits all three in batch.
+  // approvedConsentKey: if provided (from consent Confirm), written in the
+  // same batch. If not provided, consent is preserved only if scope matches;
+  // otherwise set to null (invalidated). Never auto-approves.
   const commitProviderState = (
     nextProviders: MockProvider[],
     nextSelection: ActiveSelection,
+    approvedConsentKey?: string,
   ): boolean => {
     const result = validateActiveSelection(nextSelection, nextProviders);
     if (!result.ok) {
       pushToast("destructive", result.errors[0]!.message);
       return false;
     }
+    const oldScopeKey = consentScopeKey(buildConsentScope(selection(), providers()));
     const newScope = buildConsentScope(nextSelection, nextProviders);
     const newKey = consentScopeKey(newScope);
+    const previousConsent = consentKey();
+    // If an approved key is provided, use it. Otherwise preserve only if
+    // the scope hasn't changed and consent was already valid.
+    const nextConsent = approvedConsentKey !== undefined
+      ? approvedConsentKey
+      : (previousConsent !== null && previousConsent === oldScopeKey && newKey === oldScopeKey
+          ? previousConsent
+          : null);
     batch(() => {
       setProviders(nextProviders);
       setSelection(nextSelection);
-      // Only invalidate consent if recipient origins changed
-      if (newKey !== consentKey()) setConsentKey(null);
+      setConsentKey(nextConsent);
     });
     return true;
   };
@@ -358,10 +368,9 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
           parallelUuids: [...prev.parallelUuids, uuid],
           fallbackUuid: prev.fallbackUuid === uuid ? null : prev.fallbackUuid,
         };
-        if (commitProviderState(providers(), candidate)) {
-          // Save consent scope AFTER successful commit
-          setConsentKey(consentScopeKey(buildConsentScope(candidate, providers())));
-        }
+        const approvedKey = consentScopeKey(buildConsentScope(candidate, providers()));
+        // Pass approvedConsentKey so it's committed in the same batch
+        commitProviderState(providers(), candidate, approvedKey);
       }
     }
     setConsentOpen(false);
@@ -421,37 +430,40 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
 
     setProfileSaveByUuid((prev) => ({ ...prev, [uuid]: "saving" }));
     const token = opRegistry.startOp(
-      "save" as OpKind,
+      "profile-save" as OpKind,
       uuid,
       () => setProfileSaveByUuid((prev) => ({ ...prev, [uuid]: "idle" })),
       () => {
         // Commit: write drafts into the provider fixture
-        const oldOrigin = normalizeOrigin(provider.endpoint);
-        const newOrigin = normalizeOrigin(effectiveEndpoint);
-        const nextProviders = providers().map((p) =>
+        const oldProviders = providers();
+        const oldScopeKey = consentScopeKey(buildConsentScope(selection(), oldProviders));
+        const nextProviders = oldProviders.map((p) =>
           p.uuid === uuid
             ? { ...p, endpoint: effectiveEndpoint, model: draftModel ?? p.model }
             : p,
         );
         const sel = selection();
-        // Recompute consent scope from committed providers
         const newScope = buildConsentScope(sel, nextProviders);
         const newKey = consentScopeKey(newScope);
+        const previousConsent = consentKey();
+        // Consent preservation: only retain previousConsent if it matched
+        // the OLD scope AND the scope hasn't changed. Never auto-approve.
+        const nextConsent =
+          previousConsent !== null &&
+          previousConsent === oldScopeKey &&
+          newKey === oldScopeKey
+            ? previousConsent
+            : null;
         // Atomic batch: providers + selection + consent together
         batch(() => {
           setProviders(nextProviders);
-          // Only invalidate consent if origin actually changed
-          if (oldOrigin !== newOrigin && newKey !== consentKey()) {
-            setConsentKey(null);
-          } else {
-            setConsentKey(newKey);
-          }
+          setConsentKey(nextConsent);
         });
         // Clear the committed drafts
         setEndpointDraft((prev) => { const n = { ...prev }; delete n[uuid]; return n; });
         setModelDraftByUuid((prev) => { const n = { ...prev }; delete n[uuid]; return n; });
         setProfileSaveByUuid((prev) => ({ ...prev, [uuid]: "saved" }));
-        pushToast("success", props.t.keySaved);
+        pushToast("success", props.t.profileSaved);
       },
       1000,
     );
@@ -756,6 +768,20 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
     const uuid = selectedUuid();
     return uuid ? (saveByUuid()[uuid] === "saving") : false;
   });
+  const isProfileSaving = createMemo(() => {
+    const uuid = selectedUuid();
+    return uuid ? (profileSaveByUuid()[uuid] === "saving") : false;
+  });
+  // profileDirty: draft exists AND differs from committed provider value
+  const profileDirty = (uuid: string): boolean => {
+    const p = providers().find((x) => x.uuid === uuid);
+    if (!p) return false;
+    const epDraft = endpointDraft()[uuid];
+    const modelDraft = modelDraftByUuid()[uuid];
+    const epDirty = epDraft !== undefined && epDraft !== p.endpoint;
+    const modelDirty = modelDraft !== undefined && modelDraft !== (p.model ?? "");
+    return epDirty || modelDirty;
+  };
   const connForSelected = createMemo(() => {
     const uuid = selectedUuid();
     return uuid ? (connStatus()[uuid] ?? "idle") : "idle";
@@ -992,15 +1018,15 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
                   errorText={endpointErrorByUuid()[p().uuid] ?? (props.state === "endpoint-invalid" ? props.t.endpointInvalid : undefined)}
                 />
                 {/* Profile Save button — commits endpoint+model draft */}
-                <Show when={endpointDraft()[p().uuid] || modelDraftByUuid()[p().uuid]}>
+                <Show when={profileDirty(p().uuid)}>
                   <Button
                     variant="primary"
                     size="sm"
-                    loading={profileSaveByUuid()[p().uuid] === "saving"}
+                    loading={isProfileSaving()}
                     loadingLabel={props.t.saving}
                     onClick={() => handleSaveProfile(p().uuid)}
                   >
-                    {props.t.saveKey}
+                    {props.t.saveProfile}
                   </Button>
                 </Show>
 
@@ -1011,7 +1037,7 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
                       label={props.t.manualModelEntry}
                       value={modelDraftByUuid()[p().uuid] ?? ""}
                       placeholder={props.t.manualModelPlaceholder}
-                      disabled={isSaving()}
+                      disabled={isSaving() || isProfileSaving()}
                       onInput={(e) => setModelDraftByUuid((prev) => ({ ...prev, [p().uuid]: e.currentTarget.value }))}
                       helperText={modelFetchForSelected() === "error" || props.state === "model-fetch-error" ? props.t.modelFetchError : undefined}
                     />
@@ -1025,12 +1051,12 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
                         const uuid = selectedUuid();
                         if (uuid) setModelDraftByUuid((prev) => ({ ...prev, [uuid]: v }));
                       }}
-                      disabled={isSaving()}
+                      disabled={isSaving() || isProfileSaving()}
                       loading={modelFetchForSelected() === "loading" || props.state === "loading-models"}
                       loadingLabel={props.t.loadingModels}
                       errorText={modelFetchForSelected() === "error" || props.state === "model-fetch-error" ? props.t.modelFetchError : undefined}
                     />
-                    <Button variant="ghost" size="sm" onClick={handleFetchModels} disabled={isSaving()}>
+                    <Button variant="ghost" size="sm" onClick={handleFetchModels} disabled={isSaving() || isProfileSaving()}>
                       {props.t.fetchModels}
                     </Button>
                   </Match>
@@ -1046,7 +1072,7 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
                         type="password"
                         value={keyInputByUuid()[p().uuid] ?? ""}
                         placeholder={props.t.apiKeyPlaceholder}
-                        disabled={isSaving()}
+                        disabled={isSaving() || isProfileSaving()}
                         onInput={(e) => setKeyInputByUuid((prev) => ({ ...prev, [p().uuid]: e.currentTarget.value }))}
                       />
                       <Button
@@ -1075,7 +1101,7 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
                     loading={connForSelected() === "testing" || props.state === "connection-testing"}
                     loadingLabel={props.t.testing}
                     onClick={handleTestConnection}
-                    disabled={isSaving()}
+                    disabled={isSaving() || isProfileSaving()}
                   >
                     {props.t.testConnection}
                   </Button>
@@ -1120,7 +1146,7 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
                         size="sm"
                         loadingLabel={props.t.balanceLoading}
                         onClick={handleFetchBalance}
-                        disabled={isSaving()}
+                        disabled={isSaving() || isProfileSaving()}
                       >
                         {props.t.balanceLoading.replace("…", "")}
                       </Button>

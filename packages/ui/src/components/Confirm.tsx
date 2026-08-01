@@ -21,6 +21,9 @@ export type ConfirmProps = {
   /** Ref to the trigger element that opened this dialog. On close, focus is
    *  restored to this element via onCloseAutoFocus. */
   triggerRef?: { current?: HTMLElement };
+  /** Ref to a fallback element if the trigger is disabled/removed (e.g. the
+   *  next provider card or the provider list container). */
+  fallbackFocusRef?: { current?: HTMLElement };
 };
 
 /**
@@ -48,10 +51,19 @@ const Confirm: Component<ConfirmProps> = (props) => {
   // provider) — fall back to the next focusable element in the document.
   const restoreFocus = () => {
     const trigger = props.triggerRef?.current;
-    const target = (trigger && document.contains(trigger) && !trigger.hasAttribute("disabled"))
-      ? trigger
-      : document.querySelector<HTMLElement>("button:not([disabled]):not([aria-disabled='true'])");
-    target?.focus();
+    if (trigger && document.contains(trigger) && !trigger.hasAttribute("disabled")) {
+      trigger.focus();
+      return;
+    }
+    // Fallback to explicit fallbackFocusRef (e.g. provider list container)
+    const fallback = props.fallbackFocusRef?.current;
+    if (fallback && document.contains(fallback)) {
+      fallback.focus();
+      return;
+    }
+    // Last resort: first focusable in the provider list area
+    const listArea = document.querySelector<HTMLElement>(".pc__sidebar, .pc__provider-list");
+    listArea?.focus();
   };
 
   return (
