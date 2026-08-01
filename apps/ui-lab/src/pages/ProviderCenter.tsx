@@ -610,7 +610,10 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
   };
 
   // --- drag-to-reorder (HTML5 DnD) ---
-  const handleDragStart = (uuid: string) => {
+  const handleDragStart = (e: DragEvent, uuid: string) => {
+    // Must set dataTransfer or some browsers won't initiate the drag
+    e.dataTransfer?.setData("text/plain", uuid);
+    e.dataTransfer!.effectAllowed = "move";
     setDraggedUuid(uuid);
   };
   const handleDragOver = (e: DragEvent, uuid: string) => {
@@ -710,25 +713,39 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
     <div class="pc__body" role="region" aria-label={props.t.states[props.state]}>
       {/* Settings shell: nav rail (icon-only at 600-699px) + content */}
       <div class="pc__settings-shell">
-        <nav class="pc__settings-rail" aria-label={props.t.providerListLabel}>
-          {/* Active nav item */}
-          <div class="pc__rail-item pc__rail-item--active" title={props.t.navProviderCenter}>
+        <nav class="pc__settings-rail" aria-label={props.t.navSettings}>
+          {/* Active nav item — real button, keyboard-focusable */}
+          <button
+            type="button"
+            class="pc__rail-item lr-focusable pc__rail-item--active"
+            aria-current="page"
+          >
             <Server size={20} aria-hidden="true" />
             <span class="pc__rail-item__label">{props.t.navProviderCenter}</span>
-          </div>
-          {/* Disabled nav items — focusable via tabindex + aria-disabled */}
-          <div class="pc__rail-item" tabindex="0" aria-disabled="true" title={props.t.navShortcuts}
+          </button>
+          {/* Disabled nav items — focusable (not native disabled) with aria-disabled */}
+          <button
+            type="button"
+            class="pc__rail-item lr-focusable"
+            aria-disabled="true"
+            tabindex="0"
+            onClick={(e) => e.preventDefault()}
             onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") e.preventDefault(); }}
           >
             <Keyboard size={20} aria-hidden="true" />
             <span class="pc__rail-item__label">{props.t.navShortcuts}</span>
-          </div>
-          <div class="pc__rail-item" tabindex="0" aria-disabled="true" title={props.t.navPrivacy}
+          </button>
+          <button
+            type="button"
+            class="pc__rail-item lr-focusable"
+            aria-disabled="true"
+            tabindex="0"
+            onClick={(e) => e.preventDefault()}
             onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") e.preventDefault(); }}
           >
             <Shield size={20} aria-hidden="true" />
             <span class="pc__rail-item__label">{props.t.navPrivacy}</span>
-          </div>
+          </button>
         </nav>
         <div class="pc__content">
       <div class="pc__layout">
@@ -804,7 +821,7 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
                       aria-label={props.t.dragHandle}
                       draggable={p.status === "active"}
                       disabled={p.status !== "active"}
-                      onDragStart={() => handleDragStart(p.uuid)}
+                      onDragStart={(e: DragEvent) => handleDragStart(e, p.uuid)}
                       onDragEnd={() => handleDragEnd()}
                     >
                       <GripVertical size={16} aria-hidden="true" />
