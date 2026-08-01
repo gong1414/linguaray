@@ -1,9 +1,14 @@
-# LinguaRay UI Brief — S1a Design Decisions
+# LinguaRay UI Brief — Design Decision Record
 
 **Date:** 2026-08-01
 **Branch:** `codex/s1-design-system`
 **Spec ref:** [2026-08-01-linguaray-product-baseline.md](../../docs/superpowers/specs/2026-08-01-linguaray-product-baseline.md) (S0 Frozen)
 **Skill ref:** `ui-ux-pro-max` v2.11.0 (adapted, SHA `e28f987c`)
+
+> **This document records WHY each decision was made. Production UI follows
+> ONLY `MASTER.md` (the single source of truth) and `pages/<page>.md` overrides.
+> `SKILL-RAW.md` is the unmodified skill output kept for audit. Do NOT implement
+> from `SKILL-RAW.md` or this brief — use `MASTER.md`.**
 
 ---
 
@@ -25,38 +30,28 @@ native macOS/Windows tool: compact, unobtrusive, fast.
 ## 2. Color Tokens
 
 The skill generated a "VPN & Privacy Tool" dark-first palette. LinguaRay needs
-**light + dark theme** (system-following). We adopt the skill's accent and semantic
-roles, but restructure for dual-theme CSS custom properties.
+**light + dark theme** (system-following). The final token values (with verified
+contrast ratios) are in **`MASTER.md` §1** — this section records only the
+decision rationale.
 
 ### Adopted from skill
-- Accent role = green (`#22C55E`) — used for "connected", "key saved ✓", success states.
-- Destructive = `#DC2626`.
-- Border approach: low-opacity rgba on dark; warm grey on light.
+- Accent role = green (success/connected).
+- Destructive = red.
+- Dark border approach: low-opacity rgba.
 
-### Overridden / rejected
-- **Primary = `#1E3A5F` (dark navy) → OVERRIDDEN to beam blue `#2563EB`.**
-  The spec calls for "光束蓝" (beam blue). `#1E3A5F` is a muted navy; `#2563EB`
-  is a clear, energetic blue that reads as "beam" in both light and dark themes.
-- **Skill background `#0F172A` (dark-only) → SPLIT into light/dark tokens.**
-- **Skill style "Exaggerated Minimalism" → REJECTED.** That style is for
-  fashion/editorial landing pages with `clamp(3rem, 10vw, 12rem)` headings. LinguaRay
-  is a compact desktop utility. Adopted style: **Flat Design + Micro-interactions**
-  (from the "Translator App" product result, not the generic style match).
+### Overridden (with contrast corrections)
+- **Primary `#1E3A5F` → `#2563EB`.** Spec calls for "光束蓝" (beam blue).
+  `#2563EB` passes 5.17:1 with white text in BOTH themes (skill's navy was dark-only).
+- **Light success `#16A34A` → `#15803D`** (was 3.30:1; now 5.36:1 with white).
+- **Dark success text `#22C55E` → `#4ADE80`** (was 2.28:1 on dark bg; now 9.99:1).
+- **Destructive `#DC2626` → `#B91C1C`** light (5.49:1); dark uses `#F87171` text
+  (5.48:1) / `#991B1B` filled bg (5.61:1).
+- **Focus ring: was `rgba(...,20)` → opaque `#2563EB` light / `#60A5FA` dark**
+  with `outline-offset: 2px` (transparent rings are invisible).
+- Added `--color-warning`, `--color-info`, `--color-bg-hover`, `--color-bg-selected`,
+  `--color-bg-overlay`, `--color-on-success`, `--color-on-destructive`, `--color-disabled-*`.
 
-### Final token table (CSS custom properties)
-
-| Token | Light | Dark |
-|---|---|---|
-| `--color-primary` | `#2563EB` | `#3B82F6` |
-| `--color-on-primary` | `#FFFFFF` | `#FFFFFF` |
-| `--color-accent` | `#16A34A` | `#22C55E` |
-| `--color-bg` | `#FFFFFF` | `#0F172A` |
-| `--color-bg-elevated` | `#F8FAFC` | `#1E293B` |
-| `--color-fg` | `#0F172A` | `#F1F5F9` |
-| `--color-fg-muted` | `#64748B` | `#94A3B8` |
-| `--color-border` | `#E2E8F0` | `rgba(255,255,255,0.08)` |
-| `--color-destructive` | `#DC2626` | `#EF4444` |
-| `--color-ring` | `#2563EB20` | `#3B82F620` |
+All ratios are in `MASTER.md` §1.1/§1.2.
 
 ---
 
@@ -107,13 +102,14 @@ Adopted from the skill's `--density 8` output:
 
 ## 5. Window Sizes & Z-Order
 
-| Window | Size | Z-order | Notes |
-|---|---|---|---|
-| **Settings (main)** | 800×600 (min 600×400) | Normal | Resizable; not always-on-top |
-| **Selection popup** | Auto-sized (min 200×40, max 400×300) | Always-on-top | Transparent background outside card; dismisses on blur |
-| **Input window** | 420×280 (min 360×200) | Always-on-top | Resizable; Enter translates, Shift+Enter newlines |
-| **OCR overlay** | Full-screen per monitor | Always-on-top (above all) | Transparent; user draws rectangle; Esc cancels |
-| **Multi-result panel** | 480×400 (min 400×300) | Always-on-top | Extends from popup or opens separately |
+Final window specs are in **`MASTER.md` §8**. Key decisions recorded here:
+
+- **Multi-engine result:** reuses the SAME popup window in expanded mode. NOT a
+  separate panel/window (eliminates the "expand or open separate" ambiguity).
+- **Pinned popup:** does NOT hide on blur. Only unpinned popups auto-dismiss.
+- **Settings adaptive:** tested at 600×400 min. Sidebar collapses to icon-only
+  rail at <700px; hamburger overlay at <500px. No horizontal overflow on the window.
+- **Onboarding:** uses 600×400 min (same as settings); single-column flow.
 
 ---
 

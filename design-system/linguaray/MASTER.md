@@ -1,227 +1,308 @@
-# Design System Master File
+# LinguaRay Design System — Master (Single Source of Truth)
 
-> **LOGIC:** When building a specific page, first check `design-system/pages/[page-name].md`.
-> If that file exists, its rules **override** this Master file.
-> If not, strictly follow the rules below.
-
----
+> **This is the ONLY design document that production UI must follow.**
+> `SKILL-RAW.md` is the unmodified skill output kept for audit only — do NOT
+> implement from it. `UI-BRIEF.md` records the rationale for adopt/override/reject
+> decisions but does NOT override this file. Page-specific overrides live in
+> `pages/<page>.md` and take precedence over this file for that page only.
 
 **Project:** LinguaRay
-**Generated:** 2026-08-01 18:18:52
-**Category:** Productivity Tool
-**Design Dials:** Variance 3/10 (Centered / Minimal) | Motion 3/10 (Subtle) | Density 8/10 (Dense / Dashboard)
+**Date:** 2026-08-01
+**Spec:** [Product Baseline (S0 Frozen)](../../docs/superpowers/specs/2026-08-01-linguaray-product-baseline.md)
+**Identity:** Native restraint · Beam blue · Compact density · Privacy-first
 
 ---
 
-## Global Rules
+## 1. Color Tokens
 
-### Color Palette
+### 1.1 Light Theme
 
-| Role | Hex | CSS Variable |
-|------|-----|--------------|
-| Primary | `#1E3A5F` | `--color-primary` |
-| On Primary | `#FFFFFF` | `--color-on-primary` |
-| Secondary | `#334155` | `--color-secondary` |
-| Accent/CTA | `#22C55E` | `--color-accent` |
-| Background | `#0F172A` | `--color-background` |
-| Foreground | `#FFFFFF` | `--color-foreground` |
-| Muted | `#10192E` | `--color-muted` |
-| Border | `rgba(255,255,255,0.08)` | `--color-border` |
-| Destructive | `#DC2626` | `--color-destructive` |
-| Ring | `#1E3A5F` | `--color-ring` |
+| Token | Hex | On-Token | Contrast | Role |
+|---|---|---|---|---|
+| `--color-primary` | `#2563EB` | `--color-on-primary: #FFFFFF` | 5.17:1 ✅ | Filled buttons, active links, focus ring |
+| `--color-accent` (success) | `#15803D` | `--color-on-success: #FFFFFF` | 5.36:1 ✅ | "Key saved ✓", connected, success banners |
+| `--color-destructive` | `#B91C1C` | `--color-on-destructive: #FFFFFF` | 5.49:1 ✅ | Delete buttons, error banners |
+| `--color-warning` | `#B45309` | `--color-on-warning: #FFFFFF` | 4.80:1 ✅ | Warnings, rate-limited, partial |
+| `--color-info` | `#1D4ED8` | `--color-on-info: #FFFFFF` | 6.21:1 ✅ | Info banners, tips |
+| `--color-bg` | `#FFFFFF` | `--color-fg: #0F172A` | 17.9:1 ✅ | App background |
+| `--color-bg-elevated` | `#F8FAFC` | `--color-fg-elevated: #0F172A` | 17.2:1 ✅ | Cards, popups |
+| `--color-bg-hover` | `#F1F5F9` | — | — | Hover surface |
+| `--color-bg-selected` | `#DBEAFE` | — | — | Selected item background |
+| `--color-bg-overlay` | `rgba(0,0,0,0.4)` | — | — | Modal overlay |
+| `--color-fg-muted` | `#475569` | on `--color-bg`: 7.55:1 ✅ | — | Secondary text |
+| `--color-border` | `#E2E8F0` | — | — | Borders, dividers |
+| `--color-border-strong` | `#CBD5E1` | — | — | Emphasized borders |
+| `--color-ring` | `#2563EB` | — | — | Focus ring (opaque, not transparent) |
+| `--color-disabled-fg` | `#94A3B8` | — | — | Disabled text/icons |
+| `--color-disabled-bg` | `#F1F5F9` | — | — | Disabled surface |
 
-**Color Notes:** Shield dark + connected green
+### 1.2 Dark Theme
 
-### Typography
+| Token | Hex | On-Token | Contrast | Role |
+|---|---|---|---|---|
+| `--color-primary` | `#2563EB` | `--color-on-primary: #FFFFFF` | 5.17:1 ✅ | Same as light (works on both) |
+| `--color-accent` (success text/icon) | `#4ADE80` | — | on `#0F172A`: 9.99:1 ✅ | Success text, check marks, icons |
+| `--color-accent-bg` | `#166534` | `--color-on-success: #FFFFFF` | 5.66:1 ✅ | Success filled badges/banners |
+| `--color-destructive` (text/icon) | `#F87171` | — | on `#0F172A`: 5.48:1 ✅ | Error text, icons |
+| `--color-destructive-bg` | `#991B1B` | `--color-on-destructive: #FFFFFF` | 5.61:1 ✅ | Destructive filled buttons |
+| `--color-warning` (text/icon) | `#FBBF24` | — | on `#0F172A`: 9.26:1 ✅ | Warning text, icons |
+| `--color-warning-bg` | `#92400E` | `--color-on-warning: #FFFFFF` | 5.50:1 ✅ | Warning filled banners |
+| `--color-info` (text/icon) | `#60A5FA` | — | on `#0F172A`: 6.48:1 ✅ | Info text, icons |
+| `--color-bg` | `#0F172A` | `--color-fg: #F1F5F9` | 14.6:1 ✅ | App background |
+| `--color-bg-elevated` | `#1E293B` | `--color-fg-elevated: #F1F5F9` | 12.7:1 ✅ | Cards, popups |
+| `--color-bg-hover` | `#334155` | — | — | Hover surface |
+| `--color-bg-selected` | `#1E3A5F` | — | — | Selected item background |
+| `--color-bg-overlay` | `rgba(0,0,0,0.6)` | — | — | Modal overlay |
+| `--color-fg-muted` | `#94A3B8` | on `--color-bg`: 6.48:1 ✅ | — | Secondary text |
+| `--color-border` | `rgba(255,255,255,0.08)` | — | — | Borders, dividers |
+| `--color-border-strong` | `rgba(255,255,255,0.15)` | — | — | Emphasized borders |
+| `--color-ring` | `#60A5FA` | — | — | Focus ring (opaque) |
+| `--color-disabled-fg` | `#475569` | — | — | Disabled text/icons |
+| `--color-disabled-bg` | `#1E293B` | — | — | Disabled surface |
 
-- **Heading Font:** Playfair Display SC
-- **Body Font:** Karla
-- **Mood:** restaurant, menu, culinary, elegant, foodie, hospitality
-- **Google Fonts:** [Playfair Display SC + Karla](https://fonts.googleapis.com/css2?family=Karla:wght@300;400;500;600;700&family=Playfair+Display+SC:wght@400;700&display=swap)
+### 1.3 Semantic Usage Rules
 
-**CSS Import:**
+- **Filled buttons** use primary/accent/destructive with their `--color-on-*` text.
+- **Text/icons** in dark theme use the brighter variant (`#4ADE80`, `#F87171`, `#FBBF24`, `#60A5FA`).
+- **Focus ring** is always opaque (never `rgba(...20)`) with `outline: 2px solid var(--color-ring); outline-offset: 2px;`.
+- **Disabled** state: `opacity: 0.5` + `cursor: not-allowed`; never use `color: var(--color-disabled-fg)` alone.
+
+---
+
+## 2. Typography
+
+### Font Stack
+
 ```css
-@import url('https://fonts.googleapis.com/css2?family=Karla:wght@300;400;500;600;700&family=Playfair+Display+SC:wght@400;700&display=swap');
+--font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue",
+  "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+--font-mono: "SF Mono", "Cascadia Code", "Consolas", "Noto Sans Mono CJK SC",
+  monospace;
 ```
 
-### Spacing Variables
+**No remote fonts.** Privacy-first: zero CDN requests. CJK fallbacks built in.
 
-*Density: 8/10 — Dense / Dashboard*
+### Type Scale
+
+| Token | Size | Line-height | Weight | Usage |
+|---|---|---|---|---|
+| `--text-xs` | 12px | 16px | 400 | Timestamps, engine labels, metadata |
+| `--text-sm` | 13px | 18px | 400 | Secondary text, helper text |
+| `--text-base` | 14px | 20px | 400 | Body text, input text (default) |
+| `--text-md` | 16px | 24px | 500 | Section headings in settings |
+| `--text-lg` | 20px | 28px | 600 | Window title, onboarding step |
+| `--text-xl` | 24px | 32px | 700 | Onboarding hero, result emphasis |
+
+### Rules
+
+- Minimum body text: 12px (metadata only). 13px+ for anything the user reads as content.
+- `font-weight: 700` for emphasis only, not entire paragraphs.
+- Monospace for: error codes, API JSON, endpoint URLs, token display.
+
+---
+
+## 3. Spacing & Layout
+
+### Spacing Scale (density 8/10 — compact desktop)
 
 | Token | Value | Usage |
-|-------|-------|-------|
-| `--space-xs` | `2px` / `0.125rem` | Tight gaps |
-| `--space-sm` | `4px` / `0.25rem` | Icon gaps, inline spacing |
-| `--space-md` | `8px` / `0.5rem` | Standard padding |
-| `--space-lg` | `12px` / `0.75rem` | Section padding |
-| `--space-xl` | `16px` / `1rem` | Large gaps |
-| `--space-2xl` | `24px` / `1.5rem` | Section margins |
-| `--space-3xl` | `32px` / `2rem` | Hero padding |
+|---|---|---|
+| `--space-xs` | 2px | Tight icon-text gaps |
+| `--space-sm` | 4px | Inline spacing, icon padding |
+| `--space-md` | 8px | Standard padding (cards, inputs, buttons) |
+| `--space-lg` | 12px | Section padding |
+| `--space-xl` | 16px | Modal padding, large gaps |
+| `--space-2xl` | 24px | Section margins, onboarding spacing |
+| `--space-3xl` | 32px | Rare: onboarding hero padding |
 
-### Shadow Depths
+### Control Heights
 
-| Level | Value | Usage |
-|-------|-------|-------|
-| `--shadow-sm` | `0 1px 2px rgba(0,0,0,0.05)` | Subtle lift |
-| `--shadow-md` | `0 4px 6px rgba(0,0,0,0.1)` | Cards, buttons |
-| `--shadow-lg` | `0 10px 15px rgba(0,0,0,0.1)` | Modals, dropdowns |
-| `--shadow-xl` | `0 20px 25px rgba(0,0,0,0.15)` | Hero images, featured cards |
+| Token | Value | Usage |
+|---|---|---|
+| `--height-sm` | 28px | Compact buttons, badges, small inputs |
+| `--height-md` | 32px | Default buttons, icon buttons, inputs |
+| `--height-lg` | 36px | Primary action buttons, settings rows |
+
+### Border Radius
+
+| Token | Value | Usage |
+|---|---|---|
+| `--radius-sm` | 6px | Inputs, small badges, tags |
+| `--radius-md` | 8px | Buttons, cards |
+| `--radius-lg` | 12px | Modals, popup window |
+
+### Icon Sizes
+
+| Token | Value | Usage |
+|---|---|---|
+| `--icon-sm` | 14px | Inline icons in text |
+| `--icon-md` | 16px | Default (buttons, list items) |
+| `--icon-lg` | 20px | Toolbar, prominent actions |
 
 ---
 
-## Component Specs
+## 4. Shadows & Elevation
 
-### Buttons
+### Light Theme
+
+| Token | Value | Usage |
+|---|---|---|
+| `--shadow-sm` | `0 1px 2px rgba(0,0,0,0.05)` | Cards, inputs |
+| `--shadow-md` | `0 4px 6px rgba(0,0,0,0.08)` | Popup, dropdown |
+| `--shadow-lg` | `0 10px 15px rgba(0,0,0,0.1)` | Modal |
+
+### Dark Theme
+
+| Token | Value | Usage |
+|---|---|---|
+| `--shadow-sm` | `0 1px 2px rgba(0,0,0,0.3)` | Cards, inputs |
+| `--shadow-md` | `0 4px 6px rgba(0,0,0,0.4)` | Popup, dropdown |
+| `--shadow-lg` | `0 10px 15px rgba(0,0,0,0.5)` | Modal |
+
+---
+
+## 5. Motion
+
+### Durations
+
+| Token | Value | Usage |
+|---|---|---|
+| `--duration-fast` | 120ms | Hover color, toggle, small state |
+| `--duration-base` | 180ms | Popup show/hide, panel expand, card transitions |
+| `--duration-slow` | 240ms | Modal open/close, onboarding step transition |
+
+### Easing
 
 ```css
-/* Primary Button */
-.btn-primary {
-  background: #22C55E;
-  color: white;
-  padding: 12px 24px;
-  border-radius: 8px;
-  font-weight: 600;
-  transition: all 200ms ease;
-  cursor: pointer;
-}
-
-.btn-primary:hover {
-  opacity: 0.9;
-  transform: translateY(-1px);
-}
-
-/* Secondary Button */
-.btn-secondary {
-  background: transparent;
-  color: #1E3A5F;
-  border: 2px solid #1E3A5F;
-  padding: 12px 24px;
-  border-radius: 8px;
-  font-weight: 600;
-  transition: all 200ms ease;
-  cursor: pointer;
-}
+--ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+--ease-in: cubic-bezier(0.4, 0, 1, 1);
+--ease-out: cubic-bezier(0, 0, 0.2, 1);
 ```
 
-### Cards
+### Reduced Motion
 
 ```css
-.card {
-  background: #0F172A;
-  border-radius: 12px;
-  padding: 24px;
-  box-shadow: var(--shadow-md);
-  transition: all 200ms ease;
-  cursor: pointer;
-}
-
-.card:hover {
-  box-shadow: var(--shadow-lg);
-  transform: translateY(-2px);
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 1ms !important;
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }
 ```
 
-### Inputs
-
-```css
-.input {
-  padding: 12px 16px;
-  border: 1px solid #E2E8F0;
-  border-radius: 8px;
-  font-size: 16px;
-  transition: border-color 200ms ease;
-}
-
-.input:focus {
-  border-color: #1E3A5F;
-  outline: none;
-  box-shadow: 0 0 0 3px #1E3A5F20;
-}
-```
-
-### Modals
-
-```css
-.modal-overlay {
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
-}
-
-.modal {
-  background: white;
-  border-radius: 16px;
-  padding: 32px;
-  box-shadow: var(--shadow-xl);
-  max-width: 500px;
-  width: 90%;
-}
-```
+All transitions degrade to instant or opacity-only. No `transform` movements.
 
 ---
 
-## Style Guidelines
+## 6. Component States
 
-**Style:** Exaggerated Minimalism
+Every interactive component must implement these states:
 
-**Keywords:** Bold minimalism, oversized typography, high contrast, negative space, loud minimal, statement design
-
-**Best For:** Fashion, architecture, portfolios, agency landing pages, luxury brands, editorial
-
-**Key Effects:** font-size: clamp(3rem 10vw 12rem), font-weight: 900, letter-spacing: -0.05em, massive whitespace
-
-### Page Pattern
-
-**Pattern Name:** Enterprise Gateway
-
-- **Conversion Strategy:** Path selection (I am a...). Mega menu navigation. Trust signals prominent.
-- **CTA Placement:** Contact Sales (Primary) + Login (Secondary)
-- **Section Order:** 1. Hero (Video/Mission), 2. Solutions by Industry, 3. Solutions by Role, 4. Client Logos, 5. Contact Sales
+| State | Light | Dark | Notes |
+|---|---|---|---|
+| **Default** | Token bg/fg | Token bg/fg | Base appearance |
+| **Hover** | `--color-bg-hover` surface or `opacity: 0.9` on filled | Same | 120ms transition |
+| **Pressed** | `opacity: 0.8` or darker border | Same | Active pointer-down |
+| **Focus** | `outline: 2px solid var(--color-ring); outline-offset: 2px;` | Same | Never `outline: none` without replacement; visible on keyboard nav only (`:focus-visible`) |
+| **Disabled** | `opacity: 0.5; cursor: not-allowed;` | Same | No hover/pressed effects |
+| **Loading** | Spinner (12px `loader-2` icon, `animation: spin 0.8s linear infinite`); text + inputs `pointer-events: none` | Same | |
+| **Selected** | `--color-bg-selected` background; `--color-primary` text/icon | Same | Active tab, chosen provider |
+| **Destructive** | `--color-destructive` fill + `--color-on-destructive` text | `--color-destructive-bg` fill or `--color-destructive` text variant | Delete buttons, reset actions |
 
 ---
 
-## Motion
+## 7. Icon Set
 
-**Scroll Reveal** (Subtle) — Trigger: scroll (viewport enter) | Duration: 300-400ms | Easing: `power1.out`
+**Lucide Solid** (fixed by spec). Key mappings:
 
-```js
-gsap.from(el, { opacity: 0, y: 12, duration: 0.35, ease: 'power1.out', scrollTrigger: { trigger: el, start: 'top 90%', toggleActions: 'play none none reverse' } });
-```
+| Action | Lucide name | Size |
+|---|---|---|
+| Translate | `languages` | 16px |
+| Copy | `copy` | 16px |
+| Pin / Unpin | `pin` / `pin-off` | 16px |
+| Speak / Stop | `volume-2` / `square` | 16px |
+| History | `history` | 16px |
+| Provider | `server` | 16px |
+| Settings | `settings` | 20px (toolbar) |
+| Delete | `trash-2` | 16px |
+| Check / Saved | `check` | 14px (inline badge) |
+| Error | `alert-triangle` | 16px |
+| Loading | `loader-2` | 12px (spinning) |
+| Search | `search` | 16px |
+| Close | `x` | 16px |
+| Star / Unstar | `star` / `star-off` | 16px |
+| Globe (language) | `globe` | 14px |
 
-**Framework notes:** Requires the ScrollTrigger plugin registered once via gsap.registerPlugin(ScrollTrigger)
-
-- ✅ Keep the y offset small (8-16px) so it reads as a fade, not a slide
-- ❌ Don't reveal below-the-fold content needed for SEO/crawlers as invisible-by-default without a no-JS fallback
-- ⚡ toggleActions 'play none none reverse' avoids re-triggering on every scroll direction change
-
----
-
-## Anti-Patterns (Do NOT Use)
-
-- ❌ Complex onboarding
-- ❌ Slow performance
-
-### Additional Forbidden Patterns
-
-- ❌ **Emojis as icons** — Use SVG icons (Heroicons, Lucide, Simple Icons)
-- ❌ **Missing cursor:pointer** — All clickable elements must have cursor:pointer
-- ❌ **Layout-shifting hovers** — Avoid scale transforms that shift layout
-- ❌ **Low contrast text** — Maintain 4.5:1 minimum contrast ratio
-- ❌ **Instant state changes** — Always use transitions (150-300ms)
-- ❌ **Invisible focus states** — Focus states must be visible for a11y
+No emoji icons. All icon-only buttons require `aria-label`.
 
 ---
 
-## Pre-Delivery Checklist
+## 8. Windows
 
-Before delivering any UI code, verify:
+### 8.1 Window Inventory & Minimum Sizes
 
-- [ ] No emojis used as icons (use SVG instead)
-- [ ] All icons from consistent icon set (Heroicons/Lucide)
-- [ ] `cursor-pointer` on all clickable elements
-- [ ] Hover states with smooth transitions (150-300ms)
-- [ ] Light mode: text contrast 4.5:1 minimum
-- [ ] Focus states visible for keyboard navigation
-- [ ] `prefers-reduced-motion` respected
-- [ ] Responsive: 375px, 768px, 1024px, 1440px
-- [ ] No content hidden behind fixed navbars
-- [ ] No horizontal scroll on mobile
+| Window | Default | Minimum | Resizable | Z-order |
+|---|---|---|---|---|
+| Settings (main) | 800×600 | 600×400 | ✅ | Normal |
+| Selection popup | Auto (min 200×40, max 400×300) | 200×40 | ❌ | Always-on-top |
+| Input window | 420×280 | 360×200 | ✅ | Always-on-top |
+| OCR overlay | Full-screen per monitor | — | ❌ | Always-on-top (above all) |
+| Multi-result (popup expanded) | Same popup, expanded height (max 480×400) | 200×40 | ❌ | Always-on-top |
+
+### 8.2 Popup Behavior
+
+- **Unpinned:** hides on blur (clicking elsewhere).
+- **Pinned:** stays visible until explicitly unpinned or closed; does NOT hide on blur.
+- **Multi-engine result:** expands the SAME popup window to show stacked/tabbed results (NOT a separate window). Cards maintain user Provider sort order; completed cards do not jump position.
+- **Transparent area:** outside the result card is transparent (macOS private API + Popup.css override). Click-through on transparent area is NOT required.
+
+### 8.3 Settings Adaptive Behavior
+
+Settings is a desktop window, not a web page — but it still adapts at narrow widths:
+
+- **≥ 700px:** full sidebar + content side-by-side.
+- **500–699px:** sidebar collapses to icon-only rail; labels appear on hover/tooltip.
+- **< 500px (min 400px):** sidebar hidden; hamburger menu opens it as overlay; Provider cards stack vertically; tables scroll horizontally within their container.
+- **No horizontal overflow** on the window itself. Internal scroll areas (tables, long lists) are contained.
+- Onboarding target: 600×400 minimum (same as settings); uses single-column flow.
+
+### 8.4 OCR Overlay
+
+- Full-screen transparent overlay on each monitor.
+- User drags to select a rectangle (same UX as macOS screenshot).
+- `Esc` or right-click cancels.
+- After selection: overlay hides, capture proceeds.
+- No visible window chrome, title bar, or taskbar entry during overlay.
+
+---
+
+## 9. Forbidden Patterns
+
+- ❌ Remote fonts (Google Fonts, CDN)
+- ❌ Emoji as icons
+- ❌ `outline: none` without replacement focus style
+- ❌ `transform: translateY(...)` hover effects on desktop utility UI
+- ❌ `backdrop-filter: blur()` on overlays (use solid `rgba` overlay)
+- ❌ GSAP scroll-triggered animations (desktop windows, no scroll)
+- ❌ Web responsive breakpoints (375/768/1024/1440) — these are desktop windows
+- ❌ Layout-shifting hovers (scale, translate that changes element bounds)
+- ❌ Instant state changes (0ms) — always use ≥ 120ms transition
+- ❌ Placeholder-only labels (always have visible `label` elements for form fields)
+
+---
+
+## 10. Pre-Delivery Checklist
+
+Before any UI is shipped:
+
+- [ ] All color pairs pass WCAG AA (4.5:1 body, 3:1 large text)
+- [ ] Light AND dark themes verified
+- [ ] Focus rings visible on every interactive element (`:focus-visible`)
+- [ ] Full keyboard navigation (Tab order = visual order; Enter/Esc on modals)
+- [ ] `prefers-reduced-motion` respected (transitions → 1ms)
+- [ ] Icon-only buttons have `aria-label`
+- [ ] No remote font requests
+- [ ] No horizontal overflow on any window
+- [ ] All component states implemented (hover, pressed, focus, disabled, loading, selected, destructive)
+- [ ] CJK text renders correctly in both themes
