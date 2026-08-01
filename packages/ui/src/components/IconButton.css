@@ -37,6 +37,17 @@
   opacity: 0.8;
 }
 
+/* §6 Selected: toggled/active ghost icon buttons get the selected treatment so
+   the pressed state is visible, not just semantic (aria-pressed). */
+.lr-icon-btn--ghost[aria-pressed="true"] {
+  background: var(--color-bg-selected);
+  color: var(--color-selected-fg);
+}
+.lr-icon-btn--ghost[aria-pressed="true"]:hover {
+  background: var(--color-bg-selected);
+  opacity: 0.9;
+}
+
 .lr-icon-btn--primary {
   background: var(--color-primary-fill);
   color: var(--color-on-primary-fill);
