@@ -117,6 +117,8 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
   const [toasts, setToasts] = createSignal<{ id: number; variant: "info" | "success" | "warning" | "destructive"; message: string }[]>([]);
   const [reorderAnnouncement, setReorderAnnouncement] = createSignal("");
   const [showPresetGrid, setShowPresetGrid] = createSignal(false);
+  // Reorder persist pending — disables further reorder/drag until resolved
+  const [reorderPending, setReorderPending] = createSignal(false);
   // Drag state
   const [draggedUuid, setDraggedUuid] = createSignal<string | null>(null);
   const [dragOverUuid, setDragOverUuid] = createSignal<string | null>(null);
@@ -208,6 +210,7 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
     setDeleteConfirmUuid(null);
     setReorderAnnouncement("");
     setShowPresetGrid(false);
+    setReorderPending(false);
     setDraggedUuid(null);
     setDragOverUuid(null);
 
@@ -529,12 +532,15 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
   };
 
   // --- delete retry: re-attempt the delete for the stuck provider ---
+  const [deleteRetryPending, setDeleteRetryPending] = createSignal(false);
   const handleDeleteRetry = () => {
     const uuid = retryTargetUuid();
-    if (!uuid) return;
+    if (!uuid || deleteRetryPending()) return;
+    setDeleteRetryPending(true);
     scheduleTracked(() => {
       setProviders((prev) => prev.filter((p) => p.uuid !== uuid));
       setRetryTargetUuid(null);
+      setDeleteRetryPending(false);
       pushToast("success", props.t.delete);
     }, 1500);
   };
@@ -596,8 +602,8 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
   // preserving all other provider modifications (endpoint, key, roles, etc.)
   const maybeRevertReorder = (preReorderProviders: MockProvider[]) => {
     if (props.state === "reorder-failed") {
+      setReorderPending(true);
       scheduleTracked(() => {
-        // Restore the original sort orders without losing other state
         const sortOrderSnapshot = new Map(preReorderProviders.map((p) => [p.uuid, p.sortOrder]));
         setProviders((prev) => prev.map((p) => ({
           ...p,
@@ -605,6 +611,7 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
         })));
         setReorderAnnouncement(props.t.reorderReverted);
         pushToast("destructive", props.t.reorderReverted);
+        setReorderPending(false);
       }, 800);
     }
   };
@@ -719,6 +726,8 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
             type="button"
             class="pc__rail-item lr-focusable pc__rail-item--active"
             aria-current="page"
+            aria-label={props.t.navProviderCenter}
+            title={props.t.navProviderCenter}
           >
             <Server size={20} aria-hidden="true" />
             <span class="pc__rail-item__label">{props.t.navProviderCenter}</span>
@@ -728,6 +737,8 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
             type="button"
             class="pc__rail-item lr-focusable"
             aria-disabled="true"
+            aria-label={props.t.navShortcuts}
+            title={props.t.navShortcuts}
             tabindex="0"
             onClick={(e) => e.preventDefault()}
             onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") e.preventDefault(); }}
@@ -739,6 +750,8 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
             type="button"
             class="pc__rail-item lr-focusable"
             aria-disabled="true"
+            aria-label={props.t.navPrivacy}
+            title={props.t.navPrivacy}
             tabindex="0"
             onClick={(e) => e.preventDefault()}
             onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") e.preventDefault(); }}
@@ -819,8 +832,8 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
                       type="button"
                       class="pc__drag-handle lr-focusable"
                       aria-label={props.t.dragHandle}
-                      draggable={p.status === "active"}
-                      disabled={p.status !== "active"}
+                      draggable={p.status === "active" && !reorderPending()}
+                      disabled={p.status !== "active" || reorderPending()}
                       onDragStart={(e: DragEvent) => handleDragStart(e, p.uuid)}
                       onDragEnd={() => handleDragEnd()}
                     >
@@ -845,7 +858,7 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
                         class="lr-icon-btn lr-focusable lr-icon-btn--ghost lr-icon-btn--sm"
                         aria-label={props.t.moveUp}
                         title={props.t.moveUp}
-                        disabled={index() === 0 || p.status === "deleting"}
+                        disabled={index() === 0 || p.status === "deleting" || reorderPending()}
                         onClick={() => moveProvider(p.uuid, "up")}
                       >
                         <ArrowUp size={14} aria-hidden="true" />
@@ -855,7 +868,7 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
                         class="lr-icon-btn lr-focusable lr-icon-btn--ghost lr-icon-btn--sm"
                         aria-label={props.t.moveDown}
                         title={props.t.moveDown}
-                        disabled={index() === sortedProviders().length - 1 || p.status === "deleting"}
+                        disabled={index() === sortedProviders().length - 1 || p.status === "deleting" || reorderPending()}
                         onClick={() => moveProvider(p.uuid, "down")}
                       >
                         <ArrowDown size={14} aria-hidden="true" />

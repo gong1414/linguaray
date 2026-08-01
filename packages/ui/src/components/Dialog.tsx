@@ -26,11 +26,13 @@ const Dialog: Component<DialogProps> = (props) => {
         <KobalteDialog.Overlay class="lr-dialog__overlay" />
         <KobalteDialog.Content
           class={`lr-dialog__content${props.class ? ` ${props.class}` : ""}`}
-          onCloseAutoFocus={(e) => {
-            if (props.triggerRef?.current) {
-              e.preventDefault();
-              props.triggerRef.current.focus();
-            }
+          onCloseAutoFocus={(e: Event) => {
+            e.preventDefault();
+            const trigger = props.triggerRef?.current;
+            const target = (trigger && document.contains(trigger) && !trigger.hasAttribute("disabled"))
+              ? trigger
+              : document.querySelector<HTMLElement>("button:not([disabled]):not([aria-disabled='true'])");
+            if (target) target.focus();
           }}
         >
           <KobalteDialog.Title class="lr-dialog__title">
