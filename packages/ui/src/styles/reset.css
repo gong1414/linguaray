@@ -1,6 +1,13 @@
 /**
  * Minimal CSS reset — coexists with host app styles. Only resets what the
  * design system needs to render predictably inside any container.
+ *
+ * IMPORTANT: this file NEVER removes the focus outline globally. A global
+ * `outline: none` would strip the keyboard focus indicator from every host
+ * control that does not carry the `.lr-focusable` class, breaking keyboard
+ * accessibility for the consuming application. Components that render their
+ * own `:focus-visible` ring may suppress the default outline on their OWN
+ * elements only (scoped to their class).
  */
 
 *,
@@ -27,10 +34,4 @@ textarea,
 select {
   font: inherit;
   color: inherit;
-}
-
-/* §6: never remove focus outline without replacement. Default replacement is
-   the 2px ring on :focus-visible, defined in base.css. */
-:focus {
-  outline: none;
 }

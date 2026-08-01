@@ -33,14 +33,12 @@
   height: var(--height-lg);
 }
 
-.lr-text-field__control:focus-within {
-  /* Use box-shadow to render the focus ring so it does not collide with the
-     1px border (outline-offset on a bordered control looks detached). */
+/* §6 Focus: highlight the control border only on keyboard focus (:focus-visible),
+   never on mouse click. The input itself carries .lr-focusable, which renders the
+   2px ring + 2px offset outline defined in base.css. The border accent below is a
+   secondary affordance scoped to keyboard navigation via :has(). */
+.lr-text-field__control:has(input:focus-visible) {
   border-color: var(--color-ring);
-  box-shadow: 0 0 0 2px var(--color-ring);
-  /* outline kept transparent so :focus-visible default still satisfies §6; the
-     shadow is the visible affordance. */
-  outline: none;
 }
 
 .lr-text-field--error .lr-text-field__control {
