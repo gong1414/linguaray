@@ -1,0 +1,36 @@
+/**
+ * Minimal CSS reset — coexists with host app styles. Only resets what the
+ * design system needs to render predictably inside any container.
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* Components own their own margins; reset the usual offenders */
+h1, h2, h3, h4, h5, h6, p, figure, blockquote {
+  margin: 0;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+input,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+/* §6: never remove focus outline without replacement. Default replacement is
+   the 2px ring on :focus-visible, defined in base.css. */
+:focus {
+  outline: none;
+}

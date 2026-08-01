@@ -1,0 +1,63 @@
+/* Spinner — MASTER §5 reduced-motion exception.
+ *
+ * The label element is `.lr-visually-hidden` by default (set by base.css),
+ * so in full motion it is screen-reader-only. Under reduced motion we restore
+ * it to a visible "Loading…" text and hide the spinning icon, so the loading
+ * state is still communicated without motion.
+ */
+
+.lr-spinner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+}
+
+.lr-spinner__icon {
+  animation: lr-spin 0.9s linear infinite;
+}
+
+@keyframes lr-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Reduced-motion (real OS preference): show text, hide spinner. */
+@media (prefers-reduced-motion: reduce) {
+  .lr-spinner__icon {
+    display: none;
+  }
+  /* Override base.css visually-hidden so the label becomes visible. */
+  .lr-spinner__label {
+    position: static !important;
+    width: auto !important;
+    height: auto !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    clip: auto !important;
+    clip-path: none !important;
+    white-space: normal !important;
+    display: inline;
+  }
+}
+
+/* Lab/testing hook: [data-motion="reduced"] forces the same reduced-motion
+   branch so ui-lab can exercise it without an OS setting. */
+[data-motion="reduced"] .lr-spinner__icon {
+  display: none;
+}
+[data-motion="reduced"] .lr-spinner__label {
+  position: static !important;
+  width: auto !important;
+  height: auto !important;
+  margin: 0 !important;
+  overflow: visible !important;
+  clip: auto !important;
+  clip-path: none !important;
+  white-space: normal !important;
+  display: inline;
+}

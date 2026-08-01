@@ -1,0 +1,67 @@
+/* ResultCard — MASTER §7 ResultCard. */
+
+.lr-result-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg-elevated);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-lg);
+  /* Used inside side-by-side multi-engine layout; let it flex. */
+  min-width: 200px;
+}
+
+.lr-result-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+
+.lr-result-card__engine {
+  font-size: var(--text-xs);
+  line-height: var(--text-xs--line-height);
+  color: var(--color-fg-muted);
+  font-weight: var(--text-md--weight);
+}
+
+.lr-result-card__status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--text-xs);
+  line-height: var(--text-xs--line-height);
+}
+
+.lr-result-card__text {
+  font-size: var(--text-base);
+  line-height: var(--text-base--line-height);
+  color: var(--color-fg);
+  /* Each card scrolls independently within the popup (MASTER §8.2). */
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.lr-result-card__error {
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+  color: var(--color-destructive-fg);
+}
+
+.lr-result-card__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+  /* Actions never scroll away. */
+  flex: 0 0 auto;
+}
+
+.lr-result-card__meta {
+  font-size: var(--text-xs);
+  line-height: var(--text-xs--line-height);
+  color: var(--color-fg-muted);
+  margin-left: auto;
+}
