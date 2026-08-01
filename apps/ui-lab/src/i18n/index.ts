@@ -12,7 +12,8 @@ export type Locale = "zh" | "en";
 
 /**
  * S0 §4.1 Selection Popup — complete state matrix. Every row in the spec table
- * is represented. `initial-hidden` renders the empty/hidden frame.
+ * is represented. `initial-hidden` renders NO popup window/region at all (the
+ * popup does not exist until a selection is made).
  */
 export type SelectionState =
   | "initial-hidden"
@@ -84,7 +85,6 @@ export type LabStrings = {
     configError401: string;
     noPermission: string;
     keystoreCorrupt: string;
-    offlineFallback: string;
     offlineError: string;
     pinned: string;
     copy: string;
@@ -106,7 +106,6 @@ export type LabStrings = {
     engineA: string;
     engineB: string;
     engineC: string;
-    engineFallback: string;
   };
 };
 
@@ -180,7 +179,6 @@ export const strings: Record<Locale, LabStrings> = {
       configError401: "401 Unauthorized — check your API key",
       noPermission: "Grant Accessibility permission",
       keystoreCorrupt: "Keystore unreadable",
-      offlineFallback: "Offline — showing dictionary result",
       offlineError: "Offline",
       pinned: "Pinned",
       copy: "Copy",
@@ -202,7 +200,6 @@ export const strings: Record<Locale, LabStrings> = {
       engineA: "DeepSeek",
       engineB: "OpenAI",
       engineC: "Google",
-      engineFallback: "Offline dictionary",
     },
   },
   zh: {
@@ -274,7 +271,6 @@ export const strings: Record<Locale, LabStrings> = {
       configError401: "401 未授权 —— 请检查 API 密钥",
       noPermission: "请授予辅助功能权限",
       keystoreCorrupt: "密钥库无法读取",
-      offlineFallback: "离线 —— 显示词典结果",
       offlineError: "离线",
       pinned: "已固定",
       copy: "复制",
@@ -296,7 +292,6 @@ export const strings: Record<Locale, LabStrings> = {
       engineA: "DeepSeek",
       engineB: "OpenAI",
       engineC: "Google",
-      engineFallback: "离线词典",
     },
   },
 };

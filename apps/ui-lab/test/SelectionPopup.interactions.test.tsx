@@ -57,6 +57,38 @@ describe("Selection Popup — async safety (fake timers)", () => {
     expect(queryByRole("alert")).toBeNull();
     expect(getByRole("region")).toBeTruthy();
   });
+
+  it("Pinned → Retry keeps the result card and shows a busy Retry button", () => {
+    const { getByRole, container } = render(() => <App />);
+    fireEvent.click(getByRole("button", { name: "Pinned" }));
+
+    // One result card present before retry
+    expect(container.querySelectorAll(".lr-result-card").length).toBe(1);
+
+    // Click the pinned Retry button
+    fireEvent.click(getByRole("button", { name: "Retry" }));
+
+    // Result card MUST still be present (not blanked), and the region exposes
+    // aria-busy so AT announces the retry. The pinned Retry button is disabled
+    // (loading state) but still in the DOM.
+    expect(container.querySelectorAll(".lr-result-card").length).toBe(1);
+    const region = getByRole("region");
+    expect(region.getAttribute("aria-busy")).toBe("true");
+    // Body is not empty
+    expect(region.textContent?.trim().length).toBeGreaterThan(0);
+    // Pinned retry bar button still present, now disabled (loading)
+    const pinnedBarBtn = container.querySelector(
+      ".sel-popup__pinned-bar button",
+    ) as HTMLElement;
+    expect(pinnedBarBtn).toBeTruthy();
+    expect(pinnedBarBtn.getAttribute("aria-busy")).toBe("true");
+    expect(pinnedBarBtn.disabled).toBe(true);
+
+    // After the retry window, busy state clears and card remains
+    vi.advanceTimersByTime(1300);
+    expect(container.querySelectorAll(".lr-result-card").length).toBe(1);
+    expect(getByRole("region").getAttribute("aria-busy")).toBeNull();
+  });
 });
 
 describe("Selection Popup — action feedback", () => {
