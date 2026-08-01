@@ -18,6 +18,9 @@ export type ConfirmProps = {
   /** Optional extra content rendered between message and footer (e.g. consent
    *  recipient list). */
   children?: JSX.Element;
+  /** Ref to the trigger element that opened this dialog. On close, focus is
+   *  restored to this element via onCloseAutoFocus. */
+  triggerRef?: { current?: HTMLElement };
 };
 
 /**
@@ -51,6 +54,12 @@ const Confirm: Component<ConfirmProps> = (props) => {
             if (variant() === "destructive") {
               e.preventDefault();
               cancelRef?.focus();
+            }
+          }}
+          onCloseAutoFocus={() => {
+            // Restore focus to the trigger element that opened this dialog.
+            if (props.triggerRef?.current) {
+              props.triggerRef.current.focus();
             }
           }}
         >

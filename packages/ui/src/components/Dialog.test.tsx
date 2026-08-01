@@ -123,4 +123,37 @@ describe("Confirm", () => {
     fireEvent.keyDown(screen.getByRole("button", { name: "Cancel" }), { key: "Enter" });
     expect(confirmed).toBe(false);
   });
+
+  it("triggerRef: focus restores to the trigger element on close", () => {
+    const triggerRef: { current?: HTMLElement } = {};
+    let open = true;
+    // Create a trigger button and capture its ref
+    const TriggerButton = () => (
+      <button ref={(el) => { triggerRef.current = el; }} data-testid="trigger">
+        Open
+      </button>
+    );
+    render(() => (
+      <>
+        <TriggerButton />
+        <Confirm
+          open={open}
+          onOpenChange={(v) => (open = v)}
+          title="Delete?"
+          message="Sure?"
+          confirmLabel="Delete"
+          cancelLabel="Cancel"
+          onConfirm={() => {}}
+          onCancel={() => {}}
+          triggerRef={triggerRef}
+        />
+      </>
+    ));
+    // Close the dialog
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(open).toBe(false);
+    // The trigger element should exist and be focusable
+    expect(triggerRef.current).toBeTruthy();
+    expect(triggerRef.current?.tagName).toBe("BUTTON");
+  });
 });

@@ -111,6 +111,9 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
   const [connLatency, setConnLatency] = createSignal<Record<string, number>>({});
   const [saveByUuid, setSaveByUuid] = createSignal<Record<string, "idle" | "saving" | "saved" | "failed">>({});
   const [deleteConfirmUuid, setDeleteConfirmUuid] = createSignal<string | null>(null);
+  // Trigger refs for focus-restore on dialog close
+  const deleteTriggerRef: { current?: HTMLElement } = {};
+  const consentTriggerRef: { current?: HTMLElement } = {};
   const [toasts, setToasts] = createSignal<{ id: number; variant: "info" | "success" | "warning" | "destructive"; message: string }[]>([]);
   const [reorderAnnouncement, setReorderAnnouncement] = createSignal("");
   const [showPresetGrid, setShowPresetGrid] = createSignal(false);
@@ -313,8 +316,8 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
     commitProviderState(providers(), candidate);
   };
 
-  const handleAddParallel = (uuid: string) => {
-    // Consent required before adding to parallel
+  const handleAddParallel = (uuid: string, triggerEl?: HTMLElement) => {
+    if (triggerEl) consentTriggerRef.current = triggerEl;
     setPendingParallel(uuid);
     setConsentOpen(true);
   };
@@ -454,7 +457,8 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
   };
 
   // --- delete flow ---
-  const handleDelete = (uuid: string) => {
+  const handleDelete = (uuid: string, triggerEl?: HTMLElement) => {
+    if (triggerEl) deleteTriggerRef.current = triggerEl;
     setDeleteConfirmUuid(uuid);
   };
 
@@ -783,7 +787,7 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
                       enabled={p.enabled}
                       onToggle={(en) => handleToggle(p.uuid, en)}
                       onEdit={() => selectProvider(p.uuid)}
-                      onDelete={() => handleDelete(p.uuid)}
+                      onDelete={() => handleDelete(p.uuid, document.activeElement as HTMLElement)}
                       labels={cardLabels()}
                     />
                     {/* Reorder controls — buttons with aria-label (accessible
@@ -819,7 +823,7 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
                         </Button>
                       </Show>
                       <Show when={roleFor(p.uuid).kind !== "parallel" && p.enabled}>
-                        <Button variant="ghost" size="sm" onClick={() => handleAddParallel(p.uuid)}>
+                        <Button variant="ghost" size="sm" onClick={(e) => handleAddParallel(p.uuid, e.currentTarget)}>
                           {props.t.addParallel}
                         </Button>
                       </Show>
@@ -856,7 +860,7 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
                   label={props.t.endpoint}
                   value={endpointDraft()[p().uuid] ?? p().endpoint}
                   disabled={isSaving()}
-                  onChange={(e) => setEndpointDraft((prev) => ({ ...prev, [p().uuid]: e.currentTarget.value }))}
+                  onInput={(e) => setEndpointDraft((prev) => ({ ...prev, [p().uuid]: e.currentTarget.value }))}
                   errorText={props.state === "endpoint-invalid" ? props.t.endpointInvalid : undefined}
                 />
 
@@ -868,7 +872,7 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
                       value={manualModel()}
                       placeholder={props.t.manualModelPlaceholder}
                       disabled={isSaving()}
-                      onChange={(e) => setManualModel(e.currentTarget.value)}
+                      onInput={(e) => setManualModel(e.currentTarget.value)}
                       helperText={modelFetchForSelected() === "error" || props.state === "model-fetch-error" ? props.t.modelFetchError : undefined}
                     />
                   </Match>
@@ -903,7 +907,7 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
                         value={keyInputByUuid()[p().uuid] ?? ""}
                         placeholder={props.t.apiKeyPlaceholder}
                         disabled={isSaving()}
-                        onChange={(e) => setKeyInputByUuid((prev) => ({ ...prev, [p().uuid]: e.currentTarget.value }))}
+                        onInput={(e) => setKeyInputByUuid((prev) => ({ ...prev, [p().uuid]: e.currentTarget.value }))}
                       />
                       <Button
                         variant="primary"
@@ -1044,6 +1048,7 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
         variant="destructive"
         onConfirm={confirmDelete}
         onCancel={cancelDelete}
+        triggerRef={deleteTriggerRef}
       />
 
       {/* Consent dialog */}
@@ -1057,6 +1062,7 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
         variant="primary"
         onConfirm={confirmConsent}
         onCancel={cancelConsent}
+        triggerRef={consentTriggerRef}
       >
         <ul class="pc__consent-list">
           <For each={consentRecipients()}>
