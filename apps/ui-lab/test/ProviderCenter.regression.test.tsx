@@ -245,9 +245,9 @@ describe("Provider Center — 23 states have unique semantic contracts", () => {
     { state: "Drag to reorder", check: () => expect(screen.getAllByRole("button", { name: "Move up" }).length).toBeGreaterThan(0) },
     { state: "Reorder failed", check: () => expect(screen.getAllByRole("button", { name: "Move up" }).length).toBeGreaterThan(0) },
     { state: "Balance loading", check: () => expect(screen.getByText(strings.en.provider.balanceLoading)).toBeTruthy() },
-    { state: "Balance unsupported", check: () => expect(screen.getByText(strings.en.provider.balanceUnsupported)).toBeTruthy() },
-    { state: "Balance rate-limited", check: () => expect(screen.getByText(strings.en.provider.balanceRateLimited)).toBeTruthy() },
-    { state: "Balance error", check: () => expect(screen.getByText(strings.en.provider.balanceError)).toBeTruthy() },
+    { state: "Balance unsupported", check: () => expect(document.querySelector(".pc__balance-section button")).toBeTruthy() },
+    { state: "Balance rate-limited", check: () => expect(document.querySelector(".pc__balance-section button")).toBeTruthy() },
+    { state: "Balance error", check: () => expect(document.querySelector(".pc__balance-section button")).toBeTruthy() },
     { state: "Endpoint invalid", check: () => expect(screen.getByText(strings.en.provider.endpointInvalid)).toBeTruthy() },
   ];
 

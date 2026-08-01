@@ -252,15 +252,16 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
       setConnStatus({ "mock-openai-1": "failed" });
     }
 
+    // Balance: demo states set the OUTCOME fixture (what fetch will resolve
+    // to), NOT the current status. Current status starts at "idle" so the
+    // Fetch button is visible. The user clicks Fetch → loading → outcome.
+    // Exception: balance-loading starts mid-loading (shows spinner).
     if (state === "balance-loading") {
       setBalanceByUuid({ "mock-openai-1": "loading" });
-    } else if (state === "balance-unsupported") {
-      setBalanceByUuid({ "mock-openai-1": "unsupported" });
-    } else if (state === "balance-rate-limited") {
-      setBalanceByUuid({ "mock-openai-1": "rate-limited" });
-    } else if (state === "balance-error") {
-      setBalanceByUuid({ "mock-openai-1": "error" });
     }
+    // For unsupported/rate-limited/error: DON'T pre-set status. The outcome
+    // is determined by handleFetchBalance reading props.state. Status stays
+    // idle so the Fetch button renders.
 
     setConsentKey(consentScopeKey(buildConsentScope(sel, provs)));
     }),
@@ -537,6 +538,7 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
 
   // --- reorder (keyboard-first) with persist/rollback ---
   const reorderProviders = (fromUuid: string, toUuid: string, pos: "before" | "after") => {
+    const snapshot = providers(); // capture before reorder
     setProviders((prev) => {
       const sorted = [...prev].sort((a, b) => a.sortOrder - b.sortOrder);
       const fromIdx = sorted.findIndex((p) => p.uuid === fromUuid);
@@ -544,17 +546,17 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
       if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return prev;
       const [moved] = sorted.splice(fromIdx, 1);
       const insertAt = pos === "before" ? toIdx : toIdx + 1;
-      // Adjust insertAt if we removed an element before it
       const adjusted = fromIdx < toIdx ? insertAt - 1 : insertAt;
       sorted.splice(adjusted, 0, moved!);
       return sorted.map((p, i) => ({ ...p, sortOrder: i }));
     });
     const name = providers().find((p) => p.uuid === fromUuid)?.name ?? "";
     setReorderAnnouncement(`${name} ${props.t.movedDown}`);
-    maybeRevertReorder();
+    maybeRevertReorder(snapshot);
   };
 
   const moveProvider = (uuid: string, dir: "up" | "down") => {
+    const snapshot = providers(); // capture before reorder
     setProviders((prev) => {
       const sorted = [...prev].sort((a, b) => a.sortOrder - b.sortOrder);
       const idx = sorted.findIndex((p) => p.uuid === uuid);
@@ -566,14 +568,20 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
     });
     const name = providers().find((p) => p.uuid === uuid)?.name ?? "";
     setReorderAnnouncement(`${name} ${dir === "up" ? props.t.movedUp : props.t.movedDown}`);
-    maybeRevertReorder();
+    maybeRevertReorder(snapshot);
   };
 
-  // Persist failure → revert to original order
-  const maybeRevertReorder = () => {
+  // Persist failure → revert ONLY sortOrder (snapshot before reorder),
+  // preserving all other provider modifications (endpoint, key, roles, etc.)
+  const maybeRevertReorder = (preReorderProviders: MockProvider[]) => {
     if (props.state === "reorder-failed") {
       window.setTimeout(() => {
-        setProviders(initialProviders());
+        // Restore the original sort orders without losing other state
+        const sortOrderSnapshot = new Map(preReorderProviders.map((p) => [p.uuid, p.sortOrder]));
+        setProviders((prev) => prev.map((p) => ({
+          ...p,
+          sortOrder: sortOrderSnapshot.get(p.uuid) ?? p.sortOrder,
+        })));
         setReorderAnnouncement(props.t.reorderReverted);
         pushToast("destructive", props.t.reorderReverted);
       }, 800);
@@ -760,23 +768,23 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
                       "pc__provider-row--drag-over-after": dragOverUuid() === p.uuid && dragOverPos() === "after",
                     }}
                     data-status={p.status}
-                    draggable={p.status === "active"}
-                    onDragStart={() => handleDragStart(p.uuid)}
-                    onDragOver={(e) => handleDragOver(e, p.uuid)}
+                    onDragOver={(e: DragEvent) => handleDragOver(e, p.uuid)}
                     onDrop={() => handleDrop(p.uuid)}
-                    onDragEnd={() => handleDragEnd()}
                   >
                     <Show when={p.status === "deleting"}>
                       <div class="pc__deleting-overlay">
                         <Spinner size={16} label={props.t.deleting} />
                       </div>
                     </Show>
-                    {/* Drag handle */}
+                    {/* Drag handle — draggable is HERE, not on the row */}
                     <button
                       type="button"
                       class="pc__drag-handle lr-focusable"
                       aria-label={props.t.dragHandle}
+                      draggable={p.status === "active"}
                       disabled={p.status !== "active"}
+                      onDragStart={() => handleDragStart(p.uuid)}
+                      onDragEnd={() => handleDragEnd()}
                     >
                       <GripVertical size={16} aria-hidden="true" />
                     </button>
