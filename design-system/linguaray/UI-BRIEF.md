@@ -29,110 +29,73 @@ native macOS/Windows tool: compact, unobtrusive, fast.
 
 ## 2. Color Tokens
 
-The skill generated a "VPN & Privacy Tool" dark-first palette. LinguaRay needs
-**light + dark theme** (system-following). The final token values (with verified
-contrast ratios) are in **`MASTER.md` §1** — this section records only the
-decision rationale.
+The skill generated a dark-first "VPN & Privacy Tool" palette. LinguaRay needs
+dual-theme (light + dark). All final token values and independently-verified
+contrast ratios are in **`MASTER.md` §1**. This section records only the rationale.
 
-### Adopted from skill
-- Accent role = green (success/connected).
-- Destructive = red.
-- Dark border approach: low-opacity rgba.
-
-### Overridden (with contrast corrections)
-- **Primary `#1E3A5F` → `#2563EB`.** Spec calls for "光束蓝" (beam blue).
-  `#2563EB` passes 5.17:1 with white text in BOTH themes (skill's navy was dark-only).
-- **Light success `#16A34A` → `#15803D`** (was 3.30:1; now 5.36:1 with white).
-- **Dark success text `#22C55E` → `#4ADE80`** (was 2.28:1 on dark bg; now 9.99:1).
-- **Destructive `#DC2626` → `#B91C1C`** light (5.49:1); dark uses `#F87171` text
-  (5.48:1) / `#991B1B` filled bg (5.61:1).
-- **Focus ring: was `rgba(...,20)` → opaque `#2563EB` light / `#60A5FA` dark**
-  with `outline-offset: 2px` (transparent rings are invisible).
-- Added `--color-warning`, `--color-info`, `--color-bg-hover`, `--color-bg-selected`,
-  `--color-bg-overlay`, `--color-on-success`, `--color-on-destructive`, `--color-disabled-*`.
-
-All ratios are in `MASTER.md` §1.1/§1.2.
+### Decisions
+- **Primary:** skill gave dark navy. Overridden to beam blue (S1 design decision —
+  the product identity calls for "光束蓝"). Final values in MASTER.md §1.
+- **Success/destructive/warning/info:** skill's values had AA failures in several
+  pairs. All corrected — final values and ratios in MASTER.md §1.
+- **Token naming:** restructured to symmetric `*-fill` / `on-*-fill` / `*-fg`
+  pattern so a token never means fill in one theme and text in the other.
+- **Decorative vs strong borders:** skill had one border token at ~1.2:1 on white.
+  Split into `--color-border` (decorative) and `--color-border-strong` (3:1 for
+  input edges and switch tracks).
+- **Selected foreground:** added `--color-selected-fg` (separate from primary) to
+  pass AA on selected backgrounds.
 
 ---
 
 ## 3. Typography
 
-### Adopted
-- Base size: 14px (desktop utility, not 16px web default — the spec calls for
-  "紧凑桌面密度" compact density).
-- Line-height: 1.5 (skill UX rule, adopted).
-- System font stack only.
-
-### Overridden / rejected
-- **Skill fonts (Playfair Display SC / Karla) → REJECTED.** Those are a
-  restaurant/hospitality pairing with remote Google Fonts. LinguaRay is a
-  multilingual desktop tool that must render CJK correctly without loading
-  remote fonts (privacy-first principle from the spec).
-
-### Final font stack
-
-```css
---font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue",
-  "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
---font-mono: "SF Mono", "Cascadia Code", "Consolas", "Noto Sans Mono CJK SC",
-  monospace;
-```
-
-- **No remote Google Fonts.** Privacy-first: no font CDN requests.
-- CJK fallbacks: PingFang SC (macOS), Microsoft YaHei (Windows), Noto Sans CJK SC.
-- Mono for error codes, API responses, technical details.
+### Decisions
+- **Base size 14px** (S1 design decision — compact desktop density; skill default
+  was 16px web).
+- **System font stack only** (privacy-first: no remote fonts). Skill recommended
+  Playfair Display SC / Karla (a restaurant/hospitality pairing with Google Fonts).
+  Rejected: wrong mood, wrong domain, privacy violation.
+- **CJK fallbacks** built into the system stack.
+- Final font stack, type scale, and weights in **MASTER.md §2**.
 
 ---
 
-## 4. Spacing (density 8/10)
+## 4. Spacing, Controls, Icons — See MASTER.md §3
 
-Adopted from the skill's `--density 8` output:
-
-| Token | Value | Usage |
-|---|---|---|
-| `--space-xs` | 2px | Tight gaps |
-| `--space-sm` | 4px | Icon gaps, inline spacing |
-| `--space-md` | 8px | Standard padding (cards, inputs) |
-| `--space-lg` | 12px | Section padding |
-| `--space-xl` | 16px | Large gaps, modal padding |
-| `--space-2xl` | 24px | Section margins |
-| `--space-3xl` | 32px | Rare: onboarding hero |
+Adopted skill's density 8/10 output. All final token values, control heights,
+border radius, icon sizes, and icon mappings in **MASTER.md §3**.
 
 ---
 
-## 5. Window Sizes & Z-Order
+## 5. Windows — See MASTER.md §8
 
-Final window specs are in **`MASTER.md` §8**. Key decisions recorded here:
+Key decisions (final specs in MASTER.md):
 
-- **Multi-engine result:** reuses the SAME popup window in expanded mode. NOT a
-  separate panel/window (eliminates the "expand or open separate" ambiguity).
-- **Pinned popup:** does NOT hide on blur. Only unpinned popups auto-dismiss.
-- **Settings adaptive:** tested at 600×400 min. Sidebar collapses to icon-only
-  rail at 600–699px. No hamburger path (min is 600px). No horizontal overflow.
-- **Onboarding:** uses 600×400 min (same as settings); single-column flow.
+- **Multi-engine result:** reuses the SAME popup in expanded mode. Results shown
+  side-by-side (per S0 spec). NOT a separate window.
+- **Pinned popup:** does NOT hide on blur.
+- **Settings adaptive:** min 600px. Sidebar collapses to icon-only at 600–699px.
+  No hamburger path.
+- **Onboarding:** 600×400 min, single-column.
 
 ---
 
 ## 6. Focus, Keyboard, Motion, Contrast — See MASTER.md
 
-All final values, contrast ratios, and rules are in **`MASTER.md` §1, §5, §6, §10**.
-This section records only the decision rationale:
+All final values in **MASTER.md §1, §5, §6, §10**. Rationale only here:
 
-- **Focus:** skill recommended focus rings; we adopt opaque `--color-ring` + `outline`
-  (not box-shadow). Details in MASTER.md §6.
-- **Keyboard:** adopted from skill UX priority-1 rules. Details in MASTER.md §10.
-- **Motion:** adopted subtle tier from skill. Durations/easing in MASTER.md §5.
-  Reduced-motion: 1ms for transitions, but spinners get a static + text fallback
-  (not a freeze). See MASTER.md §5 exception.
-- **Contrast:** all ratios independently computed via WCAG formula and recorded
-  in MASTER.md §1 tables.
+- **Focus:** opaque `--color-ring` + `outline` (not box-shadow).
+- **Motion:** subtle tier (S1 design decision). Reduced-motion: 1ms transitions +
+  spinner static/text fallback.
+- **Contrast:** all ratios independently computed via WCAG formula.
 
 ---
 
 ## 7. Icon Set
 
 **Lucide via `lucide-solid`** (SolidJS binding; standard outline icons — no filled
-variants). The skill recommended Phosphor; overridden to Lucide per spec. Key icons:
+variants). S1 design decision (skill recommended Phosphor; overridden). Key icons:
 
 | Action | Lucide name | Usage |
 |---|---|---|
@@ -154,21 +117,21 @@ variants). The skill recommended Phosphor; overridden to Lucide per spec. Key ic
 
 ### Adopted
 - Product match: "Translator App" → Flat Design + AI-Native UI + Micro-interactions
-- Color role structure: primary/accent/destructive/muted/border/ring
+- Color role structure (adapted to symmetric fill/fg naming)
 - Dense spacing scale (density 8/10)
-- Subtle motion tier (150–300ms, no scroll choreography)
+- Subtle motion tier (no scroll choreography; final durations in MASTER.md §5)
 - Accessibility rules: contrast 4.5:1, focus rings, keyboard nav, icon aria-labels
 - Anti-patterns: no emojis as icons, no instant state changes, no invisible focus
 - Pre-delivery checklist (adapted for desktop, not responsive web breakpoints)
 
 ### Overridden
-- Primary color `#1E3A5F` → `#2563EB` (beam blue per spec)
-- Fonts (Playfair/Karla) → system font stack (privacy: no remote fonts)
-- Style "Exaggerated Minimalism" → "Flat Design + Micro-interactions" (translator, not editorial)
-- Page pattern "Enterprise Gateway" → not applicable (desktop utility, no landing page)
+- Primary color → beam blue (S1 design decision; final values in MASTER.md §1)
+- Fonts → system font stack (privacy: no remote fonts)
+- Style → Flat Design + Micro-interactions (translator, not editorial)
+- Page pattern → not applicable (desktop utility, no landing page)
 - GSAP scroll reveal → not applicable (desktop windows, no scroll)
-- Responsive breakpoints 375/768/1024/1440 → not applicable (fixed desktop windows)
-- Base font size 16px → 14px (compact desktop density)
+- Responsive breakpoints → not applicable (fixed desktop windows)
+- Base font size → 14px (compact desktop density; S1 design decision)
 
 ### Rejected entirely
 - Remote Google Fonts (`@import url(fonts.googleapis.com...)`) — privacy violation

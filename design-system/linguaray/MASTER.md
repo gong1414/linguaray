@@ -47,7 +47,7 @@ A single token never means "fill" in one theme and "text" in the other.
 | `--color-info-fill` | `#1D4ED8` | `--color-on-info-fill: #FFFFFF` | 6.702:1 ✅ | Info banners |
 | `--color-info-fg` | `#1D4ED8` | — | on bg: 6.702:1 ✅ | Info text/icons |
 | `--color-bg` | `#FFFFFF` | `--color-fg: #0F172A` | 17.853:1 ✅ | App background |
-| `--color-bg-elevated` | `#F8FAFC` | `--color-fg-elevated: #0F172A` | 17.201:1 ✅ | Cards, popups |
+| `--color-bg-elevated` | `#F8FAFC` | `--color-fg-elevated: #0F172A` | 17.063:1 ✅ | Cards, popups |
 | `--color-bg-hover` | `#F1F5F9` | — | — | Hover surface |
 | `--color-bg-selected` | `#DBEAFE` | `--color-selected-fg: #1D4ED8` | 5.493:1 ✅ | Selected item |
 | `--color-bg-overlay` | `rgba(0,0,0,0.4)` | — | — | Modal overlay |
@@ -74,7 +74,7 @@ A single token never means "fill" in one theme and "text" in the other.
 | `--color-info-fill` | `#1E40AF` | `--color-on-info-fill: #FFFFFF` | 9.130:1 ✅ | Info banners |
 | `--color-info-fg` | `#60A5FA` | — | on bg: 7.022:1 ✅ | Info text/icons |
 | `--color-bg` | `#0F172A` | `--color-fg: #F1F5F9` | 16.296:1 ✅ | App background |
-| `--color-bg-elevated` | `#1E293B` | `--color-fg-elevated: #F1F5F9` | 12.697:1 ✅ | Cards, popups |
+| `--color-bg-elevated` | `#1E293B` | `--color-fg-elevated: #F1F5F9` | 13.353:1 ✅ | Cards, popups |
 | `--color-bg-hover` | `#334155` | — | — | Hover surface |
 | `--color-bg-selected` | `#1E3A5F` | `--color-selected-fg: #60A5FA` | 4.524:1 ✅ | Selected item |
 | `--color-bg-overlay` | `rgba(0,0,0,0.6)` | — | — | Modal overlay |
@@ -272,7 +272,9 @@ props:     disabled, loading, leftIcon, rightIcon, fullWidth
 - `secondary`: transparent bg + `--color-border-strong` border + `--color-fg` text.
 - `ghost`: transparent bg + `--color-fg` text; hover = `--color-bg-hover`.
 - `destructive`: `--color-destructive-fill` bg + `--color-on-destructive-fill`.
-- `loading`: replace children with 12px spinner (or static icon + "Loading…" under reduced-motion); `pointer-events: none`; keep width to prevent layout shift.
+- `loading`: replace children with 12px spinner (or static icon + "Loading…" under
+  reduced-motion); set `disabled` + `aria-disabled="true"` + `aria-busy="true"` +
+  `tabindex="-1"` to block keyboard activation; keep width to prevent layout shift.
 
 ### IconButton
 
@@ -311,14 +313,18 @@ props:     label, value, options, disabled, placeholder
 ```
 props:     checked, disabled, label, indeterminate
 ```
-- Uses Kobalte `Checkbox`. Check icon = `--color-primary-fg` on checked. Box border = `--color-border-strong`.
+- Checked: background = `--color-primary-fill`, check icon = `--color-on-primary-fill`.
+- Unchecked: border = `--color-border-strong`, background = transparent.
+- Uses Kobalte `Checkbox`.
 
 ### Switch
 
 ```
 props:     checked, disabled, label
 ```
-- On: `--color-primary-fill` track. Off: `--color-border` track.
+- On: `--color-primary-fill` track + `--color-on-primary-fill` thumb.
+- Off: `--color-border-strong` track (NOT `--color-border` — decorative border is
+  too low contrast to identify the off state) + `--color-fg-muted` thumb.
 - Uses Kobalte `Switch`.
 
 ### Tabs / SegmentedControl
@@ -337,7 +343,12 @@ props:     open, title, description, children, footer, onClose
 Confirm:   title, message, confirmLabel, cancelLabel, variant (primary|destructive), onConfirm, onCancel
 ```
 - Overlay: `--color-bg-overlay`. Dialog: `--color-bg-elevated` + `--radius-lg` + `--shadow-lg`.
-- Close on `Esc`. Focus trap inside dialog. First focusable = initial focus.
+- Close on `Esc`. Focus trap inside dialog.
+- **Focus management:** on open, focus moves into dialog. On close, focus **restores
+  to the trigger element** that opened the dialog.
+- **Destructive Confirm:** initial focus lands on **Cancel** (not Confirm) to
+  prevent accidental destructive action via Enter key.
+- Uses Kobalte `Dialog`.
 
 ### Banner / Toast
 
@@ -353,7 +364,7 @@ Toast:     variant, message, duration (default 3s), onDismiss
 ```
 props:     content, children, side (top|bottom|left|right)
 ```
-- Uses Kobante `Tooltip`. `--color-bg-elevated` bg + `--color-fg` text. `--text-sm`. Max width 240px.
+- Uses Kobalte `Tooltip`. `--color-bg-elevated` bg + `--color-fg` text. `--text-sm`. Max width 240px.
 
 ### Card
 
@@ -361,15 +372,22 @@ props:     content, children, side (top|bottom|left|right)
 props:     children, padding (default md), interactive, onClick
 ```
 - `--color-bg-elevated` + `--radius-md` + `--shadow-sm`.
-- Interactive: hover = `--shadow-md`; cursor: pointer.
+- Interactive: render as `<button role="button">` (or `<a>` if navigates). Tabbable.
+  Enter/Space triggers `onClick`. Hover = `--shadow-md`; `cursor: pointer`.
+  `:focus-visible` ring per §6. NOT a bare `<div onClick>` — must have button/link
+  semantics for keyboard and screen-reader access.
 
 ### ListRow
 
 ```
 props:     leading (icon|avatar), title, subtitle, trailing (badge|action), onClick
 ```
-- Height: `--height-lg` (36px). Padding: `--space-md` horizontal.
-- Selected: `--color-bg-selected` bg.
+- **Single-line:** height 36px (`--height-lg`). Title only (no subtitle).
+- **Two-line:** height 52px minimum. Title (14px) + subtitle (12px `--color-fg-muted`).
+- Padding: `--space-md` horizontal.
+- If `onClick` present: render as `<button>` with full-row click target; Tab + Enter
+  supported. NOT a bare `<div onClick>`.
+- Selected: `--color-bg-selected` bg + `--color-selected-fg` text.
 
 ### ProviderCard
 
@@ -377,7 +395,7 @@ props:     leading (icon|avatar), title, subtitle, trailing (badge|action), onCl
 props:     profile (name, template, status), hasKey, isActive, onEdit, onDelete, onToggle
 ```
 - Card layout: name + template badge + key status indicator + enabled switch.
-- Active provider: `--color-bg-selected` accent border-left (3px `--color-primary-fill`).
+- Active provider: `--color-bg-selected` accent border-left (3px `--color-selected-fg`).
 
 ### ResultCard
 
@@ -415,10 +433,16 @@ All sizes are Tauri/CSS logical pixels.
 ### 8.2 Popup Mode Switching
 
 - **Single result:** popup max = 400×300.
-- **Multi-engine (expanded):** popup max changes to 480×400 via Tauri `setSize`/
+- **Multi-engine (expanded):** popup max changes to 600×400 via Tauri `setSize`/
   `setMaxSize` when entering expanded mode, and reverts when leaving.
-- **Multi-engine layout:** stacked `ResultCard`s in provider sort order, internal
-  vertical scroll. NOT tabs. Cards do not jump position as results arrive.
+- **Multi-engine layout:** `ResultCard`s shown **side-by-side** (per S0 spec
+  §2.1 "results from N providers shown side-by-side"), in provider sort order.
+  Cards do not jump position as results arrive.
+  - 2 providers: 2 columns, each min 200px wide.
+  - 3+ providers: horizontal scroll if total width exceeds popup max (600px).
+  - Each card is independently scrollable vertically if its text overflows.
+  - At screen edge: popup shifts left so its right edge aligns with screen edge
+    (same cursor-anchored logic as single-result, clamped to screen bounds).
 - **Pinned:** popup stays visible regardless of blur. Only unpinned popups hide on blur.
 
 ### 8.3 Settings Adaptive Behavior
@@ -452,7 +476,7 @@ Min width = 600px (enforced by Tauri). Within 600–800px:
 - ✅ Layout structure (grid, flex direction, sidebar arrangement)
 - ✅ Component composition (which components, in what order)
 - ✅ Content guidance (copy, labels, empty-state text)
-- ✅ Density adjustments for that page (tighter/looser spacing)
+- ✅ Density adjustments for that page (using existing spacing tokens to adjust layout gaps; does NOT change component sizes or control heights)
 
 `pages/<page>.md` files may NOT override:
 
@@ -469,7 +493,7 @@ Changing any of these requires editing MASTER.md first.
 ## 10. Pre-Delivery Checklist
 
 - [ ] All color fill+text pairs pass WCAG AA (≥4.5:1) — see §1 contrast column
-- [ ] Non-text UI (borders, focus rings) pass 3:1 minimum
+- [ ] All non-decorative UI elements carrying state/boundary identification (borders on inputs, switch tracks, focus rings) pass 3:1 minimum
 - [ ] Light AND dark themes verified
 - [ ] Focus rings visible on every interactive element (`:focus-visible`)
 - [ ] Full keyboard navigation (Tab order = visual order; Enter/Esc on modals/inputs)

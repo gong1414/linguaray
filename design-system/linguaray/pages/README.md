@@ -9,7 +9,7 @@ This directory contains page-specific design overrides. Each file (e.g.
 - ✅ Layout structure (grid, flex direction, sidebar arrangement)
 - ✅ Component composition (which components, in what order)
 - ✅ Content guidance (copy, labels, empty-state text)
-- ✅ Density adjustments for that page (tighter/looser spacing)
+- ✅ Density adjustments for that page (using existing spacing tokens to adjust layout gaps; does NOT change component sizes or control heights)
 
 ## What page files may NOT override
 
