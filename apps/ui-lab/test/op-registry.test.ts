@@ -13,8 +13,7 @@ describe("OpRegistry — CAS semantics", () => {
   it("startOp returns a token and registers the op", () => {
     let cleared = false;
     const token = registry.startOp(
-      "save" as OpKind,
-      "uuid-a",
+      "save" as OpKind, "uuid-a",
       () => (cleared = true),
       () => {},
       1000,
@@ -27,44 +26,29 @@ describe("OpRegistry — CAS semantics", () => {
   it("startOp cancels a previous op on the same key", () => {
     let oldCleared = false;
     const oldToken = registry.startOp(
-      "save" as OpKind,
-      "uuid-a",
+      "save" as OpKind, "uuid-a",
       () => (oldCleared = true),
       () => {},
       1000,
     );
     const newToken = registry.startOp(
-      "save" as OpKind,
-      "uuid-a",
+      "save" as OpKind, "uuid-a",
       () => {},
       () => {},
       1000,
     );
     expect(newToken).toBeGreaterThan(oldToken);
-    // Old op's clearBusy was called
     expect(oldCleared).toBe(true);
-    // New token is current
     expect(registry.currentToken("save" as OpKind, "uuid-a")).toBe(newToken);
   });
 
   it("finishOpIfCurrent with old token returns false and does NOT run result", () => {
     let resultRan = false;
     const oldToken = registry.startOp(
-      "test" as OpKind,
-      "uuid-a",
-      () => {},
-      () => {},
-      1000,
+      "test" as OpKind, "uuid-a",
+      () => {}, () => {}, 1000,
     );
-    // Start a NEW op on the same key (old is cancelled)
-    registry.startOp(
-      "test" as OpKind,
-      "uuid-a",
-      () => {},
-      () => {},
-      1000,
-    );
-    // Try to finish with the OLD token
+    registry.startOp("test" as OpKind, "uuid-a", () => {}, () => {}, 1000);
     const applied = registry.finishOpIfCurrent("test" as OpKind, "uuid-a", oldToken, () => {
       resultRan = true;
     });
@@ -75,11 +59,8 @@ describe("OpRegistry — CAS semantics", () => {
   it("finishOpIfCurrent with current token runs result and cleans up", () => {
     let resultRan = false;
     const token = registry.startOp(
-      "fetch" as OpKind,
-      "uuid-a",
-      () => {},
-      () => {},
-      1000,
+      "fetch" as OpKind, "uuid-a",
+      () => {}, () => {}, 1000,
     );
     const applied = registry.finishOpIfCurrent("fetch" as OpKind, "uuid-a", token, () => {
       resultRan = true;
@@ -91,85 +72,54 @@ describe("OpRegistry — CAS semantics", () => {
 
   it("cancelOpIfCurrent with old token does not clear new op's busy", () => {
     let newCleared = false;
-    const oldToken = registry.startOp(
-      "balance" as OpKind,
-      "uuid-a",
-      () => {},
-      () => {},
-      1000,
-    );
-    registry.startOp(
-      "balance" as OpKind,
-      "uuid-a",
-      () => (newCleared = true),
-      () => {},
-      1000,
-    );
-    // Cancel with OLD token — should NOT clear the new op
+    const oldToken = registry.startOp("balance" as OpKind, "uuid-a", () => {}, () => {}, 1000);
+    registry.startOp("balance" as OpKind, "uuid-a", () => (newCleared = true), () => {}, 1000);
     const cancelled = registry.cancelOpIfCurrent("balance" as OpKind, "uuid-a", oldToken);
     expect(cancelled).toBe(false);
     expect(newCleared).toBe(false);
-    // New op still active
     expect(registry.isActive("balance" as OpKind, "uuid-a")).toBe(true);
   });
 
-  it("cancelOpsForUuid cancels all ops for a provider", () => {
-    let saveCleared = false;
-    let testCleared = false;
-    registry.startOp("save" as OpKind, "uuid-a", () => (saveCleared = true), () => {}, 1000);
-    registry.startOp("test" as OpKind, "uuid-a", () => (testCleared = true), () => {}, 1000);
-    // Different provider — should NOT be cancelled
-    let otherCleared = false;
-    registry.startOp("save" as OpKind, "uuid-b", () => (otherCleared = true), () => {}, 1000);
-
+  it("cancelOpsForUuid cancels all ops for a provider but not others", () => {
+    let s = false, t = false, other = false;
+    registry.startOp("save" as OpKind, "uuid-a", () => (s = true), () => {}, 1000);
+    registry.startOp("test" as OpKind, "uuid-a", () => (t = true), () => {}, 1000);
+    registry.startOp("save" as OpKind, "uuid-b", () => (other = true), () => {}, 1000);
     registry.cancelOpsForUuid("uuid-a");
-    expect(saveCleared).toBe(true);
-    expect(testCleared).toBe(true);
-    expect(otherCleared).toBe(false);
-    expect(registry.isActive("save" as OpKind, "uuid-a")).toBe(false);
-    expect(registry.isActive("save" as OpKind, "uuid-b")).toBe(true);
+    expect(s).toBe(true);
+    expect(t).toBe(true);
+    expect(other).toBe(false);
   });
 
-  it("timer fires and runs callback only if still current", () => {
-    let ran = false;
+  it("timer fires and runs result exactly once (CAS auto-complete)", () => {
+    let resultCount = 0;
     registry.startOp(
-      "save" as OpKind,
-      "uuid-a",
+      "save" as OpKind, "uuid-a",
       () => {},
-      () => {
-        ran = true;
-      },
+      () => { resultCount++; },
       1000,
     );
+    expect(resultCount).toBe(0);
     vi.advanceTimersByTime(1100);
-    expect(ran).toBe(true);
+    expect(resultCount).toBe(1);
     expect(registry.isActive("save" as OpKind, "uuid-a")).toBe(false);
   });
 
-  it("timer does NOT fire if a newer op replaced it", () => {
-    let oldRan = false;
-    registry.startOp(
-      "save" as OpKind,
-      "uuid-a",
-      () => {},
-      () => {
-        oldRan = true;
-      },
-      1000,
-    );
-    // Replace with a new op before timer fires
+  it("timer does NOT fire result if a newer op replaced it", () => {
+    let oldResult = false;
+    registry.startOp("save" as OpKind, "uuid-a", () => {}, () => { oldResult = true; }, 1000);
     registry.startOp("save" as OpKind, "uuid-a", () => {}, () => {}, 2000);
-    vi.advanceTimersByTime(1100); // old timer would have fired
-    expect(oldRan).toBe(false);
+    vi.advanceTimersByTime(1100);
+    expect(oldResult).toBe(false);
   });
 
-  it("cancelAll clears everything", () => {
-    let cleared1 = false;
-    let cleared2 = false;
+  it("cancelAll: snapshot + clear BEFORE clearBusy (reentry-safe)", () => {
+    let cleared1 = false, cleared2 = false;
     registry.startOp("save" as OpKind, "uuid-a", () => (cleared1 = true), () => {}, 1000);
     registry.startOp("test" as OpKind, "uuid-b", () => (cleared2 = true), () => {}, 1000);
     registry.cancelAll();
     expect(cleared1).toBe(true);
     expect(cleared2).toBe(true);
+    expect(registry.isActive("save" as OpKind, "uuid-a")).toBe(false);
   });
 });

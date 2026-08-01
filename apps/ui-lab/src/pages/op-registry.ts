@@ -5,9 +5,13 @@
  * cannot interfere with a save on provider B, and a new op on the same
  * key+uuid cancels the old one.
  *
- * Hard constraint (from review): the registry entry is ALWAYS deleted from
- * the map BEFORE the callback runs, so a reentrant callback that starts a
- * new op cannot be cleaned up by the old entry's clearBusy.
+ * Hard constraints (from review):
+ * 1. Registry entry is ALWAYS deleted from the map BEFORE the callback runs.
+ * 2. cancelAll snapshots + clears the map BEFORE iterating clearBusy, so a
+ *    reentrant clearBusy that starts a new op is not wiped by the loop.
+ * 3. The timer itself calls finishOpIfCurrent — callers do NOT nest a second
+ *    finish. This prevents the "entry already deleted → result never applies"
+ *    bug.
  */
 
 export type OpKind = "save" | "test" | "fetch" | "balance";
@@ -18,6 +22,7 @@ export type OpEntry = {
   token: number;
   timerId: number;
   clearBusy: () => void;
+  result: () => void;
 };
 
 let nextToken = 0;
@@ -33,25 +38,25 @@ export class OpRegistry {
    * Start a new operation. Cancels any existing op on the same key first
    * (delete-from-map → clearTimeout → clearBusy), then registers the new one.
    * Returns the new token.
+   *
+   * The timer calls finishOpIfCurrent internally — callers pass `result`
+   * and do NOT call finish themselves.
    */
   startOp(
     kind: OpKind,
     uuid: string,
     clearBusy: () => void,
-    run: (token: number) => void,
+    result: () => void,
     ms: number,
   ): number {
     const key = OpRegistry.key(kind, uuid);
     this.cancelOp(key);
     const token = ++nextToken;
     const timerId = window.setTimeout(() => {
-      // Delete from map BEFORE callback to prevent reentrant cleanup.
-      const entry = this.ops.get(key);
-      if (entry?.token !== token) return;
-      this.ops.delete(key);
-      run(token);
+      // finishOpIfCurrent does the CAS check + delete-from-map + result().
+      this.finishOpIfCurrent(kind, uuid, token, result);
     }, ms);
-    this.ops.set(key, { token, timerId, clearBusy });
+    this.ops.set(key, { token, timerId, clearBusy, result });
     return token;
   }
 
@@ -68,7 +73,7 @@ export class OpRegistry {
     const key = OpRegistry.key(kind, uuid);
     const entry = this.ops.get(key);
     if (entry?.token !== token) return false;
-    // Delete BEFORE callback (hard constraint).
+    // Delete BEFORE callback (hard constraint: reentry-safe).
     this.ops.delete(key);
     result();
     return true;
@@ -106,13 +111,18 @@ export class OpRegistry {
     }
   }
 
-  /** Cancel ALL operations (used on state-change reset). */
+  /**
+   * Cancel ALL operations (used on state-change reset).
+   * Snapshot + clear the map BEFORE iterating, so a reentrant clearBusy that
+   * starts a new op is not deleted by the loop.
+   */
   cancelAll(): void {
-    for (const [, entry] of this.ops) {
+    const snapshot = [...this.ops.values()];
+    this.ops.clear();
+    for (const entry of snapshot) {
       window.clearTimeout(entry.timerId);
       entry.clearBusy();
     }
-    this.ops.clear();
   }
 
   /** Check if an op is currently active for a key (for testing). */
