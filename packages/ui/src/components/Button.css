@@ -1,0 +1,115 @@
+/* Button — MASTER §7 Button + §6 states. */
+
+.lr-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  font-family: var(--font-sans);
+  font-weight: var(--text-base--weight);
+  font-size: var(--text-base);
+  line-height: 1;
+  border-radius: var(--radius-md);
+  padding: 0 var(--space-lg);
+  white-space: nowrap;
+  user-select: none;
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    opacity var(--duration-fast) var(--ease-standard);
+}
+
+/* Sizes */
+.lr-btn--sm {
+  height: var(--height-sm);
+  font-size: var(--text-sm);
+}
+.lr-btn--md {
+  height: var(--height-md);
+}
+.lr-btn--lg {
+  height: var(--height-lg);
+  font-size: var(--text-md);
+  font-weight: var(--text-md--weight);
+}
+
+.lr-btn--block {
+  width: 100%;
+}
+
+/* Variants */
+.lr-btn--primary {
+  background: var(--color-primary-fill);
+  color: var(--color-on-primary-fill);
+}
+.lr-btn--primary:hover {
+  opacity: 0.9;
+}
+.lr-btn--primary:active {
+  opacity: 0.8;
+}
+
+.lr-btn--secondary {
+  background: transparent;
+  color: var(--color-fg);
+  border: 1px solid var(--color-border-strong);
+}
+.lr-btn--secondary:hover {
+  background: var(--color-bg-hover);
+}
+.lr-btn--secondary:active {
+  opacity: 0.8;
+}
+
+.lr-btn--ghost {
+  background: transparent;
+  color: var(--color-fg);
+}
+.lr-btn--ghost:hover {
+  background: var(--color-bg-hover);
+}
+.lr-btn--ghost:active {
+  opacity: 0.8;
+}
+
+.lr-btn--destructive {
+  background: var(--color-destructive-fill);
+  color: var(--color-on-destructive-fill);
+}
+.lr-btn--destructive:hover {
+  opacity: 0.9;
+}
+.lr-btn--destructive:active {
+  opacity: 0.8;
+}
+
+/* States — §6 */
+.lr-btn:disabled,
+.lr-btn[aria-busy="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.lr-btn:disabled:hover,
+.lr-btn[aria-busy="true"]:hover {
+  opacity: 0.5;
+  background: var(--color-disabled-bg);
+}
+/* Primary/destructive keep their fill when disabled (don't go flat-gray) */
+.lr-btn--primary:disabled:hover,
+.lr-btn--primary[aria-busy="true"]:hover {
+  background: var(--color-primary-fill);
+  opacity: 0.5;
+}
+.lr-btn--destructive:disabled:hover,
+.lr-btn--destructive[aria-busy="true"]:hover {
+  background: var(--color-destructive-fill);
+  opacity: 0.5;
+}
+
+/* Keep width during loading to prevent layout shift (content stays, spinner
+   replaces icon/text). */
+.lr-btn__content {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+}

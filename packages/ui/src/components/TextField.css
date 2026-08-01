@@ -1,0 +1,90 @@
+/* TextField — MASTER §7 TextField. */
+
+.lr-text-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  width: 100%;
+}
+
+.lr-text-field__label {
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+  color: var(--color-fg);
+  font-weight: var(--text-md--weight);
+}
+
+.lr-text-field__control {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  padding: 0 var(--space-md);
+  transition: border-color var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard);
+}
+
+.lr-text-field--md .lr-text-field__control {
+  height: var(--height-md);
+}
+.lr-text-field--lg .lr-text-field__control {
+  height: var(--height-lg);
+}
+
+.lr-text-field__control:focus-within {
+  /* Use box-shadow to render the focus ring so it does not collide with the
+     1px border (outline-offset on a bordered control looks detached). */
+  border-color: var(--color-ring);
+  box-shadow: 0 0 0 2px var(--color-ring);
+  /* outline kept transparent so :focus-visible default still satisfies §6; the
+     shadow is the visible affordance. */
+  outline: none;
+}
+
+.lr-text-field--error .lr-text-field__control {
+  border-color: var(--color-destructive-fg);
+}
+
+.lr-text-field--disabled .lr-text-field__control {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: var(--color-disabled-bg);
+}
+
+.lr-text-field__input {
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: var(--text-base);
+  line-height: var(--text-base--line-height);
+  color: var(--color-fg);
+  height: 100%;
+}
+
+.lr-text-field__input::placeholder {
+  color: var(--color-fg-muted);
+}
+
+.lr-text-field__input:disabled {
+  cursor: not-allowed;
+}
+
+.lr-text-field--mono .lr-text-field__input {
+  font-family: var(--font-mono);
+}
+
+/* Helper / error text */
+.lr-text-field__helper {
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+  color: var(--color-fg-muted);
+}
+
+.lr-text-field__error {
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+  color: var(--color-destructive-fg);
+}
