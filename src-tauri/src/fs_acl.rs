@@ -176,10 +176,10 @@ pub(crate) fn set_win32_owner_dacl(path: &Path, inherit: bool) -> Result<(), Acl
         )));
     }
 
-    // Step 2: Set the DACL PROTECTED bit separately — pass ONLY
-    // PROTECTED_DACL_SECURITY_INFORMATION (not DACL_SECURITY_INFORMATION) so
-    // SetNamedSecurityInfoW toggles the control flag without rewriting the
-    // DACL content (and thus without stripping ACE inheritance flags).
+    // Step 2: Set the PROTECTED control bit WITHOUT rewriting the DACL content.
+    // Calling SetNamedSecurityInfoW with only PROTECTED_DACL_SECURITY_INFORMATION
+    // (no DACL_SECURITY_INFORMATION) toggles the control flag and leaves the
+    // existing DACL ACEs (including their inheritance flags) untouched.
     let rc = unsafe {
         SetNamedSecurityInfoW(
             path_wide.as_ptr(), SE_FILE_OBJECT,
@@ -190,7 +190,7 @@ pub(crate) fn set_win32_owner_dacl(path: &Path, inherit: bool) -> Result<(), Acl
     };
     if rc != 0 {
         return Err(AclError::Win32(format!(
-            "SetNamedSecurityInfoW (PROTECTED) failed: Win32 error {rc}"
+            "SetNamedSecurityInfoW (PROTECTED only) failed: Win32 error {rc}"
         )));
     }
     Ok(())
