@@ -48,8 +48,12 @@ After `archive_keystore` / `reset_keystore` (keystore becomes empty/missing):
 1. Phase 5 re-runs: zero keys in keystore → verification passes trivially.
 2. DB transaction: `UPDATE providers SET enabled = 0 WHERE needs_key = 1` (AI providers lost their keys → disabled). Keyless providers (`needs_key = 0`) stay enabled.
 3. Clear active selection + consent (slots may reference now-disabled providers).
-4. `migration_complete = 1`, `DataReadiness = Ready`.
-5. User re-enters keys via `provider_set_key`, which re-enables the profile.
+4. `migration_complete = 1`.
+5. User re-enters keys via `provider_set_key` (writes key only — does **not** auto-enable). The user then explicitly enables the provider via `provider_toggle(uuid, true)` if they want it active. This avoids silently re-enabling profiles the user had previously disabled.
+
+**`provider_set_key` semantics:** writes the key to `keystore.provider_keys[secret_ref]` only. It does NOT modify `enabled`. Enabling is a separate explicit user action (`provider_toggle`).
+
+**Post-archive `DataReadiness`:** Only transitions to `Ready` if the DB exists, the cleanup transaction succeeded, AND no other readiness-blocking condition remains. If the DB was `None` / `NeedsDatabaseRecovery` before the archive, it stays in that state — archiving the keystore does not fix a DB problem.
 
 The recovery SQL is now executable directly (`WHERE needs_key = 1`), not a pseudo-derivation.
 
