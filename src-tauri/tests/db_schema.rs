@@ -552,12 +552,12 @@ fn constraint_history_failure_partial_ciphertext_only_rejected() {
 #[test]
 fn win32_db_open_secures_dir_and_file() {
     use std::os::windows::ffi::OsStrExt;
-    use windows_sys::Win32::Foundation::{LocalFree, PSID};
+    use windows_sys::Win32::Foundation::LocalFree;
     use windows_sys::Win32::Security::Authorization::{GetNamedSecurityInfoW, SE_FILE_OBJECT};
     use windows_sys::Win32::Security::{
         AclSizeInformation, EqualSid, GetAclInformation, GetAce, GetSecurityDescriptorControl,
         ACL_SIZE_INFORMATION, DACL_SECURITY_INFORMATION, OWNER_SECURITY_INFORMATION,
-        PSECURITY_DESCRIPTOR, SE_DACL_PROTECTED, ACL,
+        PSID, PSECURITY_DESCRIPTOR, SE_DACL_PROTECTED, ACL,
     };
 
     // ACE type + flag constants (from Win32 SDK):
