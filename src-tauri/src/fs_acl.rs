@@ -129,10 +129,12 @@ pub(crate) fn set_win32_owner_dacl(path: &Path, inherit: bool) -> Result<(), Acl
         ACL, ACL_REVISION_DS, AddAccessAllowedAceEx, InitializeAcl,
         CONTAINER_INHERIT_ACE, DACL_SECURITY_INFORMATION, OBJECT_INHERIT_ACE,
         OWNER_SECURITY_INFORMATION, PROTECTED_DACL_SECURITY_INFORMATION, PSID,
-        SECURITY_DESCRIPTOR, SECURITY_DESCRIPTOR_REVISION,
+        SECURITY_DESCRIPTOR,
         InitializeSecurityDescriptor, SetSecurityDescriptorOwner,
-        SetSecurityDescriptorDacl, SetFileSecurityW,
+        SetSecurityDescriptorDacl,
     };
+    use windows_sys::Win32::Storage::FileSystem::SetFileSecurityW;
+    const SECURITY_DESCRIPTOR_REVISION: u32 = 1;
 
     let sid_buf = current_user_sid()?;
     let sid: PSID = sid_from_token_user_buf(&sid_buf)?;
@@ -166,7 +168,7 @@ pub(crate) fn set_win32_owner_dacl(path: &Path, inherit: bool) -> Result<(), Acl
     // (SE_DACL_PROTECTED is bit 0x800 in the control field; we always set it
     // here because SetFileSecurityW doesn't strip ACE inheritance flags like
     // SetNamedSecurityInfoW does.)
-    let dacl_protected = 1u32; // SE_DACL_PROTECTED
+    let dacl_protected: i32 = 1; // SE_DACL_PROTECTED bit
     if unsafe { SetSecurityDescriptorDacl(sd, 1, acl, dacl_protected) } == 0 {
         return Err(AclError::Win32("SetSecurityDescriptorDacl failed".into()));
     }
