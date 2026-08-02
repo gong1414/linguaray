@@ -124,7 +124,7 @@ pub fn sid_from_token_user_buf(buf: &[u8]) -> Result<windows_sys::Win32::Securit
 #[cfg(windows)]
 pub(crate) fn set_win32_owner_dacl(path: &Path, inherit: bool) -> Result<(), AclError> {
     use std::os::windows::ffi::OsStrExt;
-    use windows_sys::Win32::Foundation::{GENERIC_ALL, LocalFree};
+    use windows_sys::Win32::Foundation::GENERIC_ALL;
     use windows_sys::Win32::Security::Authorization::{
         SetNamedSecurityInfoW, SE_FILE_OBJECT,
     };
