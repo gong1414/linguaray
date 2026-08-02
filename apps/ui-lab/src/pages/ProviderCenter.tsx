@@ -23,6 +23,7 @@ import {
   Banner,
   EmptyState,
   Spinner,
+  Tooltip,
   type ProviderRole,
   type SelectOption,
   type ProviderCardLabels,
@@ -171,7 +172,7 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
   ): boolean => {
     const result = validateActiveSelection(nextSelection, nextProviders);
     if (!result.ok) {
-      pushToast("destructive", result.errors[0]!.message);
+      pushToast("destructive", props.t.selectionErrors[result.errors[0]!.code]);
       return false;
     }
     const oldScopeKey = consentScopeKey(buildConsentScope(selection(), providers()));
@@ -235,7 +236,7 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
       sel = { primaryUuid: null, parallelUuids: [], fallbackUuid: null };
     } else if (state === "duplicate") {
       const orig = provs.find((p) => p.uuid === "mock-openai-1")!;
-      provs = [...provs, { ...orig, uuid: "mock-openai-dup", name: "OpenAI #1 (copy)", hasKey: false, sortOrder: provs.length }];
+      provs = [...provs, { ...orig, uuid: "mock-openai-dup", name: `${orig.name} ${props.t.copySuffix}`, hasKey: false, sortOrder: provs.length }];
     } else if (state === "deleting" || state === "delete-retry") {
       provs = provs.map((p) => (p.uuid === "mock-openai-1" ? { ...p, status: "deleting" as const, enabled: false } : p));
       sel = {
@@ -417,7 +418,7 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
     const effectiveEndpoint = draftEndpoint ?? provider.endpoint;
     const epCheck = validateEndpoint(effectiveEndpoint);
     if (!epCheck.ok) {
-      setEndpointErrorByUuid((prev) => ({ ...prev, [uuid]: epCheck.error! }));
+      setEndpointErrorByUuid((prev) => ({ ...prev, [uuid]: props.t.endpointErrors[epCheck.code] }));
       return;
     }
     setEndpointErrorByUuid((prev) => {
@@ -443,15 +444,9 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
         const sel = selection();
         const newScope = buildConsentScope(sel, nextProviders);
         const newKey = consentScopeKey(newScope);
-        const previousConsent = consentKey();
-        // Consent preservation: only retain previousConsent if it matched
-        // the OLD scope AND the scope hasn't changed. Never auto-approve.
-        const nextConsent =
-          previousConsent !== null &&
-          previousConsent === oldScopeKey &&
-          newKey === oldScopeKey
-            ? previousConsent
-            : null;
+        // Single consent transition implementation (shared with commitProviderState).
+        // Never auto-approves: preserve only if scope is unchanged AND was valid.
+        const nextConsent = resolveConsentKey(consentKey(), oldScopeKey, newKey);
         // Atomic batch: providers + selection + consent together
         batch(() => {
           setProviders(nextProviders);
@@ -549,7 +544,7 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
     const copy: MockProvider = {
       ...orig,
       uuid: mockUuid(),
-      name: `${orig.name} (copy)`,
+      name: `${orig.name} ${props.t.copySuffix}`,
       hasKey: false,
       sortOrder: providers().length,
     };
@@ -813,44 +808,57 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
       {/* Settings shell: nav rail (icon-only at 600-699px) + content */}
       <div class="pc__settings-shell">
         <nav class="pc__settings-rail" aria-label={props.t.navSettings}>
-          {/* Active nav item — real button, keyboard-focusable */}
-          <button
-            type="button"
-            class="pc__rail-item lr-focusable pc__rail-item--active"
-            aria-current="page"
-            aria-label={props.t.navProviderCenter}
-            title={props.t.navProviderCenter}
+          {/* Rail items use the shared <Tooltip as="button"> so each shows a
+              hover/focus tooltip (Kobante) with a proper aria-describedby link.
+              The icon-only 600-699px container-query view relies on this tooltip
+              for the accessible name; no native title attribute anywhere. */}
+          <Tooltip
+            as="button"
+            content={props.t.navProviderCenter}
+            triggerProps={{
+              type: "button",
+              class: "pc__rail-item lr-focusable pc__rail-item--active",
+              "aria-current": "page",
+              "aria-label": props.t.navProviderCenter,
+            }}
           >
             <Server size={20} aria-hidden="true" />
             <span class="pc__rail-item__label">{props.t.navProviderCenter}</span>
-          </button>
-          {/* Disabled nav items — focusable (not native disabled) with aria-disabled */}
-          <button
-            type="button"
-            class="pc__rail-item lr-focusable"
-            aria-disabled="true"
-            aria-label={props.t.navShortcuts}
-            title={props.t.navShortcuts}
-            tabindex="0"
-            onClick={(e) => e.preventDefault()}
-            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") e.preventDefault(); }}
+          </Tooltip>
+          {/* Disabled nav items — focusable (not native disabled) with aria-disabled,
+              so they remain keyboard-reachable and can surface their tooltip. */}
+          <Tooltip
+            as="button"
+            content={props.t.navShortcuts}
+            triggerProps={{
+              type: "button",
+              class: "pc__rail-item lr-focusable",
+              "aria-disabled": "true",
+              "aria-label": props.t.navShortcuts,
+              tabindex: "0",
+              onClick: (e: MouseEvent) => e.preventDefault(),
+              onKeyDown: (e: KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") e.preventDefault(); },
+            }}
           >
             <Keyboard size={20} aria-hidden="true" />
             <span class="pc__rail-item__label">{props.t.navShortcuts}</span>
-          </button>
-          <button
-            type="button"
-            class="pc__rail-item lr-focusable"
-            aria-disabled="true"
-            aria-label={props.t.navPrivacy}
-            title={props.t.navPrivacy}
-            tabindex="0"
-            onClick={(e) => e.preventDefault()}
-            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") e.preventDefault(); }}
+          </Tooltip>
+          <Tooltip
+            as="button"
+            content={props.t.navPrivacy}
+            triggerProps={{
+              type: "button",
+              class: "pc__rail-item lr-focusable",
+              "aria-disabled": "true",
+              "aria-label": props.t.navPrivacy,
+              tabindex: "0",
+              onClick: (e: MouseEvent) => e.preventDefault(),
+              onKeyDown: (e: KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") e.preventDefault(); },
+            }}
           >
             <Shield size={20} aria-hidden="true" />
             <span class="pc__rail-item__label">{props.t.navPrivacy}</span>
-          </button>
+          </Tooltip>
         </nav>
         <div class="pc__content">
       <div class="pc__layout">

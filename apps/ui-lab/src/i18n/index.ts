@@ -177,6 +177,21 @@ export type LabStrings = {
     balanceRateLimited: string;
     balanceError: string;
     endpointInvalid: string;
+    /** Stable error-code → localized message maps. Domain layer returns codes;
+     *  Provider Center looks up the user-facing string here. */
+    endpointErrors: {
+      "endpoint-required": string;
+      "endpoint-invalid-url": string;
+      "endpoint-must-https": string;
+    };
+    selectionErrors: {
+      "parallel-duplicate": string;
+      "parallel-contains-primary": string;
+      "role-overlap": string;
+      "disabled-in-slot": string;
+      "fallback-not-traditional": string;
+      "fallback-overlaps": string;
+    };
     setPrimary: string;
     addParallel: string;
     removeParallel: string;
@@ -187,6 +202,8 @@ export type LabStrings = {
     consentCancel: string;
     selectPrimary: string;
     duplicate: string;
+    /** Suffix appended to a duplicated provider's name, e.g. "OpenAI #1 (copy)". */
+    copySuffix: string;
     primary: string;
     fallback: string;
     parallel: string;
@@ -376,6 +393,19 @@ export const strings: Record<Locale, LabStrings> = {
       balanceRateLimited: "Rate limited — try later",
       balanceError: "Error fetching balance",
       endpointInvalid: "Must be HTTPS (or localhost)",
+      endpointErrors: {
+        "endpoint-required": "Endpoint is required",
+        "endpoint-invalid-url": "Invalid URL",
+        "endpoint-must-https": "Must be HTTPS (or localhost)",
+      },
+      selectionErrors: {
+        "parallel-duplicate": "Parallel list contains a duplicate provider",
+        "parallel-contains-primary": "Parallel list must not contain the primary provider",
+        "role-overlap": "A provider cannot hold two roles",
+        "disabled-in-slot": "Provider is disabled or deleted",
+        "fallback-not-traditional": "Fallback must be a traditional MT engine",
+        "fallback-overlaps": "Fallback must not overlap primary or parallel",
+      },
       setPrimary: "Set as primary",
       addParallel: "Add to parallel",
       removeParallel: "Remove from parallel",
@@ -386,6 +416,7 @@ export const strings: Record<Locale, LabStrings> = {
       consentCancel: "Cancel",
       selectPrimary: "Select a primary provider",
       duplicate: "Duplicate",
+      copySuffix: "(copy)",
       primary: "Primary",
       fallback: "Fallback",
       parallel: "Parallel",
@@ -570,6 +601,19 @@ export const strings: Record<Locale, LabStrings> = {
       balanceRateLimited: "限流 —— 请稍后重试",
       balanceError: "获取余额出错",
       endpointInvalid: "必须为 HTTPS（或 localhost）",
+      endpointErrors: {
+        "endpoint-required": "端点不能为空",
+        "endpoint-invalid-url": "URL 无效",
+        "endpoint-must-https": "必须为 HTTPS（或 localhost）",
+      },
+      selectionErrors: {
+        "parallel-duplicate": "并行列表包含重复服务商",
+        "parallel-contains-primary": "并行列表不得包含主引擎",
+        "role-overlap": "一个服务商不能同时担任两个角色",
+        "disabled-in-slot": "服务商已禁用或已删除",
+        "fallback-not-traditional": "回退必须是传统机器翻译引擎",
+        "fallback-overlaps": "回退不得与主引擎或并行重复",
+      },
       setPrimary: "设为主引擎",
       addParallel: "加入并行",
       removeParallel: "移出并行",
@@ -580,6 +624,7 @@ export const strings: Record<Locale, LabStrings> = {
       consentCancel: "取消",
       selectPrimary: "请选择主引擎",
       duplicate: "复制",
+      copySuffix: "（副本）",
       primary: "主引擎",
       fallback: "回退",
       parallel: "并行",

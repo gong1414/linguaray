@@ -56,14 +56,18 @@ export type ActiveSelection = {
   fallbackUuid: string | null;
 };
 
+export type ActiveSelectionErrorCode =
+  | "parallel-duplicate"
+  | "parallel-contains-primary"
+  | "role-overlap"
+  | "disabled-in-slot"
+  | "fallback-not-traditional"
+  | "fallback-overlaps";
+
 export type ActiveSelectionError = {
-  code:
-    | "parallel-duplicate"
-    | "parallel-contains-primary"
-    | "role-overlap"
-    | "disabled-in-slot"
-    | "fallback-not-traditional"
-    | "fallback-overlaps";
+  code: ActiveSelectionErrorCode;
+  /** Stable, non-localized developer message — NEVER shown to users.
+   *  UI must map `code` through i18n. Kept for debugging/tests only. */
   message: string;
 };
 
@@ -272,19 +276,33 @@ export function resolveConsentKey(
 
 // --- Endpoint validator ---------------------------------------------------
 
+/** Stable, non-localized error code for endpoint validation.
+ *  UI maps this through i18n. NEVER render the raw code to users. */
+export type EndpointErrorCode =
+  | "endpoint-required"
+  | "endpoint-invalid-url"
+  | "endpoint-must-https";
+
+export type EndpointValidationResult =
+  | { ok: true }
+  | { ok: false; code: EndpointErrorCode };
+
 /**
  * Validates a provider endpoint. Global HTTPS; HTTP only for exact loopback
  * hosts (localhost, 127.0.0.1, [::1]). Rejects localhost.evil.com etc.
+ *
+ * Returns a STABLE ERROR CODE (not a display string) — the caller must map
+ * `code` through the i18n dictionary before showing it to users.
  */
-export function validateEndpoint(endpoint: string): { ok: boolean; error?: string } {
+export function validateEndpoint(endpoint: string): EndpointValidationResult {
   const trimmed = endpoint.trim();
-  if (!trimmed) return { ok: false, error: "Endpoint is required" };
+  if (!trimmed) return { ok: false, code: "endpoint-required" };
 
   let url: URL;
   try {
     url = new URL(trimmed);
   } catch {
-    return { ok: false, error: "Invalid URL" };
+    return { ok: false, code: "endpoint-invalid-url" };
   }
 
   const protocol = url.protocol;
@@ -295,12 +313,9 @@ export function validateEndpoint(endpoint: string): { ok: boolean; error?: strin
     if (host === "localhost" || host === "127.0.0.1" || host === "[::1]") {
       return { ok: true };
     }
-    return {
-      ok: false,
-      error: "Must be HTTPS (or localhost)",
-    };
+    return { ok: false, code: "endpoint-must-https" };
   }
-  return { ok: false, error: "Must be HTTPS (or localhost)" };
+  return { ok: false, code: "endpoint-must-https" };
 }
 
 /** Normalizes an endpoint to its origin (scheme + host + port). */
