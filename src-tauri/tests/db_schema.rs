@@ -286,6 +286,9 @@ fn db_file_has_0600_perms() {
     use std::os::unix::fs::PermissionsExt;
     let dir = tempdir().unwrap();
     let db_path = dir.path().join("perm_test.db");
+    // Pre-loosen the file to 0644 so the test proves open() tightens it:
+    std::fs::write(&db_path, b"x").unwrap();
+    std::fs::set_permissions(&db_path, std::fs::Permissions::from_mode(0o644)).unwrap();
     let _db = Database::open(&db_path).unwrap();
     let perms = std::fs::metadata(&db_path).unwrap().permissions().mode();
     assert_eq!(perms & 0o777, 0o600, "DB file must have 0600 perms on Unix");
@@ -294,12 +297,18 @@ fn db_file_has_0600_perms() {
 #[cfg(unix)]
 #[test]
 fn db_dir_has_0700_perms() {
-    use std::os::unix::fs::PermissionsExt;
-    let dir = tempdir().unwrap();
-    let db_path = dir.path().join("perm_test.db");
+    use std::os::unix::fs::{PermissionsExt, DirBuilderExt};
+    // Create a dir explicitly at 0755 (NOT tempdir's default 0700) so the test
+    // proves Database::open tightens it:
+    let parent = tempdir().unwrap();
+    let dir = parent.path().join("loose_dir");
+    std::fs::DirBuilder::new().mode(0o755).create(&dir).unwrap();
+    assert_eq!(std::fs::metadata(&dir).unwrap().permissions().mode() & 0o777, 0o755,
+        "precondition: dir must start at 0755");
+    let db_path = dir.join("test.db");
     let _db = Database::open(&db_path).unwrap();
-    let perms = std::fs::metadata(dir.path()).unwrap().permissions().mode();
-    assert_eq!(perms & 0o777, 0o700, "DB dir must have 0700 perms on Unix");
+    let perms = std::fs::metadata(&dir).unwrap().permissions().mode();
+    assert_eq!(perms & 0o777, 0o700, "DB dir must have 0700 perms after open");
 }
 
 #[test]
@@ -420,4 +429,213 @@ fn uuid_v5_recovered_key_golden() {
         "f369b7e2-c69e-5960-a803-eeae81b79ad2",
         "recovered_key UUIDv5 golden vector mismatch"
     );
+}
+
+// ── Table-driven DDL constraint tests ─────────────────────────────────
+// Each row: a SQL INSERT/UPDATE that must be REJECTED by a CHECK constraint.
+// Proves the domain constraints are enforced at the DB level, preventing
+// drift if the DDL is ever modified.
+
+/// Helper: assert that the given SQL fails (constraint violation).
+fn assert_rejected(conn: &rusqlite::Connection, label: &str, sql: &str) {
+    let result = conn.execute(sql, []);
+    assert!(result.is_err(), "{label}: expected CHECK rejection, but it succeeded");
+}
+
+/// Helper: insert a minimal valid provider row for UPDATE-based tests.
+fn insert_valid_provider(conn: &rusqlite::Connection, uuid: &str, secret_ref: &str) {
+    conn.execute(
+        "INSERT INTO providers (uuid, template_id, name, protocol, endpoint, needs_key, secret_ref)
+         VALUES (?, 'openai', 'Test', 'openai_chat', 'https://a.com', 1, ?)",
+        rusqlite::params![uuid, secret_ref],
+    ).unwrap();
+}
+
+#[test]
+fn constraint_providers_protocol_check() {
+    let (_dir, db) = fresh_db();
+    db.with_conn(|conn| {
+        assert_rejected(conn, "invalid protocol", "INSERT INTO providers (uuid, template_id, name, protocol, endpoint, needs_key, secret_ref) VALUES ('u1', 't', 'N', 'bogus_proto', 'https://a.com', 1, 'r1')");
+        Ok(())
+    }).unwrap();
+}
+
+#[test]
+fn constraint_providers_status_check() {
+    let (_dir, db) = fresh_db();
+    db.with_conn(|conn| {
+        insert_valid_provider(conn, "u1", "r1");
+        assert_rejected(conn, "invalid status", "UPDATE providers SET status='bogus' WHERE uuid='u1'");
+        Ok(())
+    }).unwrap();
+}
+
+#[test]
+fn constraint_providers_boolean_columns_check() {
+    let (_dir, db) = fresh_db();
+    db.with_conn(|conn| {
+        assert_rejected(conn, "enabled=2", "INSERT INTO providers (uuid, template_id, name, protocol, endpoint, enabled, needs_key, secret_ref) VALUES ('u1','t','N','openai_chat','https://a.com',2,1,'r1')");
+        assert_rejected(conn, "is_local=5", "INSERT INTO providers (uuid, template_id, name, protocol, endpoint, is_local, needs_key, secret_ref) VALUES ('u2','t','N','openai_chat','https://a.com',1,5,'r2')");
+        assert_rejected(conn, "needs_key=3", "INSERT INTO providers (uuid, template_id, name, protocol, endpoint, needs_key, secret_ref) VALUES ('u3','t','N','openai_chat','https://a.com',3,'r3')");
+        Ok(())
+    }).unwrap();
+}
+
+#[test]
+fn constraint_preferences_history_enabled_check() {
+    let (_dir, db) = fresh_db();
+    db.with_conn(|conn| {
+        assert_rejected(conn, "history_enabled=2", "UPDATE preferences SET history_enabled=2 WHERE id=1");
+        Ok(())
+    }).unwrap();
+}
+
+#[test]
+fn constraint_history_sessions_is_favorite_check() {
+    let (_dir, db) = fresh_db();
+    db.with_conn(|conn| {
+        assert_rejected(conn, "is_favorite=2",
+            "INSERT INTO history_sessions (session_uuid, timestamp, trigger_source, target_language, is_favorite, source_text_encrypted, source_text_nonce, crypto_version) VALUES ('s1',1,'selection','zh',2,X'AA',X'BB',1)");
+        Ok(())
+    }).unwrap();
+}
+
+#[test]
+fn constraint_schema_migrations_singleton_check() {
+    let (_dir, db) = fresh_db();
+    db.with_conn(|conn| {
+        assert_rejected(conn, "id=2 in _schema_migrations", "INSERT INTO _schema_migrations (id, schema_version, migration_complete) VALUES (2, 1, 0)");
+        Ok(())
+    }).unwrap();
+}
+
+#[test]
+fn constraint_preferences_singleton_check() {
+    let (_dir, db) = fresh_db();
+    db.with_conn(|conn| {
+        assert_rejected(conn, "id=2 in preferences", "INSERT INTO preferences (id) VALUES (2)");
+        Ok(())
+    }).unwrap();
+}
+
+#[test]
+fn constraint_history_failure_partial_nonce_only_rejected() {
+    let (_dir, db) = fresh_db();
+    db.with_conn(|conn| {
+        conn.execute(
+            "INSERT INTO history_sessions (session_uuid, timestamp, trigger_source, target_language, is_favorite, source_text_encrypted, source_text_nonce, crypto_version) VALUES ('s1',1,'selection','zh',0,X'AA',X'BB',1)", [])?;
+        // failure with error_message_nonce but NO ciphertext → rejected:
+        assert_rejected(conn, "nonce without ciphertext",
+            "INSERT INTO history_results (result_uuid, session_uuid, provider_uuid, provider_name_snapshot, engine_id, elapsed_ms, outcome_tag, error_kind, error_message_nonce, crypto_version) VALUES ('r1','s1','p1','OpenAI','openai',100,'failure','Network',X'12',1)");
+        Ok(())
+    }).unwrap();
+}
+
+#[test]
+fn constraint_history_failure_partial_ciphertext_only_rejected() {
+    let (_dir, db) = fresh_db();
+    db.with_conn(|conn| {
+        conn.execute(
+            "INSERT INTO history_sessions (session_uuid, timestamp, trigger_source, target_language, is_favorite, source_text_encrypted, source_text_nonce, crypto_version) VALUES ('s1',1,'selection','zh',0,X'AA',X'BB',1)", [])?;
+        // failure with error_message_ciphertext but NO nonce → rejected:
+        assert_rejected(conn, "ciphertext without nonce",
+            "INSERT INTO history_results (result_uuid, session_uuid, provider_uuid, provider_name_snapshot, engine_id, elapsed_ms, outcome_tag, error_kind, error_message_encrypted, crypto_version) VALUES ('r1','s1','p1','OpenAI','openai',100,'failure','Network',X'34',1)");
+        Ok(())
+    }).unwrap();
+}
+
+// ── Windows end-to-end DB ACL verification ────────────────────────────
+// Proves Database::open() actually applies the protected DACL to BOTH the
+// directory and the DB file — not just that the helper works in isolation.
+
+#[cfg(windows)]
+#[test]
+fn win32_db_open_secures_dir_and_file() {
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::Foundation::LocalFree;
+    use windows_sys::Win32::Security::Authorization::{GetNamedSecurityInfoW, SE_FILE_OBJECT};
+    use windows_sys::Win32::Security::{
+        AclSizeInformation, GetAclInformation, GetAce, GetSecurityDescriptorControl,
+        ACL_SIZE_INFORMATION, DACL_SECURITY_INFORMATION, OWNER_SECURITY_INFORMATION,
+        PSECURITY_DESCRIPTOR, SE_DACL_PROTECTED, ACL,
+    };
+    const ACCESS_ALLOWED: u8 = 0;
+
+    let dir = tempfile::tempdir().unwrap();
+    let db_path = dir.path().join("test.db");
+    let _db = Database::open(&db_path).unwrap();
+
+    // Expected SID (same source prod path used):
+    let sid_buf = linguaray_lib::fs_acl::current_user_sid().unwrap();
+    let expected_sid = linguaray_lib::fs_acl::sid_from_token_user_buf(&sid_buf).unwrap();
+
+    // Verify BOTH dir and file:
+    for path in [dir.path(), db_path.as_path()] {
+        let path_wide: Vec<u16> = path.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
+        let mut dacl: *mut ACL = std::ptr::null_mut();
+        let mut sd: PSECURITY_DESCRIPTOR = std::ptr::null_mut();
+        let rc = unsafe {
+            GetNamedSecurityInfoW(
+                path_wide.as_ptr(), SE_FILE_OBJECT,
+                DACL_SECURITY_INFORMATION | OWNER_SECURITY_INFORMATION,
+                std::ptr::null_mut(), std::ptr::null_mut(),
+                &mut dacl, std::ptr::null_mut(), &mut sd,
+            )
+        };
+        assert_eq!(rc, 0, "GetNamedSecurityInfoW failed for {:?}", path);
+        struct SdGuard(PSECURITY_DESCRIPTOR);
+        impl Drop for SdGuard {
+            fn drop(&mut self) { unsafe { LocalFree(self.0 as *mut _) }; }
+        }
+        let _guard = SdGuard(sd);
+
+        // DACL is PROTECTED (no inheritance from parent):
+        let mut control: u16 = 0;
+        let mut revision: u32 = 0;
+        unsafe { GetSecurityDescriptorControl(sd, &mut control, &mut revision); }
+        assert_ne!(control & SE_DACL_PROTECTED, 0, "DACL must be PROTECTED for {:?}", path);
+
+        // Exactly ONE ACE:
+        let mut acl_info = ACL_SIZE_INFORMATION::default();
+        unsafe { GetAclInformation(dacl, &mut acl_info as *mut _ as *mut _, std::mem::size_of::<ACL_SIZE_INFORMATION>(), AclSizeInformation); }
+        assert_eq!(acl_info.AceCount, 1, "exactly 1 ACE for {:?}", path);
+
+        // ACE is ACCESS_ALLOWED for the current user:
+        let mut ace: *mut std::ffi::c_void = std::ptr::null_mut();
+        unsafe { GetAce(dacl, 0, &mut ace); }
+        let ace_header = unsafe { &*(ace as *const [u8; 4]) };
+        assert_eq!(ace_header[0], ACCESS_ALLOWED, "ACE must be ACCESS_ALLOWED for {:?}", path);
+    }
+
+    // Directory ACE must be inheritable; file ACE must NOT be:
+    // (Check the inheritance flags on the directory's ACE)
+    let dir_wide: Vec<u16> = dir.path().as_os_str().encode_wide().chain(std::iter::once(0)).collect();
+    let mut dir_dacl: *mut ACL = std::ptr::null_mut();
+    let mut dir_sd: PSECURITY_DESCRIPTOR = std::ptr::null_mut();
+    unsafe {
+        GetNamedSecurityInfoW(dir_wide.as_ptr(), SE_FILE_OBJECT,
+            DACL_SECURITY_INFORMATION, std::ptr::null_mut(), std::ptr::null_mut(),
+            &mut dir_dacl, std::ptr::null_mut(), &mut dir_sd);
+    }
+    let mut dir_ace: *mut std::ffi::c_void = std::ptr::null_mut();
+    unsafe { GetAce(dir_dacl, 0, &mut dir_ace); }
+    // ACE_HEADER = { AceType: u8, AceFlags: u8, AceSize: u16 }
+    let dir_flags = unsafe { *(dir_ace.add(1) as *const u8) };
+    // SUB_CONTAINERS_AND_OBJECTS_INHERIT = 0x3
+    assert_ne!(dir_flags & 0x3, 0, "directory ACE must be inheritable");
+    unsafe { LocalFree(dir_sd as *mut _); }
+
+    let file_wide: Vec<u16> = db_path.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
+    let mut file_dacl: *mut ACL = std::ptr::null_mut();
+    let mut file_sd: PSECURITY_DESCRIPTOR = std::ptr::null_mut();
+    unsafe {
+        GetNamedSecurityInfoW(file_wide.as_ptr(), SE_FILE_OBJECT,
+            DACL_SECURITY_INFORMATION, std::ptr::null_mut(), std::ptr::null_mut(),
+            &mut file_dacl, std::ptr::null_mut(), &mut file_sd);
+    }
+    let mut file_ace: *mut std::ffi::c_void = std::ptr::null_mut();
+    unsafe { GetAce(file_dacl, 0, &mut file_ace); }
+    let file_flags = unsafe { *(file_ace.add(1) as *const u8) };
+    assert_eq!(file_flags & 0x3, 0, "file ACE must NOT be inheritable");
+    unsafe { LocalFree(file_sd as *mut _); }
 }

@@ -66,7 +66,7 @@ pub fn secure_file(path: &Path) -> Result<(), AclError> {
 // Extracted verbatim from keystore.rs; the keystore now delegates here.
 
 #[cfg(windows)]
-pub(crate) fn current_user_sid() -> Result<Vec<u8>, AclError> {
+pub fn current_user_sid() -> Result<Vec<u8>, AclError> {
     use windows_sys::Win32::Foundation::{CloseHandle, HANDLE};
     use windows_sys::Win32::Security::{GetTokenInformation, TOKEN_QUERY, TokenUser};
     use windows_sys::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
@@ -102,7 +102,7 @@ pub(crate) fn current_user_sid() -> Result<Vec<u8>, AclError> {
 }
 
 #[cfg(windows)]
-pub(crate) fn sid_from_token_user_buf(buf: &[u8]) -> Result<windows_sys::Win32::Security::PSID, AclError> {
+pub fn sid_from_token_user_buf(buf: &[u8]) -> Result<windows_sys::Win32::Security::PSID, AclError> {
     use windows_sys::Win32::Security::TOKEN_USER;
     if buf.len() < std::mem::size_of::<TOKEN_USER>() {
         return Err(AclError::Win32("token buffer too small for TOKEN_USER".into()));
@@ -111,9 +111,6 @@ pub(crate) fn sid_from_token_user_buf(buf: &[u8]) -> Result<windows_sys::Win32::
     Ok(user.User.Sid)
 }
 
-/// Windows: set owner = current-user SID + protected DACL with one ACE
-/// (current user, GENERIC_ALL). `inherit` controls whether the ACE propagates
-/// to children (true for directories, false for files).
 /// Windows: set owner = current-user SID + protected DACL with one ACE
 /// (current user, GENERIC_ALL). `inherit` controls whether the ACE propagates
 /// to children (true for directories, false for files). Pub(crate) so the
