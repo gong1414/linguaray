@@ -208,12 +208,11 @@
   z-index: 5;
 }
 
-/* Reorder controls sit beside the card in a top row (handle + card + arrows).
- * No absolute positioning → no overlap with card content. */
+/* Reorder controls — inside the card action bar, pushed to the right edge. */
 .pc__reorder-controls {
   display: flex;
   gap: var(--space-xs);
-  flex: 0 0 auto;
+  margin-left: auto;
 }
 
 /* Role actions: a single non-wrapping row that scrolls if the sidebar is too
@@ -331,15 +330,20 @@
   z-index: 1000;
 }
 
-/* Main row: horizontal flex [handle | card | reorder arrows]. */
+/* Main row: horizontal flex [handle | card]. Card fills remaining width. */
 .pc__provider-main {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: var(--space-xs);
 }
 
-/* Provider list drag handle — inline in the main row, vertically centered
- * by the row's align-items: center. No absolute positioning needed. */
+/* Card fills the row width so it isn't squeezed by the handle. */
+.pc__provider-main .lr-provider-card {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Provider list drag handle — inline at the card's left, vertically centered. */
 .pc__drag-handle {
   flex: 0 0 auto;
   display: inline-flex;

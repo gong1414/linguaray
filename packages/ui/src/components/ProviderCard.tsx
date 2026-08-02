@@ -1,4 +1,4 @@
-import { Show, Switch as FlowSwitch, Match, type Component } from "solid-js";
+import { Show, Switch as FlowSwitch, Match, type Component, type JSX } from "solid-js";
 import { Check, AlertTriangle, Server, Pencil, Trash2 } from "lucide-solid";
 import Switch from "./Switch";
 import "./ProviderCard.css";
@@ -54,6 +54,10 @@ export type ProviderCardProps = {
   onEdit: (triggerEl?: HTMLElement) => void;
   onDelete: (triggerEl?: HTMLElement) => void;
   labels?: Partial<ProviderCardLabels>;
+  /** Extra actions rendered at the end of the card's action bar (e.g. reorder
+   *  arrows). Lets the page keep all controls inside the full-width card
+   *  instead of squeezing the card between external handle + arrows. */
+  extraActions?: JSX.Element;
   class?: string;
 };
 
@@ -164,6 +168,7 @@ const ProviderCard: Component<ProviderCardProps> = (props) => {
         >
           <Trash2 size={14} aria-hidden="true" />
         </button>
+        {props.extraActions}
       </div>
     </div>
   );
