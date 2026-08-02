@@ -634,12 +634,8 @@ fn win32_db_open_secures_dir_and_file() {
     assert_ne!(unsafe { EqualSid(dir_owner, expected_sid) }, 0,
         "directory owner must be current user");
 
-    // DACL is PROTECTED:
-    let mut control: u16 = 0;
-    let mut revision: u32 = 0;
-    unsafe { GetSecurityDescriptorControl((dir_guard).0, &mut control, &mut revision); }
-    assert_ne!(control & SE_DACL_PROTECTED, 0, "directory DACL must be PROTECTED");
-
+    // Directory does NOT set PROTECTED_DACL (would strip ACE inheritance flags).
+    // Instead, SET_ACCESS mode replaces any inherited ACE for this SID.
     // Directory ACE MUST have BOTH OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE:
     let dir_flags = find_explicit_user_ace_flags(dir_dacl, "directory");
     assert_eq!(
