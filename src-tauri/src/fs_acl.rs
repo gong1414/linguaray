@@ -138,10 +138,8 @@ pub(crate) fn set_win32_owner_dacl(path: &Path, inherit: bool) -> Result<(), Acl
     let sid_buf = current_user_sid()?;
     let sid: PSID = sid_from_token_user_buf(&sid_buf)?;
 
-    // Build the ACL manually (not via SetEntriesInAclW) so AceFlags are set
-    // directly and survive SetNamedSecurityInfoW.
-    // Max ACL size for 1 ACE: header (8) + ACE header (4) + mask (4) + SID (max ~68) = ~84.
-    // Round up to 128 for safety.
+    // Build the ACL manually (InitializeAcl + AddAccessAllowedAceEx) so AceFlags
+    // are set directly.
     const ACL_BUF_SIZE: usize = 128;
     let mut acl_buf: [u8; ACL_BUF_SIZE] = [0u8; ACL_BUF_SIZE];
     let acl: *mut ACL = acl_buf.as_mut_ptr() as *mut ACL;
@@ -150,7 +148,6 @@ pub(crate) fn set_win32_owner_dacl(path: &Path, inherit: bool) -> Result<(), Acl
         return Err(AclError::Win32("InitializeAcl failed".into()));
     }
 
-    // AceFlags: directory gets OBJECT_INHERIT | CONTAINER_INHERIT; file gets 0.
     let ace_flags = if inherit {
         OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE
     } else {
@@ -162,23 +159,38 @@ pub(crate) fn set_win32_owner_dacl(path: &Path, inherit: bool) -> Result<(), Acl
     }
 
     let path_wide: Vec<u16> = path.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
-    let info: OBJECT_SECURITY_INFORMATION = OWNER_SECURITY_INFORMATION
-        | DACL_SECURITY_INFORMATION
-        | PROTECTED_DACL_SECURITY_INFORMATION;
+
+    // Step 1: Set owner + DACL (WITHOUT PROTECTED_DACL — that flag causes
+    // SetNamedSecurityInfoW to strip inheritance bits from ACEs).
+    let info: OBJECT_SECURITY_INFORMATION = OWNER_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION;
     let rc = unsafe {
         SetNamedSecurityInfoW(
-            path_wide.as_ptr(),
-            SE_FILE_OBJECT,
-            info,
-            sid,
-            std::ptr::null_mut(),
-            acl,
-            std::ptr::null_mut(),
+            path_wide.as_ptr(), SE_FILE_OBJECT, info,
+            sid, std::ptr::null_mut(),
+            acl, std::ptr::null_mut(),
         )
     };
     if rc != 0 {
         return Err(AclError::Win32(format!(
-            "SetNamedSecurityInfoW failed: Win32 error {rc}"
+            "SetNamedSecurityInfoW (owner+dacl) failed: Win32 error {rc}"
+        )));
+    }
+
+    // Step 2: Set the DACL PROTECTED bit separately — pass ONLY
+    // PROTECTED_DACL_SECURITY_INFORMATION (not DACL_SECURITY_INFORMATION) so
+    // SetNamedSecurityInfoW toggles the control flag without rewriting the
+    // DACL content (and thus without stripping ACE inheritance flags).
+    let rc = unsafe {
+        SetNamedSecurityInfoW(
+            path_wide.as_ptr(), SE_FILE_OBJECT,
+            PROTECTED_DACL_SECURITY_INFORMATION,
+            std::ptr::null_mut(), std::ptr::null_mut(),
+            std::ptr::null_mut(), std::ptr::null_mut(),
+        )
+    };
+    if rc != 0 {
+        return Err(AclError::Win32(format!(
+            "SetNamedSecurityInfoW (PROTECTED) failed: Win32 error {rc}"
         )));
     }
     Ok(())
