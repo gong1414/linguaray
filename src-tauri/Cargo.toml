@@ -55,6 +55,8 @@ fs2 = "0.4"
 thiserror = "1"
 log = "0.4"
 url = "2"
+rusqlite = { version = "0.40", features = ["bundled"] }
+uuid = { version = "1", features = ["v4", "v5"] }
 tauri-plugin-global-shortcut = "2"
 mouse_position = "0.1"
 arboard = "3"
@@ -98,3 +100,4 @@ objc2-app-kit = { version = "0.3", features = [
 wiremock = "0.6"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 tempfile = "3"
+crossbeam-channel = "0.5"

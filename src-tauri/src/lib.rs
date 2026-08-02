@@ -25,6 +25,9 @@ pub mod selection_engine;
 pub mod service;
 pub mod settings;
 pub mod wire;
+pub mod db;
+pub mod fs_acl;
+pub mod uuid_util;
 
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
