@@ -1,2 +1,8 @@
 node_modules
 dist
+
+# UI Lab review screenshots (local verification evidence, not source)
+s1b-shots/
+
+# ZCode agent runtime artifacts
+.zcode/

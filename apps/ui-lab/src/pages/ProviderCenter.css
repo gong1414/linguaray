@@ -1,0 +1,367 @@
+/* ProviderCenter — S0 §4.3 + §8.3.
+ * Settings shell: nav rail (icon-only at 600-699px) + content area.
+ * Content area: provider sidebar + detail panel side-by-side. */
+
+.pc__body {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--color-bg);
+}
+
+/* Settings shell — the container query target */
+.pc__settings-shell {
+  display: flex;
+  flex-direction: row;
+  flex: 1 1 auto;
+  min-height: 0;
+  container-type: inline-size;
+}
+
+/* Settings nav rail */
+.pc__settings-rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-md) var(--space-sm);
+  width: 180px;
+  flex: 0 0 auto;
+  border-right: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+  overflow-y: auto;
+}
+
+.pc__rail-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  color: var(--color-fg-muted);
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+
+.pc__rail-item:hover {
+  background: var(--color-bg-hover);
+}
+
+.pc__rail-item--active {
+  background: var(--color-bg-selected);
+  color: var(--color-selected-fg);
+}
+
+.pc__rail-item[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.pc__rail-item__label {
+  font-size: var(--text-sm);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.pc__content {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Container query: 600-699px → icon-only rail */
+@container (max-width: 699px) {
+  .pc__settings-rail {
+    width: 48px;
+    padding: var(--space-md) var(--space-xs);
+    align-items: center;
+  }
+  .pc__rail-item {
+    justify-content: center;
+    padding: var(--space-sm);
+  }
+  .pc__rail-item__label {
+    display: none;
+  }
+}
+
+/* Container query: ≥700px → full labels */
+@container (min-width: 700px) {
+  .pc__settings-rail {
+    width: 180px;
+  }
+  .pc__rail-item__label {
+    display: inline;
+  }
+}
+
+/* Preset grid (add-provider) */
+.pc__preset-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: var(--space-sm);
+  padding: var(--space-sm) 0;
+}
+
+.pc__preset {
+  justify-content: flex-start !important;
+  padding: 0 var(--space-md) !important;
+  width: 100% !important;
+  height: var(--height-md) !important;
+  font-size: var(--text-sm);
+}
+
+/* Consent list in dialog */
+.pc__consent-list {
+  list-style: none;
+  margin: var(--space-sm) 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.pc__consent-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--text-sm);
+  color: var(--color-fg);
+}
+
+.pc__consent-origin {
+  color: var(--color-fg-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.pc__consent-local {
+  margin-left: auto;
+  font-size: var(--text-xs);
+  color: var(--color-fg-muted);
+}
+
+.pc__layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-md);
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: var(--space-lg);
+  overflow: auto;
+}
+
+/* Sidebar */
+.pc__sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: var(--space-sm);
+}
+
+.pc__sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  flex: 0 0 auto;
+}
+
+.pc__sidebar-title {
+  font-size: var(--text-md);
+  font-weight: var(--text-md--weight);
+  line-height: var(--text-md--line-height);
+  color: var(--color-fg);
+  margin: 0;
+}
+
+.pc__provider-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+/* Provider row: horizontal flex [handle | card | reorder arrows].
+ * Role-action icon buttons live INSIDE the card's action bar (via
+ * ProviderCard.extraActions), not as a separate row below. */
+.pc__provider-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  position: relative;
+}
+
+.pc__provider-row[data-status="deleting"] {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.pc__deleting-overlay {
+  position: absolute;
+  top: var(--space-sm);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+}
+
+/* Reorder arrows — outside the card, stacked vertically on the row's right.
+ * flex: 0 0 auto so they never get squeezed/clipped. */
+.pc__reorder-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 0 0 auto;
+  justify-content: center;
+}
+
+/* Detail panel */
+.pc__detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-md);
+  background: var(--color-bg-elevated);
+  border-radius: var(--radius-md);
+}
+
+.pc__detail-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.pc__detail-title {
+  font-size: var(--text-lg);
+  font-weight: var(--text-lg--weight);
+  line-height: var(--text-lg--line-height);
+  color: var(--color-fg);
+  margin: 0;
+}
+
+.pc__select-primary {
+  font-size: var(--text-sm);
+  color: var(--color-fg-muted);
+  text-align: center;
+  padding: var(--space-2xl);
+}
+
+.pc__key-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.pc__key-saved {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  color: var(--color-success-fg);
+  font-size: var(--text-sm);
+}
+
+.pc__conn-section {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.pc__conn-ok {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--color-success-fg);
+  font-size: var(--text-sm);
+}
+
+.pc__conn-fail {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--color-destructive-fg);
+  font-size: var(--text-sm);
+}
+
+.pc__balance-section {
+  font-size: var(--text-sm);
+  color: var(--color-fg-muted);
+}
+
+/* Conflict banner + delete retry */
+.pc__conflict-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  background: var(--color-warning-fill);
+  color: var(--color-on-warning-fill);
+  font-size: var(--text-sm);
+}
+
+.pc__delete-retry {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  background: var(--color-destructive-fill);
+  color: var(--color-on-destructive-fill);
+  font-size: var(--text-sm);
+}
+
+/* Toasts */
+.pc__toasts {
+  position: fixed;
+  bottom: var(--space-lg);
+  right: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  z-index: 1000;
+}
+
+/* Main row: horizontal flex [handle | card]. Card fills remaining width. */
+.pc__provider-main {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-xs);
+}
+
+/* Card fills the row width so it isn't squeezed by the handle. */
+.pc__provider-main .lr-provider-card {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Provider list drag handle — inline at the card's left, vertically centered. */
+.pc__drag-handle {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  cursor: grab;
+  opacity: 0.4;
+  transition: opacity var(--duration-fast) var(--ease-standard);
+}
+
+.pc__provider-row:hover .pc__drag-handle,
+.pc__provider-row:focus-within .pc__drag-handle {
+  opacity: 1;
+}
+
+.pc__provider-row--dragging {
+  opacity: 0.4;
+}
+
+.pc__provider-row--drag-over-before {
+  border-top: 2px solid var(--color-primary-fill);
+}
+
+.pc__provider-row--drag-over-after {
+  border-bottom: 2px solid var(--color-primary-fill);
+}

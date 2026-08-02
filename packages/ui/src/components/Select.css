@@ -1,0 +1,147 @@
+/* Select — MASTER §7. Wraps Kobalte Select (unstyled). Trigger styled like
+ * TextField; dropdown = bg-elevated + shadow-md. */
+
+.lr-select {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  width: 100%;
+}
+
+.lr-select__label {
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+  color: var(--color-fg);
+  font-weight: var(--text-md--weight);
+}
+
+/* Trigger — mirrors TextField control styling */
+.lr-select__trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  width: 100%;
+  height: var(--height-md);
+  padding: 0 var(--space-md);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-base);
+  line-height: var(--text-base--line-height);
+  color: var(--color-fg);
+  cursor: pointer;
+  transition: border-color var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard);
+}
+
+.lr-select--lg .lr-select__trigger {
+  height: var(--height-lg);
+}
+
+.lr-select__trigger:hover {
+  background: var(--color-bg-hover);
+}
+
+/* §6 focus: keyboard-only ring via Kobante's data-focus */
+.lr-select__trigger[data-focus] {
+  border-color: var(--color-ring);
+  box-shadow: 0 0 0 2px var(--color-ring);
+  outline: none;
+}
+
+.lr-select__trigger:disabled,
+.lr-select__trigger[aria-busy="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.lr-select__value {
+  flex: 1 1 auto;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lr-select__value--placeholder {
+  color: var(--color-fg-muted);
+}
+
+.lr-select__icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-fg-muted);
+  transition: transform var(--duration-fast) var(--ease-standard);
+}
+
+.lr-select__trigger[aria-expanded="true"] .lr-select__icon {
+  transform: rotate(180deg);
+}
+
+/* Dropdown content */
+.lr-select__content {
+  background: var(--color-bg-elevated);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-sm);
+  min-width: var(--kb-select-content-transform-origin);
+  max-height: 240px;
+  overflow-y: auto;
+  z-index: 1000;
+  /* Reduced-motion guard */
+  animation: lr-select-fade var(--duration-fast) var(--ease-out);
+}
+
+@keyframes lr-select-fade {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.lr-select__listbox {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  outline: none;
+}
+
+.lr-select__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+  color: var(--color-fg);
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+
+.lr-select__item[data-highlighted] {
+  background: var(--color-bg-hover);
+}
+
+.lr-select__item[data-selected] {
+  background: var(--color-bg-selected);
+  color: var(--color-selected-fg);
+}
+
+.lr-select__item-indicator {
+  flex: 0 0 auto;
+  color: var(--color-selected-fg);
+}
+
+.lr-select__description {
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+  color: var(--color-fg-muted);
+}
+
+.lr-select__error {
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+  color: var(--color-destructive-fg);
+}

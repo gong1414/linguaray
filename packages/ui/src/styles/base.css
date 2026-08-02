@@ -1,0 +1,57 @@
+/**
+ * Base element + interaction rules shared by all components.
+ * Implements MASTER §6 (focus ring) and §5 (reduced-motion).
+ */
+
+.lr-u-surface {
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--text-base--line-height);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* §6 Focus — opaque ring, :focus-visible only. Apply to every focusable. */
+.lr-focusable:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
+}
+
+/* §5 Reduced motion — durations collapse to 1ms, animations play once.
+   Spinner exception handled in Spinner.css (static icon + text fallback). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 1ms !important;
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/* Lab/testing hook: [data-motion="reduced"] forces reduced-motion rendering
+   even when the OS prefers motion (lets ui-lab exercise the branch). Mirrors
+   the media query exactly so visual behavior matches the real query. */
+[data-motion="reduced"] *,
+[data-motion="reduced"] *::before,
+[data-motion="reduced"] *::after {
+  transition-duration: 1ms !important;
+  animation-duration: 1ms !important;
+  animation-iteration-count: 1 !important;
+}
+
+/* VisuallyHidden — keep content in the a11y tree, remove from visual layout. */
+.lr-visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  clip-path: inset(50%) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
