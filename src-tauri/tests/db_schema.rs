@@ -612,7 +612,7 @@ fn win32_db_open_secures_dir_and_file() {
         let mut found_user_ace = false;
         for i in 0..acl_info.AceCount {
             let mut ace: *mut std::ffi::c_void = std::ptr::null_mut();
-            unsafe { GetAce(dacl, i as u32, &mut ace); }
+            unsafe { GetAce(dacl, i, &mut ace); }
             if ace.is_null() { continue; }
             let ace_header = unsafe { &*(ace as *const [u8; 4]) };
             if ace_header[0] != ACCESS_ALLOWED { continue; }
