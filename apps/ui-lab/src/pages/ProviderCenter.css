@@ -208,20 +208,15 @@
   z-index: 5;
 }
 
-/* Reorder controls — inside the card action bar, pushed to the right edge. */
-.pc__reorder-controls {
-  display: flex;
-  gap: var(--space-xs);
-  margin-left: auto;
-}
-
-/* Role actions: a single non-wrapping row that scrolls if the sidebar is too
- * narrow — prevents ugly wrapping/multi-line button stacks. */
-.pc__role-actions {
-  display: flex;
-  flex-wrap: nowrap;
-  gap: var(--space-xs);
-  overflow-x: auto;
+/* Reorder divider — separates role/duplicate actions from reorder arrows. */
+.pc__reorder-divider {
+  display: inline-block;
+  width: 1px;
+  height: 16px;
+  margin: 0 var(--space-xs);
+  background: var(--color-border);
+  flex: 0 0 auto;
+  align-self: center;
 }
 
 /* Detail panel */

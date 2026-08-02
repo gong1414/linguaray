@@ -33,13 +33,11 @@ describe("Provider Center — role overlap is prevented", () => {
     render(() => <App />);
     goToProviderCenter();
     clickStateChip("Connection OK");
-    // Google is fallback by default. Find its "Set as primary" button and click.
+    // Google is fallback by default. Find its "Set as primary" icon button (aria-label) and click.
     const googleRow = document.querySelector('[data-template="google"]')?.closest(".pc__provider-row");
-    const setPrimaryBtn = googleRow?.querySelector('button[aria-label]')?.parentElement?.querySelector('button:not([disabled])');
-    // Use the Set as primary button within Google's row
-    const setPrimaryBtns = googleRow?.querySelectorAll("button");
-    const primaryBtn = [...(setPrimaryBtns ?? [])].find((b) => b.textContent === "Set as primary");
-    if (primaryBtn) fireEvent.click(primaryBtn);
+    const primaryBtn = googleRow?.querySelector('button[aria-label="Set as primary"]') as HTMLElement | null;
+    expect(primaryBtn, "Set as primary button must exist for Google").toBeTruthy();
+    fireEvent.click(primaryBtn!);
     // Google should now be primary, NOT fallback
     const googleCardAfter = document.querySelector('[data-template="google"]');
     expect(googleCardAfter?.getAttribute("data-role")).toBe("primary");
@@ -424,10 +422,9 @@ describe("Provider Center — focus restores to a valid target on dialog close",
     const { container } = render(() => <App />);
     goToProviderCenter();
     clickStateChip("Connection OK");
-    // Open the consent dialog by adding a parallel provider
-    const addParBtn = [...container.querySelectorAll("button")]
-      .find((b) => b.textContent === "Add to parallel");
-    expect(addParBtn).toBeTruthy();
+    // Open the consent dialog by adding a parallel provider (icon button, aria-label)
+    const addParBtn = container.querySelector('button[aria-label="Add to parallel"]') as HTMLElement | null;
+    expect(addParBtn, "Add to parallel button must exist").toBeTruthy();
     fireEvent.click(addParBtn!);
     await new Promise((r) => setTimeout(r, 30));
     expect(screen.getByText(strings.en.provider.consentTitle)).toBeTruthy();
