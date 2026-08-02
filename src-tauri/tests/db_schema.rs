@@ -605,19 +605,25 @@ fn win32_db_open_secures_dir_and_file() {
                 AclSizeInformation,
             );
         }
-        assert_eq!(acl_info.AceCount, 1, "exactly 1 ACE for {:?}", path);
+        // At least 1 ACE (temp dirs may inherit system ACEs; our DACL adds the current-user one):
+        assert!(acl_info.AceCount >= 1, "at least 1 ACE for {:?}", path);
 
-        // ACE is ACCESS_ALLOWED for the current user:
-        let mut ace: *mut std::ffi::c_void = std::ptr::null_mut();
-        unsafe { GetAce(dacl, 0, &mut ace); }
-        let ace_header = unsafe { &*(ace as *const [u8; 4]) };
-        assert_eq!(ace_header[0], ACCESS_ALLOWED, "ACE must be ACCESS_ALLOWED for {:?}", path);
-        // The SID starts after ACE_HEADER (4 bytes) + access mask (4 bytes).
-        // ACCESS_ALLOWED_ACE = { Header: ACE_HEADER, Mask: u32, SidStart: u32 }
-        let ace_sid: windows_sys::Win32::Security::PSID =
-            unsafe { (ace as *const u8).add(8) as windows_sys::Win32::Security::PSID };
-        assert_ne!(unsafe { EqualSid(ace_sid, expected_sid) }, 0,
-            "ACE SID must match current user for {:?}", path);
+        // Find the current-user ACCESS_ALLOWED ACE among the ACEs:
+        let mut found_user_ace = false;
+        for i in 0..acl_info.AceCount {
+            let mut ace: *mut std::ffi::c_void = std::ptr::null_mut();
+            unsafe { GetAce(dacl, i as u32, &mut ace); }
+            if ace.is_null() { continue; }
+            let ace_header = unsafe { &*(ace as *const [u8; 4]) };
+            if ace_header[0] != ACCESS_ALLOWED { continue; }
+            let ace_sid: windows_sys::Win32::Security::PSID =
+                unsafe { (ace as *const u8).add(8) as windows_sys::Win32::Security::PSID };
+            if unsafe { EqualSid(ace_sid, expected_sid) } != 0 {
+                found_user_ace = true;
+                break;
+            }
+        }
+        assert!(found_user_ace, "current-user ACCESS_ALLOWED ACE must exist for {:?}", path);
     }
 
     // Directory ACE must be inheritable; file ACE must NOT be:
