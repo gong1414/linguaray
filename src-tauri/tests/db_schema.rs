@@ -3,7 +3,6 @@
 
 use linguaray_lib::db::{Database, DbError};
 use linguaray_lib::db::schema;
-use rusqlite::OptionalExtension;
 use tempfile::tempdir;
 
 /// Helper: open a fresh DB in a temp dir and run create_all_tables + seed_singletons.
@@ -269,4 +268,156 @@ fn invalid_migration_complete_value_is_rejected() {
             other => panic!("expected Integrity error for value=5, got {other:?}"),
         }
     }).unwrap();
+}
+
+#[test]
+fn busy_timeout_is_5000() {
+    let (_dir, db) = fresh_db();
+    db.with_conn(|conn| {
+        let timeout: i64 = conn.pragma_query_value(None, "busy_timeout", |r| r.get(0))?;
+        assert_eq!(timeout, 5000, "PRAGMA busy_timeout must be 5000ms");
+        Ok(())
+    }).unwrap();
+}
+
+#[cfg(unix)]
+#[test]
+fn db_file_has_0600_perms() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = tempdir().unwrap();
+    let db_path = dir.path().join("perm_test.db");
+    let _db = Database::open(&db_path).unwrap();
+    let perms = std::fs::metadata(&db_path).unwrap().permissions().mode();
+    assert_eq!(perms & 0o777, 0o600, "DB file must have 0600 perms on Unix");
+}
+
+#[cfg(unix)]
+#[test]
+fn db_dir_has_0700_perms() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = tempdir().unwrap();
+    let db_path = dir.path().join("perm_test.db");
+    let _db = Database::open(&db_path).unwrap();
+    let perms = std::fs::metadata(dir.path()).unwrap().permissions().mode();
+    assert_eq!(perms & 0o777, 0o700, "DB dir must have 0700 perms on Unix");
+}
+
+#[test]
+fn fk_cascade_deletes_history_results() {
+    let (_dir, db) = fresh_db();
+    db.with_conn(|conn| {
+        // Insert a session + 2 results.
+        conn.execute(
+            "INSERT INTO history_sessions (session_uuid, timestamp, trigger_source, target_language,
+             is_favorite, source_text_encrypted, source_text_nonce, crypto_version)
+             VALUES ('s1', 1, 'selection', 'zh', 0, X'AABB', X'CCDD', 1)", [],
+        )?;
+        conn.execute(
+            "INSERT INTO history_results (result_uuid, session_uuid, provider_uuid,
+             provider_name_snapshot, engine_id, elapsed_ms, outcome_tag,
+             result_text_encrypted, result_text_nonce, crypto_version)
+             VALUES ('r1', 's1', 'p1', 'OpenAI', 'openai', 100, 'success', X'12', X'34', 1)", [],
+        )?;
+        conn.execute(
+            "INSERT INTO history_results (result_uuid, session_uuid, provider_uuid,
+             provider_name_snapshot, engine_id, elapsed_ms, outcome_tag,
+             result_text_encrypted, result_text_nonce, crypto_version)
+             VALUES ('r2', 's1', 'p2', 'DeepSeek', 'deepseek', 200, 'success', X'56', X'78', 1)", [],
+        )?;
+        // Delete the session → results must cascade-delete.
+        conn.execute("DELETE FROM history_sessions WHERE session_uuid='s1'", [])?;
+        let remaining: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM history_results WHERE session_uuid='s1'", [], |r| r.get(0)
+        )?;
+        assert_eq!(remaining, 0, "FK ON DELETE CASCADE must remove child results");
+        Ok(())
+    }).unwrap();
+}
+
+#[test]
+fn history_failure_with_encrypted_error_is_valid() {
+    let (_dir, db) = fresh_db();
+    db.with_conn(|conn| {
+        conn.execute(
+            "INSERT INTO history_sessions (session_uuid, timestamp, trigger_source, target_language,
+             is_favorite, source_text_encrypted, source_text_nonce, crypto_version)
+             VALUES ('s3', 1, 'selection', 'zh', 0, X'AABB', X'CCDD', 1)", [],
+        )?;
+        // failure with encrypted error message (both ciphertext + nonce present) — valid.
+        conn.execute(
+            "INSERT INTO history_results (result_uuid, session_uuid, provider_uuid,
+             provider_name_snapshot, engine_id, elapsed_ms, outcome_tag,
+             error_kind, error_message_encrypted, error_message_nonce, crypto_version)
+             VALUES ('r3', 's3', 'p1', 'OpenAI', 'openai', 100, 'failure',
+                     'RateLimit', X'EEFF', X'0011', 1)", [],
+        )?;
+        let count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM history_results WHERE result_uuid='r3'", [], |r| r.get(0)
+        )?;
+        assert_eq!(count, 1, "failure with encrypted error message should be valid");
+        Ok(())
+    }).unwrap();
+}
+
+#[test]
+fn history_failure_with_plaintext_error_only_is_valid() {
+    let (_dir, db) = fresh_db();
+    db.with_conn(|conn| {
+        conn.execute(
+            "INSERT INTO history_sessions (session_uuid, timestamp, trigger_source, target_language,
+             is_favorite, source_text_encrypted, source_text_nonce, crypto_version)
+             VALUES ('s4', 1, 'selection', 'zh', 0, X'AABB', X'CCDD', 1)", [],
+        )?;
+        // failure with plaintext error only (no encrypted detail) — valid.
+        conn.execute(
+            "INSERT INTO history_results (result_uuid, session_uuid, provider_uuid,
+             provider_name_snapshot, engine_id, elapsed_ms, outcome_tag,
+             error_kind, crypto_version)
+             VALUES ('r4', 's4', 'p1', 'OpenAI', 'openai', 100, 'failure',
+                     'AuthFailed', 1)", [],
+        )?;
+        let count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM history_results WHERE result_uuid='r4'", [], |r| r.get(0)
+        )?;
+        assert_eq!(count, 1, "failure with plaintext error only should be valid");
+        Ok(())
+    }).unwrap();
+}
+
+// ── UUIDv5 golden vectors ─────────────────────────────────────────────
+// Hardcoded expected values so namespace/prefix drift is caught immediately
+// (not just "same function call twice = equal").
+
+#[test]
+fn uuid_v5_legacy_openai_golden() {
+    use linguaray_lib::uuid_util::legacy_provider_uuid;
+    let uuid = legacy_provider_uuid("openai");
+    // Golden: deterministic UUIDv5 — if this changes, the namespace or prefix drifted.
+    assert_eq!(
+        uuid.to_string(),
+        "aacdfcbf-c622-5299-9184-4a216ec8de91",
+        "openai legacy UUIDv5 golden vector mismatch — check NAMESPACE_LINGUARAY or prefix"
+    );
+}
+
+#[test]
+fn uuid_v5_legacy_anthropic_golden() {
+    use linguaray_lib::uuid_util::legacy_provider_uuid;
+    let uuid = legacy_provider_uuid("anthropic");
+    assert_eq!(
+        uuid.to_string(),
+        "531dda9f-b498-5535-8c8f-c2c4798adf93",
+        "anthropic legacy UUIDv5 golden vector mismatch"
+    );
+}
+
+#[test]
+fn uuid_v5_recovered_key_golden() {
+    use linguaray_lib::uuid_util::recovered_key_uuid;
+    let uuid = recovered_key_uuid("provider/abc-123");
+    assert_eq!(
+        uuid.to_string(),
+        "f369b7e2-c69e-5960-a803-eeae81b79ad2",
+        "recovered_key UUIDv5 golden vector mismatch"
+    );
 }
