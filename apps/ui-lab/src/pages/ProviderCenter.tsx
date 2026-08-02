@@ -694,6 +694,15 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
     // Must set dataTransfer or some browsers won't initiate the drag
     e.dataTransfer?.setData("text/plain", uuid);
     e.dataTransfer!.effectAllowed = "move";
+    // Use the whole provider row as the drag image (not just the tiny handle
+    // icon, which floats detached at the cursor's top-left). Offset is set so
+    // the ghost roughly tracks the grab point. Note: some Chromium WebViews
+    // (incl. some IABs) ignore setDragImage entirely — in that case the native
+    // ghost is unavoidable here and must be checked in the production WebView.
+    const row = (e.currentTarget as HTMLElement).closest(".pc__provider-row") as HTMLElement | null;
+    if (row && e.dataTransfer?.setDragImage) {
+      e.dataTransfer.setDragImage(row, e.offsetX, e.offsetY);
+    }
     setDraggedUuid(uuid);
   };
   const handleDragOver = (e: DragEvent, uuid: string) => {
@@ -927,54 +936,53 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
                         <Spinner size={16} label={props.t.deleting} />
                       </div>
                     </Show>
-                    {/* Drag handle — draggable is HERE, not on the row */}
-                    <button
-                      type="button"
-                      class="pc__drag-handle lr-focusable"
-                      aria-label={props.t.dragHandle}
-                      draggable={p.status === "active" && !reorderPending()}
-                      disabled={p.status !== "active" || reorderPending()}
-                      onDragStart={(e: DragEvent) => handleDragStart(e, p.uuid)}
-                      onDragEnd={() => handleDragEnd()}
-                    >
-                      <GripVertical size={16} aria-hidden="true" />
-                    </button>
-                    <ProviderCard
-                      profile={{ name: p.name, template: p.template, status: p.status }}
-                      hasKey={p.hasKey}
-                      role={roleFor(p.uuid)}
-                      enabled={p.enabled}
-                      onToggle={(en) => handleToggle(p.uuid, en)}
-                      onEdit={() => handleEdit(p.uuid)}
-                      onDelete={(triggerEl) => handleDelete(p.uuid, triggerEl)}
-                      labels={cardLabels()}
-                    />
-                    {/* Reorder controls — buttons with aria-label (accessible
-                        name). Tooltip omitted to avoid nested-interactive
-                        (Kobante Trigger renders its own focusable wrapper). */}
-                    <div class="pc__reorder-controls">
+                    {/* Main row: [handle | card | reorder arrows] horizontal,
+                        no overlap. Handle is draggable (not the whole row). */}
+                    <div class="pc__provider-main">
                       <button
                         type="button"
-                        class="lr-icon-btn lr-focusable lr-icon-btn--ghost lr-icon-btn--sm"
-                        aria-label={props.t.moveUp}
-                        title={props.t.moveUp}
-                        disabled={index() === 0 || p.status === "deleting" || reorderPending()}
-                        onClick={() => moveProvider(p.uuid, "up")}
+                        class="pc__drag-handle lr-focusable"
+                        aria-label={props.t.dragHandle}
+                        draggable={p.status === "active" && !reorderPending()}
+                        disabled={p.status !== "active" || reorderPending()}
+                        onDragStart={(e: DragEvent) => handleDragStart(e, p.uuid)}
+                        onDragEnd={() => handleDragEnd()}
                       >
-                        <ArrowUp size={14} aria-hidden="true" />
+                        <GripVertical size={16} aria-hidden="true" />
                       </button>
-                      <button
-                        type="button"
-                        class="lr-icon-btn lr-focusable lr-icon-btn--ghost lr-icon-btn--sm"
-                        aria-label={props.t.moveDown}
-                        title={props.t.moveDown}
-                        disabled={index() === sortedProviders().length - 1 || p.status === "deleting" || reorderPending()}
-                        onClick={() => moveProvider(p.uuid, "down")}
-                      >
-                        <ArrowDown size={14} aria-hidden="true" />
-                      </button>
+                      <ProviderCard
+                        profile={{ name: p.name, template: p.template, status: p.status }}
+                        hasKey={p.hasKey}
+                        role={roleFor(p.uuid)}
+                        enabled={p.enabled}
+                        onToggle={(en) => handleToggle(p.uuid, en)}
+                        onEdit={() => handleEdit(p.uuid)}
+                        onDelete={(triggerEl) => handleDelete(p.uuid, triggerEl)}
+                        labels={cardLabels()}
+                      />
+                      {/* Reorder controls — aria-label gives accessible name */}
+                      <div class="pc__reorder-controls">
+                        <button
+                          type="button"
+                          class="lr-icon-btn lr-focusable lr-icon-btn--ghost lr-icon-btn--sm"
+                          aria-label={props.t.moveUp}
+                          disabled={index() === 0 || p.status === "deleting" || reorderPending()}
+                          onClick={() => moveProvider(p.uuid, "up")}
+                        >
+                          <ArrowUp size={14} aria-hidden="true" />
+                        </button>
+                        <button
+                          type="button"
+                          class="lr-icon-btn lr-focusable lr-icon-btn--ghost lr-icon-btn--sm"
+                          aria-label={props.t.moveDown}
+                          disabled={index() === sortedProviders().length - 1 || p.status === "deleting" || reorderPending()}
+                          onClick={() => moveProvider(p.uuid, "down")}
+                        >
+                          <ArrowDown size={14} aria-hidden="true" />
+                        </button>
+                      </div>
                     </div>
-                    {/* Role / action menu */}
+                    {/* Role / action buttons — separate non-wrapping row below */}
                     <div class="pc__role-actions">
                       <Show when={roleFor(p.uuid).kind !== "primary" && p.enabled}>
                         <Button variant="ghost" size="sm" onClick={() => handleSetPrimary(p.uuid)}>

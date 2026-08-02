@@ -185,10 +185,13 @@
   gap: var(--space-md);
 }
 
+/* Provider row: horizontal flex [handle | card | reorder], then role-actions
+ * below as a separate non-wrapping row. Nothing is absolutely positioned over
+ * the card, so there is no overlap. Role-actions can scroll-x if too narrow. */
 .pc__provider-row {
   display: flex;
   flex-direction: column;
-  gap: var(--space-sm);
+  gap: var(--space-xs);
   position: relative;
 }
 
@@ -205,18 +208,21 @@
   z-index: 5;
 }
 
+/* Reorder controls sit beside the card in a top row (handle + card + arrows).
+ * No absolute positioning → no overlap with card content. */
 .pc__reorder-controls {
   display: flex;
   gap: var(--space-xs);
-  position: absolute;
-  top: var(--space-sm);
-  right: var(--space-sm);
+  flex: 0 0 auto;
 }
 
+/* Role actions: a single non-wrapping row that scrolls if the sidebar is too
+ * narrow — prevents ugly wrapping/multi-line button stacks. */
 .pc__role-actions {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: var(--space-xs);
+  overflow-x: auto;
 }
 
 /* Detail panel */
@@ -325,14 +331,23 @@
   z-index: 1000;
 }
 
-/* Provider list drag handle + indicators */
+/* Main row: horizontal flex [handle | card | reorder arrows]. */
+.pc__provider-main {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+/* Provider list drag handle — inline in the main row, vertically centered
+ * by the row's align-items: center. No absolute positioning needed. */
 .pc__drag-handle {
-  position: absolute;
-  left: -20px;
-  top: 50%;
-  transform: translateY(-50%);
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
   cursor: grab;
-  opacity: 0;
+  opacity: 0.4;
   transition: opacity var(--duration-fast) var(--ease-standard);
 }
 
