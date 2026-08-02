@@ -552,117 +552,122 @@ fn constraint_history_failure_partial_ciphertext_only_rejected() {
 #[test]
 fn win32_db_open_secures_dir_and_file() {
     use std::os::windows::ffi::OsStrExt;
-    use windows_sys::Win32::Foundation::LocalFree;
+    use windows_sys::Win32::Foundation::{LocalFree, PSID};
     use windows_sys::Win32::Security::Authorization::{GetNamedSecurityInfoW, SE_FILE_OBJECT};
     use windows_sys::Win32::Security::{
         AclSizeInformation, EqualSid, GetAclInformation, GetAce, GetSecurityDescriptorControl,
         ACL_SIZE_INFORMATION, DACL_SECURITY_INFORMATION, OWNER_SECURITY_INFORMATION,
         PSECURITY_DESCRIPTOR, SE_DACL_PROTECTED, ACL,
     };
-    const ACCESS_ALLOWED: u8 = 0;
-    const INHERITED_ACE_FLAG: u8 = 0x10;
+
+    // ACE type + flag constants (from Win32 SDK):
+    const ACCESS_ALLOWED_ACE_TYPE: u8 = 0;
+    const INHERITED_ACE: u8 = 0x10;
+    const CONTAINER_INHERIT_ACE: u8 = 0x02;
+    const OBJECT_INHERIT_ACE: u8 = 0x01;
 
     let dir = tempfile::tempdir().unwrap();
     let db_path = dir.path().join("test.db");
     let _db = Database::open(&db_path).unwrap();
 
-    // Expected SID (same source prod path used):
+    // Expected SID (same source the production path used):
     let sid_buf = linguaray_lib::fs_acl::current_user_sid().unwrap();
     let expected_sid = linguaray_lib::fs_acl::sid_from_token_user_buf(&sid_buf).unwrap();
 
-    // Verify BOTH dir and file:
-    for path in [dir.path(), db_path.as_path()] {
+    // Helper: query the security descriptor for a path, returning (owner_sid, dacl, sd_guard).
+    // The caller must keep the returned sd alive until done (LocalFree on drop).
+    struct SdGuard(PSECURITY_DESCRIPTOR);
+    impl Drop for SdGuard {
+        fn drop(&mut self) { unsafe { LocalFree(self.0 as *mut _) }; }
+    }
+
+    let query_sd = |path: &std::path::Path| -> (PSID, *mut ACL, SdGuard) {
         let path_wide: Vec<u16> = path.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
+        let mut owner: PSID = std::ptr::null_mut();
         let mut dacl: *mut ACL = std::ptr::null_mut();
         let mut sd: PSECURITY_DESCRIPTOR = std::ptr::null_mut();
         let rc = unsafe {
             GetNamedSecurityInfoW(
                 path_wide.as_ptr(), SE_FILE_OBJECT,
                 DACL_SECURITY_INFORMATION | OWNER_SECURITY_INFORMATION,
-                std::ptr::null_mut(), std::ptr::null_mut(),
+                &mut owner, std::ptr::null_mut(),
                 &mut dacl, std::ptr::null_mut(), &mut sd,
             )
         };
         assert_eq!(rc, 0, "GetNamedSecurityInfoW failed for {:?}", path);
-        struct SdGuard(PSECURITY_DESCRIPTOR);
-        impl Drop for SdGuard {
-            fn drop(&mut self) { unsafe { LocalFree(self.0 as *mut _) }; }
-        }
-        let _guard = SdGuard(sd);
+        (owner, dacl, SdGuard(sd))
+    };
 
-        // DACL is PROTECTED (no inheritance from parent):
-        let mut control: u16 = 0;
-        let mut revision: u32 = 0;
-        unsafe { GetSecurityDescriptorControl(sd, &mut control, &mut revision); }
-        assert_ne!(control & SE_DACL_PROTECTED, 0, "DACL must be PROTECTED for {:?}", path);
-
-        // Exactly ONE ACE:
-        let mut acl_info = ACL_SIZE_INFORMATION { AceCount: 0, AclBytesInUse: 0, AclBytesFree: 0 };
+    // Helper: find the EXPLICIT (non-inherited) current-user ACCESS_ALLOWED ACE.
+    // Returns its AceFlags byte, or panics if not found.
+    let find_explicit_user_ace_flags = |dacl: *mut ACL, label: &str| -> u8 {
+        let mut info = ACL_SIZE_INFORMATION { AceCount: 0, AclBytesInUse: 0, AclBytesFree: 0 };
         unsafe {
             GetAclInformation(
-                dacl,
-                &mut acl_info as *mut _ as *mut _,
-                std::mem::size_of::<ACL_SIZE_INFORMATION>() as u32,
-                AclSizeInformation,
+                dacl, &mut info as *mut _ as *mut _,
+                std::mem::size_of::<ACL_SIZE_INFORMATION>() as u32, AclSizeInformation,
             );
         }
-        // At least 1 ACE (temp dirs may inherit system ACEs; our DACL adds the current-user one):
-        assert!(acl_info.AceCount >= 1, "at least 1 ACE for {:?}", path);
-
-        // Find the current-user ACCESS_ALLOWED ACE among the ACEs:
-        let mut found_user_ace = false;
-        for i in 0..acl_info.AceCount {
+        for i in 0..info.AceCount {
             let mut ace: *mut std::ffi::c_void = std::ptr::null_mut();
             unsafe { GetAce(dacl, i, &mut ace); }
             if ace.is_null() { continue; }
-            let ace_header = unsafe { &*(ace as *const [u8; 4]) };
-            if ace_header[0] != ACCESS_ALLOWED { continue; }
-            let ace_sid: windows_sys::Win32::Security::PSID =
-                unsafe { (ace as *const u8).add(8) as windows_sys::Win32::Security::PSID };
+            let header = unsafe { &*(ace as *const [u8; 4]) };
+            let ace_type = header[0];
+            let ace_flags = header[1];
+            // Must be ACCESS_ALLOWED + NOT inherited (explicit, set by our code):
+            if ace_type != ACCESS_ALLOWED_ACE_TYPE { continue; }
+            if ace_flags & INHERITED_ACE != 0 { continue; }
+            // SID starts at offset 8 (ACE_HEADER 4 + Mask 4):
+            let ace_sid: PSID = unsafe { (ace as *const u8).add(8) as PSID };
             if unsafe { EqualSid(ace_sid, expected_sid) } != 0 {
-                found_user_ace = true;
-                break;
+                return ace_flags;
             }
         }
-        assert!(found_user_ace, "current-user ACCESS_ALLOWED ACE must exist for {:?}", path);
-    }
+        panic!("no explicit current-user ACCESS_ALLOWED ACE found on {}", label);
+    };
 
-    // Verify the file's explicit ACE is NOT inheritable (leaf):
-    let file_wide: Vec<u16> = db_path.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
-    let mut file_dacl: *mut ACL = std::ptr::null_mut();
-    let mut file_sd: PSECURITY_DESCRIPTOR = std::ptr::null_mut();
-    unsafe {
-        GetNamedSecurityInfoW(file_wide.as_ptr(), SE_FILE_OBJECT,
-            DACL_SECURITY_INFORMATION, std::ptr::null_mut(), std::ptr::null_mut(),
-            &mut file_dacl, std::ptr::null_mut(), &mut file_sd);
-    }
-    let mut file_info = ACL_SIZE_INFORMATION { AceCount: 0, AclBytesInUse: 0, AclBytesFree: 0 };
-    unsafe {
-        GetAclInformation(file_dacl, &mut file_info as *mut _ as *mut _,
-            std::mem::size_of::<ACL_SIZE_INFORMATION>() as u32, AclSizeInformation);
-    }
-    // Find the file's explicit current-user ACE and verify it's NOT inheritable:
-    let mut file_not_inheritable = false;
-    for i in 0..file_info.AceCount {
-        let mut ace: *mut std::ffi::c_void = std::ptr::null_mut();
-        unsafe { GetAce(file_dacl, i, &mut ace); }
-        if ace.is_null() { continue; }
-        let flags = unsafe { *(ace.add(1) as *const u8) };
-        if flags & INHERITED_ACE_FLAG != 0 { continue; } // skip inherited
-        let ace_sid: windows_sys::Win32::Security::PSID =
-            unsafe { (ace as *const u8).add(8) as windows_sys::Win32::Security::PSID };
-        if unsafe { EqualSid(ace_sid, expected_sid) } != 0 {
-            assert_eq!(flags & 0x3, 0, "file explicit ACE must NOT be inheritable");
-            file_not_inheritable = true;
-            break;
-        }
-    }
-    unsafe { LocalFree(file_sd as *mut _); }
-    assert!(file_not_inheritable, "file must have an explicit current-user ACE");
+    // ── Verify directory ──
+    let (dir_owner, dir_dacl, dir_guard) = query_sd(dir.path());
 
-    // Directory inheritance is verified by the keystore helper unit test
-    // (set_win32_owner_dacl with inherit=true). Database::open calls the same
-    // helper, so the function-level coverage is sufficient. The file-level
-    // check above proves the non-inheritable path; the inheritable path is
-    // the same code with a different flag.
+    // Owner is the current user:
+    assert_ne!(unsafe { EqualSid(dir_owner, expected_sid) }, 0,
+        "directory owner must be current user");
+
+    // DACL is PROTECTED:
+    let mut control: u16 = 0;
+    let mut revision: u32 = 0;
+    unsafe { GetSecurityDescriptorControl((dir_guard).0, &mut control, &mut revision); }
+    assert_ne!(control & SE_DACL_PROTECTED, 0, "directory DACL must be PROTECTED");
+
+    // Directory ACE must have BOTH OBJECT_INHERIT + CONTAINER_INHERIT:
+    let dir_flags = find_explicit_user_ace_flags(dir_dacl, "directory");
+    assert_eq!(
+        dir_flags & (OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE),
+        OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE,
+        "directory ACE must be inheritable (OBJECT + CONTAINER)"
+    );
+    drop(dir_guard);
+
+    // ── Verify database file ──
+    let (file_owner, file_dacl, file_guard) = query_sd(&db_path);
+
+    // Owner is the current user:
+    assert_ne!(unsafe { EqualSid(file_owner, expected_sid) }, 0,
+        "file owner must be current user");
+
+    // DACL is PROTECTED:
+    let mut control: u16 = 0;
+    let mut revision: u32 = 0;
+    unsafe { GetSecurityDescriptorControl((file_guard).0, &mut control, &mut revision); }
+    assert_ne!(control & SE_DACL_PROTECTED, 0, "file DACL must be PROTECTED");
+
+    // File ACE must NOT be inheritable (leaf):
+    let file_flags = find_explicit_user_ace_flags(file_dacl, "file");
+    assert_eq!(
+        file_flags & (OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE),
+        0,
+        "file ACE must NOT be inheritable"
+    );
+    drop(file_guard);
 }
