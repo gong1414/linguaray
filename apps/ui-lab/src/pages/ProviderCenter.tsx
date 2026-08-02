@@ -936,9 +936,9 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
                         <Spinner size={16} label={props.t.deleting} />
                       </div>
                     </Show>
-                    {/* Main row: [handle | card]. Card takes full width; reorder
-                        arrows live inside the card's action bar via extraActions.
-                        Handle is draggable (not the whole row). */}
+                    {/* Main row: [handle | card | reorder]. Reorder arrows are
+                        OUTSIDE the card (on the row's right edge) so they never
+                        get clipped by the card's action-bar overflow. */}
                     <div class="pc__provider-main">
                       <button
                         type="button"
@@ -1018,29 +1018,31 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
                             >
                               <Copy size={14} aria-hidden="true" />
                             </button>
-                            {/* Reorder arrows — pushed to the right edge */}
-                            <span class="pc__reorder-divider" aria-hidden="true" />
-                            <button
-                              type="button"
-                              class="lr-icon-btn lr-focusable lr-icon-btn--ghost lr-icon-btn--sm"
-                              aria-label={props.t.moveUp}
-                              disabled={index() === 0 || p.status === "deleting" || reorderPending()}
-                              onClick={() => moveProvider(p.uuid, "up")}
-                            >
-                              <ArrowUp size={14} aria-hidden="true" />
-                            </button>
-                            <button
-                              type="button"
-                              class="lr-icon-btn lr-focusable lr-icon-btn--ghost lr-icon-btn--sm"
-                              aria-label={props.t.moveDown}
-                              disabled={index() === sortedProviders().length - 1 || p.status === "deleting" || reorderPending()}
-                              onClick={() => moveProvider(p.uuid, "down")}
-                            >
-                              <ArrowDown size={14} aria-hidden="true" />
-                            </button>
                           </>
                         }
                       />
+                      {/* Reorder arrows — outside the card, on the row's right.
+                          Vertical stack so they take minimal horizontal space. */}
+                      <div class="pc__reorder-controls">
+                        <button
+                          type="button"
+                          class="lr-icon-btn lr-focusable lr-icon-btn--ghost lr-icon-btn--sm"
+                          aria-label={props.t.moveUp}
+                          disabled={index() === 0 || p.status === "deleting" || reorderPending()}
+                          onClick={() => moveProvider(p.uuid, "up")}
+                        >
+                          <ArrowUp size={14} aria-hidden="true" />
+                        </button>
+                        <button
+                          type="button"
+                          class="lr-icon-btn lr-focusable lr-icon-btn--ghost lr-icon-btn--sm"
+                          aria-label={props.t.moveDown}
+                          disabled={index() === sortedProviders().length - 1 || p.status === "deleting" || reorderPending()}
+                          onClick={() => moveProvider(p.uuid, "down")}
+                        >
+                          <ArrowDown size={14} aria-hidden="true" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}

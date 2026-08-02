@@ -116,11 +116,27 @@
 .lr-provider-card__actions {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
+  gap: var(--space-xs);
 }
 
 .lr-provider-card__toggle {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
+  gap: var(--space-xs);
+  margin-right: auto; /* push icon actions to the right edge */
+}
+
+/* In the card's narrow action bar, hide the switch's visible text label
+ * (still readable by screen readers via Kobante's Label). This saves ~60px
+ * so the icon buttons fit without overflow. */
+.lr-provider-card__toggle .lr-switch__label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }

@@ -208,15 +208,14 @@
   z-index: 5;
 }
 
-/* Reorder divider — separates role/duplicate actions from reorder arrows. */
-.pc__reorder-divider {
-  display: inline-block;
-  width: 1px;
-  height: 16px;
-  margin: 0 var(--space-xs);
-  background: var(--color-border);
+/* Reorder arrows — outside the card, stacked vertically on the row's right.
+ * flex: 0 0 auto so they never get squeezed/clipped. */
+.pc__reorder-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   flex: 0 0 auto;
-  align-self: center;
+  justify-content: center;
 }
 
 /* Detail panel */
