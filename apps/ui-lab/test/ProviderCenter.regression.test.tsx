@@ -485,6 +485,58 @@ describe("Provider Center — Settings rail uses shared Tooltip", () => {
   });
 });
 
+// --- Role-action icon buttons have Tooltip (P1) ---------------------------
+
+describe("Provider Center — role-action icons show Tooltip on focus", () => {
+  afterEach(() => cleanup());
+
+  it("Set-as-primary icon is a single button with no nested interactive", () => {
+    render(() => <App />);
+    goToProviderCenter();
+    clickStateChip("Drag to reorder");
+    // Google is traditional + fallback by default; find a Set-as-primary button
+    const btn = document.querySelector('button[aria-label="Set as primary"]') as HTMLElement | null;
+    expect(btn).toBeTruthy();
+    expect(btn.tagName).toBe("BUTTON");
+    // No nested button (Tooltip as="button" renders trigger AS the button)
+    expect(btn.querySelector("button")).toBeNull();
+  });
+
+  it("focusing Set-as-primary opens a Tooltip with aria-describedby linkage", async () => {
+    render(() => <App />);
+    goToProviderCenter();
+    clickStateChip("Drag to reorder");
+    const btn = document.querySelector('button[aria-label="Set as primary"]') as HTMLElement;
+    // Before focus: no tooltip content rendered
+    expect(document.body.querySelector(".lr-tooltip__content")).toBeNull();
+    // Focus opens the tooltip (Kobante opens on focus OR hover)
+    btn.focus();
+    await new Promise((r) => setTimeout(r, 0));
+    const content = document.body.querySelector(".lr-tooltip__content") as HTMLElement | null;
+    expect(content).toBeTruthy();
+    expect(content?.textContent).toContain("Set as primary");
+    // aria-describedby on the trigger must point to the tooltip content's id
+    const describedById = btn.getAttribute("aria-describedby");
+    expect(typeof describedById).toBe("string");
+    expect(describedById!.length).toBeGreaterThan(0);
+    expect(content?.id).toBe(describedById);
+  });
+
+  it("Duplicate icon Tooltip shows the duplicate label", async () => {
+    render(() => <App />);
+    goToProviderCenter();
+    clickStateChip("Drag to reorder");
+    const btn = document.querySelector('button[aria-label="Duplicate"]') as HTMLElement;
+    expect(btn).toBeTruthy();
+    btn.focus();
+    await new Promise((r) => setTimeout(r, 0));
+    const content = document.body.querySelector(".lr-tooltip__content") as HTMLElement | null;
+    expect(content?.textContent).toContain("Duplicate");
+    const describedById = btn.getAttribute("aria-describedby");
+    expect(content?.id).toBe(describedById);
+  });
+});
+
 
 // --- All-23-state zh automated scan (P1) ----------------------------------
 // Every ProviderState is exercised in zh locale and scanned for untranslated

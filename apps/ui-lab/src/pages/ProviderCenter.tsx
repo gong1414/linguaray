@@ -962,62 +962,84 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
                         labels={cardLabels()}
                         extraActions={
                           <>
-                            {/* Role actions — compact icon buttons with aria-label.
-                                Keeps all controls in one tidy action bar; no text
-                                buttons that wrap/misalign in a narrow sidebar. */}
+                            {/* Role actions — compact icon buttons, each wrapped
+                                in a Tooltip (as="button") so hover/focus shows the
+                                action name. Single native button per action (no
+                                nested interactive). aria-label is the accessible
+                                name; Tooltip content is the visible hint. */}
                             <Show when={roleFor(p.uuid).kind !== "primary" && p.enabled}>
-                              <button
-                                type="button"
-                                class="lr-icon-btn lr-focusable lr-icon-btn--ghost lr-icon-btn--sm"
-                                aria-label={props.t.setPrimary}
-                                disabled={p.status === "deleting"}
-                                onClick={() => handleSetPrimary(p.uuid)}
+                              <Tooltip
+                                as="button"
+                                content={props.t.setPrimary}
+                                triggerProps={{
+                                  type: "button",
+                                  class: "lr-icon-btn lr-focusable lr-icon-btn--ghost lr-icon-btn--sm",
+                                  "aria-label": props.t.setPrimary,
+                                  disabled: p.status === "deleting",
+                                  onClick: () => handleSetPrimary(p.uuid),
+                                }}
                               >
                                 <Star size={14} aria-hidden="true" />
-                              </button>
+                              </Tooltip>
                             </Show>
                             <Show when={roleFor(p.uuid).kind !== "parallel" && p.enabled}>
-                              <button
-                                type="button"
-                                class="lr-icon-btn lr-focusable lr-icon-btn--ghost lr-icon-btn--sm"
-                                aria-label={props.t.addParallel}
-                                disabled={p.status === "deleting"}
-                                onClick={(e) => handleAddParallel(p.uuid, e.currentTarget as HTMLElement)}
+                              <Tooltip
+                                as="button"
+                                content={props.t.addParallel}
+                                triggerProps={{
+                                  type: "button",
+                                  class: "lr-icon-btn lr-focusable lr-icon-btn--ghost lr-icon-btn--sm",
+                                  "aria-label": props.t.addParallel,
+                                  disabled: p.status === "deleting",
+                                  onClick: (e: MouseEvent) => handleAddParallel(p.uuid, (e.currentTarget as HTMLElement)),
+                                }}
                               >
                                 <Layers size={14} aria-hidden="true" />
-                              </button>
+                              </Tooltip>
                             </Show>
                             <Show when={roleFor(p.uuid).kind === "parallel"}>
-                              <button
-                                type="button"
-                                class="lr-icon-btn lr-focusable lr-icon-btn--ghost lr-icon-btn--sm"
-                                aria-label={props.t.removeParallel}
-                                disabled={p.status === "deleting"}
-                                onClick={() => handleRemoveParallel(p.uuid)}
+                              <Tooltip
+                                as="button"
+                                content={props.t.removeParallel}
+                                triggerProps={{
+                                  type: "button",
+                                  class: "lr-icon-btn lr-focusable lr-icon-btn--ghost lr-icon-btn--sm",
+                                  "aria-label": props.t.removeParallel,
+                                  disabled: p.status === "deleting",
+                                  onClick: () => handleRemoveParallel(p.uuid),
+                                }}
                               >
                                 <Minus size={14} aria-hidden="true" />
-                              </button>
+                              </Tooltip>
                             </Show>
                             <Show when={TRADITIONAL_TEMPLATES.has(p.template) && roleFor(p.uuid).kind !== "fallback" && p.enabled}>
-                              <button
-                                type="button"
-                                class="lr-icon-btn lr-focusable lr-icon-btn--ghost lr-icon-btn--sm"
-                                aria-label={props.t.setFallback}
-                                disabled={p.status === "deleting"}
-                                onClick={() => handleSetFallback(p.uuid)}
+                              <Tooltip
+                                as="button"
+                                content={props.t.setFallback}
+                                triggerProps={{
+                                  type: "button",
+                                  class: "lr-icon-btn lr-focusable lr-icon-btn--ghost lr-icon-btn--sm",
+                                  "aria-label": props.t.setFallback,
+                                  disabled: p.status === "deleting",
+                                  onClick: () => handleSetFallback(p.uuid),
+                                }}
                               >
                                 <CornerDownLeft size={14} aria-hidden="true" />
-                              </button>
+                              </Tooltip>
                             </Show>
-                            <button
-                              type="button"
-                              class="lr-icon-btn lr-focusable lr-icon-btn--ghost lr-icon-btn--sm"
-                              aria-label={props.t.duplicate}
-                              disabled={p.status === "deleting"}
-                              onClick={() => handleDuplicate(p.uuid)}
+                            <Tooltip
+                              as="button"
+                              content={props.t.duplicate}
+                              triggerProps={{
+                                type: "button",
+                                class: "lr-icon-btn lr-focusable lr-icon-btn--ghost lr-icon-btn--sm",
+                                "aria-label": props.t.duplicate,
+                                disabled: p.status === "deleting",
+                                onClick: () => handleDuplicate(p.uuid),
+                              }}
                             >
                               <Copy size={14} aria-hidden="true" />
-                            </button>
+                            </Tooltip>
                           </>
                         }
                       />

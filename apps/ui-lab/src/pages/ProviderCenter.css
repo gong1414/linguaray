@@ -185,9 +185,9 @@
   gap: var(--space-md);
 }
 
-/* Provider row: horizontal flex [handle | card | reorder], then role-actions
- * below as a separate non-wrapping row. Nothing is absolutely positioned over
- * the card, so there is no overlap. Role-actions can scroll-x if too narrow. */
+/* Provider row: horizontal flex [handle | card | reorder arrows].
+ * Role-action icon buttons live INSIDE the card's action bar (via
+ * ProviderCard.extraActions), not as a separate row below. */
 .pc__provider-row {
   display: flex;
   flex-direction: column;
