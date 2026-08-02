@@ -640,20 +640,13 @@ fn win32_db_open_secures_dir_and_file() {
     unsafe { GetSecurityDescriptorControl((dir_guard).0, &mut control, &mut revision); }
     assert_ne!(control & SE_DACL_PROTECTED, 0, "directory DACL must be PROTECTED");
 
-    // Directory ACE should ideally have OBJECT_INHERIT + CONTAINER_INHERIT (set
-    // via SUB_CONTAINERS_AND_OBJECTS_INHERIT in set_win32_owner_dacl). However,
-    // SetNamedSecurityInfoW with PROTECTED_DACL_SECURITY_INFORMATION may normalize
-    // the ACE flags on some Windows versions. Since the DACL is PROTECTED (blocks
-    // parent inheritance) and every child file gets its own explicit ACL via
-    // secure_file(), the security property holds regardless. We log but don't
-    // hard-fail on the inheritance bits for the directory:
+    // Directory ACE MUST have BOTH OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE:
     let dir_flags = find_explicit_user_ace_flags(dir_dacl, "directory");
-    let dir_inherit = dir_flags & (OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE);
-    if dir_inherit != (OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE) {
-        eprintln!("NOTE: directory ACE inheritance bits = {dir_inherit:#x} (expected 0x3). \
-            SetNamedSecurityInfoW with PROTECTED_DACL may normalize these. \
-            Security is not affected: DACL is PROTECTED + child files have explicit ACLs.");
-    }
+    assert_eq!(
+        dir_flags & (OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE),
+        OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE,
+        "directory ACE must be inheritable (OBJECT + CONTAINER) so child files inherit the ACE"
+    );
     drop(dir_guard);
 
     // ── Verify database file ──
@@ -677,4 +670,74 @@ fn win32_db_open_secures_dir_and_file() {
         "file ACE must NOT be inheritable"
     );
     drop(file_guard);
+}
+
+#[cfg(windows)]
+#[test]
+fn win32_dir_inheritance_propagates_to_child_file() {
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::Foundation::{LocalFree, PSID};
+    use windows_sys::Win32::Security::Authorization::{GetNamedSecurityInfoW, SE_FILE_OBJECT};
+    use windows_sys::Win32::Security::{
+        AclSizeInformation, EqualSid, GetAclInformation, GetAce,
+        ACL_SIZE_INFORMATION, DACL_SECURITY_INFORMATION, ACL,
+    };
+    const ACCESS_ALLOWED_ACE_TYPE: u8 = 0;
+
+    // Create a dir, secure it (with inheritance), then create a child file
+    // WITHOUT calling secure_file — the child must inherit the current-user ACE.
+    let dir = tempfile::tempdir().unwrap();
+    linguaray_lib::fs_acl::secure_dir(dir.path()).unwrap();
+
+    let child = dir.path().join("child.txt");
+    std::fs::write(&child, b"inherited?").unwrap();
+    // Deliberately do NOT call secure_file on the child.
+
+    // Expected SID:
+    let sid_buf = linguaray_lib::fs_acl::current_user_sid().unwrap();
+    let expected_sid = linguaray_lib::fs_acl::sid_from_token_user_buf(&sid_buf).unwrap();
+
+    // Query the child file's DACL:
+    let child_wide: Vec<u16> = child.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
+    let mut dacl: *mut ACL = std::ptr::null_mut();
+    let mut sd: *mut std::ffi::c_void = std::ptr::null_mut();
+    let rc = unsafe {
+        GetNamedSecurityInfoW(
+            child_wide.as_ptr(), SE_FILE_OBJECT,
+            DACL_SECURITY_INFORMATION,
+            std::ptr::null_mut(), std::ptr::null_mut(),
+            &mut dacl, std::ptr::null_mut(), &mut sd,
+        )
+    };
+    assert_eq!(rc, 0, "GetNamedSecurityInfoW failed for child file");
+    struct SdGuard(*mut std::ffi::c_void);
+    impl Drop for SdGuard {
+        fn drop(&mut self) { unsafe { LocalFree(self.0 as *mut _) }; }
+    }
+    let _guard = SdGuard(sd);
+
+    // Count ACEs + find the inherited current-user ACE:
+    let mut info = ACL_SIZE_INFORMATION { AceCount: 0, AclBytesInUse: 0, AclBytesFree: 0 };
+    unsafe {
+        GetAclInformation(
+            dacl, &mut info as *mut _ as *mut _,
+            std::mem::size_of::<ACL_SIZE_INFORMATION>() as u32, AclSizeInformation,
+        );
+    }
+    let mut found_inherited = false;
+    for i in 0..info.AceCount {
+        let mut ace: *mut std::ffi::c_void = std::ptr::null_mut();
+        unsafe { GetAce(dacl, i, &mut ace); }
+        if ace.is_null() { continue; }
+        let header = unsafe { &*(ace as *const [u8; 4]) };
+        if header[0] != ACCESS_ALLOWED_ACE_TYPE { continue; }
+        let ace_sid: PSID = unsafe { (ace as *const u8).add(8) as PSID };
+        if unsafe { EqualSid(ace_sid, expected_sid) } != 0 {
+            found_inherited = true;
+            break;
+        }
+    }
+    assert!(found_inherited,
+        "child file created in secured dir must inherit current-user ACCESS_ALLOWED ACE \
+         (directory ACE must have OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE)");
 }
