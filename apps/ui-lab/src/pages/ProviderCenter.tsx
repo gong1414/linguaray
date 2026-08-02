@@ -12,7 +12,7 @@ import {
   batch,
   type Component,
 } from "solid-js";
-import { Server, Plus, Copy, ArrowUp, ArrowDown, Check, X, Globe, GripVertical, Keyboard, Shield } from "lucide-solid";
+import { Server, Plus, Copy, ArrowUp, ArrowDown, Check, X, Globe, GripVertical, Keyboard, Shield, Star, Layers, CornerDownLeft, Minus } from "lucide-solid";
 import {
   ProviderCard,
   Button,
@@ -961,7 +961,65 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
                         onDelete={(triggerEl) => handleDelete(p.uuid, triggerEl)}
                         labels={cardLabels()}
                         extraActions={
-                          <div class="pc__reorder-controls">
+                          <>
+                            {/* Role actions — compact icon buttons with aria-label.
+                                Keeps all controls in one tidy action bar; no text
+                                buttons that wrap/misalign in a narrow sidebar. */}
+                            <Show when={roleFor(p.uuid).kind !== "primary" && p.enabled}>
+                              <button
+                                type="button"
+                                class="lr-icon-btn lr-focusable lr-icon-btn--ghost lr-icon-btn--sm"
+                                aria-label={props.t.setPrimary}
+                                disabled={p.status === "deleting"}
+                                onClick={() => handleSetPrimary(p.uuid)}
+                              >
+                                <Star size={14} aria-hidden="true" />
+                              </button>
+                            </Show>
+                            <Show when={roleFor(p.uuid).kind !== "parallel" && p.enabled}>
+                              <button
+                                type="button"
+                                class="lr-icon-btn lr-focusable lr-icon-btn--ghost lr-icon-btn--sm"
+                                aria-label={props.t.addParallel}
+                                disabled={p.status === "deleting"}
+                                onClick={(e) => handleAddParallel(p.uuid, e.currentTarget as HTMLElement)}
+                              >
+                                <Layers size={14} aria-hidden="true" />
+                              </button>
+                            </Show>
+                            <Show when={roleFor(p.uuid).kind === "parallel"}>
+                              <button
+                                type="button"
+                                class="lr-icon-btn lr-focusable lr-icon-btn--ghost lr-icon-btn--sm"
+                                aria-label={props.t.removeParallel}
+                                disabled={p.status === "deleting"}
+                                onClick={() => handleRemoveParallel(p.uuid)}
+                              >
+                                <Minus size={14} aria-hidden="true" />
+                              </button>
+                            </Show>
+                            <Show when={TRADITIONAL_TEMPLATES.has(p.template) && roleFor(p.uuid).kind !== "fallback" && p.enabled}>
+                              <button
+                                type="button"
+                                class="lr-icon-btn lr-focusable lr-icon-btn--ghost lr-icon-btn--sm"
+                                aria-label={props.t.setFallback}
+                                disabled={p.status === "deleting"}
+                                onClick={() => handleSetFallback(p.uuid)}
+                              >
+                                <CornerDownLeft size={14} aria-hidden="true" />
+                              </button>
+                            </Show>
+                            <button
+                              type="button"
+                              class="lr-icon-btn lr-focusable lr-icon-btn--ghost lr-icon-btn--sm"
+                              aria-label={props.t.duplicate}
+                              disabled={p.status === "deleting"}
+                              onClick={() => handleDuplicate(p.uuid)}
+                            >
+                              <Copy size={14} aria-hidden="true" />
+                            </button>
+                            {/* Reorder arrows — pushed to the right edge */}
+                            <span class="pc__reorder-divider" aria-hidden="true" />
                             <button
                               type="button"
                               class="lr-icon-btn lr-focusable lr-icon-btn--ghost lr-icon-btn--sm"
@@ -980,35 +1038,9 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
                             >
                               <ArrowDown size={14} aria-hidden="true" />
                             </button>
-                          </div>
+                          </>
                         }
                       />
-                    </div>
-                    {/* Role / action buttons — separate non-wrapping row below */}
-                    <div class="pc__role-actions">
-                      <Show when={roleFor(p.uuid).kind !== "primary" && p.enabled}>
-                        <Button variant="ghost" size="sm" onClick={() => handleSetPrimary(p.uuid)}>
-                          {props.t.setPrimary}
-                        </Button>
-                      </Show>
-                      <Show when={roleFor(p.uuid).kind !== "parallel" && p.enabled}>
-                        <Button variant="ghost" size="sm" onClick={(e) => handleAddParallel(p.uuid, e.currentTarget)}>
-                          {props.t.addParallel}
-                        </Button>
-                      </Show>
-                      <Show when={roleFor(p.uuid).kind === "parallel"}>
-                        <Button variant="ghost" size="sm" onClick={() => handleRemoveParallel(p.uuid)}>
-                          {props.t.removeParallel}
-                        </Button>
-                      </Show>
-                      <Show when={TRADITIONAL_TEMPLATES.has(p.template) && roleFor(p.uuid).kind !== "fallback" && p.enabled}>
-                        <Button variant="ghost" size="sm" onClick={() => handleSetFallback(p.uuid)}>
-                          {props.t.setFallback}
-                        </Button>
-                      </Show>
-                      <Button variant="ghost" size="sm" leftIcon={<Copy size={14} />} onClick={() => handleDuplicate(p.uuid)}>
-                        {props.t.duplicate}
-                      </Button>
                     </div>
                   </div>
                 )}
