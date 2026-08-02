@@ -596,8 +596,15 @@ fn win32_db_open_secures_dir_and_file() {
         assert_ne!(control & SE_DACL_PROTECTED, 0, "DACL must be PROTECTED for {:?}", path);
 
         // Exactly ONE ACE:
-        let mut acl_info = ACL_SIZE_INFORMATION::default();
-        unsafe { GetAclInformation(dacl, &mut acl_info as *mut _ as *mut _, std::mem::size_of::<ACL_SIZE_INFORMATION>(), AclSizeInformation); }
+        let mut acl_info = ACL_SIZE_INFORMATION { AceCount: 0, AclBytesInUse: 0, AclBytesFree: 0 };
+        unsafe {
+            GetAclInformation(
+                dacl,
+                &mut acl_info as *mut _ as *mut _,
+                std::mem::size_of::<ACL_SIZE_INFORMATION>() as u32,
+                AclSizeInformation,
+            );
+        }
         assert_eq!(acl_info.AceCount, 1, "exactly 1 ACE for {:?}", path);
 
         // ACE is ACCESS_ALLOWED for the current user:
