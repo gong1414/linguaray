@@ -5,6 +5,16 @@ import IconButton from "./IconButton";
 import { Copy } from "lucide-solid";
 import { assertNoAxeViolations } from "../../test/setup";
 
+// jsdom matchMedia mock — Kobante's tooltip queries matchMedia on mount.
+if (!window.matchMedia) {
+  // @ts-expect-error partial mock
+  window.matchMedia = () => ({
+    matches: false,
+    addEventListener() {},
+    removeEventListener() {},
+  });
+}
+
 describe("Tooltip", () => {
   it("renders a trigger child", () => {
     const { getByText } = render(() => (
@@ -49,19 +59,68 @@ describe("Tooltip", () => {
     expect(trigger.getAttribute("aria-label")).toBe("Copy");
   });
 
-  it("as={IconButton}: Kobante applies aria-describedby for tooltip content", () => {
+  it("as={IconButton}: focus opens tooltip and establishes aria-describedby link", async () => {
+    // The tooltip content is rendered into a Portal, so query document.body.
     const { container } = render(() => (
-      <Tooltip content="Copy" as={IconButton} triggerProps={{ "aria-label": "Copy" }}>
+      <Tooltip content="Copy this value" as={IconButton} triggerProps={{ "aria-label": "Copy" }}>
         <Copy size={16} />
       </Tooltip>
     ));
-    // Kobante links trigger → content via aria-describedby when visible.
-    // The trigger element should have the capacity for it (id or describedby).
     const trigger = container.querySelector(".lr-tooltip__trigger") as HTMLElement;
-    // Kobante may set aria-describedby on open; at minimum the trigger
-    // is a proper button with an aria-label (accessible name).
     expect(trigger.tagName).toBe("BUTTON");
-    expect(trigger.getAttribute("aria-label")).toBeTruthy();
+
+    // BEFORE open: no tooltip content in the DOM, no describedby yet.
+    expect(document.body.querySelector(".lr-tooltip__content")).toBeNull();
+
+    // Focus opens the tooltip (Kobante opens on focus OR hover by default).
+    trigger.focus();
+    // Let Solid + Kobante effects flush (microtask → macrotask).
+    await new Promise((r) => setTimeout(r, 0));
+
+    // AFTER open: tooltip content exists in the portal...
+    const content = document.body.querySelector(".lr-tooltip__content") as HTMLElement | null;
+    expect(content).toBeTruthy();
+    expect(content?.textContent).toContain("Copy this value");
+
+    // ...AND the trigger carries aria-describedby pointing at that content's id.
+    const describedById = trigger.getAttribute("aria-describedby");
+    expect(typeof describedById).toBe("string");
+    expect(describedById!.length).toBeGreaterThan(0);
+    // The referenced id MUST be the tooltip content element — proves linkage.
+    expect(content?.id).toBe(describedById);
+  });
+
+  it("Esc closes an open tooltip", async () => {
+    const { container } = render(() => (
+      <Tooltip content="Tip" as={IconButton} triggerProps={{ "aria-label": "Copy" }}>
+        <Copy size={16} />
+      </Tooltip>
+    ));
+    const trigger = container.querySelector(".lr-tooltip__trigger") as HTMLElement;
+    trigger.focus();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(document.body.querySelector(".lr-tooltip__content")).toBeTruthy();
+
+    // Esc dismisses the tooltip (Kobante default).
+    trigger.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(document.body.querySelector(".lr-tooltip__content")).toBeNull();
+  });
+
+  it("as={IconButton}: ref passed via triggerProps lands on the native button", () => {
+    // The rail uses this to confirm the trigger is the real focusable element.
+    const ref: { current?: HTMLElement } = {};
+    render(() => (
+      <Tooltip
+        content="Copy"
+        as={IconButton}
+        triggerProps={{ "aria-label": "Copy", ref: (el: HTMLElement) => { ref.current = el; } }}
+      >
+        <Copy size={16} />
+      </Tooltip>
+    ));
+    expect(ref.current).toBeTruthy();
+    expect(ref.current!.tagName).toBe("BUTTON");
   });
 
   it("has no axe violations", async () => {

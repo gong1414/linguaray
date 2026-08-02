@@ -161,20 +161,40 @@ describe("validateEndpoint", () => {
     expect(validateEndpoint("http://[::1]:8080").ok).toBe(true);
   });
 
-  it("rejects HTTP non-loopback", () => {
-    expect(validateEndpoint("http://api.openai.com/v1").ok).toBe(false);
+  it("rejects HTTP non-loopback (stable code)", () => {
+    const r = validateEndpoint("http://api.openai.com/v1");
+    expect(r.ok).toBe(false);
+    expect(r.ok === false && r.code).toBe("endpoint-must-https");
   });
 
   it("rejects localhost.evil.com (not exact loopback)", () => {
-    expect(validateEndpoint("http://localhost.evil.com/v1").ok).toBe(false);
+    const r = validateEndpoint("http://localhost.evil.com/v1");
+    expect(r.ok).toBe(false);
+    expect(r.ok === false && r.code).toBe("endpoint-must-https");
   });
 
-  it("rejects empty", () => {
-    expect(validateEndpoint("").ok).toBe(false);
+  it("rejects empty (stable code)", () => {
+    const r = validateEndpoint("");
+    expect(r.ok).toBe(false);
+    expect(r.ok === false && r.code).toBe("endpoint-required");
   });
 
-  it("rejects no-scheme", () => {
-    expect(validateEndpoint("api.openai.com/v1").ok).toBe(false);
+  it("rejects no-scheme (stable code)", () => {
+    const r = validateEndpoint("api.openai.com/v1");
+    expect(r.ok).toBe(false);
+    expect(r.ok === false && r.code).toBe("endpoint-invalid-url");
+  });
+
+  it("returns a code, NEVER a display string (i18n boundary)", () => {
+    // The result must carry a stable code, not a localized message —
+    // so the domain layer never leaks English into a Chinese UI.
+    const r = validateEndpoint("ftp://bad.example.com");
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(typeof r.code).toBe("string");
+      // code is a stable identifier, not an English sentence
+      expect(r.code).not.toMatch(/[A-Z][a-z]+\s/);
+    }
   });
 });
 
@@ -182,5 +202,43 @@ describe("normalizeOrigin", () => {
   it("extracts scheme + host + port", () => {
     expect(normalizeOrigin("https://api.openai.com/v1/chat")).toBe("https://api.openai.com");
     expect(normalizeOrigin("http://localhost:11434/v1")).toBe("http://localhost:11434");
+  });
+});
+
+// --- i18n error-code coverage ---------------------------------------------
+// The domain layer returns stable codes; the UI layer must map every code to
+// a localized string. This guards against a new code landing in the domain
+// without a matching dictionary entry (which would render "undefined").
+
+describe("error code → i18n coverage", () => {
+  it("every endpoint error code has a zh + en message", async () => {
+    const { strings } = await import("../src/i18n");
+    const codes = ["endpoint-required", "endpoint-invalid-url", "endpoint-must-https"] as const;
+    for (const locale of ["en", "zh"] as const) {
+      for (const code of codes) {
+        const msg = strings[locale].provider.endpointErrors[code];
+        expect(typeof msg).toBe("string");
+        expect(msg.length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it("every selection error code has a zh + en message", async () => {
+    const { strings } = await import("../src/i18n");
+    const codes = [
+      "parallel-duplicate",
+      "parallel-contains-primary",
+      "role-overlap",
+      "disabled-in-slot",
+      "fallback-not-traditional",
+      "fallback-overlaps",
+    ] as const;
+    for (const locale of ["en", "zh"] as const) {
+      for (const code of codes) {
+        const msg = strings[locale].provider.selectionErrors[code];
+        expect(typeof msg).toBe("string");
+        expect(msg.length).toBeGreaterThan(0);
+      }
+    }
   });
 });

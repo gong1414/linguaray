@@ -385,26 +385,176 @@ describe("Provider Center — key cleared from DOM at submit", () => {
   });
 });
 
-// --- zh automated accessible-name scan (P2) ------------------------------
+// --- Focus restoration after dialog close (document.activeElement) --------
 
-describe("Provider Center — Chinese automated scan", () => {
+describe("Provider Center — focus restores to a valid target on dialog close", () => {
   afterEach(() => cleanup());
 
-  // Strict allowlist: only propnoun provider/brand names, URLs, model IDs,
-  // version numbers, and numeric values. NO broad "." inclusion.
-  const isAllowed = (t: string): boolean => {
-    if (/^(OpenAI|DeepSeek|Google|GPT|gpt-|Ollama|Anthropic|Gemini|DeepL|LinguaRay)/i.test(t)) return true;
-    if (/^https?:\/\//.test(t)) return true; // URLs
-    if (/^localhost(:\d+)?/.test(t)) return true;
-    if (/^mock-/.test(t)) return true;
-    if (/^\$[\d.]+/.test(t)) return true; // currency
-    if (/^\d+ms$/.test(t)) return true; // latency
-    if (t === "—") return true;
-    return false;
-  };
+  it("delete Cancel: focus returns to the delete trigger (still valid)", async () => {
+    const { container } = render(() => <App />);
+    goToProviderCenter();
+    clickStateChip("Connection OK");
+    const delBtn = container.querySelector('[aria-label="Delete OpenAI #1"]') as HTMLElement;
+    fireEvent.click(delBtn);
+    await Promise.resolve();
+    expect(screen.getByText(strings.en.provider.deleteConfirmTitle)).toBeTruthy();
+    // Cancel — provider NOT deleted, trigger still valid → focus back to it
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(document.activeElement).toBe(delBtn);
+  });
 
-  // Parametrize across representative states to catch state-specific English.
-  const zhStates = ["连接成功", "密钥已保存", "缺少密钥", "删除确认", "删除中", "余额错误"];
+  it("delete Confirm: trigger becomes invalid → focus lands on sidebar fallback", async () => {
+    const { container } = render(() => <App />);
+    goToProviderCenter();
+    clickStateChip("Connection OK");
+    const delBtn = container.querySelector('[aria-label="Delete OpenAI #1"]') as HTMLElement;
+    fireEvent.click(delBtn);
+    await Promise.resolve();
+    // Confirm → provider marked deleting, trigger disabled/removed → fallback
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    await new Promise((r) => setTimeout(r, 50));
+    const sidebar = container.querySelector(".pc__sidebar");
+    // The sidebar fallback (tabindex=-1) must receive focus
+    expect(document.activeElement).toBe(sidebar);
+    expect(sidebar?.getAttribute("tabindex")).toBe("-1");
+  });
+
+  it("consent Confirm: focus returns to the Add-to-parallel trigger (still valid)", async () => {
+    const { container } = render(() => <App />);
+    goToProviderCenter();
+    clickStateChip("Connection OK");
+    // Open the consent dialog by adding a parallel provider
+    const addParBtn = [...container.querySelectorAll("button")]
+      .find((b) => b.textContent === "Add to parallel");
+    expect(addParBtn).toBeTruthy();
+    fireEvent.click(addParBtn!);
+    await new Promise((r) => setTimeout(r, 30));
+    expect(screen.getByText(strings.en.provider.consentTitle)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
+    await new Promise((r) => setTimeout(r, 50));
+    // Consent Confirm does not disable the trigger → focus returns to it
+    expect(document.activeElement).toBe(addParBtn);
+  });
+});
+
+// --- Rail uses Tooltip component (no native title) (P1) -------------------
+
+describe("Provider Center — Settings rail uses shared Tooltip", () => {
+  afterEach(() => cleanup());
+
+  it("rail items have no native title attribute (Tooltip provides the label)", () => {
+    render(() => <App />);
+    goToProviderCenter();
+    const rail = document.querySelector(".pc__settings-rail");
+    expect(rail).toBeTruthy();
+    const titled = rail!.querySelectorAll("[title]");
+    expect(titled.length).toBe(0);
+  });
+
+  it("each rail item is a single native BUTTON (no nested interactive)", () => {
+    render(() => <App />);
+    goToProviderCenter();
+    const rail = document.querySelector(".pc__settings-rail")!;
+    const items = rail.querySelectorAll(".pc__rail-item");
+    expect(items.length).toBe(3);
+    items.forEach((item) => {
+      expect(item.tagName).toBe("BUTTON");
+      // no nested button inside the trigger
+      expect(item.querySelector("button")).toBeNull();
+    });
+  });
+
+  it("focusing a rail item opens its tooltip and links aria-describedby", async () => {
+    render(() => <App />);
+    goToProviderCenter();
+    const rail = document.querySelector(".pc__settings-rail")!;
+    // The disabled items carry aria-disabled but remain focusable (tabindex=0),
+    // so their tooltip still surfaces on keyboard focus.
+    const shortcutsItem = rail.querySelector('[aria-label="Shortcuts"]') as HTMLElement;
+    expect(shortcutsItem).toBeTruthy();
+    expect(shortcutsItem.tagName).toBe("BUTTON");
+
+    shortcutsItem.focus();
+    await new Promise((r) => setTimeout(r, 0));
+
+    const content = document.body.querySelector(".lr-tooltip__content") as HTMLElement | null;
+    expect(content).toBeTruthy();
+    expect(content?.textContent).toContain("Shortcuts");
+    const describedById = shortcutsItem.getAttribute("aria-describedby");
+    expect(typeof describedById).toBe("string");
+    expect(describedById!.length).toBeGreaterThan(0);
+    expect(content?.id).toBe(describedById);
+  });
+});
+
+
+// --- All-23-state zh automated scan (P1) ----------------------------------
+// Every ProviderState is exercised in zh locale and scanned for untranslated
+// English. Covers the full matrix, not a representative subset, so a stale
+// dictionary entry or a domain-layer English leak surfaces immediately.
+
+describe("Provider Center — Chinese automated scan (all 23 states)", () => {
+  afterEach(() => cleanup());
+
+  // zh labels for all 23 ProviderStates (mirrors i18n zh.provider.states).
+  const zhStates = [
+    "空（无服务商）",
+    "加载模型",
+    "模型获取失败",
+    "手动输入模型",
+    "连接测试中",
+    "连接成功",
+    "连接失败",
+    "密钥已保存",
+    "缺少密钥",
+    "复制",
+    "保存中",
+    "保存失败",
+    "保存冲突",
+    "删除确认",
+    "删除中",
+    "删除重试",
+    "拖拽排序",
+    "排序失败",
+    "余额加载中",
+    "不支持余额",
+    "余额限流",
+    "余额错误",
+    "端点无效",
+  ];
+
+  // Tokens that are legitimately English even in a zh UI: brand/proper nouns,
+  // provider PRODUCT names (data, not UI strings), URLs, schemes, loopback
+  // hosts, model IDs, currency, latency, mock UUIDs, and unlocalized acronyms.
+  // We STRIP these from each string, then reject any remaining Latin word.
+  // A mixed string like "保存失败 Save error" survives the strip and fails.
+  const ALLOWED_TOKEN = new RegExp(
+    [
+      "OpenAI", "DeepSeek", "Google Translate", "Google", "GPT", "gpt-",
+      "Ollama", "Anthropic", "Gemini", "DeepL", "LinguaRay",
+    ].join("|"),
+    "i",
+  );
+
+  const stripAllowed = (t: string): string =>
+    t
+      .replace(/https?:\/\/[^\s）)]+/g, " ")        // full URLs
+      .replace(/\bhttps?:/g, " ")                  // bare scheme
+      .replace(/\blocalhost(:\d+)?\b/gi, " ")      // loopback host
+      .replace(/\b127\.0\.0\.1(:\d+)?\b/g, " ")    // loopback IP
+      .replace(/\bmock-[a-z0-9-]+\b/g, " ")        // mock UUIDs
+      .replace(/\$[\d.]+/g, " ")                   // currency
+      .replace(/\b\d+\s*ms\b/g, " ")              // latency
+      .replace(/×/g, " ")                          // size labels
+      // Multi-token model IDs (e.g. "GPT-4o mini", "gpt-4-turbo") BEFORE the
+      // brand-token strip, so "GPT" isn't removed and "mini" left dangling.
+      .replace(/\b(GPT|gpt)[-.\s]*\d[a-z0-9\s-]*\b/gi, " ")
+      .replace(/\b(deepseek|llama)\w*\b/gi, " ")   // model/engine names
+      .replace(ALLOWED_TOKEN, " ")                 // brand/proper nouns + product names
+      .replace(/\bapi\b/gi, " ")                   // unlocalized acronym
+      .replace(/\bhttps\b/gi, " ")                 // unlocalized acronym
+      .replace(/—/g, " ");
 
   it.each(zhStates)("zh state '%s' has no untranslated English", (zhLabel) => {
     const { container } = render(() => <App />);
@@ -413,25 +563,33 @@ describe("Provider Center — Chinese automated scan", () => {
     const stateBar = screen.getByRole("group", { name: "状态" });
     const chips = [...stateBar.querySelectorAll("button")];
     const chip = chips.find((b) => b.textContent === zhLabel);
-    if (chip) fireEvent.click(chip);
+    // HARD FAIL if the chip is missing — a drifted/missing label must not let
+    // the scan silently pass on the default/previous state.
+    expect(chip, `state chip "${zhLabel}" must exist`).toBeTruthy();
+    fireEvent.click(chip!);
 
-    // Collect all aria-labels + visible text
+    // Collect aria-labels + visible text. Scan BOTH the render container AND
+    // document.body, so Kobante Portal content (Dialog/Tooltip) is covered.
     const texts: string[] = [];
-    container.querySelectorAll("[aria-label]").forEach((el) => {
-      texts.push(el.getAttribute("aria-label") || "");
-    });
-    container.querySelectorAll("button, span, h2, h3, p, li").forEach((el) => {
-      const t = el.textContent?.trim();
-      if (t && t.length > 2) texts.push(t);
-    });
+    const collectFrom = (root: ParentNode) => {
+      root.querySelectorAll("[aria-label]").forEach((el) => {
+        texts.push(el.getAttribute("aria-label") || "");
+      });
+      root.querySelectorAll("button, span, h2, h3, p, li").forEach((el) => {
+        const t = el.textContent?.trim();
+        if (t && t.length > 2) texts.push(t);
+      });
+    };
+    collectFrom(container);
+    collectFrom(document.body);
 
-    const suspicious = texts.filter((t) =>
-      t.length > 3 &&
-      !isAllowed(t) &&
-      /[A-Za-z]{4,}/.test(t) &&
-      !/[\u4e00-\u9fff]/.test(t) && // no Chinese chars
-      !t.includes("×") // size labels
-    );
+    const suspicious = texts
+      .map((t) => ({ original: t, stripped: stripAllowed(t).trim() }))
+      // After stripping allowed tokens, any remaining Latin run of 4+ letters
+      // is an untranslated English leak — even inside a mixed zh/en string.
+      .filter((x) => /[A-Za-z]{4,}/.test(x.stripped))
+      .map((x) => x.original);
+
     expect(suspicious).toEqual([]);
   });
 });
