@@ -29,8 +29,9 @@ pub enum DbError {
     Io(std::io::Error),
     Integrity(String),
     NotFound(String),
-    /// Test-injected failure (never produced in production — afp=None).
-    #[cfg(test)]
+    /// Test-injected failure. Production code passes afp=None so this is never
+    /// produced at runtime, but the variant must exist in release builds because
+    /// the archive_database failpoint path references it in match arms.
     Injected(String),
 }
 
@@ -41,7 +42,6 @@ impl std::fmt::Display for DbError {
             DbError::Io(e) => write!(f, "io: {e}"),
             DbError::Integrity(s) => write!(f, "integrity: {s}"),
             DbError::NotFound(s) => write!(f, "not found: {s}"),
-            #[cfg(test)]
             DbError::Injected(s) => write!(f, "injected: {s}"),
         }
     }
@@ -55,6 +55,15 @@ impl From<rusqlite::Error> for DbError {
 
 impl From<std::io::Error> for DbError {
     fn from(e: std::io::Error) -> Self { DbError::Io(e) }
+}
+
+impl From<crate::fs_acl::AclError> for DbError {
+    fn from(e: crate::fs_acl::AclError) -> Self {
+        match e {
+            crate::fs_acl::AclError::Io(io) => DbError::Io(io),
+            crate::fs_acl::AclError::Win32(s) => DbError::Integrity(s),
+        }
+    }
 }
 
 /// The SQLite database wrapper. Connection is behind a Mutex; all access
@@ -90,13 +99,16 @@ impl Database {
         f: impl FnOnce(&mut Connection) -> Result<T, DbError>,
     ) -> Result<T, DbError> {
         let mut conn = self.conn.lock();
-        f(&mut *conn)
+        f(&mut conn)
     }
 
     /// Explicitly close the connection. Consumes self.
     ///
     /// Matches rusqlite 0.40.1's `Connection::close(self) -> Result<(), (Self, Error)>`:
     /// on failure, returns the Connection back so the caller can recover it.
+    /// The large Err variant is inherent to the rusqlite contract (must return
+    /// the Connection for recovery) — boxing would complicate the caller.
+    #[allow(clippy::result_large_err)]
     pub fn close(self) -> Result<(), (Database, rusqlite::Error)> {
         let conn = self.conn.into_inner();
         conn.close().map_err(|(conn, e)| (Database { conn: Mutex::new(conn) }, e))

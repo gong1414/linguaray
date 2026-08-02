@@ -17,6 +17,8 @@ pub enum KeystoreError {
     AuthFailed,
     #[error("unsupported version {0}")]
     UnsupportedVersion(u64),
+    #[error("acl: {0}")]
+    Acl(#[from] crate::fs_acl::AclError),
 }
 
 /// Where the machine identity comes from. Recorded at creation; frozen for the
@@ -260,18 +262,9 @@ impl Keystore {
         Ok(Self { dir, in_proc: Mutex::new(()) })
     }
 
-    #[cfg(target_os = "macos")]
     fn set_dir_perms(dir: &Path) -> Result<(), KeystoreError> {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700))?;
-        Ok(())
+        Ok(crate::fs_acl::secure_dir(dir)?)
     }
-    #[cfg(target_os = "windows")]
-    fn set_dir_perms(dir: &Path) -> Result<(), KeystoreError> {
-        set_win32_owner_dacl(dir, true)
-    }
-    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-    fn set_dir_perms(_dir: &Path) -> Result<(), KeystoreError> { Ok(()) }
 
     fn file(&self) -> PathBuf { self.dir.join(FILE) }
 
@@ -404,18 +397,9 @@ impl Keystore {
         })
     }
 
-    #[cfg(target_os = "macos")]
     fn set_file_perms(&self, p: &Path) -> Result<(), KeystoreError> {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(p, std::fs::Permissions::from_mode(0o600))?;
-        Ok(())
+        Ok(crate::fs_acl::secure_file(p)?)
     }
-    #[cfg(target_os = "windows")]
-    fn set_file_perms(&self, p: &Path) -> Result<(), KeystoreError> {
-        set_win32_owner_dacl(p, false)
-    }
-    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-    fn set_file_perms(&self, _p: &Path) -> Result<(), KeystoreError> { Ok(()) }
 }
 
 /// Atomic replace. macOS: rename over target (first-create or update).
@@ -468,165 +452,10 @@ fn atomic_replace(src: &Path, dst: &Path) -> Result<(), KeystoreError> {
     Ok(())
 }
 
-/// Windows §A perms: lock `path` (file or dir) to the current user only.
-///
-/// Sets owner = current-user SID and a PROTECTED DACL with exactly one explicit
-/// ACE granting that SID `GENERIC_ALL` (which includes DELETE, so `ReplaceFileW`
-/// can later replace the keystore file). `PROTECTED_DACL_SECURITY_INFORMATION`
-/// blocks inherited ACEs — the object is reachable ONLY by the current user,
-/// matching the macOS 0o600/0o700 intent. NOT icacls (plan Task 2).
-///
-/// SID source: the current process token's user SID (canonical + unambiguous,
-/// unlike a trustee *name*). The SID buffer is owned by us and must outlive the
-/// `SetNamedSecurityInfoW` call (it reads, then copies internally — we free after).
-#[cfg(target_os = "windows")]
-/// Current-user SID (canonical, locale-independent) from the process token.
-/// Returns a Vec<u8> OWNING the TOKEN_USER + the SID it points to (GetTokenInformation
-/// writes both into one caller buffer; the SID aliases into it). Shared by the
-/// production set call AND the verification test (so they compare the SAME SID source).
-#[cfg(target_os = "windows")]
-fn current_user_sid() -> Result<Vec<u8>, KeystoreError> {
-    use windows_sys::Win32::Foundation::{CloseHandle, HANDLE};
-    use windows_sys::Win32::Security::{GetTokenInformation, TOKEN_QUERY, TokenUser};
-    use windows_sys::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
-
-    let mut token: HANDLE = std::ptr::null_mut();
-    // SAFETY: GetCurrentProcess returns a pseudo-handle (no real handle to leak); we pass
-    // it straight to OpenProcessToken, which writes our `token` out-param. TOKEN_QUERY is
-    // the minimal right needed for GetTokenInformation.
-    let ok = unsafe { OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token) };
-    if ok == 0 {
-        return Err(KeystoreError::Io(std::io::Error::last_os_error()));
-    }
-    struct TokenHandle(HANDLE);
-    impl Drop for TokenHandle {
-        fn drop(&mut self) {
-            // SAFETY: self.0 is a real token handle from OpenProcessToken; CloseHandle
-            // is the documented release. Called exactly once via Drop.
-            unsafe { CloseHandle(self.0) };
-        }
-    }
-    let _token_guard = TokenHandle(token);
-
-    // TOKEN_USER = { SID_AND_ATTRIBUTES { Sid: PSID, Attributes: u32 } }. GetTokenInformation
-    // writes the TOKEN_USER struct AND the SID it points to into the caller's buffer (the
-    // SID is NOT separately allocated — it aliases into the buffer). Query length first.
-    let mut needed: u32 = 0;
-    // SAFETY: first call is expected to fail with ERROR_INSUFFICIENT_BUFFER and write the
-    // required length into `needed`; we ignore the return and read `needed`.
-    unsafe {
-        GetTokenInformation(token, TokenUser, std::ptr::null_mut(), 0, &mut needed);
-    }
-    if needed == 0 {
-        return Err(KeystoreError::Io(std::io::Error::last_os_error()));
-    }
-    let mut buf: Vec<u8> = vec![0u8; needed as usize];
-    // SAFETY: buf holds `needed` bytes; the call writes ≤ needed and sets the TOKEN_USER.
-    let ok = unsafe {
-        GetTokenInformation(token, TokenUser, buf.as_mut_ptr() as *mut _, needed, &mut needed)
-    };
-    if ok == 0 {
-        return Err(KeystoreError::Io(std::io::Error::last_os_error()));
-    }
-    Ok(buf)
-}
-
-/// Borrow the SID pointer out of a TOKEN_USER buffer (the SID aliases into `buf`).
-/// Caller MUST keep `buf` alive for as long as the returned PSID is used.
-#[cfg(target_os = "windows")]
-fn sid_from_token_user_buf(buf: &[u8]) -> Result<windows_sys::Win32::Security::PSID, KeystoreError> {
-    use windows_sys::Win32::Security::TOKEN_USER;
-    if buf.len() < std::mem::size_of::<TOKEN_USER>() {
-        return Err(KeystoreError::Envelope("token buffer too small for TOKEN_USER".into()));
-    }
-    // SAFETY: buf came from current_user_sid() (a valid TOKEN_USER). We only read the
-    // fixed-size header to get the SID pointer; buf outlives the returned borrow.
-    let user: &TOKEN_USER = unsafe { &*(buf.as_ptr() as *const TOKEN_USER) };
-    Ok(user.User.Sid)
-}
-
-#[cfg(target_os = "windows")]
-fn set_win32_owner_dacl(path: &Path, inherit: bool) -> Result<(), KeystoreError> {
-    use std::os::windows::ffi::OsStrExt;
-    use windows_sys::Win32::Foundation::{GENERIC_ALL, LocalFree};
-    use windows_sys::Win32::Security::Authorization::{
-        SetEntriesInAclW, SetNamedSecurityInfoW, EXPLICIT_ACCESS_W, SE_FILE_OBJECT,
-        SET_ACCESS, TRUSTEE_FORM, TRUSTEE_IS_SID, TRUSTEE_W,
-    };
-    use windows_sys::Win32::Security::{
-        ACL, DACL_SECURITY_INFORMATION, OBJECT_SECURITY_INFORMATION,
-        OWNER_SECURITY_INFORMATION, PROTECTED_DACL_SECURITY_INFORMATION, PSID,
-        SUB_CONTAINERS_AND_OBJECTS_INHERIT,
-    };
-
-    // 1. Current-user SID (owned buffer); the SID aliases into it and must outlive the Set call.
-    let sid_buf = current_user_sid()?;
-    let sid: PSID = sid_from_token_user_buf(&sid_buf)?;
-
-    // 2. Build a one-entry DACL: current user → GENERIC_ALL (incl. DELETE).
-    // We build the EXPLICIT_ACCESS_W directly rather than via BuildExplicitAccessWithNameW
-    // (that helper is name-based + locale-dependent). TrusteeForm = TRUSTEE_IS_SID: the
-    // ptstrName field is a pointer to the SID itself (NOT a name string), which is
-    // unambiguous and matches how the SID was obtained.
-    let mut ea: EXPLICIT_ACCESS_W = unsafe { std::mem::zeroed() };
-    ea.grfAccessPermissions = GENERIC_ALL;
-    ea.grfAccessMode = SET_ACCESS; // GRANT would merge with inherited; SET replaces.
-    // Directories get an INHERITABLE ACE so files created inside (keystore.json.tmp,
-    // keystore.json, keystore.lock) auto-receive current-user full control — matches the
-    // macOS 0o700-dir-+umask intent. Files get inheritance=0 (leaf, nothing to propagate).
-    // SE_DACL_PROTECTED (set below) still blocks the dir from inheriting its PARENT's ACEs,
-    // so the dir is locked to current user even though its own ACE propagates downward.
-    ea.grfInheritance = if inherit { SUB_CONTAINERS_AND_OBJECTS_INHERIT } else { 0 };
-    let mut trustee: TRUSTEE_W = unsafe { std::mem::zeroed() };
-    trustee.TrusteeForm = TRUSTEE_IS_SID as TRUSTEE_FORM; // ptstrName = SID (not a name)
-    trustee.ptstrName = sid as *mut _;
-    ea.Trustee = trustee;
-
-    let mut new_acl: *mut ACL = std::ptr::null_mut();
-    // SAFETY: 1 entry in `&ea`, no old ACL (null) → builds a fresh ACL. On success
-    // returns ERROR_SUCCESS (0) and allocates `new_acl` on the Local heap; we free it.
-    let rc = unsafe { SetEntriesInAclW(1, &ea, std::ptr::null(), &mut new_acl) };
-    if rc != 0 || new_acl.is_null() {
-        return Err(KeystoreError::Envelope(format!("SetEntriesInAclW failed: Win32 error {rc}")));
-    }
-    // RAII: free the ACL with LocalFree (SetEntriesInAclW allocates via the Local heap;
-    // LocalFree is in Win32::Foundation, not Memory).
-    struct AclGuard(*mut ACL);
-    impl Drop for AclGuard {
-        fn drop(&mut self) {
-            // SAFETY: self.0 was allocated by SetEntriesInAclW (Local heap); LocalFree
-            // is the documented free. Called exactly once via Drop.
-            unsafe { LocalFree(self.0 as *mut _) };
-        }
-    }
-    let _acl_guard = AclGuard(new_acl);
-
-    // 3. Apply: set OWNER + DACL + PROTECTED (block inheritance) atomically on the path.
-    let path_wide: Vec<u16> = path.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
-    let info: OBJECT_SECURITY_INFORMATION = OWNER_SECURITY_INFORMATION
-        | DACL_SECURITY_INFORMATION
-        | PROTECTED_DACL_SECURITY_INFORMATION;
-    // SAFETY: path_wide is NUL-terminated and alive across the call; sid aliases `buf`
-    // (also alive); new_acl is valid (alive via _acl_guard). SetNamedSecurityInfoW copies
-    // what it needs, so freeing sid-buf/acl after the call is correct.
-    let rc = unsafe {
-        SetNamedSecurityInfoW(
-            path_wide.as_ptr(),
-            SE_FILE_OBJECT,
-            info,
-            sid,
-            std::ptr::null_mut(),
-            new_acl,
-            std::ptr::null_mut(),
-        )
-    };
-    if rc != 0 {
-        return Err(KeystoreError::Envelope(format!(
-            "SetNamedSecurityInfoW failed: Win32 error {rc}"
-        )));
-    }
-    Ok(())
-}
+// Win32 ACL functions (current_user_sid, sid_from_token_user_buf,
+// set_win32_owner_dacl) have been extracted to fs_acl.rs and are shared
+// by both keystore and database. The keystore verification test below
+// references them via crate::fs_acl::.
 
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
 fn atomic_replace(_src: &Path, _dst: &Path) -> Result<(), KeystoreError> {
@@ -719,11 +548,11 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let f = dir.path().join("keystore.json");
         std::fs::write(&f, b"x").unwrap();
-        set_win32_owner_dacl(&f, false).expect("set_win32_owner_dacl should succeed");
+        crate::fs_acl::set_win32_owner_dacl(&f, false).expect("set_win32_owner_dacl should succeed");
 
         // Expected SID (same source the prod path used):
-        let sid_buf = current_user_sid().unwrap();
-        let expected_sid = sid_from_token_user_buf(&sid_buf).unwrap();
+        let sid_buf = crate::fs_acl::current_user_sid().unwrap();
+        let expected_sid = crate::fs_acl::sid_from_token_user_buf(&sid_buf).unwrap();
 
         let path_wide: Vec<u16> = f.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
         let mut owner: PSECURITY_DESCRIPTOR = std::ptr::null_mut();
