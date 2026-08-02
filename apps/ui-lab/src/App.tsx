@@ -119,7 +119,7 @@ const App: Component = () => {
   const [nav, setNav] = createSignal<NavKey>("selection-popup");
   const [selState, setSelState] = createSignal<SelectionState>("success-single");
   const [provState, setProvState] = createSignal<ProviderState>("empty");
-  const [settingsSize, setSettingsSize] = createSignal<"min" | "default">("default");
+  const [settingsSize, setSettingsSize] = createSignal<"min" | "default" | "narrow-699" | "boundary-700">("default");
 
   const t = createMemo(() => strings[locale()]);
   const selT = createMemo(() => t().selection);
@@ -280,7 +280,18 @@ const App: Component = () => {
               <div
                 class="lab__frame lab__frame--settings"
                 style={{
-                  width: settingsSize() === "min" ? "600px" : "800px",
+                  // Boundary-probe modes set the frame width so the
+                  // settings-shell's OWN clientWidth straddles the 699/700
+                  // container-query boundary. The shell is ~2px narrower than
+                  // the frame (its own border), so:
+                  //   frame 699 → shell ≈697 (≤699 → icon-only rail)
+                  //   frame 702 → shell ≈700 (≥700 → full labels)
+                  // This is the only way to exercise the transition in a layout.
+                  width:
+                    settingsSize() === "min" ? "600px"
+                    : settingsSize() === "narrow-699" ? "699px"
+                    : settingsSize() === "boundary-700" ? "702px"
+                    : "800px",
                   height: settingsSize() === "min" ? "400px" : "600px",
                 }}
               >
@@ -291,7 +302,10 @@ const App: Component = () => {
                 />
               </div>
               <span class="lab__frame-meta">
-                {settingsSize() === "min" ? "600×400" : "800×600"} ·{" "}
+                {settingsSize() === "min" ? "600×400"
+                  : settingsSize() === "narrow-699" ? "shell≈697 (icon-only)"
+                  : settingsSize() === "boundary-700" ? "shell≈700 (labels)"
+                  : "800×600"} ·{" "}
                 {t().provider.states[provState()]}
               </span>
             </Match>
@@ -343,10 +357,17 @@ const App: Component = () => {
             <button
               type="button"
               class="lab__state-chip lr-focusable"
-              aria-pressed={settingsSize() === "min" ? "true" : "false"}
-              onClick={() => setSettingsSize((v) => (v === "min" ? "default" : "min"))}
+              onClick={() => setSettingsSize((v) =>
+                v === "default" ? "min"
+                : v === "min" ? "narrow-699"
+                : v === "narrow-699" ? "boundary-700"
+                : "default",
+              )}
             >
-              {settingsSize() === "min" ? t().provider.frameMin : t().provider.frameDefault}
+              {settingsSize() === "min" ? t().provider.frameMin
+                : settingsSize() === "narrow-699" ? t().provider.frameNarrow699
+                : settingsSize() === "boundary-700" ? t().provider.frameBoundary700
+                : t().provider.frameDefault}
             </button>
           </div>
         </Show>

@@ -568,16 +568,26 @@ describe("Provider Center — Chinese automated scan (all 23 states)", () => {
     expect(chip, `state chip "${zhLabel}" must exist`).toBeTruthy();
     fireEvent.click(chip!);
 
-    // Collect aria-labels + visible text. Scan BOTH the render container AND
-    // document.body, so Kobante Portal content (Dialog/Tooltip) is covered.
+    // Collect ALL user-facing text: every text node in the scoped surface PLUS
+    // the accessible/display attributes (aria-label, aria-description,
+    // placeholder, title, alt). Scanning the container AND document.body covers
+    // Kobante Portal content (Dialog/Tooltip rendered outside the container).
     const texts: string[] = [];
+    const ATTRS = ["aria-label", "aria-description", "placeholder", "title", "alt"];
     const collectFrom = (root: ParentNode) => {
-      root.querySelectorAll("[aria-label]").forEach((el) => {
-        texts.push(el.getAttribute("aria-label") || "");
-      });
-      root.querySelectorAll("button, span, h2, h3, p, li").forEach((el) => {
-        const t = el.textContent?.trim();
-        if (t && t.length > 2) texts.push(t);
+      // 1. Every direct text node (not just a fixed tag whitelist) — catches
+      //    <label>, <option>, <summary>, bare text, etc.
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+      while (walker.nextNode()) {
+        const t = (walker.currentNode.nodeValue || "").trim();
+        if (t.length > 2) texts.push(t);
+      }
+      // 2. Accessible/display attributes on every element.
+      root.querySelectorAll("*").forEach((el) => {
+        for (const attr of ATTRS) {
+          const v = el.getAttribute(attr);
+          if (v && v.trim().length > 2) texts.push(v.trim());
+        }
       });
     };
     collectFrom(container);

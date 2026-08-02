@@ -1,9 +1,18 @@
 /**
- * Provider Center — HTML5 drag-to-reorder (real DnD event path).
+ * Provider Center — drag-to-reorder HANDLER coverage (synthesized events).
  *
- * These exercise the production dragstart/dragover/drop handlers — NOT the
- * keyboard Move up/down path. They prove the DataTransfer write, the
- * before/after midpoint indicator, the reorder commit, and the rollback.
+ * SCOPE: These are handler-level unit tests. They dispatch synthesized
+ * DragEvent objects (Event + MockDataTransfer shim + mocked geometry) at the
+ * production onDragStart/onDragOver/onDrop handlers. They prove the handler
+ * LOGIC — DataTransfer write, before/after midpoint indicator, reorder commit,
+ * rollback, dragend cleanup — but NOT real browser drag initiation, native
+ * DataTransfer behavior, or the visible drag interaction.
+ *
+ * Real-browser DnD acceptance (native mouse drag → reorder + rollback + visible
+ * drop indicator) is a separate manual gate: jsdom cannot initiate native HTML5
+ * drags, and browser automation (Playwright/IAB) cannot synthesize a DragEvent
+ * carrying a real DataTransfer. See the verification notes for the manual
+ * result recorded against this code.
  *
  * jsdom does not implement DataTransfer or layout, so we synthesize a DragEvent
  * carrying a minimal DataTransfer shim and mock getBoundingClientRect to give

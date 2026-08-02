@@ -233,6 +233,8 @@ export type LabStrings = {
     presetOllama: string;
     frameMin: string;
     frameDefault: string;
+    frameNarrow699: string;
+    frameBoundary700: string;
   };
 };
 
@@ -443,6 +445,8 @@ export const strings: Record<Locale, LabStrings> = {
       presetOllama: "Ollama",
       frameMin: "600×400 (min)",
       frameDefault: "800×600 (default)",
+      frameNarrow699: "699 (icon-only rail)",
+      frameBoundary700: "700 (label rail)",
     },
   },
   zh: {
@@ -651,6 +655,8 @@ export const strings: Record<Locale, LabStrings> = {
       presetOllama: "Ollama",
       frameMin: "600×400（最小）",
       frameDefault: "800×600（默认）",
+      frameNarrow699: "699（仅图标栏）",
+      frameBoundary700: "700（标签栏）",
     },
   },
 };
