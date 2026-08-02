@@ -626,35 +626,42 @@ fn win32_db_open_secures_dir_and_file() {
         assert!(found_user_ace, "current-user ACCESS_ALLOWED ACE must exist for {:?}", path);
     }
 
-    // Directory ACE must be inheritable; file ACE must NOT be:
-    // (Check the inheritance flags on the directory's ACE)
-    let dir_wide: Vec<u16> = dir.path().as_os_str().encode_wide().chain(std::iter::once(0)).collect();
-    let mut dir_dacl: *mut ACL = std::ptr::null_mut();
-    let mut dir_sd: PSECURITY_DESCRIPTOR = std::ptr::null_mut();
-    unsafe {
-        GetNamedSecurityInfoW(dir_wide.as_ptr(), SE_FILE_OBJECT,
-            DACL_SECURITY_INFORMATION, std::ptr::null_mut(), std::ptr::null_mut(),
-            &mut dir_dacl, std::ptr::null_mut(), &mut dir_sd);
-    }
-    let mut dir_ace: *mut std::ffi::c_void = std::ptr::null_mut();
-    unsafe { GetAce(dir_dacl, 0, &mut dir_ace); }
-    // ACE_HEADER = { AceType: u8, AceFlags: u8, AceSize: u16 }
-    let dir_flags = unsafe { *(dir_ace.add(1) as *const u8) };
-    // SUB_CONTAINERS_AND_OBJECTS_INHERIT = 0x3
-    assert_ne!(dir_flags & 0x3, 0, "directory ACE must be inheritable");
-    unsafe { LocalFree(dir_sd as *mut _); }
-
-    let file_wide: Vec<u16> = db_path.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
-    let mut file_dacl: *mut ACL = std::ptr::null_mut();
-    let mut file_sd: PSECURITY_DESCRIPTOR = std::ptr::null_mut();
-    unsafe {
-        GetNamedSecurityInfoW(file_wide.as_ptr(), SE_FILE_OBJECT,
-            DACL_SECURITY_INFORMATION, std::ptr::null_mut(), std::ptr::null_mut(),
-            &mut file_dacl, std::ptr::null_mut(), &mut file_sd);
-    }
-    let mut file_ace: *mut std::ffi::c_void = std::ptr::null_mut();
-    unsafe { GetAce(file_dacl, 0, &mut file_ace); }
-    let file_flags = unsafe { *(file_ace.add(1) as *const u8) };
-    assert_eq!(file_flags & 0x3, 0, "file ACE must NOT be inheritable");
-    unsafe { LocalFree(file_sd as *mut _); }
+    // Directory ACE must be inheritable; file ACE must NOT be.
+    // Find the current-user's explicit ACE (by SID) and check its inheritance flags.
+    let check_inheritance = |path: &std::path::Path, expect_inherit: bool| {
+        let path_wide: Vec<u16> = path.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
+        let mut dacl: *mut ACL = std::ptr::null_mut();
+        let mut sd: PSECURITY_DESCRIPTOR = std::ptr::null_mut();
+        unsafe {
+            GetNamedSecurityInfoW(path_wide.as_ptr(), SE_FILE_OBJECT,
+                DACL_SECURITY_INFORMATION, std::ptr::null_mut(), std::ptr::null_mut(),
+                &mut dacl, std::ptr::null_mut(), &mut sd);
+        }
+        let mut size_info = ACL_SIZE_INFORMATION { AceCount: 0, AclBytesInUse: 0, AclBytesFree: 0 };
+        unsafe {
+            GetAclInformation(dacl, &mut size_info as *mut _ as *mut _,
+                std::mem::size_of::<ACL_SIZE_INFORMATION>() as u32, AclSizeInformation);
+        }
+        // Find the current-user ACE and check its flags:
+        for i in 0..size_info.AceCount {
+            let mut ace: *mut std::ffi::c_void = std::ptr::null_mut();
+            unsafe { GetAce(dacl, i, &mut ace); }
+            if ace.is_null() { continue; }
+            let ace_sid: windows_sys::Win32::Security::PSID =
+                unsafe { (ace as *const u8).add(8) as windows_sys::Win32::Security::PSID };
+            if unsafe { EqualSid(ace_sid, expected_sid) } != 0 {
+                // ACE_HEADER = { AceType: u8, AceFlags: u8, AceSize: u16 }
+                let flags = unsafe { *(ace.add(1) as *const u8) };
+                let is_inheritable = (flags & 0x3) != 0; // SUB_CONTAINERS_AND_OBJECTS_INHERIT
+                unsafe { LocalFree(sd as *mut _); }
+                assert_eq!(is_inheritable, expect_inherit,
+                    "inheritance mismatch for {:?}: expected inheritable={}", path, expect_inherit);
+                return;
+            }
+        }
+        unsafe { LocalFree(sd as *mut _); }
+        panic!("current-user ACE not found for inheritance check on {:?}", path);
+    };
+    check_inheritance(dir.path(), true);   // directory: inheritable
+    check_inheritance(&db_path, false);     // file: NOT inheritable
 }
