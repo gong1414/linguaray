@@ -54,9 +54,9 @@ export type ProviderCardProps = {
   onEdit: (triggerEl?: HTMLElement) => void;
   onDelete: (triggerEl?: HTMLElement) => void;
   labels?: Partial<ProviderCardLabels>;
-  /** Extra actions rendered at the end of the card's action bar (e.g. reorder
-   *  arrows). Lets the page keep all controls inside the full-width card
-   *  instead of squeezing the card between external handle + arrows. */
+  /** Extra actions rendered at the end of the card's action bar. In the
+   *  Provider Center this carries the role-action icon buttons (Set primary,
+   *  Add/Remove parallel, Set fallback, Duplicate), each wrapped in a Tooltip. */
   extraActions?: JSX.Element;
   class?: string;
 };
