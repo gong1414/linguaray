@@ -1,90 +1,94 @@
-# S0 Erratum — Phase 5 Migration Verification Direction
+# S0 Erratum — Phase 5 Migration Verification Direction (revised)
 
 **Status:** Proposed erratum to frozen S0 spec (`2026-08-01-linguaray-product-baseline.md` §8.5).
-**Date:** 2026-07-31.
-**Reason:** The frozen §8.5 Phase 5 says "Read the v2 keystore back. Assert every DB profile's `secret_ref` exists in `provider_keys`." This is directionally wrong for keyless providers and blocks migration in legitimate scenarios. This erratum clarifies the verification scope before S2a implementation references it.
+**Date:** 2026-08-02. *(rev-1 incorrectly dated 2026-07-31, which predates the frozen S0.)*
+**Reason:** The frozen §8.5 Phase 5 says "Assert every DB profile's `secret_ref` exists in `provider_keys`." This is directionally wrong for keyless providers and blocks migration. This erratum clarifies verification scope, `needs_key` storage, and orphan-key detection before S2a references it.
 
 ---
 
-## Problem
-
-The frozen text asserts **every** DB profile has a key in `provider_keys`. But several provider types legitimately have no key:
-
-- **Local providers** (Ollama): `is_local = true`, `needs_key = false`. No key in the keystore.
-- **Traditional engines configured as fallback** (Google): free, keyless. No key.
-- **Key-missing profiles**: a user may create a provider and not yet enter a key. The profile exists in the DB; the key is absent.
-
-Under the frozen text, Phase 5 would fail for all of these, blocking migration permanently.
-
-## Erratum
-
-Phase 5 verification is **keystore → DB direction, scoped to key-bearing profiles only**:
+## 1. Phase 5 verification direction: keystore → DB, key-bearing only
 
 1. **Enumerate keys** from the v2 keystore's `provider_keys`.
-2. For each key found, assert a DB profile exists with `secret_ref` matching that key.
-3. **Do NOT** assert the reverse (that every DB profile has a key). Keyless providers are valid.
+2. For each key, assert a DB profile exists with `secret_ref` matching that key AND `status != 'deleted'`.
+3. **Do NOT** assert the reverse (every DB profile has a key). Keyless providers are valid.
 
-### `needs_key` classification
+### Orphan-key rule (deleted tombstones)
 
-A provider `needs_key` if and only if:
-- `is_local = false` (not a loopback/local provider), AND
-- `protocol ≠ google_translate` (traditional free engines are keyless), AND
-- The provider's template/preset declares `needs_key = true`.
+A key in the keystore whose only matching DB profile is `status = 'deleted'` (tombstone) is an **orphan** — verification fails. A deleted provider must have had its key removed in delete step 2; if the key persists, the migration is incomplete.
 
-`needs_key` is a **derived property** from `is_local` + `protocol` + preset metadata, not a stored column. It is computed at read time by joining the profile's `template_id` against the preset catalog.
-
-### Keyless vs profile-missing-key
-
-| State | `needs_key` | key in keystore | Valid? |
-|-------|-------------|-----------------|--------|
-| Local provider (Ollama) | false | absent | ✅ Valid — no key needed |
-| Traditional engine (Google free) | false | absent | ✅ Valid — no key needed |
-| AI provider, key entered | true | present | ✅ Valid |
-| AI provider, key not yet entered | true | absent | ✅ Valid (provisional) — profile exists, user can enter key later. UI shows "key missing". Not callable until key set. |
-
-All four states pass Phase 5. The only state that fails is: **a key exists in the keystore but no DB profile has a matching `secret_ref`** (an orphaned key — the profile was deleted but the key wasn't removed, or the DB was lost).
-
-### Archive keystore recovery
-
-After the user archives a corrupt keystore (`archive_keystore` → `.broken-<ts>`):
-1. The keystore is empty (`Missing`).
-2. Phase 5 re-runs: enumerates zero keys from the empty keystore → verification passes trivially (no keys to check).
-3. Existing DB profiles lose their keys. AI providers with `needs_key = true` are set to `enabled = false` in a DB transaction (key-missing state). The user re-enters keys via `provider_set_key`.
-4. `migration_complete = 1`. `DataReadiness = Ready`.
-5. **Phase 5 does not permanently fail.**
-
-### DB-loss recovery (keystore v2, DB rebuilt)
-
-When the DB is lost but the keystore is v2:
-1. Enumerate `provider_keys` from the v2 keystore.
-2. For `"provider/<uuid>"` keys: create repair profiles (`template_id = "unknown"`, `protocol = "custom_http"`, `endpoint = ""`, `enabled = false`). The uuid is extracted from the key if parseable.
-3. For legacy keys (no `"provider/"` prefix): same preset-lookup logic as normal migration.
-4. Phase 5 verifies these newly-created profiles against the keys → passes.
+- `status = 'deleting'`: NOT an orphan. The key is expected to still exist (delete step 2 hasn't run yet). `resume_deletions` will remove it.
+- `status = 'deleted'`: the key should already be gone. If it persists → orphan → verification fails → `MigrationIncomplete`.
 
 ---
 
-## Traditional engine provider catalog (new)
+## 2. `needs_key` — stored DB column with CHECK
 
-The frozen spec maps `fallback_engine` to a provider UUID, but the current `TraditionalEngine` trait has no `endpoint()` method and `base_url` is private. S2a introduces a **traditional provider catalog**:
+`needs_key` is a **stored column** on `providers` (NOT a derived runtime property), constrained by CHECK:
+
+```sql
+needs_key INTEGER NOT NULL CHECK (needs_key IN (0, 1))
+```
+
+This eliminates ambiguity. The value is set at profile creation and never changes:
+
+| Provider type | `needs_key` |
+|---------------|-------------|
+| Local (Ollama) | 0 |
+| Traditional free engine (Google) | 0 |
+| AI preset (OpenAI/Anthropic/Gemini) | 1 |
+| Unknown/custom repair profile | 1 (fail-closed: requires a key before callable) |
+
+### Phase 5 does NOT check keyless providers
+
+Profiles with `needs_key = 0` are never required to have a key. Phase 5 only verifies keys that actually exist in the keystore have a matching non-deleted profile.
+
+### Post-archive recovery (keystore emptied)
+
+After `archive_keystore` / `reset_keystore` (keystore becomes empty/missing):
+1. Phase 5 re-runs: zero keys in keystore → verification passes trivially.
+2. DB transaction: `UPDATE providers SET enabled = 0 WHERE needs_key = 1` (AI providers lost their keys → disabled). Keyless providers (`needs_key = 0`) stay enabled.
+3. Clear active selection + consent (slots may reference now-disabled providers).
+4. `migration_complete = 1`, `DataReadiness = Ready`.
+5. User re-enters keys via `provider_set_key`, which re-enables the profile.
+
+The recovery SQL is now executable directly (`WHERE needs_key = 1`), not a pseudo-derivation.
+
+---
+
+## 3. DB-loss recovery (keystore v2, DB rebuilt)
+
+When the DB is lost/rebuilt but the keystore is v2:
+
+1. Enumerate `provider_keys` from the v2 keystore.
+2. For `"provider/<uuid>"` keys (new-style):
+   - **Parseable UUID:** create repair profile with that UUID, `secret_ref = "provider/<uuid>"`, `template_id = "unknown"`, `protocol = "custom_http"`, `endpoint = ""`, `needs_key = 1`, `enabled = 0`.
+   - **Unparseable:** generate a **deterministic UUIDv5** from the full `secret_ref` string (`UUIDv5(NAMESPACE, "linguaray:recovered-key:" + secret_ref)`). NOT UUIDv4 — crash replay must be idempotent.
+3. For legacy keys (no `"provider/"` prefix): same preset/catalog lookup as normal migration; unknown → repair profile (`needs_key = 1`, `enabled = 0`).
+4. Phase 5 verifies: each enumerated key has a matching non-deleted profile → passes.
+
+---
+
+## 4. Traditional engine provider catalog
+
+The frozen spec maps `fallback_engine` to a provider UUID, but `TraditionalEngine` has no `endpoint()` method and `base_url` is private. S2a introduces a **static catalog**:
 
 ```rust
 pub struct TraditionalProviderCatalog {
-    pub template_id: &'static str,   // "google", "deepl", "baidu", ...
+    pub template_id: &'static str,
     pub label: &'static str,
-    pub endpoint: &'static str,       // the base URL for this engine
-    pub needs_key: bool,
+    pub endpoint: &'static str,
+    pub needs_key: bool,  // always false for traditional free engines
+}
+
+pub fn traditional_catalog() -> &'static [TraditionalProviderCatalog] {
+    &[
+        TraditionalProviderCatalog {
+            template_id: "google", label: "Google Translate",
+            endpoint: "https://translate.google.com", needs_key: false,
+        },
+        // DeepL, Baidu, etc. added here in future slices
+    ]
 }
 ```
 
-This catalog is static data (like `providers::presets()`), separate from the runtime `TraditionalEngine` trait. It provides the `endpoint` + `template_id` needed to create a `ProviderProfile` row for a traditional engine. Google's entry:
-
-```rust
-TraditionalProviderCatalog {
-    template_id: "google",
-    label: "Google Translate",
-    endpoint: "https://translate.google.com",
-    needs_key: false,
-}
-```
-
-The `TraditionalEngine` trait may later gain an `endpoint()` method that returns this, but S2a does not require modifying the trait — the static catalog suffices for migration.
+This is static data, separate from the runtime `TraditionalEngine` trait. It provides `endpoint` + `template_id` for creating a `ProviderProfile` row. The trait is not modified.
