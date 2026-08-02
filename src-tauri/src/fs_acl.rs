@@ -125,20 +125,19 @@ pub fn sid_from_token_user_buf(buf: &[u8]) -> Result<windows_sys::Win32::Securit
 pub(crate) fn set_win32_owner_dacl(path: &Path, inherit: bool) -> Result<(), AclError> {
     use std::os::windows::ffi::OsStrExt;
     use windows_sys::Win32::Foundation::GENERIC_ALL;
-    use windows_sys::Win32::Security::Authorization::{SetNamedSecurityInfoW, SE_FILE_OBJECT};
     use windows_sys::Win32::Security::{
         ACL, ACL_REVISION_DS, AddAccessAllowedAceEx, InitializeAcl,
-        CONTAINER_INHERIT_ACE, DACL_SECURITY_INFORMATION, OBJECT_SECURITY_INFORMATION,
-        OBJECT_INHERIT_ACE, OWNER_SECURITY_INFORMATION, PROTECTED_DACL_SECURITY_INFORMATION,
-        PSID,
+        CONTAINER_INHERIT_ACE, DACL_SECURITY_INFORMATION, OBJECT_INHERIT_ACE,
+        OWNER_SECURITY_INFORMATION, PROTECTED_DACL_SECURITY_INFORMATION, PSID,
+        SECURITY_DESCRIPTOR, SECURITY_DESCRIPTOR_REVISION,
+        InitializeSecurityDescriptor, SetSecurityDescriptorOwner,
+        SetSecurityDescriptorDacl, SetFileSecurityW,
     };
 
     let sid_buf = current_user_sid()?;
     let sid: PSID = sid_from_token_user_buf(&sid_buf)?;
 
-    // Build ACL manually: InitializeAcl + AddAccessAllowedAceEx.
-    // AddAccessAllowedAceEx writes AceFlags DIRECTLY, unlike SetEntriesInAclW
-    // which may not propagate grfInheritance correctly.
+    // Build ACL with AddAccessAllowedAceEx (sets AceFlags directly).
     const ACL_BUF_SIZE: usize = 128;
     let mut acl_buf: [u8; ACL_BUF_SIZE] = [0u8; ACL_BUF_SIZE];
     let acl: *mut ACL = acl_buf.as_mut_ptr() as *mut ACL;
@@ -150,21 +149,32 @@ pub(crate) fn set_win32_owner_dacl(path: &Path, inherit: bool) -> Result<(), Acl
         return Err(AclError::Win32("AddAccessAllowedAceEx failed".into()));
     }
 
+    // Build a self-relative security descriptor in a buffer.
+    // SetFileSecurityW applies it WITHOUT the ACE-flag normalization that
+    // SetNamedSecurityInfoW performs.
+    const SD_BUF_SIZE: usize = 256;
+    let mut sd_buf: [u8; SD_BUF_SIZE] = [0u8; SD_BUF_SIZE];
+    let sd: *mut SECURITY_DESCRIPTOR = sd_buf.as_mut_ptr() as *mut SECURITY_DESCRIPTOR;
+    if unsafe { InitializeSecurityDescriptor(sd, SECURITY_DESCRIPTOR_REVISION) } == 0 {
+        return Err(AclError::Win32("InitializeSecurityDescriptor failed".into()));
+    }
+    // Owner = current user:
+    if unsafe { SetSecurityDescriptorOwner(sd, sid, 0) } == 0 {
+        return Err(AclError::Win32("SetSecurityDescriptorOwner failed".into()));
+    }
+    // DACL present + the ACL we built. PROTECTED flag = NOT inheritable from parent.
+    // (SE_DACL_PROTECTED is bit 0x800 in the control field; we always set it
+    // here because SetFileSecurityW doesn't strip ACE inheritance flags like
+    // SetNamedSecurityInfoW does.)
+    let dacl_protected = 1u32; // SE_DACL_PROTECTED
+    if unsafe { SetSecurityDescriptorDacl(sd, 1, acl, dacl_protected) } == 0 {
+        return Err(AclError::Win32("SetSecurityDescriptorDacl failed".into()));
+    }
+
     let path_wide: Vec<u16> = path.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
-    // Directories: no PROTECTED_DACL (it strips ACE inheritance flags).
-    // Files: PROTECTED_DACL (leaf, no children to propagate to).
-    let info: OBJECT_SECURITY_INFORMATION = OWNER_SECURITY_INFORMATION
-        | DACL_SECURITY_INFORMATION
-        | if inherit { 0 } else { PROTECTED_DACL_SECURITY_INFORMATION };
-    let rc = unsafe {
-        SetNamedSecurityInfoW(
-            path_wide.as_ptr(), SE_FILE_OBJECT, info,
-            sid, std::ptr::null_mut(),
-            acl, std::ptr::null_mut(),
-        )
-    };
-    if rc != 0 {
-        return Err(AclError::Win32(format!("SetNamedSecurityInfoW failed: Win32 error {rc}")));
+    let rc = unsafe { SetFileSecurityW(path_wide.as_ptr(), DACL_SECURITY_INFORMATION | OWNER_SECURITY_INFORMATION, sd as *const _) };
+    if rc == 0 {
+        return Err(AclError::Win32(format!("SetFileSecurityW failed: {}", std::io::Error::last_os_error())));
     }
     Ok(())
 }
