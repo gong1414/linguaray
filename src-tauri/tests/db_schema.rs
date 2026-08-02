@@ -676,7 +676,8 @@ fn win32_db_open_secures_dir_and_file() {
 #[test]
 fn win32_dir_inheritance_propagates_to_child_file() {
     use std::os::windows::ffi::OsStrExt;
-    use windows_sys::Win32::Foundation::{LocalFree, PSID};
+    use windows_sys::Win32::Foundation::LocalFree;
+    use windows_sys::Win32::Security::PSID;
     use windows_sys::Win32::Security::Authorization::{GetNamedSecurityInfoW, SE_FILE_OBJECT};
     use windows_sys::Win32::Security::{
         AclSizeInformation, EqualSid, GetAclInformation, GetAce,
