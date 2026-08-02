@@ -12,14 +12,15 @@
  * rule, or the 700px label rule is removed or altered, this fails.
  *
  * REAL-BROWSER LAYOUT MEASUREMENT (recorded against current code):
- * The UI Lab now exposes boundary-probe frame modes (frame chip cycles
- * default → 600 → 699 → 702). Measured in a real browser via the probe modes:
- *   - frame 699px → settings-shell clientWidth = 697px (≤699) → rail 47px,
+ * The UI Lab exposes boundary-probe frame modes (frame chip cycles
+ * default → 600 → 699 → 702). Independently measured in a real browser:
+ *   - frame 699px → settings-shell clientWidth = 697px (≤699) → rail 48px,
  *     label display "none" (icon-only) ✓
- *   - frame 702px → settings-shell clientWidth = 700px (≥700) → rail 179px,
+ *   - frame 702px → settings-shell clientWidth = 700px (≥700) → rail 180px,
  *     label display "block" (full labels) ✓
- * The shell is ~2px narrower than the frame (its border), so the probe frame
- * widths are chosen to land the SHELL straddling the 699/700 boundary.
+ * (rail widths are the rendered CSS width: 48px / 180px, matching the rules
+ * asserted below.) The shell is ~2px narrower than the frame (its border), so
+ * the probe frame widths are chosen to land the SHELL straddling the boundary.
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
