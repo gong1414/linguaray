@@ -113,46 +113,53 @@ pub fn sid_from_token_user_buf(buf: &[u8]) -> Result<windows_sys::Win32::Securit
 
 /// Windows: set owner = current-user SID + protected DACL with one ACE
 /// (current user, GENERIC_ALL). `inherit` controls whether the ACE propagates
-/// to children (true for directories, false for files). Pub(crate) so the
-/// keystore verification test can call it directly.
+/// to children (true for directories, false for files).
+///
+/// Uses `InitializeAcl` + `AddAccessAllowedAceEx` (NOT `SetEntriesInAclW`)
+/// because `SetEntriesInAclW` + `SetNamedSecurityInfoW(PROTECTED_DACL)` can
+/// normalize away the inheritance flags on some Windows versions.
+/// `AddAccessAllowedAceEx` writes `AceFlags` directly into the ACE, so the
+/// `OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE` bits survive.
+/// Pub(crate) so the keystore verification test can call it directly.
 #[cfg(windows)]
 pub(crate) fn set_win32_owner_dacl(path: &Path, inherit: bool) -> Result<(), AclError> {
     use std::os::windows::ffi::OsStrExt;
     use windows_sys::Win32::Foundation::{GENERIC_ALL, LocalFree};
     use windows_sys::Win32::Security::Authorization::{
-        SetEntriesInAclW, SetNamedSecurityInfoW, EXPLICIT_ACCESS_W, SE_FILE_OBJECT,
-        SET_ACCESS, TRUSTEE_FORM, TRUSTEE_IS_SID, TRUSTEE_W,
+        SetNamedSecurityInfoW, SE_FILE_OBJECT,
     };
     use windows_sys::Win32::Security::{
-        ACL, DACL_SECURITY_INFORMATION, OBJECT_SECURITY_INFORMATION,
-        OWNER_SECURITY_INFORMATION, PROTECTED_DACL_SECURITY_INFORMATION, PSID,
-        SUB_CONTAINERS_AND_OBJECTS_INHERIT,
+        ACL, ACL_REVISION_DS, AddAccessAllowedAceEx, InitializeAcl,
+        CONTAINER_INHERIT_ACE, DACL_SECURITY_INFORMATION, OBJECT_SECURITY_INFORMATION,
+        OBJECT_INHERIT_ACE, OWNER_SECURITY_INFORMATION, PROTECTED_DACL_SECURITY_INFORMATION,
+        PSID,
     };
 
     let sid_buf = current_user_sid()?;
     let sid: PSID = sid_from_token_user_buf(&sid_buf)?;
 
-    let mut ea: EXPLICIT_ACCESS_W = unsafe { std::mem::zeroed() };
-    ea.grfAccessPermissions = GENERIC_ALL;
-    ea.grfAccessMode = SET_ACCESS;
-    ea.grfInheritance = if inherit { SUB_CONTAINERS_AND_OBJECTS_INHERIT } else { 0 };
-    let mut trustee: TRUSTEE_W = unsafe { std::mem::zeroed() };
-    trustee.TrusteeForm = TRUSTEE_IS_SID as TRUSTEE_FORM;
-    trustee.ptstrName = sid as *mut _;
-    ea.Trustee = trustee;
+    // Build the ACL manually (not via SetEntriesInAclW) so AceFlags are set
+    // directly and survive SetNamedSecurityInfoW.
+    // Max ACL size for 1 ACE: header (8) + ACE header (4) + mask (4) + SID (max ~68) = ~84.
+    // Round up to 128 for safety.
+    const ACL_BUF_SIZE: usize = 128;
+    let mut acl_buf: [u8; ACL_BUF_SIZE] = [0u8; ACL_BUF_SIZE];
+    let acl: *mut ACL = acl_buf.as_mut_ptr() as *mut ACL;
+    let ok = unsafe { InitializeAcl(acl, ACL_BUF_SIZE as u32, ACL_REVISION_DS) };
+    if ok == 0 {
+        return Err(AclError::Win32("InitializeAcl failed".into()));
+    }
 
-    let mut new_acl: *mut ACL = std::ptr::null_mut();
-    let rc = unsafe { SetEntriesInAclW(1, &ea, std::ptr::null(), &mut new_acl) };
-    if rc != 0 || new_acl.is_null() {
-        return Err(AclError::Win32(format!("SetEntriesInAclW failed: Win32 error {rc}")));
+    // AceFlags: directory gets OBJECT_INHERIT | CONTAINER_INHERIT; file gets 0.
+    let ace_flags = if inherit {
+        OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE
+    } else {
+        0
+    };
+    let ok = unsafe { AddAccessAllowedAceEx(acl, ACL_REVISION_DS, ace_flags, GENERIC_ALL, sid) };
+    if ok == 0 {
+        return Err(AclError::Win32("AddAccessAllowedAceEx failed".into()));
     }
-    struct AclGuard(*mut ACL);
-    impl Drop for AclGuard {
-        fn drop(&mut self) {
-            unsafe { LocalFree(self.0 as *mut _) };
-        }
-    }
-    let _acl_guard = AclGuard(new_acl);
 
     let path_wide: Vec<u16> = path.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
     let info: OBJECT_SECURITY_INFORMATION = OWNER_SECURITY_INFORMATION
@@ -165,7 +172,7 @@ pub(crate) fn set_win32_owner_dacl(path: &Path, inherit: bool) -> Result<(), Acl
             info,
             sid,
             std::ptr::null_mut(),
-            new_acl,
+            acl,
             std::ptr::null_mut(),
         )
     };
