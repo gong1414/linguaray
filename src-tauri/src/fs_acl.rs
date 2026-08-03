@@ -131,9 +131,8 @@ pub(crate) fn set_win32_owner_dacl(path: &Path, inherit: bool) -> Result<(), Acl
         OWNER_SECURITY_INFORMATION, PROTECTED_DACL_SECURITY_INFORMATION, PSID,
         SECURITY_DESCRIPTOR,
         InitializeSecurityDescriptor, SetSecurityDescriptorOwner,
-        SetSecurityDescriptorDacl,
+        SetSecurityDescriptorDacl, SetFileSecurityW,
     };
-    use windows_sys::Win32::Storage::FileSystem::SetFileSecurityW;
     const SECURITY_DESCRIPTOR_REVISION: u32 = 1;
 
     let sid_buf = current_user_sid()?;
