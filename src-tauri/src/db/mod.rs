@@ -22,6 +22,12 @@ pub mod schema;
 pub mod providers;
 pub mod migration;
 
+/// Convenience re-export: derive the pre-migration settings backup path. Tests
+/// assert on it without hardcoding the `.bak-pre-migration` suffix.
+pub fn migration_settings_bak_path(settings_path: &Path) -> std::path::PathBuf {
+    migration::settings_bak_path(settings_path)
+}
+
 /// Database error type. Wraps rusqlite errors + domain-specific errors.
 #[derive(Debug)]
 pub enum DbError {
