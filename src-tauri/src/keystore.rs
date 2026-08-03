@@ -285,58 +285,93 @@ pub fn encrypt(identity: &str, identity_source: IdentitySource, keys: &serde_jso
 /// Validate the envelope header against the whitelist BEFORE decryption, then
 /// decrypt. A tampered `kdf_params` is rejected outright (DoS guard) — never honored.
 pub fn decrypt(envelope: &Envelope, machine_source: IdentitySource) -> Result<serde_json::Value, KeystoreError> {
-    if envelope.version != VERSION { return Err(KeystoreError::UnsupportedVersion(envelope.version)); }
-    if envelope.aead != "aes-256-gcm" || envelope.kdf != "argon2id" { return Err(KeystoreError::Envelope("bad aead/kdf".into())); }
-    if envelope.kdf_params.m_kib != PINNED_KDF.m_kib
-        || envelope.kdf_params.t != PINNED_KDF.t
-        || envelope.kdf_params.p != PINNED_KDF.p
-        || envelope.kdf_params.output_len != PINNED_KDF.output_len {
-        return Err(KeystoreError::Envelope("kdf_params not pinned".into()));
-    }
-    if envelope.identity_source != machine_source {
+    if machine_source != IdentitySource::CURRENT {
+        // Historical callers passed an explicit source; the current pin is the
+        // platform's CURRENT source. Only CURRENT is honored (the envelope's
+        // recorded source is still checked inside decrypt_with).
         return Err(KeystoreError::AuthFailed);
     }
-    let salt = B64.decode(&envelope.salt).map_err(|e| KeystoreError::Envelope(e.to_string()))?;
-    let nonce = B64.decode(&envelope.nonce).map_err(|e| KeystoreError::Envelope(e.to_string()))?;
-    let ct = B64.decode(&envelope.ciphertext).map_err(|e| KeystoreError::Envelope(e.to_string()))?;
-    if salt.len() != SALT_LEN || nonce.len() != NONCE_LEN || ct.len() < 16 {
-        return Err(KeystoreError::Envelope("bad field lengths".into()));
-    }
-    let identity = machine_source.read()?;
-    let key = derive_key(&identity, &salt);
-    let cipher = Aes256Gcm::new_from_slice(&key)
-        .map_err(|e| KeystoreError::Crypto(e.to_string()))?;
-    let pt = cipher.decrypt(Nonce::from_slice(&nonce), aes_gcm::aead::Payload { msg: &ct, aad: FIXED_AAD })
-        .map_err(|_| KeystoreError::AuthFailed)?;
-    let v: serde_json::Value = serde_json::from_slice(&pt).map_err(|e| KeystoreError::Envelope(e.to_string()))?;
-    Ok(v)
+    decrypt_with(envelope, Identity::Machine)
 }
 
 #[doc(hidden)]
 /// Test-only: decrypt with an explicit identity string instead of reading the
 /// machine. Lets tests drive the crypto without touching real OS identity.
 pub fn decrypt_with_identity(envelope: &Envelope, identity: &str) -> Result<serde_json::Value, KeystoreError> {
+    decrypt_with(envelope, Identity::Injected(identity))
+}
+
+use std::path::{Path, PathBuf};
+use parking_lot::Mutex;
+
+/// Where the identity used to (de)crypt comes from. The single axis along which
+/// the production path and the test seam differ — every other piece of locked
+/// read / backup / rewrite logic is shared via the `*_locked_core` functions
+/// below, so tests exercise the SAME core as production (no duplicated logic
+/// that could drift and produce false greens).
+///
+/// `Machine`  → read the real OS identity via `IdentitySource::CURRENT` (and
+///              validate the envelope's `identity_source` against it). Production.
+/// `Injected` → use the given string verbatim (no source check). Test only.
+#[derive(Clone, Copy)]
+enum Identity<'a> {
+    Machine,
+    Injected(&'a str),
+}
+
+impl<'a> Identity<'a> {
+    /// Validate the envelope header + decrypt, branching on the identity source.
+    /// `Machine` validates `identity_source == CURRENT` and reads the OS identity;
+    /// `Injected` skips the source check and uses the injected string. All other
+    /// validation (version/aead/kdf/lengths) is identical to the public `decrypt`
+    /// and `decrypt_with_identity` paths — those now delegate here too.
+    fn decrypt_for(&self, envelope: &Envelope) -> Result<serde_json::Value, KeystoreError> {
+        decrypt_with(envelope, *self)
+    }
+}
+
+/// Validate the envelope header against the pinned whitelist, then decrypt using
+/// the identity selected by `id`. The single crypto entry point for both the
+/// production (`Machine`) and test (`Injected`) paths. The public `decrypt` and
+/// `decrypt_with_identity` are thin facades over this.
+fn decrypt_with(envelope: &Envelope, id: Identity<'_>) -> Result<serde_json::Value, KeystoreError> {
     if envelope.version != VERSION { return Err(KeystoreError::UnsupportedVersion(envelope.version)); }
-    if envelope.aead != "aes-256-gcm" || envelope.kdf != "argon2id" { return Err(KeystoreError::Envelope("bad aead/kdf".into())); }
-    if envelope.kdf_params.m_kib != PINNED_KDF.m_kib || envelope.kdf_params.t != PINNED_KDF.t
-        || envelope.kdf_params.p != PINNED_KDF.p || envelope.kdf_params.output_len != PINNED_KDF.output_len {
+    if envelope.aead != "aes-256-gcm" || envelope.kdf != "argon2id" {
+        return Err(KeystoreError::Envelope("bad aead/kdf".into()));
+    }
+    if envelope.kdf_params.m_kib != PINNED_KDF.m_kib
+        || envelope.kdf_params.t != PINNED_KDF.t
+        || envelope.kdf_params.p != PINNED_KDF.p
+        || envelope.kdf_params.output_len != PINNED_KDF.output_len
+    {
         return Err(KeystoreError::Envelope("kdf_params not pinned".into()));
     }
+    // Identity resolution. Production validates the recorded source against the
+    // current platform's source AND reads the real OS identity; tests inject the
+    // string directly and skip the source check (the envelope was sealed with a
+    // known test identity regardless of its recorded source field).
+    let identity = match id {
+        Identity::Machine => {
+            if envelope.identity_source != IdentitySource::CURRENT {
+                return Err(KeystoreError::AuthFailed);
+            }
+            IdentitySource::CURRENT.read()?
+        }
+        Identity::Injected(s) => s.to_string(),
+    };
     let salt = B64.decode(&envelope.salt).map_err(|e| KeystoreError::Envelope(e.to_string()))?;
     let nonce = B64.decode(&envelope.nonce).map_err(|e| KeystoreError::Envelope(e.to_string()))?;
     let ct = B64.decode(&envelope.ciphertext).map_err(|e| KeystoreError::Envelope(e.to_string()))?;
     if salt.len() != SALT_LEN || nonce.len() != NONCE_LEN || ct.len() < 16 {
         return Err(KeystoreError::Envelope("bad field lengths".into()));
     }
-    let key = derive_key(identity, &salt);
-    let cipher = Aes256Gcm::new_from_slice(&key).map_err(|e| KeystoreError::Crypto(e.to_string()))?;
+    let key = derive_key(&identity, &salt);
+    let cipher = Aes256Gcm::new_from_slice(&key)
+        .map_err(|e| KeystoreError::Crypto(e.to_string()))?;
     let pt = cipher.decrypt(Nonce::from_slice(&nonce), aes_gcm::aead::Payload { msg: &ct, aad: FIXED_AAD })
         .map_err(|_| KeystoreError::AuthFailed)?;
     serde_json::from_slice(&pt).map_err(|e| KeystoreError::Envelope(e.to_string()))
 }
-
-use std::path::{Path, PathBuf};
-use parking_lot::Mutex;
 
 /// Owns the keystore directory + in-process lock + cross-process sidecar lock.
 ///
@@ -431,6 +466,23 @@ impl Keystore {
     /// Returns `Missing` WITHOUT taking the flock when the file is absent, so a
     /// fresh-install probe never contends with a writer on the same dir.
     pub fn load_state(&self) -> KeystoreLoadState {
+        self.load_state_with(Identity::Machine)
+    }
+
+    /// Test-only: same as [`load_state`](Self::load_state) but decrypts with an
+    /// explicit identity string instead of reading the machine. Lets tests drive
+    /// the classification without touching real OS identity. Delegates to the SAME
+    /// locked-read core as the production path (no duplicated read/decrypt logic).
+    #[doc(hidden)]
+    pub fn load_state_with_identity(&self, identity: &str) -> KeystoreLoadState {
+        self.load_state_with(Identity::Injected(identity))
+    }
+
+    /// Shared front end for both `load_state` (production) and
+    /// `load_state_with_identity` (test). The fast-path Missing check is done
+    /// OUTSIDE the flock (fresh-install probe never contends with a writer); the
+    /// actual read + decrypt + classify happens under BOTH locks via the core.
+    fn load_state_with(&self, id: Identity<'_>) -> KeystoreLoadState {
         // Fast path: if the file doesn't exist, there's nothing to lock on.
         // Checking first (without locks) is safe — absence is monotonic for our
         // usage and Missing-vs-the-rest is what callers branch on. If a file
@@ -440,50 +492,28 @@ impl Keystore {
         if !self.file().exists() {
             return KeystoreLoadState::Missing;
         }
-        match self.with_locks(|ks| ks.load_state_locked()) {
+        match self.with_locks(|ks| ks.load_state_locked_core(id)) {
             Ok(state) => state,
             Err(e) => KeystoreLoadState::Corrupt(e),
         }
     }
 
-    /// Locked classification (caller holds BOTH locks). Decrypts with the machine
-    /// identity exactly like `load_locked`, then inspects the payload for a
-    /// `version` field. Any read/decrypt/parse failure is returned as `Err` so the
-    /// public `load_state` wrapper can fold it into `Corrupt`.
-    fn load_state_locked(&self) -> Result<KeystoreLoadState, KeystoreError> {
+    /// THE locked classification core (caller holds BOTH locks). Reads the file,
+    /// decrypts with the identity selected by `id`, and classifies the payload
+    /// into Missing / LegacyV1 / CurrentV2. Both the production path
+    /// (`Identity::Machine`) and the test seam (`Identity::Injected`) go through
+    /// here — no duplicated read/decrypt logic to drift. Any
+    /// read/decrypt/parse failure is returned as `Err` so the public wrapper can
+    /// fold it into `Corrupt`.
+    fn load_state_locked_core(&self, id: Identity<'_>) -> Result<KeystoreLoadState, KeystoreError> {
         let path = self.file();
         // Re-check absence under the lock (race with a concurrent reset/archive).
         if !path.exists() { return Ok(KeystoreLoadState::Missing); }
         let bytes = std::fs::read(&path)?;
         let env: Envelope = serde_json::from_slice(&bytes)
             .map_err(|e| KeystoreError::Envelope(format!("malformed: {e}")))?;
-        let payload = decrypt(&env, IdentitySource::CURRENT)?;
+        let payload = id.decrypt_for(&env)?;
         classify_payload(&payload)
-    }
-
-    /// Test-only: same as [`load_state`](Self::load_state) but decrypts with an
-    /// explicit identity string instead of reading the machine. Lets tests drive
-    /// the classification without touching real OS identity.
-    #[doc(hidden)]
-    pub fn load_state_with_identity(&self, identity: &str) -> KeystoreLoadState {
-        if !self.file().exists() {
-            return KeystoreLoadState::Missing;
-        }
-        // Inline the locked read + injected-identity decrypt. We can't reuse
-        // load_state_locked (it calls decrypt with CURRENT), so we open-code the
-        // minimal read+classify under the lock.
-        match self.with_locks(|ks| {
-            let path = ks.file();
-            if !path.exists() { return Ok(KeystoreLoadState::Missing); }
-            let bytes = std::fs::read(&path)?;
-            let env: Envelope = serde_json::from_slice(&bytes)
-                .map_err(|e| KeystoreError::Envelope(format!("malformed: {e}")))?;
-            let payload = decrypt_with_identity(&env, identity)?;
-            classify_payload(&payload)
-        }) {
-            Ok(state) => state,
-            Err(e) => KeystoreLoadState::Corrupt(e),
-        }
     }
 
     /// Encrypt + atomically write the keys map. Takes both locks.
@@ -493,10 +523,26 @@ impl Keystore {
         self.with_locks(|ks| ks.store_locked(&keys))
     }
 
-    /// Locked write (caller holds BOTH locks). Used by with_locks bodies.
+    /// Locked write (caller holds BOTH locks). Used by with_locks bodies. Reads
+    /// the machine identity and delegates to [`store_locked_core`](Self::store_locked_core).
     fn store_locked(&self, keys: &serde_json::Value) -> Result<(), KeystoreError> {
-        let identity = IdentitySource::CURRENT.read()?;
-        let env = encrypt(&identity, IdentitySource::CURRENT, keys)?;
+        self.store_locked_core(keys, Identity::Machine)
+    }
+
+    /// THE locked write core (caller holds BOTH locks). Encrypts with the identity
+    /// selected by `id` and atomically replaces the keystore file. The production
+    /// [`store_locked`](Self::store_locked) and the migration test seam both go
+    /// through here — no duplicated encrypt/atomic-replace logic to drift.
+    fn store_locked_core(&self, keys: &serde_json::Value, id: Identity<'_>) -> Result<(), KeystoreError> {
+        // Production reads the real OS identity + records CURRENT as the source.
+        // Tests inject the identity string and record the macOS source (the test
+        // identity is the same on every host regardless of the platform it runs
+        // on, so the recorded source only matters for the production path).
+        let (identity, source) = match id {
+            Identity::Machine => (IdentitySource::CURRENT.read()?, IdentitySource::CURRENT),
+            Identity::Injected(s) => (s.to_string(), IdentitySource::MacosIoplatformuuid),
+        };
+        let env = encrypt(&identity, source, keys)?;
         let tmp = self.dir.join(TMP);
         let json = serde_json::to_vec(&env).map_err(|e| KeystoreError::Envelope(e.to_string()))?;
         std::fs::write(&tmp, &json)?;
@@ -573,43 +619,63 @@ impl Keystore {
     /// assert on it without hardcoding the filename string.
     fn backup_path(&self) -> PathBuf { self.dir.join(BACKUP_PRE_MIGRATION) }
 
-    /// Under BOTH locks: create the pre-migration backup if it doesn't already
-    /// exist (create-new only — never overwrite a prior backup), then atomically
-    /// rewrite the keystore with the v2 payload. Used by `migrate_to_v2`.
-    fn migrate_to_v2_locked(&self, data: &KeystoreData) -> Result<(), KeystoreError> {
-        // Backup: copy keystore.json → keystore.json.bak-pre-migration, create-new
-        // only. Done UNDER the lock so a concurrent writer can't race the copy.
+    /// Under BOTH locks: create the pre-migration backup (idempotent — create-new
+    /// only, never overwrites a prior backup). Reads `keystore.json` bytes and
+    /// writes them to `keystore.json.bak-pre-migration`, secured with
+    /// `fs_acl::secure_file`. No-op if the canonical file is absent or the backup
+    /// already exists. This is the locked core shared by `migrate_to_v2_locked_core`
+    /// and the standalone [`backup_keystore`](crate::keystore::backup_keystore) free
+    /// function (Step 1 of the migration coordinator: backup SEPARATE from rewrite).
+    fn backup_locked(&self) -> Result<(), KeystoreError> {
         let src = self.file();
-        if src.exists() {
-            let bak = self.backup_path();
-            if !bak.exists() {
-                // create_new fails atomically if a concurrent process created it,
-                // which is the create-new guarantee we want.
-                match std::fs::OpenOptions::new()
-                    .create_new(true)
-                    .write(true)
-                    .open(&bak)
-                {
-                    Ok(mut f) => {
-                        // Copy current bytes into the freshly-created backup.
-                        let bytes = std::fs::read(&src)?;
-                        std::io::Write::write_all(&mut f, &bytes)?;
-                        drop(f);
-                        // Match the keystore file's ACL (owner-only).
-                        crate::fs_acl::secure_file(&bak)?;
-                    }
-                    Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
-                        // Lost the create-new race (or a prior backup exists) —
-                        // leave the existing backup untouched (create-new semantics).
-                    }
-                    Err(e) => return Err(KeystoreError::Io(e)),
-                }
-            }
+        if !src.exists() {
+            // Nothing to back up (fresh install). Idempotent no-op.
+            return Ok(());
         }
-        // Atomic rewrite of the v2 payload via the same encrypt + atomic_replace
-        // path the rest of the keystore uses.
+        let bak = self.backup_path();
+        if bak.exists() {
+            // A prior backup exists — leave it untouched (create-new semantics).
+            return Ok(());
+        }
+        // create_new fails atomically if a concurrent process created it, which is
+        // the create-new guarantee we want.
+        let mut f = match std::fs::OpenOptions::new().create_new(true).write(true).open(&bak) {
+            Ok(f) => f,
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                // Lost the create-new race (or a prior backup exists) — leave the
+                // existing backup untouched (create-new semantics).
+                return Ok(());
+            }
+            Err(e) => return Err(KeystoreError::Io(e)),
+        };
+        // Copy current bytes into the freshly-created backup.
+        let bytes = std::fs::read(&src)?;
+        std::io::Write::write_all(&mut f, &bytes)?;
+        drop(f);
+        // Match the keystore file's ACL (owner-only).
+        crate::fs_acl::secure_file(&bak)?;
+        Ok(())
+    }
+
+    /// Under BOTH locks: create the idempotent pre-migration backup (see
+    /// [`backup_locked`](Self::backup_locked)), then atomically rewrite the
+    /// keystore with the v2 payload. Used by `migrate_to_v2`.
+    fn migrate_to_v2_locked(&self, data: &KeystoreData) -> Result<(), KeystoreError> {
+        self.migrate_to_v2_locked_core(data, Identity::Machine)
+    }
+
+    /// THE migration core (caller holds BOTH locks). Holds ALL migration logic:
+    /// (1) the idempotent pre-migration backup and (2) the atomic v2 rewrite. The
+    /// production [`migrate_to_v2_locked`](Self::migrate_to_v2_locked) and the test
+    /// seam go through here — no duplicated backup or rewrite logic to drift.
+    fn migrate_to_v2_locked_core(&self, data: &KeystoreData, id: Identity<'_>) -> Result<(), KeystoreError> {
+        // (1) Backup. Idempotent: a prior backup (from a standalone backup_keystore
+        // call or a previous migration) is never overwritten.
+        self.backup_locked()?;
+        // (2) Atomic rewrite of the v2 payload via the same encrypt +
+        // atomic_replace path the rest of the keystore uses.
         let value = data.to_value()?;
-        self.store_locked(&value)
+        self.store_locked_core(&value, id)
     }
 }
 
@@ -644,6 +710,27 @@ pub fn migrate_to_v2(dir: &Path, legacy_map: HashMap<String, String>) -> Result<
     ks.with_locks(|k| k.migrate_to_v2_locked(&data))
 }
 
+/// Create the one-time pre-migration backup SEPARATELY from the v2 rewrite (S2a).
+///
+/// The migration coordinator (Step 4) needs Phase-1 backup and Phase-4 rewrite to
+/// be distinct operations. This is the standalone backup entry point: it takes a
+/// dir (not a `&Keystore`), classifies the keystore via [`load_state`], then —
+/// under the keystore's fs2 flock — copies `keystore.json` →
+/// `keystore.json.bak-pre-migration` (create-new only, never overwrites a prior
+/// backup) and secures the copy with `fs_acl::secure_file`.
+///
+/// Idempotent: a second call (or a call after `migrate_to_v2` already made the
+/// backup) is a no-op.
+///
+/// Classification:
+/// - `Missing`        → `Ok(())` (nothing to back up).
+/// - `CurrentV2(_)`   → `Ok(())` (already migrated; no v1 to preserve).
+/// - `LegacyV1(_)`    → performs the backup.
+/// - `Corrupt(e)`     → `Err(e)` (cannot back up an unreadable file).
+pub fn backup_keystore(dir: &Path) -> Result<(), KeystoreError> {
+    backup_keystore_with(dir, Identity::Machine)
+}
+
 /// Test-only: write an envelope (encrypted with an explicit identity) directly to
 /// `dir/keystore.json`. Lets tests seed a v1 or v2 payload without touching real
 /// OS identity or the production `store` path. Mirrors how the file looks on disk
@@ -664,8 +751,10 @@ pub fn store_with_identity(
 }
 
 /// Test-only: migrate a legacy map to v2 using an injected identity. Same as
-/// [`migrate_to_v2`] but the inner store uses the given identity instead of the
-/// machine identity. Used to drive migration tests deterministically.
+/// [`migrate_to_v2`] but the rewrite (and backup classification) uses the given
+/// identity instead of the machine identity. Delegates to the SAME
+/// `migrate_to_v2_locked_core` as the production path (no duplicated
+/// backup/rewrite logic), so tests exercise the real migration code.
 #[doc(hidden)]
 pub fn migrate_to_v2_with_identity(
     dir: &Path,
@@ -674,33 +763,34 @@ pub fn migrate_to_v2_with_identity(
 ) -> Result<(), KeystoreError> {
     let ks = Keystore::new(dir.to_path_buf())?;
     let data = KeystoreData::new_v2(legacy_map);
-    ks.with_locks(|k| {
-        // Backup (same create-new logic as the prod path).
-        let src = k.file();
-        if src.exists() {
-            let bak = k.backup_path();
-            if !bak.exists() {
-                match std::fs::OpenOptions::new().create_new(true).write(true).open(&bak) {
-                    Ok(mut f) => {
-                        let bytes = std::fs::read(&src)?;
-                        std::io::Write::write_all(&mut f, &bytes)?;
-                        drop(f);
-                        crate::fs_acl::secure_file(&bak)?;
-                    }
-                    Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
-                    Err(e) => return Err(KeystoreError::Io(e)),
-                }
-            }
-        }
-        // Encrypt with the injected identity + atomic replace.
-        let value = data.to_value()?;
-        let env = encrypt(identity, IdentitySource::MacosIoplatformuuid, &value)?;
-        let tmp = k.dir.join(TMP);
-        let json = serde_json::to_vec(&env).map_err(|e| KeystoreError::Envelope(e.to_string()))?;
-        std::fs::write(&tmp, &json)?;
-        k.set_file_perms(&tmp)?;
-        atomic_replace(&tmp, &k.file())
-    })
+    ks.with_locks(|k| k.migrate_to_v2_locked_core(&data, Identity::Injected(identity)))
+}
+
+/// Test-only: standalone backup with an injected identity (mirror of
+/// [`backup_keystore`]). Classifies the keystore with the injected identity and,
+/// if it is `LegacyV1`, creates the create-new backup. Delegates to the same
+/// `backup_locked` core as the production path.
+#[doc(hidden)]
+pub fn backup_keystore_with_identity(dir: &Path, identity: &str) -> Result<(), KeystoreError> {
+    backup_keystore_with(dir, Identity::Injected(identity))
+}
+
+/// Shared backup entry point for the production (`Machine`) and test (`Injected`)
+/// paths. Classifies the keystore with `id`, then — only for `LegacyV1` — creates
+/// the idempotent create-new backup under the keystore's fs2 flock.
+fn backup_keystore_with(dir: &Path, id: Identity<'_>) -> Result<(), KeystoreError> {
+    // Probe existence first so a fresh-install dir returns early without creating
+    // a Keystore (matches load_state's fast-path contract).
+    if !dir.join(FILE).exists() {
+        return Ok(());
+    }
+    let ks = Keystore::new(dir.to_path_buf())?;
+    match ks.load_state_with(id) {
+        KeystoreLoadState::Missing => Ok(()),
+        KeystoreLoadState::CurrentV2(_) => Ok(()),
+        KeystoreLoadState::LegacyV1(_) => ks.with_locks(|k| k.backup_locked()),
+        KeystoreLoadState::Corrupt(e) => Err(e),
+    }
 }
 
 /// Test-only: path to the pre-migration backup inside `dir`.
