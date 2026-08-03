@@ -128,7 +128,7 @@ pub(crate) fn set_win32_owner_dacl(path: &Path, inherit: bool) -> Result<(), Acl
     use windows_sys::Win32::Security::{
         ACL, ACL_REVISION_DS, AddAccessAllowedAceEx, InitializeAcl,
         CONTAINER_INHERIT_ACE, DACL_SECURITY_INFORMATION, OBJECT_INHERIT_ACE,
-        OWNER_SECURITY_INFORMATION, PROTECTED_DACL_SECURITY_INFORMATION, PSID,
+        OWNER_SECURITY_INFORMATION, PSID,
         PSECURITY_DESCRIPTOR, SE_DACL_PROTECTED,
         InitializeSecurityDescriptor, SetSecurityDescriptorControl,
         SetSecurityDescriptorOwner, SetSecurityDescriptorDacl, SetFileSecurityW,
