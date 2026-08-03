@@ -22,6 +22,10 @@ pub mod schema;
 pub mod providers;
 pub mod migration;
 pub mod delete;
+pub mod readiness;
+
+// Re-export the readiness type at the crate root (lib.rs uses `readiness::`).
+pub use readiness::DataReadiness;
 
 /// Convenience re-export: derive the pre-migration settings backup path. Tests
 /// assert on it without hardcoding the `.bak-pre-migration` suffix.
