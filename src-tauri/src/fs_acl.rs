@@ -129,11 +129,10 @@ pub(crate) fn set_win32_owner_dacl(path: &Path, inherit: bool) -> Result<(), Acl
         ACL, ACL_REVISION_DS, AddAccessAllowedAceEx, InitializeAcl,
         CONTAINER_INHERIT_ACE, DACL_SECURITY_INFORMATION, OBJECT_INHERIT_ACE,
         OWNER_SECURITY_INFORMATION, PROTECTED_DACL_SECURITY_INFORMATION, PSID,
-        SECURITY_DESCRIPTOR,
-        InitializeSecurityDescriptor, SetSecurityDescriptorOwner,
-        SetSecurityDescriptorDacl, SetFileSecurityW,
+        PSECURITY_DESCRIPTOR, SE_DACL_PROTECTED,
+        InitializeSecurityDescriptor, SetSecurityDescriptorControl,
+        SetSecurityDescriptorOwner, SetSecurityDescriptorDacl, SetFileSecurityW,
     };
-    const SECURITY_DESCRIPTOR_REVISION: u32 = 1;
 
     let sid_buf = current_user_sid()?;
     let sid: PSID = sid_from_token_user_buf(&sid_buf)?;
@@ -150,30 +149,38 @@ pub(crate) fn set_win32_owner_dacl(path: &Path, inherit: bool) -> Result<(), Acl
         return Err(AclError::Win32("AddAccessAllowedAceEx failed".into()));
     }
 
-    // Build a self-relative security descriptor in a buffer.
-    // SetFileSecurityW applies it WITHOUT the ACE-flag normalization that
-    // SetNamedSecurityInfoW performs.
+    // Build an absolute security descriptor. SetFileSecurityW applies it
+    // WITHOUT the ACE-flag normalization that SetNamedSecurityInfoW performs.
     const SD_BUF_SIZE: usize = 256;
     let mut sd_buf: [u8; SD_BUF_SIZE] = [0u8; SD_BUF_SIZE];
-    let sd: *mut SECURITY_DESCRIPTOR = sd_buf.as_mut_ptr() as *mut SECURITY_DESCRIPTOR;
-    if unsafe { InitializeSecurityDescriptor(sd, SECURITY_DESCRIPTOR_REVISION) } == 0 {
+    let sd: PSECURITY_DESCRIPTOR = sd_buf.as_mut_ptr() as PSECURITY_DESCRIPTOR;
+    // SECURITY_DESCRIPTOR_REVISION = 1 (constant from Win32 SDK):
+    if unsafe { InitializeSecurityDescriptor(sd, 1u32) } == 0 {
         return Err(AclError::Win32("InitializeSecurityDescriptor failed".into()));
     }
-    // Owner = current user:
+    // Owner = current user (bOwnerDefaulted = FALSE = 0):
     if unsafe { SetSecurityDescriptorOwner(sd, sid, 0) } == 0 {
         return Err(AclError::Win32("SetSecurityDescriptorOwner failed".into()));
     }
-    // DACL present + the ACL we built. PROTECTED flag = NOT inheritable from parent.
-    // (SE_DACL_PROTECTED is bit 0x800 in the control field; we always set it
-    // here because SetFileSecurityW doesn't strip ACE inheritance flags like
-    // SetNamedSecurityInfoW does.)
-    let dacl_protected: i32 = 1; // SE_DACL_PROTECTED bit
-    if unsafe { SetSecurityDescriptorDacl(sd, 1, acl, dacl_protected) } == 0 {
+    // DACL present + the ACL we built (bDaclDefaulted = FALSE = 0):
+    if unsafe { SetSecurityDescriptorDacl(sd, 1, acl as *const ACL, 0) } == 0 {
         return Err(AclError::Win32("SetSecurityDescriptorDacl failed".into()));
+    }
+    // Set SE_DACL_PROTECTED (blocks inheritance from parent) via control bits.
+    // This does NOT strip ACE inheritance flags (unlike SetNamedSecurityInfoW
+    // with PROTECTED_DACL_SECURITY_INFORMATION):
+    if unsafe { SetSecurityDescriptorControl(sd, SE_DACL_PROTECTED, SE_DACL_PROTECTED) } == 0 {
+        return Err(AclError::Win32("SetSecurityDescriptorControl (PROTECTED) failed".into()));
     }
 
     let path_wide: Vec<u16> = path.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
-    let rc = unsafe { SetFileSecurityW(path_wide.as_ptr(), DACL_SECURITY_INFORMATION | OWNER_SECURITY_INFORMATION, sd as *const _) };
+    let rc = unsafe {
+        SetFileSecurityW(
+            path_wide.as_ptr(),
+            DACL_SECURITY_INFORMATION | OWNER_SECURITY_INFORMATION,
+            sd,
+        )
+    };
     if rc == 0 {
         return Err(AclError::Win32(format!("SetFileSecurityW failed: {}", std::io::Error::last_os_error())));
     }
