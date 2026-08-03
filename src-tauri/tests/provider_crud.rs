@@ -188,6 +188,123 @@ fn update_unknown_uuid_not_found() {
     assert!(matches!(err, DbError::NotFound(_)), "got {err:?}");
 }
 
+#[test]
+fn update_same_origin_preserves_consent() {
+    // Changing only the path/query (same scheme/host/port) keeps consent.
+    let (_dir, db, p) = fresh_with_one_openai();
+    db.with_conn(|conn| {
+        conn.execute(
+            "UPDATE preferences SET primary_uuid=?1, \
+             parallel_consent_version=1, parallel_consent_scope='all' WHERE id=1",
+            rusqlite::params![p.uuid],
+        )?;
+        Ok(())
+    })
+    .unwrap();
+
+    // Same host, different path.
+    let patch = ProviderPatch {
+        endpoint: Some("https://api.openai.com/v1/messages".into()),
+        name: None,
+        model: None,
+        enabled: None,
+        sort_order: None,
+    };
+    db.with_conn(|conn| providers::update(conn, &p.uuid, &patch)).unwrap();
+
+    db.with_conn(|conn| {
+        let (ver, scope): (Option<i64>, Option<String>) = conn.query_row(
+            "SELECT parallel_consent_version, parallel_consent_scope \
+             FROM preferences WHERE id=1",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )?;
+        assert_eq!(ver, Some(1), "consent version preserved on same-origin change");
+        assert_eq!(
+            scope.as_deref(),
+            Some("all"),
+            "consent scope preserved on same-origin change"
+        );
+        Ok(())
+    })
+    .unwrap();
+}
+
+#[test]
+fn update_different_origin_invalidates_consent() {
+    // Changing scheme/host/port invalidates consent (the upstream moved).
+    let (_dir, db, p) = fresh_with_one_openai();
+    db.with_conn(|conn| {
+        conn.execute(
+            "UPDATE preferences SET primary_uuid=?1, \
+             parallel_consent_version=1, parallel_consent_scope='all' WHERE id=1",
+            rusqlite::params![p.uuid],
+        )?;
+        Ok(())
+    })
+    .unwrap();
+
+    // Different host entirely.
+    let patch = ProviderPatch {
+        endpoint: Some("https://api.anthropic.com/v1/messages".into()),
+        name: None,
+        model: None,
+        enabled: None,
+        sort_order: None,
+    };
+    db.with_conn(|conn| providers::update(conn, &p.uuid, &patch)).unwrap();
+
+    db.with_conn(|conn| {
+        let (ver, scope): (Option<i64>, Option<String>) = conn.query_row(
+            "SELECT parallel_consent_version, parallel_consent_scope \
+             FROM preferences WHERE id=1",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )?;
+        assert!(ver.is_none(), "consent version invalidated on origin change");
+        assert!(scope.is_none(), "consent scope invalidated on origin change");
+        Ok(())
+    })
+    .unwrap();
+}
+
+#[test]
+fn update_different_origin_not_in_slot_keeps_consent() {
+    // An origin change on a provider that ISN'T in any slot must NOT touch
+    // consent — the parallel set didn't change.
+    let (_dir, db, p) = fresh_with_one_openai();
+    // No slot references p.uuid.
+    db.with_conn(|conn| {
+        conn.execute(
+            "UPDATE preferences SET parallel_consent_version=1, \
+             parallel_consent_scope='all' WHERE id=1",
+            [],
+        )?;
+        Ok(())
+    })
+    .unwrap();
+
+    let patch = ProviderPatch {
+        endpoint: Some("https://api.anthropic.com/v1/messages".into()),
+        name: None,
+        model: None,
+        enabled: None,
+        sort_order: None,
+    };
+    db.with_conn(|conn| providers::update(conn, &p.uuid, &patch)).unwrap();
+
+    db.with_conn(|conn| {
+        let ver: Option<i64> = conn.query_row(
+            "SELECT parallel_consent_version FROM preferences WHERE id=1",
+            [],
+            |r| r.get(0),
+        )?;
+        assert_eq!(ver, Some(1), "consent untouched when provider not in a slot");
+        Ok(())
+    })
+    .unwrap();
+}
+
 // ─── Duplicate ────────────────────────────────────────────────────────────
 
 #[test]
@@ -358,6 +475,41 @@ fn toggle_enable_does_not_add_back_to_slots() {
             |r| r.get(0),
         )?;
         assert!(primary.is_none(), "re-enabling does NOT re-add to primary");
+        Ok(())
+    })
+    .unwrap();
+}
+
+#[test]
+fn toggle_disable_invalidates_parallel_consent() {
+    // Mirrors begin_delete_evicts_from_active_slots_and_consent but for the
+    // disable path: a provider that's in active slots must drop consent when
+    // toggled off, so the next translate re-prompts for the changed set.
+    let (_dir, db, p) = fresh_with_one_openai();
+    db.with_conn(|conn| {
+        conn.execute(
+            "UPDATE preferences SET primary_uuid=?1, parallel_uuids=?2, \
+             parallel_consent_version=1, parallel_consent_scope='all' WHERE id=1",
+            rusqlite::params![
+                p.uuid,
+                serde_json::to_string(&[&p.uuid]).unwrap()
+            ],
+        )?;
+        Ok(())
+    })
+    .unwrap();
+
+    db.with_conn(|conn| providers::toggle(conn, &p.uuid, false)).unwrap();
+
+    db.with_conn(|conn| {
+        let (ver, scope): (Option<i64>, Option<String>) = conn.query_row(
+            "SELECT parallel_consent_version, parallel_consent_scope \
+             FROM preferences WHERE id=1",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )?;
+        assert!(ver.is_none(), "consent version invalidated on disable");
+        assert!(scope.is_none(), "consent scope invalidated on disable");
         Ok(())
     })
     .unwrap();
@@ -558,6 +710,9 @@ fn build_profile_unknown_legacy_id_is_repair_profile() {
     assert!(p.endpoint.is_empty(), "repair endpoint is blank");
     assert!(!p.enabled, "repair row starts disabled");
     assert!(p.needs_key);
+    // Repair profile sorts to the bottom so known presets/catalog rows win the
+    // top of the migrated list.
+    assert_eq!(p.sort_order, 999, "repair sort_order parks at bottom");
 }
 
 #[test]
@@ -568,6 +723,9 @@ fn build_profile_providerkey_parseable_keeps_uuid() {
     let p = providers::build_profile(&cs).unwrap();
     assert_eq!(p.uuid, u.to_string(), "parseable provider/<uuid> keeps the uuid");
     assert_eq!(p.secret_ref, sr);
+    // ProviderKey repair rows carry the "unknown" template (no preset match).
+    assert_eq!(p.template_id, "unknown");
+    assert_eq!(p.sort_order, 999, "repair sort_order parks at bottom");
 }
 
 #[test]
@@ -577,6 +735,8 @@ fn build_profile_providerkey_unparseable_derives_uuid() {
     let p = providers::build_profile(&cs).unwrap();
     // Derived from recovered_key_uuid (deterministic).
     assert_ne!(p.uuid, sr);
+    assert_eq!(p.template_id, "unknown");
+    assert_eq!(p.sort_order, 999);
 }
 
 // ─── CandidateSource.deterministic_uuid golden vector ─────────────────────
