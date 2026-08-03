@@ -208,6 +208,18 @@ pub fn endpoint_is_local(endpoint: &str) -> bool {
     matches!(host, "localhost" | "127.0.0.1" | "::1" | "[::1]" | "0.0.0.0")
 }
 
+/// Normalize an endpoint down to its origin (scheme://host:port). Two endpoints
+/// with the same origin but different path/query are treated as the same server
+/// — used by [`update`] to decide whether a changed endpoint should invalidate
+/// the parallel consent. Parse failures fall back to the raw input (so a
+/// garbage endpoint at least compares unequal to a good one).
+pub fn normalize_origin(endpoint: &str) -> String {
+    match url::Url::parse(endpoint) {
+        Ok(u) => u.origin().ascii_serialization(),
+        Err(_) => endpoint.to_string(),
+    }
+}
+
 // ─── Read paths ───────────────────────────────────────────────────────────
 
 /// Active providers only (`status='active'`). This is the user-facing list:
@@ -422,6 +434,10 @@ pub fn update(
     // Read-modify-write inside the tx so the patch composes atomically.
     let existing = get(&tx, uuid)?;
 
+    // Capture the old origin BEFORE we move existing.endpoint below — the
+    // consent check compares origins, not the full URL.
+    let old_origin = normalize_origin(&existing.endpoint);
+
     let name = patch.name.clone().unwrap_or(existing.name);
     let endpoint = patch.endpoint.clone().unwrap_or(existing.endpoint);
     let model = match &patch.model {
@@ -431,6 +447,16 @@ pub fn update(
     let enabled = patch.enabled.unwrap_or(existing.enabled);
     let sort_order = patch.sort_order.unwrap_or(existing.sort_order);
     let is_local = endpoint_is_local(&endpoint);
+
+    // If the endpoint's ORIGIN changed (scheme/host/port — not just path/query)
+    // AND this provider is in the primary or any parallel slot, the prior
+    // parallel consent was given for a different upstream and must be dropped.
+    let origin_changed = patch.endpoint.as_deref().is_some_and(|new_ep| {
+        normalize_origin(new_ep) != old_origin
+    });
+    if origin_changed && provider_in_primary_or_parallel(&tx, uuid)? {
+        invalidate_consent(&tx)?;
+    }
 
     tx.execute(
         "UPDATE providers SET name=?1, endpoint=?2, model=?3, enabled=?4, \
@@ -537,7 +563,12 @@ pub fn toggle(
         params![enabled as i64, uuid],
     )?;
     if !enabled {
+        // Disable: pull the row out of every selection slot and drop consent,
+        // mirroring begin_delete. A disabled provider can't stay "selected",
+        // and the prior parallel consent was given for a set that still
+        // included it.
         remove_from_active_slots(&tx, uuid)?;
+        invalidate_consent(&tx)?;
     }
     let updated = get(&tx, uuid)?;
     tx.commit()?;
@@ -559,13 +590,8 @@ pub fn begin_delete(conn: &mut Connection, uuid: &str) -> Result<String, DbError
     )?;
     remove_from_active_slots(&tx, uuid)?;
     // Parallel-consent version is tied to the parallel set; dropping a member
-    // invalidates the prior consent. Null both fields so the next translate
-    // re-prompts.
-    tx.execute(
-        "UPDATE preferences SET parallel_consent_version=NULL, \
-         parallel_consent_scope=NULL WHERE id=1",
-        [],
-    )?;
+    // invalidates the prior consent.
+    invalidate_consent(&tx)?;
     tx.commit()?;
     Ok(profile.secret_ref)
 }
@@ -618,6 +644,47 @@ fn remove_from_active_slots(conn: &Connection, uuid: &str) -> Result<(), DbError
         params![new_json],
     )?;
     Ok(())
+}
+
+/// Null out the parallel-consent version/scope. Called whenever the parallel
+/// set changes membership (delete, disable-in-slot) or a member's endpoint
+/// origin changes — the prior consent was given for a different provider set,
+/// so the next translate must re-prompt. Caller must be in a transaction.
+fn invalidate_consent(tx: &rusqlite::Transaction<'_>) -> Result<(), DbError> {
+    tx.execute(
+        "UPDATE preferences SET parallel_consent_version=NULL, \
+         parallel_consent_scope=NULL WHERE id=1",
+        [],
+    )?;
+    Ok(())
+}
+
+/// Is `uuid` currently the `primary_uuid` or a member of `parallel_uuids`?
+/// (Fallback slot is excluded: a traditional-engine fallback never carries AI
+/// consent.) Used by [`update`] to decide whether an endpoint-origin change
+/// should invalidate consent.
+fn provider_in_primary_or_parallel(
+    tx: &rusqlite::Transaction<'_>,
+    uuid: &str,
+) -> Result<bool, DbError> {
+    let primary: Option<String> = tx
+        .query_row(
+            "SELECT primary_uuid FROM preferences WHERE id=1",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap_or(None);
+    if primary.as_deref() == Some(uuid) {
+        return Ok(true);
+    }
+    let parallel_json: String = tx.query_row(
+        "SELECT parallel_uuids FROM preferences WHERE id=1",
+        [],
+        |r| r.get(0),
+    )?;
+    let arr: Vec<String> = serde_json::from_str::<Vec<String>>(&parallel_json)
+        .unwrap_or_default();
+    Ok(arr.iter().any(|u| u == uuid))
 }
 
 // ─── TraditionalProviderCatalog ───────────────────────────────────────────
@@ -852,7 +919,9 @@ pub fn enumerate_candidates(
 ///
 /// The profile is returned with `status="active"`, `sort_order=0`, and
 /// `enabled=true` for preset/traditional lookups; repair profiles are
-/// `enabled=false` (the user must fix them before use).
+/// `enabled=false`, `sort_order=999` (parked at the bottom of the list), and
+/// `template_id="unknown"` for `ProviderKey` arms (the user must fix them
+/// before use).
 pub fn build_profile(source: &CandidateSource) -> Result<ProviderProfile, DbError> {
     match source {
         CandidateSource::LegacyId(id) => {
@@ -912,7 +981,7 @@ pub fn build_profile(source: &CandidateSource) -> Result<ProviderProfile, DbErro
                 endpoint: String::new(),
                 model: None,
                 enabled: false,
-                sort_order: 0,
+                sort_order: 999,
                 is_local: false,
                 needs_key: true,
                 secret_ref: id.clone(),
@@ -928,13 +997,13 @@ pub fn build_profile(source: &CandidateSource) -> Result<ProviderProfile, DbErro
                 .unwrap_or_else(|| source.deterministic_uuid().to_string());
             Ok(ProviderProfile {
                 uuid,
-                template_id: "custom".to_string(),
+                template_id: "unknown".to_string(),
                 name: "Recovered provider".to_string(),
                 protocol: Protocol::CustomHttp,
                 endpoint: String::new(),
                 model: None,
                 enabled: false,
-                sort_order: 0,
+                sort_order: 999,
                 is_local: false,
                 needs_key: true,
                 secret_ref: sr.clone(),
@@ -1132,6 +1201,8 @@ mod tests {
         assert!(!p.enabled);
         assert!(p.needs_key);
         assert_eq!(p.template_id, "mystery-provider");
+        // Repair profiles park at the bottom of the list.
+        assert_eq!(p.sort_order, 999);
     }
 
     #[test]
@@ -1144,6 +1215,9 @@ mod tests {
         assert_eq!(p.secret_ref, sr);
         assert_eq!(p.protocol, Protocol::CustomHttp);
         assert!(p.needs_key);
+        // ProviderKey repair rows get the unknown template + bottom sort_order.
+        assert_eq!(p.template_id, "unknown");
+        assert_eq!(p.sort_order, 999);
     }
 
     #[test]
@@ -1156,6 +1230,8 @@ mod tests {
             p.uuid,
             uuid_util::recovered_key_uuid(&sr).to_string()
         );
+        assert_eq!(p.template_id, "unknown");
+        assert_eq!(p.sort_order, 999);
     }
 
     #[test]
@@ -1166,6 +1242,30 @@ mod tests {
         assert!(endpoint_is_local("http://0.0.0.0:8080"));
         assert!(!endpoint_is_local("https://api.openai.com/v1/chat"));
         assert!(!endpoint_is_local("not a url"));
+    }
+
+    #[test]
+    fn normalize_origin_drops_path_and_query() {
+        // Same host, different path/query → same origin.
+        assert_eq!(
+            normalize_origin("https://api.openai.com/v1/chat/completions"),
+            normalize_origin("https://api.openai.com/v1/messages?x=1")
+        );
+        // Different host → different origin.
+        assert_ne!(
+            normalize_origin("https://api.openai.com"),
+            normalize_origin("https://api.anthropic.com")
+        );
+        // Port is part of the origin.
+        assert_ne!(
+            normalize_origin("http://localhost:11434"),
+            normalize_origin("http://localhost:8080")
+        );
+        // Scheme is part of the origin.
+        assert_ne!(
+            normalize_origin("http://api.openai.com"),
+            normalize_origin("https://api.openai.com")
+        );
     }
 
     #[test]
