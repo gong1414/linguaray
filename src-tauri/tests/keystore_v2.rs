@@ -5,8 +5,9 @@
 //! ID, so they are deterministic across hosts. Isolation via `tempfile::tempdir`.
 
 use linguaray_lib::keystore::{
-    backup_path_in, encrypt, store_with_identity, IdentitySource, Keystore, KeystoreData,
-    KeystoreLoadState, SerializableKey, KEYSTORE_DATA_VERSION, migrate_to_v2_with_identity,
+    backup_keystore_with_identity, backup_path_in, encrypt, store_with_identity, IdentitySource,
+    Keystore, KeystoreData, KeystoreLoadState, SerializableKey, KEYSTORE_DATA_VERSION,
+    migrate_to_v2_with_identity,
 };
 use serde_json::json;
 use std::collections::HashMap;
@@ -319,6 +320,137 @@ fn migrate_to_v2_backup_secured() {
 }
 
 #[test]
+fn backup_keystore_creates_backup_for_legacy_v1() {
+    // Standalone backup (Phase 1 of the migration coordinator): a LegacyV1
+    // keystore must get a keystore.json.bak-pre-migration holding the original
+    // v1 bytes, without performing the v2 rewrite. Exercises the same
+    // backup_locked core the full migration uses.
+    let dir = tempfile::tempdir().unwrap();
+    store_with_identity(
+        dir.path(),
+        ID,
+        IdentitySource::MacosIoplatformuuid,
+        &json!({"openai": "sk-x"}),
+    )
+    .unwrap();
+    let original_bytes = std::fs::read(dir.path().join("keystore.json")).unwrap();
+
+    backup_keystore_with_identity(dir.path(), ID).unwrap();
+
+    let bak = backup_path_in(dir.path());
+    assert!(bak.exists(), "standalone backup must create the .bak file");
+    assert_eq!(
+        std::fs::read(&bak).unwrap(),
+        original_bytes,
+        "backup must hold the original v1 bytes"
+    );
+    // The canonical keystore is NOT rewritten by a standalone backup.
+    assert_eq!(
+        std::fs::read(dir.path().join("keystore.json")).unwrap(),
+        original_bytes,
+        "standalone backup must not touch the canonical keystore"
+    );
+}
+
+#[test]
+fn backup_keystore_missing_is_noop() {
+    // Missing → Ok(()) with no backup file created.
+    let dir = tempfile::tempdir().unwrap();
+    backup_keystore_with_identity(dir.path(), ID).unwrap();
+    assert!(!backup_path_in(dir.path()).exists(), "no backup for a missing keystore");
+}
+
+#[test]
+fn backup_keystore_current_v2_is_noop() {
+    // CurrentV2 → Ok(()) (already migrated; no v1 to preserve). No backup created.
+    let dir = tempfile::tempdir().unwrap();
+    let data = KeystoreData::new_v2(map_of("openai", "sk-v2"));
+    store_with_identity(
+        dir.path(),
+        ID,
+        IdentitySource::MacosIoplatformuuid,
+        &data.to_value().unwrap(),
+    )
+    .unwrap();
+
+    backup_keystore_with_identity(dir.path(), ID).unwrap();
+    assert!(
+        !backup_path_in(dir.path()).exists(),
+        "no backup when keystore is already v2"
+    );
+}
+
+#[test]
+fn backup_keystore_corrupt_errors() {
+    // Corrupt → Err (cannot back up an unreadable file). No backup created.
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("keystore.json");
+    std::fs::write(&path, b"not json at all").unwrap();
+
+    let err = backup_keystore_with_identity(dir.path(), ID).unwrap_err();
+    assert!(
+        !backup_path_in(dir.path()).exists(),
+        "no backup when the keystore is corrupt"
+    );
+    // Surface the underlying failure kind so a silent Ok(()) regression trips this.
+    let _ = err.to_string();
+}
+
+#[test]
+fn backup_keystore_is_idempotent() {
+    // A second backup_keystore call must NOT overwrite a prior backup
+    // (create-new semantics) and must NOT error.
+    let dir = tempfile::tempdir().unwrap();
+    store_with_identity(
+        dir.path(),
+        ID,
+        IdentitySource::MacosIoplatformuuid,
+        &json!({"openai": "sk-x"}),
+    )
+    .unwrap();
+    backup_keystore_with_identity(dir.path(), ID).unwrap();
+    let first = std::fs::read(backup_path_in(dir.path())).unwrap();
+
+    // Second call: backup already exists → no-op, prior bytes untouched.
+    backup_keystore_with_identity(dir.path(), ID).unwrap();
+    let second = std::fs::read(backup_path_in(dir.path())).unwrap();
+    assert_eq!(first, second, "idempotent backup must not overwrite");
+}
+
+#[test]
+fn migrate_to_v2_skips_backup_if_already_backed_up() {
+    // If a standalone backup was made first (Phase 1), the subsequent
+    // migrate_to_v2 (Phase 4) must reuse it rather than overwrite — the core
+    // treats backup_locked as idempotent.
+    let dir = tempfile::tempdir().unwrap();
+    store_with_identity(
+        dir.path(),
+        ID,
+        IdentitySource::MacosIoplatformuuid,
+        &json!({"openai": "sk-x"}),
+    )
+    .unwrap();
+    // Phase 1: standalone backup.
+    backup_keystore_with_identity(dir.path(), ID).unwrap();
+    let phase1_backup = std::fs::read(backup_path_in(dir.path())).unwrap();
+
+    // Phase 4: full migration (backup + rewrite). Backup must be unchanged.
+    migrate_to_v2_with_identity(dir.path(), map_of("openai", "sk-x"), ID).unwrap();
+    let phase4_backup = std::fs::read(backup_path_in(dir.path())).unwrap();
+    assert_eq!(phase1_backup, phase4_backup, "migration must not overwrite an existing backup");
+
+    // And the canonical keystore is now v2.
+    let ks = Keystore::new(dir.path().to_path_buf()).unwrap();
+    match ks.load_state_with_identity(ID) {
+        KeystoreLoadState::CurrentV2(d) => {
+            assert_eq!(d.version, KEYSTORE_DATA_VERSION);
+            assert_eq!(d.get_provider_key("openai"), Some("sk-x"));
+        }
+        other => panic!("expected CurrentV2 after migrate, got {other:?}"),
+    }
+}
+
+#[test]
 fn keystore_data_get_set_remove_provider_key() {
     // KeystoreData methods on provider_keys (simple HashMap operations). Verifies
     // the typed accessors work and return the right Option<&str>/Option<String>.
@@ -346,11 +478,12 @@ fn keystore_data_get_set_remove_provider_key() {
 }
 
 #[test]
-fn load_state_does_not_block_on_empty_dir_with_concurrent_writer() {
-    // Defense-in-depth: load_state's fast-path Missing check returns BEFORE taking
-    // the flock, so a fresh-install probe never contends with a writer. We can't
-    // easily hold a cross-process lock here, but we can at least confirm a Missing
-    // result returns instantly against an empty dir (no file → no KDF → no lock).
+fn load_state_missing_is_fast() {
+    // A Missing probe returns BEFORE taking the flock (no file → no KDF → no
+    // lock), so it is effectively instantaneous. This is a latency guard for the
+    // fast path, NOT a concurrency test (we can't reliably hold a cross-process
+    // lock here); the lock-acquisition ordering itself is unit-tested via the
+    // fast-path branch in load_state_with.
     use std::time::Instant;
     let dir = tempfile::tempdir().unwrap();
     let ks = Keystore::new(dir.path().to_path_buf()).unwrap();
