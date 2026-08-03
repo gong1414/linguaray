@@ -697,6 +697,22 @@ pub fn load_state(dir: &Path) -> KeystoreLoadState {
     }
 }
 
+/// Test-only: same as [`load_state`] but decrypts with an injected identity
+/// string instead of reading the machine. Lets migration tests drive the
+/// classification (and enumerate candidates from it) without touching real OS
+/// identity. Delegates to the SAME `Keystore::load_state_with` core as the
+/// production free function (no duplicated read/decrypt/classify logic).
+#[doc(hidden)]
+pub fn load_state_with_identity(dir: &Path, identity: &str) -> KeystoreLoadState {
+    if !dir.join(FILE).exists() {
+        return KeystoreLoadState::Missing;
+    }
+    match Keystore::new(dir.to_path_buf()) {
+        Ok(ks) => ks.load_state_with(Identity::Injected(identity)),
+        Err(e) => KeystoreLoadState::Corrupt(e),
+    }
+}
+
 /// Migrate a legacy v1 flat map to a v2 `KeystoreData` payload (S2a).
 ///
 /// Standalone (takes a dir, not a `&Keystore`): creates a `Keystore` internally
