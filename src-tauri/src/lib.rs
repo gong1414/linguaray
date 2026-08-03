@@ -30,9 +30,15 @@ pub mod fs_acl;
 pub mod uuid_util;
 
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::Manager;
 use tauri_plugin_global_shortcut::{Builder as GlobalShortcutBuilder, GlobalShortcutExt, ShortcutState};
+
+use crate::db::migration::{run_migration, FailpointCell, MigrationError};
+use crate::db::providers::{self as db_providers, ProviderPatch, ProviderProfile};
+use crate::db::readiness::DataReadiness;
+use crate::db::Database;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TranslateRequest {
@@ -59,6 +65,57 @@ struct Session {
     client: reqwest::Client,
     keystore: keystore::Keystore,
     gen: concurrency::GenerationToken,
+}
+
+/// S2a application state: the SQLite database + data-readiness gate.
+///
+/// Managed alongside [`Session`] as `Arc<AppState>` (existing translate/key
+/// commands keep their `State<'_, Arc<Session>>` signature unchanged — least
+/// disruptive). The provider commands added in step 6 take
+/// `State<'_, Arc<AppState>>` and gate on [`DataReadiness`] via [`require_ready`].
+///
+/// ## Field semantics
+///
+/// - `db` — `None` when the DB file couldn't be opened (`NeedsDatabaseRecovery`).
+///   Once opened it stays `Some` for the process lifetime; recovery is a
+///   separate flow (archive + reset), not a re-open.
+/// - `data_gate` — coarse rwlock serializing archive/reset (write) against
+///   provider reads (read). Held only briefly; the DB Mutex is the real
+///   per-query serializer.
+/// - `readiness` — the single source of truth for "can provider commands run?"
+///   Computed once at startup; mutate only from recovery commands.
+/// - `db_path` / `keystore_dir` / `settings_path` — cached so recovery commands
+///   (and diagnostics) don't re-resolve them.
+pub struct AppState {
+    pub db: parking_lot::RwLock<Option<Arc<Database>>>,
+    pub data_gate: parking_lot::RwLock<()>,
+    pub readiness: parking_lot::RwLock<DataReadiness>,
+    pub db_path: PathBuf,
+    pub keystore_dir: PathBuf,
+    pub settings_path: PathBuf,
+}
+
+/// Gating check shared by every provider command.
+///
+/// Returns a cloned `Arc<Database>` (cheap — one refcount bump) so the caller
+/// can move it into `spawn_blocking` without holding the `RwLock` guard across
+/// the await (the guard is `!Send`).
+///
+/// Fails closed: any readiness other than `Ready`, or a `None` DB handle, yields
+/// an `Err` with a human-readable reason. The always-available commands
+/// (`keystore_health`, `archive_keystore`, `reset_keystore`, `get_data_readiness`)
+/// bypass this.
+fn require_ready(state: &AppState) -> Result<Arc<Database>, String> {
+    let readiness = state.readiness.read();
+    if !readiness.is_ready() {
+        return Err(format!("Database not ready: {:?}", *readiness));
+    }
+    drop(readiness);
+    state
+        .db
+        .read()
+        .clone()
+        .ok_or_else(|| "Database not available".to_string())
 }
 
 #[tauri::command]
@@ -307,6 +364,327 @@ fn keystore_health(state: tauri::State<'_, Arc<Session>>) -> String {
     }
 }
 
+// ─── S2a data-readiness + provider commands ──────────────────────────────
+//
+// All provider commands follow the same shape:
+//   1. `require_ready(&state)` — gate on DataReadiness, clone the Arc<Database>
+//      (the readiness guard is dropped before the await).
+//   2. `spawn_blocking` — rusqlite is blocking; don't hold the async runtime.
+//   3. Acquire `data_gate` (read or write) INSIDE the blocking closure. The
+//      parking_lot guards are `!Send`, so they must never cross an `.await`;
+//      keeping them on the blocking thread for the closure's duration is the
+//      one safe pattern.
+//   4. `db.with_conn(|conn| db_providers::<op>(conn, ...))`.
+//
+// Multi-step cross-store commands (`provider_delete`, `provider_set_key`) run
+// all steps inside ONE `spawn_blocking` so the `data_gate` guard spans the whole
+// operation on a single thread. The DB Mutex ↔ keystore flock lock-order rule is
+// still respected: the DB guard (`with_conn` closure) is released before each
+// keystore step (the keystore takes only its own flock).
+
+/// Returns the serialized [`DataReadiness`] so the frontend can drive the
+/// recovery banner. Always available (no readiness gate) — it's how the UI
+/// discovers the gate is closed in the first place.
+#[tauri::command]
+fn get_data_readiness(state: tauri::State<'_, Arc<AppState>>) -> String {
+    let r = state.readiness.read();
+    serde_json::to_string(&*r).unwrap_or_else(|_| "{\"state\":\"migration_incomplete\"}".into())
+}
+
+/// List active provider profiles (`status='active'`), ordered by `sort_order`.
+#[tauri::command]
+async fn provider_list(
+    state: tauri::State<'_, Arc<AppState>>,
+) -> Result<Vec<ProviderProfile>, String> {
+    let app = state.inner().clone();
+    let db = require_ready(&app)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let _gate = app.data_gate.read();
+        db.with_conn(|conn| db_providers::list(conn)).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Create a new provider from a template (preset id). The preset catalog
+/// derives protocol/endpoint/default-model/needs_key; caller values override
+/// endpoint/model when non-empty.
+#[tauri::command]
+async fn provider_create(
+    state: tauri::State<'_, Arc<AppState>>,
+    template_id: String,
+    name: String,
+    endpoint: String,
+    model: Option<String>,
+) -> Result<ProviderProfile, String> {
+    let app = state.inner().clone();
+    let db = require_ready(&app)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let _gate = app.data_gate.read();
+        db.with_conn(|conn| {
+            db_providers::create(conn, &template_id, &name, &endpoint, model.as_deref())
+        })
+        .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Apply a partial patch to a provider. An endpoint change is validated and may
+/// invalidate the parallel consent (see `db_providers::update`).
+#[tauri::command]
+async fn provider_update(
+    state: tauri::State<'_, Arc<AppState>>,
+    uuid: String,
+    patch: ProviderPatch,
+) -> Result<ProviderProfile, String> {
+    let app = state.inner().clone();
+    let db = require_ready(&app)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let _gate = app.data_gate.read();
+        db.with_conn(|conn| db_providers::update(conn, &uuid, &patch)).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Duplicate a provider. New UUID, new `secret_ref`, keyless (the original key
+/// is never copied).
+#[tauri::command]
+async fn provider_duplicate(
+    state: tauri::State<'_, Arc<AppState>>,
+    uuid: String,
+) -> Result<ProviderProfile, String> {
+    let app = state.inner().clone();
+    let db = require_ready(&app)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let _gate = app.data_gate.read();
+        db.with_conn(|conn| db_providers::duplicate(conn, &uuid)).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Begin the 3-step delete (mark `deleting`, evict from slots), purge the key
+/// from the keystore, then finalize the tombstone. Each step is committed before
+/// the next; the lock-order rule (DB Mutex and keystore flock never nested) is
+/// preserved by releasing the DB guard between steps. All three steps run on one
+/// blocking thread so the `data_gate` write guard spans the whole operation.
+#[tauri::command]
+async fn provider_delete(
+    state: tauri::State<'_, Arc<AppState>>,
+    uuid: String,
+) -> Result<(), String> {
+    let app = state.inner().clone();
+    let db = require_ready(&app)?;
+    let keystore_dir = app.keystore_dir.clone();
+    tauri::async_runtime::spawn_blocking(move || -> Result<(), String> {
+        // Write guard: a delete mutates selection slots + status; no reader/other
+        // writer may interleave. Held for all 3 steps (the DB Mutex + keystore
+        // flock are still released between steps inside their own calls).
+        let _gate = app.data_gate.write();
+
+        // Step 1: begin_delete under the DB Mutex → returns the secret_ref. The
+        // DB guard (with_conn closure) is released before the keystore step.
+        let secret_ref = db
+            .with_conn(|conn| db_providers::begin_delete(conn, &uuid))
+            .map_err(|e| e.to_string())?;
+
+        // Step 2: purge the key (keystore flock only, DB NOT locked). Uses the
+        // same sanctioned `update_keys` RMW as the resume sweep. Idempotent — a
+        // missing key is a successful no-op.
+        let ks = keystore::Keystore::new(keystore_dir).map_err(|e| e.to_string())?;
+        ks.update_keys(|keys| remove_secret_ref_mut(keys, &secret_ref))
+            .map_err(|e| e.to_string())?;
+
+        // Step 3: finalize the tombstone (DB Mutex only, keystore NOT locked).
+        db.with_conn(|conn| db_providers::finalize_delete(conn, &uuid))
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Re-assign `sort_order` to the given UUID order. The list MUST be exactly the
+/// set of active UUIDs.
+#[tauri::command]
+async fn provider_reorder(
+    state: tauri::State<'_, Arc<AppState>>,
+    uuids: Vec<String>,
+) -> Result<(), String> {
+    let app = state.inner().clone();
+    let db = require_ready(&app)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let _gate = app.data_gate.write();
+        db.with_conn(|conn| db_providers::reorder(conn, &uuids)).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Flip `enabled`. Disabling also evicts the row from selection slots and
+/// invalidates parallel consent (mirrors `begin_delete`).
+#[tauri::command]
+async fn provider_toggle(
+    state: tauri::State<'_, Arc<AppState>>,
+    uuid: String,
+    enabled: bool,
+) -> Result<(), String> {
+    let app = state.inner().clone();
+    let db = require_ready(&app)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let _gate = app.data_gate.write();
+        db.with_conn(|conn| db_providers::toggle(conn, &uuid, enabled)).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .map(|_| ())
+}
+
+/// Set/clear a provider's API key in the keystore. The provider row's
+/// `secret_ref` names the key. Cross-store (DB read → keystore write) but the
+/// two locks are never held at once: the DB read releases before the keystore
+/// RMW begins (lock-order rule). Both steps run on one blocking thread.
+#[tauri::command]
+async fn provider_set_key(
+    state: tauri::State<'_, Arc<AppState>>,
+    uuid: String,
+    key: String,
+) -> Result<(), String> {
+    let app = state.inner().clone();
+    let db = require_ready(&app)?;
+    let keystore_dir = app.keystore_dir.clone();
+    tauri::async_runtime::spawn_blocking(move || -> Result<(), String> {
+        let _gate = app.data_gate.read();
+
+        // 1. Read the secret_ref under the DB Mutex, then release.
+        let secret_ref = db
+            .with_conn(|conn| db_providers::get(conn, &uuid).map(|p| p.secret_ref))
+            .map_err(|e| e.to_string())?;
+
+        // 2. Keystore RMW (flock only, DB NOT locked). Handles both v1 flat-map
+        //    and v2 versioned shapes.
+        let ks = keystore::Keystore::new(keystore_dir).map_err(|e| e.to_string())?;
+        ks.update_keys(|keys| set_secret_ref_mut(keys, &secret_ref, &key))
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Set the active selection (primary, parallel, fallback). Empty primary and
+/// empty parallel list mean "no selection". Validates the selection against the
+/// active provider set before writing.
+#[tauri::command]
+async fn provider_set_active(
+    state: tauri::State<'_, Arc<AppState>>,
+    primary: String,
+    parallel: Vec<String>,
+    fallback: Option<String>,
+) -> Result<(), String> {
+    let app = state.inner().clone();
+    let db = require_ready(&app)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let _gate = app.data_gate.write();
+        db.with_conn(|conn| -> Result<(), DbErr> {
+            // Validate against the active set BEFORE writing.
+            let active = db_providers::list(conn)?;
+            db_providers::validate_active_selection(
+                &primary,
+                &parallel,
+                fallback.as_deref(),
+                &active,
+            )?;
+            // Write the three slots + clear prior consent (membership changed).
+            set_active_slots(conn, &primary, &parallel, fallback.as_deref())?;
+            Ok(())
+        })
+        .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+// ─── provider command helpers ──────────────────────────────────────────────
+
+/// Type alias so the closures above can name the error without importing the
+/// full path each time.
+type DbErr = crate::db::DbError;
+
+/// Remove `secret_ref` from a decrypted keystore payload, mutating it in place.
+/// Handles both on-disk shapes (v2 nested `provider_keys`, v1 flat map). Mirrors
+/// `crate::db::delete::remove_provider_key_mut` (kept local so lib.rs doesn't reach
+/// into a private fn).
+fn remove_secret_ref_mut(keys: &mut serde_json::Value, secret_ref: &str) {
+    let Some(obj) = keys.as_object_mut() else {
+        return;
+    };
+    if obj.contains_key("provider_keys") {
+        if let Some(inner) = obj.get_mut("provider_keys").and_then(|v| v.as_object_mut()) {
+            inner.remove(secret_ref);
+        }
+        return;
+    }
+    obj.remove(secret_ref);
+}
+
+/// Set `secret_ref` → `key` in a decrypted keystore payload, mutating it in
+/// place. Handles both on-disk shapes (v2 nested `provider_keys`, v1 flat map).
+fn set_secret_ref_mut(keys: &mut serde_json::Value, secret_ref: &str, key: &str) {
+    let Some(obj) = keys.as_object_mut() else {
+        // Non-object ({}/missing): rebuild as a v2 shell so the next write
+        // converges to the versioned shape.
+        let mut data = serde_json::Map::new();
+        data.insert("version".into(), serde_json::json!(2));
+        data.insert(
+            "provider_keys".into(),
+            serde_json::json!({ secret_ref: key }),
+        );
+        *keys = serde_json::Value::Object(data);
+        return;
+    };
+    if obj.contains_key("provider_keys") {
+        if let Some(inner) = obj.get_mut("provider_keys").and_then(|v| v.as_object_mut()) {
+            inner.insert(secret_ref.into(), serde_json::json!(key));
+        }
+        return;
+    }
+    // v1 flat map: insert at the top level (preserves the legacy shape until
+    // the migration rewrites it).
+    obj.insert(secret_ref.into(), serde_json::json!(key));
+}
+
+/// Write the primary/parallel/fallback slots in `preferences` + null consent.
+/// Caller drives the transaction.
+fn set_active_slots(
+    conn: &mut rusqlite::Connection,
+    primary: &str,
+    parallel: &[String],
+    fallback: Option<&str>,
+) -> Result<(), DbErr> {
+    let tx = conn.transaction()?;
+    let primary_val = if primary.is_empty() {
+        None
+    } else {
+        Some(primary)
+    };
+    let parallel_json = serde_json::to_string(parallel).unwrap_or_else(|_| "[]".into());
+    let fallback_val = fallback.filter(|s| !s.is_empty());
+    tx.execute(
+        "UPDATE preferences SET primary_uuid=?1, parallel_uuids=?2, fallback_uuid=?3, \
+         parallel_consent_version=NULL, parallel_consent_scope=NULL WHERE id=1",
+        rusqlite::params![
+            primary_val,
+            parallel_json,
+            fallback_val,
+        ],
+    )?;
+    tx.commit()?;
+    Ok(())
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct EngineInfo {
     pub id: String,
@@ -523,7 +901,7 @@ pub fn run() {
                 .path()
                 .app_local_data_dir()
                 .expect("app_local_data_dir");
-            let keystore = keystore::Keystore::new(dir).expect("keystore init");
+            let keystore = keystore::Keystore::new(dir.clone()).expect("keystore init");
             // Spec §Privacy: every preset endpoint must be HTTPS (loopback HTTP
             // allowed for local engines like Ollama). Reject at config-load so an
             // invalid/leaked preset never ships a request.
@@ -544,6 +922,81 @@ pub fn run() {
                 client,
                 keystore,
                 gen: concurrency::GenerationToken::new(),
+            }));
+
+            // ── S2a data-readiness startup (DB open → migrate → resume → gate) ──
+            //
+            // NO `.expect()` on DB/migration — the app always launches. Every
+            // failure mode degrades `DataReadiness`; provider commands then fail
+            // closed via `require_ready`, while the always-available commands
+            // (keystore_health / archive_keystore / reset_keystore /
+            // get_data_readiness) keep working so the user can recover.
+            let db_path = dir.join("linguaray.db");
+            let keystore_dir = dir.clone();
+            let settings_path = tauri_plugin_store::resolve_store_path(app.handle(), "settings.json")
+                .unwrap_or_else(|_| dir.join("settings.json"));
+
+            // 1. Open the DB. Err → db=None, NeedsDatabaseRecovery (app keeps running).
+            let (db_handle, mut readiness) = match Database::open(&db_path) {
+                Ok(db) => (Some(Arc::new(db)), DataReadiness::default()),
+                Err(e) => (
+                    None,
+                    DataReadiness::NeedsDatabaseRecovery {
+                        reason: format!("open linguaray.db: {e}"),
+                    },
+                ),
+            };
+
+            // 2-4. Only run migration + resume + preflight when the DB opened.
+            if let Some(db) = db_handle.clone() {
+                let fp = FailpointCell::none();
+                readiness = match run_migration(&db, &keystore_dir, &settings_path, &fp) {
+                    Ok(()) => {
+                        // Resume any in-flight deletes (3-step sweep). A failure
+                        // here does NOT exit setup — log + mark incomplete so the
+                        // next startup retries.
+                        match crate::db::delete::provider_resume_deletions(&db, &keystore_dir) {
+                            Ok(_) => {
+                                // Final keystore preflight: a Corrupt keystore
+                                // (detected after migration) → recovery.
+                                match keystore::load_state(&keystore_dir) {
+                                    keystore::KeystoreLoadState::Corrupt(e) => {
+                                        DataReadiness::NeedsKeystoreRecovery {
+                                            reason: format!("keystore corrupt: {e}"),
+                                        }
+                                    }
+                                    _ => DataReadiness::Ready,
+                                }
+                            }
+                            Err(e) => {
+                                log::error!("resume_deletions failed: {e}");
+                                DataReadiness::migration_incomplete(
+                                    "resume_deletions",
+                                    format!("resume deletions: {e}"),
+                                )
+                            }
+                        }
+                    }
+                    Err(MigrationError::NeedsKeystoreRecovery(reason)) => {
+                        DataReadiness::NeedsKeystoreRecovery { reason }
+                    }
+                    Err(MigrationError::SettingsCorrupt(reason)) => {
+                        DataReadiness::migration_incomplete("settings", reason)
+                    }
+                    Err(other) => DataReadiness::migration_incomplete(
+                        "migration",
+                        other.to_string(),
+                    ),
+                };
+            }
+
+            app.manage(Arc::new(AppState {
+                db: parking_lot::RwLock::new(db_handle),
+                data_gate: parking_lot::RwLock::new(()),
+                readiness: parking_lot::RwLock::new(readiness),
+                db_path,
+                keystore_dir,
+                settings_path,
             }));
             // Round-2 review P1 #2: register hotkeys at RUNTIME (per-shortcut,
             // catching each Result) so a conflict skips just that shortcut, not the
@@ -577,7 +1030,18 @@ pub fn run() {
             a11y_status,
             keystore_health,
             archive_keystore,
-            reset_keystore
+            reset_keystore,
+            // S2a data-readiness + provider CRUD.
+            get_data_readiness,
+            provider_list,
+            provider_create,
+            provider_update,
+            provider_duplicate,
+            provider_delete,
+            provider_reorder,
+            provider_toggle,
+            provider_set_key,
+            provider_set_active
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

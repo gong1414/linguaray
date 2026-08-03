@@ -17,6 +17,16 @@
     "allow-a11y-status",
     "allow-keystore-health",
     "allow-archive-keystore",
-    "allow-reset-keystore"
+    "allow-reset-keystore",
+    "allow-get-data-readiness",
+    "allow-provider-list",
+    "allow-provider-create",
+    "allow-provider-update",
+    "allow-provider-duplicate",
+    "allow-provider-delete",
+    "allow-provider-reorder",
+    "allow-provider-toggle",
+    "allow-provider-set-key",
+    "allow-provider-set-active"
   ]
 }

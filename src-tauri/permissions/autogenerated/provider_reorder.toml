@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-provider-reorder"
+description = "Enables the provider_reorder command without any pre-configured scope."
+commands.allow = ["provider_reorder"]
+
+[[permission]]
+identifier = "deny-provider-reorder"
+description = "Denies the provider_reorder command without any pre-configured scope."
+commands.deny = ["provider_reorder"]
