@@ -449,14 +449,25 @@ impl Keystore {
         self.with_locks(|ks| ks.load_locked())
     }
 
-    /// Locked read (caller holds BOTH locks). Used by with_locks bodies.
+    /// Locked read (caller holds BOTH locks). Used by with_locks bodies. Reads
+    /// the machine identity via `IdentitySource::CURRENT`.
     fn load_locked(&self) -> Result<serde_json::Value, KeystoreError> {
+        self.load_locked_core(Identity::Machine)
+    }
+
+    /// THE locked read core (caller holds BOTH locks). Reads the file and
+    /// decrypts with the identity selected by `id`. Both the production
+    /// [`load_locked`](Self::load_locked) (`Identity::Machine`) and the
+    /// [`update_keys_with_identity`](Self::update_keys_with_identity) test seam
+    /// (`Identity::Injected`) go through here — no duplicated read/decrypt logic
+    /// to drift.
+    fn load_locked_core(&self, id: Identity<'_>) -> Result<serde_json::Value, KeystoreError> {
         let path = self.file();
         if !path.exists() { return Ok(serde_json::json!({})); }
         let bytes = std::fs::read(&path)?;
         let env: Envelope = serde_json::from_slice(&bytes)
             .map_err(|e| KeystoreError::Envelope(format!("malformed: {e}")))?;
-        decrypt(&env, IdentitySource::CURRENT)
+        id.decrypt_for(&env)
     }
 
     /// Inspect the keystore and return a typed load state (S2a). Same decrypt
@@ -558,15 +569,47 @@ impl Keystore {
     where
         F: FnOnce(&mut serde_json::Value),
     {
+        self.update_keys_core(mutator, Identity::Machine)
+    }
+
+    /// THE RMW core (caller's mutator runs under BOTH locks via `with_locks`).
+    /// Shared by the production [`update_keys`](Self::update_keys) (machine
+    /// identity) and the [`update_keys_with_identity`](Self::update_keys_with_identity)
+    /// test seam (injected identity) — no duplicated load/mutate/store logic to
+    /// drift. Stale-tmp cleanup happens once in `with_locks` under the lock.
+    fn update_keys_core<F>(
+        &self,
+        mutator: F,
+        id: Identity<'_>,
+    ) -> Result<(), KeystoreError>
+    where
+        F: FnOnce(&mut serde_json::Value),
+    {
         self.with_locks(|ks| {
-            // (stale-tmp cleanup is done once in with_locks under the lock.)
-            let mut keys = ks.load_locked()?;
+            let mut keys = ks.load_locked_core(id)?;
             if !keys.is_object() {
                 keys = serde_json::json!({});
             }
             mutator(&mut keys);
-            ks.store_locked(&keys)
+            ks.store_locked_core(&keys, id)
         })
+    }
+
+    /// Test-only: same as [`update_keys`](Self::update_keys) but the load +
+    /// store inside the RMW use an injected identity string instead of reading
+    /// the machine identity. Lets tests exercise the sanctioned atomic RMW
+    /// (delete-resume, key removal) without touching real OS identity. Delegates
+    /// to the SAME `update_keys_core` as the production path.
+    #[doc(hidden)]
+    pub fn update_keys_with_identity<F>(
+        &self,
+        mutator: F,
+        identity: &str,
+    ) -> Result<(), KeystoreError>
+    where
+        F: FnOnce(&mut serde_json::Value),
+    {
+        self.update_keys_core(mutator, Identity::Injected(identity))
     }
 
     /// Move keystore.json → keystore.json.broken-<ts> (user-initiated recovery).

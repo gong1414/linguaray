@@ -21,6 +21,7 @@ use rusqlite::Connection;
 pub mod schema;
 pub mod providers;
 pub mod migration;
+pub mod delete;
 
 /// Convenience re-export: derive the pre-migration settings backup path. Tests
 /// assert on it without hardcoding the `.bak-pre-migration` suffix.
