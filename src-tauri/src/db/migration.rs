@@ -275,37 +275,66 @@ pub fn parse_settings_raw(path: &Path) -> Result<Option<RawSettings>, MigrationE
 /// Copy `settings.json` → `settings.json.bak-pre-migration` with create-new
 /// semantics: skip if the backup already exists (never overwrite a prior
 /// backup). Idempotent across migration replays.
+///
+/// The copy is staged to a sibling `.tmp` and then atomically renamed onto the
+/// final backup path, so a crash mid-write never leaves a truncated final
+/// backup (only a stray `.tmp`, which a replay overwrites). The create-new
+/// existence check looks for the FINAL path, not the `.tmp`, so a crashed prior
+/// attempt does not block a replay.
 pub(crate) fn backup_settings(settings_path: &Path) -> Result<(), MigrationError> {
     let bak = settings_bak_path(settings_path);
     if bak.exists() {
+        // A prior (complete) backup exists — leave it untouched. Checked against
+        // the FINAL path, so a crashed prior attempt's stray .tmp doesn't fool
+        // us into skipping the backup.
         return Ok(());
     }
-    // Create-new: a concurrent migration that won the race leaves its backup
-    // untouched. Missing source (fresh install) is a no-op.
+    // Missing source (fresh install) is a no-op.
     if !settings_path.exists() {
         return Ok(());
     }
-    let mut dst = match std::fs::OpenOptions::new()
-        .create_new(true)
-        .write(true)
-        .open(&bak)
-    {
-        Ok(f) => f,
-        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => return Ok(()),
-        Err(e) => {
-            return Err(MigrationError::BackupFailed(format!(
-                "create settings backup {}: {e}",
-                bak.display()
-            )))
-        }
-    };
     let bytes = std::fs::read(settings_path).map_err(|e| {
         MigrationError::BackupFailed(format!("read settings for backup: {e}"))
     })?;
+    // Stage the full copy to a sibling .tmp, then atomic-rename onto the final
+    // backup path. The final path only appears once the rename completes, so it
+    // is never observed truncated.
+    let tmp = settings_bak_tmp_path(settings_path);
     use std::io::Write;
-    dst.write_all(&bytes).map_err(|e| {
-        MigrationError::BackupFailed(format!("write settings backup: {e}"))
-    })?;
+    {
+        let mut dst = std::fs::OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(&tmp)
+            .map_err(|e| {
+                MigrationError::BackupFailed(format!(
+                    "create settings backup tmp {}: {e}",
+                    tmp.display()
+                ))
+            })?;
+        dst.write_all(&bytes).map_err(|e| {
+            MigrationError::BackupFailed(format!("write settings backup: {e}"))
+        })?;
+    }
+    match std::fs::rename(&tmp, &bak) {
+        Ok(()) => {}
+        Err(e) => {
+            // Best-effort cleanup of the .tmp so a later replay doesn't see it.
+            let _ = std::fs::remove_file(&tmp);
+            // Lost a create-new race (a concurrent migration renamed its own tmp
+            // onto `bak` first): treat as success — create-new semantics leave
+            // the prior backup untouched.
+            if bak.exists() {
+                return Ok(());
+            }
+            return Err(MigrationError::BackupFailed(format!(
+                "rename settings backup {} -> {}: {e}",
+                tmp.display(),
+                bak.display()
+            )));
+        }
+    }
     Ok(())
 }
 
@@ -315,6 +344,14 @@ pub(crate) fn backup_settings(settings_path: &Path) -> Result<(), MigrationError
 pub fn settings_bak_path(settings_path: &Path) -> std::path::PathBuf {
     let mut s = settings_path.as_os_str().to_os_string();
     s.push(".bak-pre-migration");
+    std::path::PathBuf::from(s)
+}
+
+/// Sibling temp path used to stage the settings backup before an atomic rename
+/// onto [`settings_bak_path`], so a crash never leaves a truncated final backup.
+fn settings_bak_tmp_path(settings_path: &Path) -> std::path::PathBuf {
+    let mut s = settings_path.as_os_str().to_os_string();
+    s.push(".bak-pre-migration.tmp");
     std::path::PathBuf::from(s)
 }
 
@@ -443,25 +480,19 @@ pub(crate) fn verify_key_bearing_profiles(
     };
 
     for secret_ref in &key_set {
-        // A secret_ref names a provider either by bare id (legacy, matches the
-        // preset's stored secret_ref) or by `provider/<uuid>`. We need to find a
-        // non-deleted DB profile that owns this secret.
-        let owned: i64 = if let Some(rest) = secret_ref.strip_prefix("provider/") {
-            // provider/<uuid> → match by uuid column.
-            conn.query_row(
-                "SELECT COUNT(*) FROM providers WHERE uuid=?1 AND status != 'deleted'",
-                rusqlite::params![rest],
-                |r| r.get(0),
-            )?
-        } else {
-            // Bare id → match by secret_ref column (preset rows store the bare id
-            // as their secret_ref when needs_key).
-            conn.query_row(
-                "SELECT COUNT(*) FROM providers WHERE secret_ref=?1 AND status != 'deleted'",
-                rusqlite::params![secret_ref],
-                |r| r.get(0),
-            )?
-        };
+        // Every keystore key is stored verbatim as a provider's `secret_ref`
+        // (legacy preset rows use the bare id like "openai"; v2 / recovered rows
+        // use the full "provider/<uuid>" string). Query by the FULL secret_ref
+        // so a key always lands on the profile that actually owns it — never on
+        // an unrelated row that happens to embed the same uuid (e.g. a recovered
+        // key whose uuid coincides with a preset row's deterministic uuid).
+        // status != 'deleted' excludes tombstones (a 'deleting' row still owns
+        // its secret until finalize).
+        let owned: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM providers WHERE secret_ref=?1 AND status != 'deleted'",
+            rusqlite::params![secret_ref],
+            |r| r.get(0),
+        )?;
         if owned == 0 {
             return Err(DbError::Integrity(format!(
                 "keystore key '{secret_ref}' has no matching active provider row"

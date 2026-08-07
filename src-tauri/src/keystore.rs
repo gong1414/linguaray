@@ -243,13 +243,50 @@ fn has_version_field(v: &serde_json::Value) -> bool {
     v.get("version").is_some()
 }
 
+/// The allowlist of top-level keys a versioned v2 payload may carry. Any other
+/// top-level key means the payload is a mixed v1/v2 structure (a v1 flat map
+/// merged with a v2 envelope, or a forward-incompatible v3 leak) and must be
+/// treated as Corrupt so the user is sent to recovery instead of silently
+/// losing data.
+const V2_ALLOWED_KEYS: &[&str] =
+    &["version", "provider_keys", "history_key", "external_api_token"];
+
 /// Classify an already-decrypted payload into LegacyV1 / CurrentV2 / Corrupt.
 /// Shared between the production path (decrypt with machine identity) and the
 /// test path (decrypt with an injected identity).
+///
+/// A versioned payload is only accepted as CurrentV2 when:
+/// 1. `version == KEYSTORE_DATA_VERSION` (any other value, present or missing
+///    type, is Corrupt — we never silently migrate an unknown version forward),
+/// 2. the top-level object carries ONLY keys from [`V2_ALLOWED_KEYS`] (extra
+///    keys ⇒ a mixed v1/v2 structure ⇒ Corrupt, so the recovery banner fires
+///    rather than the runtime normalization dropping keys on the floor).
 fn classify_payload(payload: &serde_json::Value) -> Result<KeystoreLoadState, KeystoreError> {
     if has_version_field(payload) {
-        // version:2 → KeystoreData. An unknown/unsupported version surfaces as
-        // Corrupt (the from_value error carries the version mismatch detail).
+        // Versioned payload: validate version + key shape BEFORE handing to
+        // KeystoreData::from_value (which would happily ignore unknown fields).
+        let obj = payload.as_object().ok_or_else(|| {
+            KeystoreError::Envelope("versioned payload is not a JSON object".into())
+        })?;
+        let version = obj.get("version").and_then(|v| v.as_u64()).ok_or_else(|| {
+            KeystoreError::Envelope("versioned payload has non-integer 'version'".into())
+        })?;
+        if version as u32 != KEYSTORE_DATA_VERSION {
+            // Unknown/unsupported version → Corrupt (never auto-upgrade).
+            return Ok(KeystoreLoadState::Corrupt(KeystoreError::Envelope(format!(
+                "unsupported keystore data version: got {version}, expected {KEYSTORE_DATA_VERSION}"
+            ))));
+        }
+        // Reject extra top-level keys (mixed v1/v2 or a forward-incompatible v3).
+        for key in obj.keys() {
+            if !V2_ALLOWED_KEYS.contains(&key.as_str()) {
+                return Ok(KeystoreLoadState::Corrupt(KeystoreError::Envelope(format!(
+                    "unknown top-level key in versioned keystore payload: '{key}'"
+                ))));
+            }
+        }
+        // version + key shape are valid → KeystoreData. A structurally wrong
+        // nested value (e.g. provider_keys not an object) still surfaces as Corrupt.
         match KeystoreData::from_value(payload) {
             Ok(data) => Ok(KeystoreLoadState::CurrentV2(data)),
             Err(e) => Ok(KeystoreLoadState::Corrupt(e)),
@@ -858,24 +895,36 @@ impl Keystore {
         let bak = self.backup_path();
         if bak.exists() {
             // A prior backup exists — leave it untouched (create-new semantics).
+            // The check is against the FINAL path (not the .tmp), so a crashed
+            // prior attempt that left a truncated .tmp does NOT block a replay.
             return Ok(());
         }
-        // create_new fails atomically if a concurrent process created it, which is
-        // the create-new guarantee we want.
-        let mut f = match std::fs::OpenOptions::new().create_new(true).write(true).open(&bak) {
-            Ok(f) => f,
-            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
-                // Lost the create-new race (or a prior backup exists) — leave the
-                // existing backup untouched (create-new semantics).
-                return Ok(());
-            }
-            Err(e) => return Err(KeystoreError::Io(e)),
-        };
-        // Copy current bytes into the freshly-created backup.
+        // Atomic-create: write the full copy to a sibling .tmp, then fs::rename
+        // onto the final backup path. A crash mid-write leaves a partial .tmp
+        // (cleaned on replay by the `bak.exists()` check above failing and a
+        // fresh .tmp being written); the FINAL backup path only ever appears
+        // once the rename completes, so it is never observed truncated.
+        let tmp = self.dir.join(BACKUP_PRE_MIGRATION_TMP);
         let bytes = std::fs::read(&src)?;
-        std::io::Write::write_all(&mut f, &bytes)?;
-        drop(f);
-        // Match the keystore file's ACL (owner-only).
+        std::fs::write(&tmp, &bytes)?;
+        match std::fs::rename(&tmp, &bak) {
+            Ok(()) => {}
+            Err(e) => {
+                // Best-effort cleanup of the .tmp on rename failure so a later
+                // replay doesn't see a stray file (the bak.exists() check would
+                // still proceed correctly, but tidy is tidy).
+                let _ = std::fs::remove_file(&tmp);
+                // If the rename lost a create-new race (a concurrent process
+                // renamed its own .tmp onto `bak` first), treat as success —
+                // create-new semantics: a prior backup is left untouched.
+                if bak.exists() {
+                    return Ok(());
+                }
+                return Err(KeystoreError::Io(e));
+            }
+        }
+        // Match the keystore file's ACL (owner-only) on the final backup. Done
+        // AFTER the rename so the secured path is the one callers inspect.
         crate::fs_acl::secure_file(&bak)?;
         Ok(())
     }
@@ -904,6 +953,9 @@ impl Keystore {
 
 /// Filename of the one-time pre-migration backup (spec §A, S2a).
 const BACKUP_PRE_MIGRATION: &str = "keystore.json.bak-pre-migration";
+/// Sibling temp path used to stage the backup before an atomic rename onto
+/// [`BACKUP_PRE_MIGRATION`], so a crash never leaves a truncated final backup.
+const BACKUP_PRE_MIGRATION_TMP: &str = "keystore.json.bak-pre-migration.tmp";
 
 /// Inspect the keystore at `dir` and return its typed load state (S2a). Standalone
 /// entry point (takes a dir, not a `&Keystore`) so callers can probe before

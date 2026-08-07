@@ -690,3 +690,79 @@ fn p0_key_status_after_migration() {
     assert!(ks.get_key_with_identity("openai", ID).unwrap().is_some());
     assert!(ks.get_key_with_identity("missing", ID).unwrap().is_none());
 }
+
+// ─── P1#5: classify_payload version + mixed-key validation ──────────────────
+
+/// A versioned payload with an unsupported version (3) must classify as Corrupt,
+/// never auto-upgrade or silently accept. This guards against a future writer
+/// landing a v3 leak that the current code can't model — fail-closed so the
+/// recovery banner surfaces it instead of dropping fields on the floor.
+#[test]
+fn load_state_rejects_unsupported_version() {
+    let dir = tempfile::tempdir().unwrap();
+    // version=3 with the otherwise-valid v2 key set.
+    let bad = json!({
+        "version": 3,
+        "provider_keys": {"openai": "sk-x"},
+    });
+    store_with_identity(dir.path(), ID, IdentitySource::MacosIoplatformuuid, &bad).unwrap();
+
+    let ks = Keystore::new(dir.path().to_path_buf()).unwrap();
+    match ks.load_state_with_identity(ID) {
+        KeystoreLoadState::Corrupt(_) => {}
+        other => panic!("expected Corrupt for version=3, got {other:?}"),
+    }
+}
+
+/// A versioned payload that carries an EXTRA top-level key (a mixed v1/v2
+/// structure, e.g. a v1 flat-map field like "openai" merged alongside the v2
+/// envelope) must classify as Corrupt. Without this guard the runtime would
+/// silently drop the stray field on read, masking a real corruption.
+#[test]
+fn load_state_rejects_mixed_v1_v2_payload() {
+    let dir = tempfile::tempdir().unwrap();
+    // version=2 + valid provider_keys, but ALSO a stray legacy field "openai"
+    // at the top level (a mixed v1/v2 shape).
+    let mixed = json!({
+        "version": 2,
+        "provider_keys": {"openai": "sk-v2"},
+        "openai": "sk-v1-leak",
+    });
+    store_with_identity(dir.path(), ID, IdentitySource::MacosIoplatformuuid, &mixed).unwrap();
+
+    let ks = Keystore::new(dir.path().to_path_buf()).unwrap();
+    match ks.load_state_with_identity(ID) {
+        KeystoreLoadState::Corrupt(_) => {}
+        other => panic!("expected Corrupt for mixed v1/v2 payload, got {other:?}"),
+    }
+}
+
+/// Belt-and-suspenders: a clean v2 payload with only the allowlisted keys still
+/// classifies as CurrentV2 (history_key + external_api_token present, no
+/// extras). Guards against the version/mixed check accidentally rejecting a
+/// legitimate opt-in payload.
+#[test]
+fn load_state_accepts_clean_v2_with_optional_fields() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut data = KeystoreData::new_v2(map_of("openai", "sk-x"));
+    data.history_key = Some(SerializableKey([1u8; 32]));
+    data.external_api_token = Some("tok".into());
+    store_with_identity(
+        dir.path(),
+        ID,
+        IdentitySource::MacosIoplatformuuid,
+        &data.to_value().unwrap(),
+    )
+    .unwrap();
+
+    let ks = Keystore::new(dir.path().to_path_buf()).unwrap();
+    match ks.load_state_with_identity(ID) {
+        KeystoreLoadState::CurrentV2(d) => {
+            assert_eq!(d.version, KEYSTORE_DATA_VERSION);
+            assert_eq!(d.get_provider_key("openai"), Some("sk-x"));
+            assert!(d.history_key.is_some());
+            assert!(d.external_api_token.is_some());
+        }
+        other => panic!("expected CurrentV2 for clean v2 payload, got {other:?}"),
+    }
+}

@@ -320,7 +320,9 @@ fn duplicate_produces_new_uuid_and_secret_ref() {
         format!("provider/{}", dup.uuid),
         "secret_ref is provider/<new-uuid>"
     );
-    // needs_key is reset to true (the key is NEVER copied).
+    // needs_key is inherited from the source profile (it's a provider-type
+    // property, not "has a key"). OpenAI needs a key → the duplicate does too;
+    // the key itself is NEVER copied (fresh secret_ref, starts keyless).
     assert!(dup.needs_key);
     assert!(dup.enabled, "duplicate starts enabled");
     // Name is suffixed so the two rows are distinguishable.
@@ -340,6 +342,10 @@ fn duplicate_of_local_keeps_is_local() {
         .with_conn(|conn| providers::duplicate(conn, &local.uuid))
         .unwrap();
     assert!(dup.is_local, "is_local is preserved on duplicate");
+    // needs_key is a provider-TYPE property, not "has a key". Ollama is keyless,
+    // so its duplicate is keyless too — not a phantom "needs a key" row.
+    assert!(!local.needs_key, "ollama preset is keyless");
+    assert!(!dup.needs_key, "duplicate inherits keyless provider-type");
 }
 
 // ─── Reorder ──────────────────────────────────────────────────────────────

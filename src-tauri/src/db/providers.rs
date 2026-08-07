@@ -305,16 +305,24 @@ pub fn insert_or_ignore(
 }
 
 /// Resolve a `template_id` to its preset-derived creation parameters
-/// (protocol/endpoint/default model/needs_key), or `None` if it isn't a preset.
+/// (protocol/endpoint/default model/needs_key/is_local), or `None` if it isn't a
+/// preset. `is_local` is derived from the preset's endpoint (the preset catalog
+/// doesn't carry the flag itself): the Ollama preset's loopback endpoint → true,
+/// everything else → false.
 fn preset_lookup(template_id: &str) -> Option<PresetDerived> {
     crate::providers::presets()
         .into_iter()
         .find(|p| p.id == template_id)
-        .map(|p| PresetDerived {
-            protocol: preset_protocol(&p.id),
-            endpoint: p.endpoint,
-            default_model: Some(p.default_model),
-            needs_key: p.needs_key,
+        .map(|p| {
+            // Compute is_local BEFORE moving p.endpoint into the struct.
+            let is_local = endpoint_is_local(&p.endpoint);
+            PresetDerived {
+                protocol: preset_protocol(&p.id),
+                endpoint: p.endpoint,
+                default_model: Some(p.default_model),
+                needs_key: p.needs_key,
+                is_local,
+            }
         })
 }
 
@@ -323,6 +331,7 @@ struct PresetDerived {
     endpoint: String,
     default_model: Option<String>,
     needs_key: bool,
+    is_local: bool,
 }
 
 /// Map a preset id to its wire protocol. OpenAI-compatible presets (openai,
@@ -458,6 +467,16 @@ pub fn update(
         invalidate_consent(&tx)?;
     }
 
+    // Disabling via update must mirror toggle(): pull the row out of every
+    // selection slot and drop parallel consent, so a disabled provider can never
+    // remain "selected" (which would otherwise violate validate_active_selection).
+    // Only fire on an actual enabled true→false transition; patching an already-
+    // disabled row with enabled=false is a no-op.
+    if patch.enabled == Some(false) && existing.enabled {
+        remove_from_active_slots(&tx, uuid)?;
+        invalidate_consent(&tx)?;
+    }
+
     tx.execute(
         "UPDATE providers SET name=?1, endpoint=?2, model=?3, enabled=?4, \
          sort_order=?5, is_local=?6 WHERE uuid=?7",
@@ -469,10 +488,15 @@ pub fn update(
     Ok(updated)
 }
 
-/// Duplicate a provider. New UUIDv4, new `secret_ref`, `enabled=true`,
-/// `needs_key=true` (the original key is NEVER copied — the duplicate starts
-/// keyless and the user must enter one). Name gets a " (copy)" suffix so the two
-/// rows are distinguishable in the UI.
+/// Duplicate a provider. New UUIDv4, new `secret_ref`, `enabled=true`. The
+/// original key is NEVER copied — the duplicate starts keyless and the user must
+/// enter one (when `needs_key`). Name gets a " (copy)" suffix so the two rows are
+/// distinguishable in the UI.
+///
+/// `needs_key` is a provider-TYPE property (Ollama=false, Google=false,
+/// OpenAI=true), NOT "currently has a key". So the duplicate inherits the
+/// source's `needs_key` — duplicating an Ollama profile yields another keyless
+/// Ollama profile, not a phantom "needs a key" row the user can never satisfy.
 pub fn duplicate(
     conn: &mut Connection,
     uuid: &str,
@@ -494,7 +518,9 @@ pub fn duplicate(
         enabled: true,
         sort_order,
         is_local: src.is_local,
-        needs_key: true, // duplicate starts keyless
+        // needs_key is a provider-type property, not "has a key". Inherit it so
+        // duplicating a keyless Ollama profile stays keyless.
+        needs_key: src.needs_key,
         secret_ref: new_secret_ref,
         capabilities: src.capabilities,
         status: ProviderStatus::Active.as_str().to_string(),
@@ -944,7 +970,10 @@ pub fn build_profile(source: &CandidateSource) -> Result<ProviderProfile, DbErro
                     model: d.default_model,
                     enabled: true,
                     sort_order: 0,
-                    is_local: false,
+                    // Inherit is_local from the preset (e.g. Ollama's loopback
+                    // endpoint → local). Setting false unconditionally would mark
+                    // every migrated Ollama profile as remote.
+                    is_local: d.is_local,
                     needs_key: d.needs_key,
                     secret_ref,
                     capabilities: ProviderCapabilities::default(),
