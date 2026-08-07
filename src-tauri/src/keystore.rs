@@ -902,14 +902,30 @@ impl Keystore {
             // prior attempt that left a truncated .tmp does NOT block a replay.
             return Ok(());
         }
-        // Atomic-create: write the full copy to a sibling .tmp, then fs::rename
-        // onto the final backup path. A crash mid-write leaves a partial .tmp
-        // (cleaned on replay by the `bak.exists()` check above failing and a
-        // fresh .tmp being written); the FINAL backup path only ever appears
-        // once the rename completes, so it is never observed truncated.
+        // Atomic-create: write the full copy to a sibling .tmp, SECURE + fsync
+        // it, THEN fs::rename onto the final backup path. A crash mid-write
+        // leaves a partial .tmp (cleaned on replay by the `bak.exists()` check
+        // above failing and a fresh .tmp being written); the FINAL backup path
+        // only ever appears once the rename completes, so it is never observed
+        // truncated. Securing the .tmp BEFORE the rename (instead of securing
+        // `bak` after) closes the window where the backup existed on disk in an
+        // unprotected state between the rename and the chmod/ACL call.
         let tmp = self.dir.join(BACKUP_PRE_MIGRATION_TMP);
         let bytes = std::fs::read(&src)?;
-        std::fs::write(&tmp, &bytes)?;
+        {
+            use std::io::Write;
+            let mut dst = std::fs::OpenOptions::new()
+                .create(true)
+                .write(true)
+                .truncate(true)
+                .open(&tmp)?;
+            dst.write_all(&bytes)?;
+            dst.flush()?;
+            dst.sync_all()?;
+        }
+        // Secure the staged file BEFORE the rename so the on-disk permissions
+        // are correct from the instant the final path appears.
+        crate::fs_acl::secure_file(&tmp)?;
         match std::fs::rename(&tmp, &bak) {
             Ok(()) => {}
             Err(e) => {
@@ -926,9 +942,6 @@ impl Keystore {
                 return Err(KeystoreError::Io(e));
             }
         }
-        // Match the keystore file's ACL (owner-only) on the final backup. Done
-        // AFTER the rename so the secured path is the one callers inspect.
-        crate::fs_acl::secure_file(&bak)?;
         Ok(())
     }
 

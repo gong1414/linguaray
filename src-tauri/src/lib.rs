@@ -250,11 +250,19 @@ fn list_engines() -> Vec<EngineInfo> {
 #[tauri::command]
 fn set_key(
     state: tauri::State<'_, Arc<Session>>,
+    app: tauri::State<'_, Arc<AppState>>,
     provider_id: String,
     key: String,
 ) -> Result<(), String> {
+    // Acquire data_gate.read() for the duration of the keystore write so this
+    // legacy command can't race archive/reset/recovery (which hold the write
+    // guard). Key writes are allowed even when the DB isn't Ready — the
+    // keystore is independent — but they MUST serialize against the data-gate
+    // writers.
+    //
     // S2a P0: typed accessor — converges the payload to v2 (a load()+store() or
     // a flat-map write would create a mixed v1/v2 structure post-migration).
+    let _gate = app.data_gate.read();
     state.keystore.set_key(&provider_id, &key).map_err(|e| e.to_string())?;
     Ok(())
 }
@@ -262,9 +270,12 @@ fn set_key(
 #[tauri::command]
 fn delete_key(
     state: tauri::State<'_, Arc<Session>>,
+    app: tauri::State<'_, Arc<AppState>>,
     provider_id: String,
 ) -> Result<(), String> {
+    // See set_key: serialize against archive/reset via the data_gate read guard.
     // S2a P0: typed accessor (idempotent — removing an absent key succeeds).
+    let _gate = app.data_gate.read();
     state.keystore.delete_key(&provider_id).map_err(|e| e.to_string())?;
     Ok(())
 }
@@ -296,8 +307,11 @@ async fn archive_keystore(
         let ks = keystore::Keystore::new(ks_dir.clone()).map_err(|e| e.to_string())?;
         let dst = ks.archive().map_err(|e| e.to_string())?;
         let dst_str = dst.to_string_lossy().into_owned();
-        // 3. DB cleanup transaction + 4. readiness update.
-        apply_keystore_recovery_db_cleanup(&app);
+        // 3. DB cleanup transaction + 4. readiness update. A cleanup failure
+        //    propagates: the keystore archive already happened, but the DB is
+        //    now in an inconsistent state (keys gone, needs-key providers still
+        //    enabled) and the user must see the error + recovery banner.
+        apply_keystore_recovery_db_cleanup(&app)?;
         Ok(dst_str)
     })
     .await
@@ -322,7 +336,9 @@ async fn reset_keystore(
             .reset()
             .map_err(|e| e.to_string())?
             .map(|p| p.to_string_lossy().into_owned());
-        apply_keystore_recovery_db_cleanup(&app);
+        // See archive_keystore: a cleanup failure propagates (keystore already
+        // reset, but DB is now inconsistent).
+        apply_keystore_recovery_db_cleanup(&app)?;
         Ok(archived)
     })
     .await
@@ -650,10 +666,15 @@ async fn provider_set_active(
         // contract). We carry the consent-required signal out via a SetActiveOutcome
         // so the outer closure can map it to the frontend-facing string without
         // smuggling a ConsentError through the DbError boundary.
+        //
+        // P1 #4: ALL reads (list, compute_scope, read_consent_scope) + the
+        // write run inside ONE transaction so a concurrent writer can't change
+        // the active set between validation and the slot write.
         let outcome = db
             .with_conn(|conn| -> Result<SetActiveOutcome, DbErr> {
+                let tx = conn.transaction()?;
                 // Validate against the active set BEFORE writing.
-                let active = db_providers::list(conn)?;
+                let active = db_providers::list(&tx)?;
                 db_providers::validate_active_selection(
                     &primary,
                     &parallel,
@@ -668,8 +689,10 @@ async fn provider_set_active(
                 if !parallel.is_empty() {
                     let actual = db_providers::compute_scope(&primary, &parallel, &active)
                         .map_err(consent_to_db)?;
-                    let stored = db_providers::read_consent_scope(conn)?;
+                    let stored = db_providers::read_consent_scope(&tx)?;
                     if stored.as_deref() != Some(actual.as_str()) {
+                        // No write — drop the tx (rolls back, which is a no-op
+                        // since nothing was written) and surface NeedsConsent.
                         return Ok(SetActiveOutcome::NeedsConsent { actual_scope: actual });
                     }
                 }
@@ -678,15 +701,16 @@ async fn provider_set_active(
                 // no parallel set (membership went to a non-consented shape); a
                 // matching-scope write keeps the consent as-is.
                 if parallel.is_empty() {
-                    set_active_slots(conn, &primary, &parallel, fallback.as_deref())?;
+                    set_active_slots(&tx, &primary, &parallel, fallback.as_deref())?;
                 } else {
                     set_active_slots_keep_consent(
-                        conn,
+                        &tx,
                         &primary,
                         &parallel,
                         fallback.as_deref(),
                     )?;
                 }
+                tx.commit()?;
                 Ok(SetActiveOutcome::Written)
             })
             .map_err(|e| e.to_string())?;
@@ -725,8 +749,12 @@ async fn provider_confirm_and_set_active(
     tauri::async_runtime::spawn_blocking(move || -> Result<i64, String> {
         let _gate = app.data_gate.write();
         db.with_conn(|conn| -> Result<i64, DbErr> {
+            // P1 #4: ALL reads + validation + scope computation + writes run in
+            // ONE transaction so no concurrent writer can change the active set
+            // between the probe and the consented write.
+            let tx = conn.transaction()?;
             // 1. Re-read inside the tx (no TOCTOU).
-            let active = db_providers::list(conn)?;
+            let active = db_providers::list(&tx)?;
             // 2. Validate.
             db_providers::validate_active_selection(
                 &primary,
@@ -745,14 +773,15 @@ async fn provider_confirm_and_set_active(
                     "consent_required:{actual_scope}"
                 )));
             }
-            // 5. Bump version + write selection + record scope atomically.
+            // 5. Bump version + write selection + record scope atomically (same tx).
             let new_version = write_consented_selection(
-                conn,
+                &tx,
                 &primary,
                 &parallel,
                 fallback.as_deref(),
                 &actual_scope,
             )?;
+            tx.commit()?;
             Ok(new_version)
         })
         .map_err(|e| e.to_string())
@@ -881,86 +910,150 @@ async fn provider_test_connection(
 
 /// User-initiated database recovery (P1 #8).
 ///
-/// Simplified version of the full archive_database flow (Arc::try_unwrap +
-/// close + rename + reopen is deferred). This implementation:
-/// 1. Acquires `data_gate.write()` (blocks all provider commands).
-/// 2. Drops the DB handle (sets the slot to `None`) so no query can run
-///    against the file we're about to move.
-/// 3. Renames `linguaray.db` → `linguaray.db.broken-<ts>` (recoverable, like
-///    keystore archive).
-/// 4. Opens a fresh DB + runs migration against the new file.
-/// 5. Updates `DataReadiness` (Ready on success; NeedsDatabaseRecovery if the
-///    reopen/migration fails).
+/// Implements the frozen close/rename/reopen state machine so the DB file
+/// handle is released BEFORE the rename (otherwise Windows refuses to rename a
+/// file with an open SQLite handle, and a cloned `Arc<Database>` could keep
+/// serving queries against the wrong file). Steps:
 ///
-/// Does NOT yet implement the ArchiveFailpoint / Arc::try_unwrap close path —
-/// that's S3 scope. The basic recovery path is enough for the user to recover
-/// from a corrupt DB file.
+/// 1. Acquire `data_gate.write()` FIRST (blocks every provider command — no
+///    new `with_conn` call can start while we're tearing down).
+/// 2. Take the `Arc<Database>` out of the slot (`db.write().take()`).
+/// 3. `Arc::try_unwrap` — the write gate guarantees no in-flight command holds
+///    a clone; if one still does (a programming bug), restore the slot and
+///    bail instead of leaving split-brain handles.
+/// 4. `Database::close(self)` — release the SQLite file handle. On failure,
+///    reopen the slot from the original path (the file still exists there) and
+///    bail.
+/// 5. `fs::rename(db_path, broken_path)` — the file handle is gone, so this
+///    succeeds even on Windows. If it fails, the file is still at the original
+///    path: reopen it, restore the slot, and bail.
+/// 6. Open a fresh DB at the original path + run migration.
+/// 7. `resume_deletions` against the fresh DB. A failure here is a real
+///    problem (not just a logged best-effort one) → MigrationIncomplete, NOT
+///    Ready.
+/// 8. On success install the new handle + Ready.
+///
+/// Any failure AFTER the rename leaves the slot `None` and readiness
+/// `NeedsDatabaseRecovery` — the file is gone, so the user must retry the
+/// recovery (which will recreate it). Any failure BEFORE the rename leaves the
+/// original DB untouched and usable.
 #[tauri::command]
 async fn archive_database(
     state: tauri::State<'_, Arc<AppState>>,
 ) -> Result<String, String> {
     let app = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || -> Result<String, String> {
-        // 1. data_gate write guard for the whole operation.
+        // 1. data_gate write guard for the whole operation. Acquired FIRST so
+        //    require_ready (which clones the Arc) cannot race us: once we hold
+        //    the write guard no provider command can start a new with_conn.
         let _gate = app.data_gate.write();
-        // 2. Drop the DB handle. We can only swap to None; the underlying Arc
-        //    may still be held by an in-flight command on another thread, but
-        //    the data_gate write guard guarantees no new with_conn calls start,
-        //    and rusqlite tolerates concurrent access on the same Connection.
-        *app.db.write() = None;
-        // 3. Rename the DB file aside (recoverable). If the file doesn't exist,
-        //    there's nothing to archive — proceed to open a fresh one.
+
         let db_path = app.db_path.clone();
+
+        // 2-4. Close the existing connection (if any) so the file handle is
+        //      released before the rename. The slot is left None across the
+        //      rename so a concurrent reader observes "no DB" rather than a
+        //      handle pointing at a renamed file.
+        let closed = match app.db.write().take() {
+            Some(arc) => match Arc::try_unwrap(arc) {
+                Ok(owned) => match owned.close() {
+                    Ok(()) => true,
+                    Err((recovered_db, e)) => {
+                        // Close failed — the file handle may still be open but
+                        // the DB object is still usable. Restore the slot so the
+                        // app keeps running against the original file and bail.
+                        let reason = e.to_string();
+                        *app.db.write() = Some(Arc::new(recovered_db));
+                        return Err(format!("close linguaray.db before archive: {reason}"));
+                    }
+                },
+                Err(arc) => {
+                    // Someone still holds a clone. The write gate should make
+                    // this impossible; restore + bail rather than risk a
+                    // split-brain handle racing the rename.
+                    *app.db.write() = Some(arc);
+                    return Err(
+                        "archive_database: DB handle still in use (data_gate violated)".into(),
+                    );
+                }
+            },
+            None => false, // No handle to close (e.g. NeedsDatabaseRecovery).
+        };
+
+        // 5. Rename the DB file aside (recoverable). If the file doesn't exist,
+        //    there's nothing to archive — proceed straight to opening a fresh
+        //    one. On rename failure the original file is still at db_path, so
+        //    we can restore the slot by reopening it.
         let archived_path = if db_path.exists() {
             let ts = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .map(|d| d.as_secs())
                 .unwrap_or(0);
             let dst = db_path.with_extension(format!("db.broken-{ts}"));
-            std::fs::rename(&db_path, &dst).map_err(|e| e.to_string())?;
-            dst.to_string_lossy().into_owned()
+            match std::fs::rename(&db_path, &dst) {
+                Ok(()) => dst.to_string_lossy().into_owned(),
+                Err(e) => {
+                    // Rename failed: the file is still at the original path.
+                    // Restore the slot by reopening it (only if we previously
+                    // held a handle, i.e. the app was using this DB) so the
+                    // user isn't left with a None slot over a usable file.
+                    if closed {
+                        if let Ok(db) = Database::open(&db_path) {
+                            *app.db.write() = Some(Arc::new(db));
+                        } else {
+                            *app.readiness.write() = DataReadiness::NeedsDatabaseRecovery {
+                                reason: format!(
+                                    "rename {} failed ({e}) and reopen also failed",
+                                    db_path.display()
+                                ),
+                            };
+                        }
+                    }
+                    return Err(format!("rename linguaray.db aside: {e}"));
+                }
+            }
         } else {
             String::new()
         };
-        // 4. Open a fresh DB + run migration. On success, install the handle.
-        //    On failure, leave the slot None and set NeedsDatabaseRecovery.
+
+        // 6-8. Open a fresh DB at the original path + migrate + resume.
         match Database::open(&db_path) {
             Ok(db) => {
                 let db = Arc::new(db);
                 let fp = FailpointCell::none();
-                let migrate_result = run_migration(
-                    &db,
-                    &app.keystore_dir,
-                    &app.settings_path,
-                    &fp,
-                );
-                match migrate_result {
-                    Ok(()) => {
-                        // Resume in-flight deletes against the fresh DB.
-                        if let Err(e) =
-                            crate::db::delete::provider_resume_deletions(&db, &app.keystore_dir)
-                        {
-                            log::error!("resume_deletions after archive_database: {e}");
-                        }
-                        *app.db.write() = Some(db);
-                        *app.readiness.write() = DataReadiness::Ready;
-                        Ok(archived_path)
-                    }
-                    Err(e) => {
-                        let reason = format!("migration after archive: {e}");
-                        *app.readiness.write() = DataReadiness::migration_incomplete(
-                            "archive_database",
-                            reason.clone(),
-                        );
-                        // Still install the handle so a later recovery/migration
-                        // retry can proceed (NeedsDatabaseRecovery would hide the
-                        // partially-migrated DB).
-                        *app.db.write() = Some(db);
-                        Err(reason)
-                    }
+                if let Err(e) = run_migration(&db, &app.keystore_dir, &app.settings_path, &fp) {
+                    let reason = format!("migration after archive: {e}");
+                    *app.readiness.write() = DataReadiness::migration_incomplete(
+                        "archive_database",
+                        reason.clone(),
+                    );
+                    // Still install the handle so a later recovery/migration
+                    // retry can proceed (NeedsDatabaseRecovery would hide the
+                    // partially-migrated DB).
+                    *app.db.write() = Some(db);
+                    return Err(reason);
                 }
+                // Resume in-flight deletes against the fresh DB. A failure here
+                // is a real consistency problem — surface MigrationIncomplete
+                // (NOT Ready) so the user sees the recovery banner.
+                if let Err(e) =
+                    crate::db::delete::provider_resume_deletions(&db, &app.keystore_dir)
+                {
+                    let reason = format!("resume_deletions after archive: {e}");
+                    *app.readiness.write() = DataReadiness::migration_incomplete(
+                        "archive_database",
+                        reason.clone(),
+                    );
+                    *app.db.write() = Some(db);
+                    return Err(reason);
+                }
+                *app.db.write() = Some(db);
+                *app.readiness.write() = DataReadiness::Ready;
+                Ok(archived_path)
             }
             Err(e) => {
+                // The file was renamed away (or never existed); the reopen
+                // failed too. There's nothing to serve — NeedsDatabaseRecovery.
                 let reason = format!("reopen linguaray.db: {e}");
                 *app.readiness.write() = DataReadiness::NeedsDatabaseRecovery {
                     reason: reason.clone(),
@@ -1007,14 +1100,14 @@ fn consent_to_db(e: ConsentErr) -> DbErr {
 }
 
 /// Write the primary/parallel/fallback slots in `preferences` + null consent.
-/// Caller drives the transaction.
+/// Runs against the caller's transaction (P1 #4: reads + writes in ONE tx) —
+/// no inner transaction is opened.
 fn set_active_slots(
-    conn: &mut rusqlite::Connection,
+    tx: &rusqlite::Transaction<'_>,
     primary: &str,
     parallel: &[String],
     fallback: Option<&str>,
 ) -> Result<(), DbErr> {
-    let tx = conn.transaction()?;
     let primary_val = if primary.is_empty() {
         None
     } else {
@@ -1031,7 +1124,6 @@ fn set_active_slots(
             fallback_val,
         ],
     )?;
-    tx.commit()?;
     Ok(())
 }
 
@@ -1052,96 +1144,130 @@ fn set_active_slots(
 /// 4. `UPDATE _schema_migrations SET migration_complete=1` — a recovery completes
 ///    migration (the DB is now in a known-good state, just without keys).
 ///
-/// Then updates `DataReadiness` from the OLD state + whether the DB is still
-/// usable:
-/// - `Ready` or `NeedsKeystoreRecovery` + DB still open → `Ready` (keystore
-///   problem fixed).
-/// - `NeedsDatabaseRecovery` → keep (keystore archive doesn't fix a corrupt DB).
-/// - DB handle is `None` → keep `NeedsDatabaseRecovery`.
+/// Returns `Err` if the cleanup transaction fails (so the caller can surface
+/// the failure — previously it was only logged and readiness was bumped to
+/// Ready, hiding a real consistency break).
 ///
-/// Errors are logged but NOT propagated: recovery is user-initiated and should
-/// always succeed from the user's perspective even if the DB cleanup hits a
-/// transient error (the keystore archive already happened; the DB will be
-/// cleaned up on the next recovery attempt or next startup).
-fn apply_keystore_recovery_db_cleanup(app: &Arc<AppState>) {
+/// Readiness transition rules:
+/// - DB cleanup tx FAILED → `MigrationIncomplete` (the DB is in an unknown
+///   state; the user must see the recovery banner). The OLD readiness is NOT
+///   promoted.
+/// - Old `Ready` or `NeedsKeystoreRecovery` + cleanup OK + DB exists → `Ready`
+///   (the keystore problem is fixed and the DB is consistent).
+/// - Old `NeedsDatabaseRecovery` → kept as-is (a keystore archive does NOT fix
+///   a corrupt/unopenable DB). The cleanup tx isn't attempted (no DB handle).
+/// - Old `MigrationIncomplete` → kept as-is even when the cleanup succeeds. The
+///   prior migration was incomplete for a reason this archive doesn't address
+///   (a half-applied schema, a corrupt settings file, a resume-deletions
+///   fault); promoting to Ready would hide that. The user must retry the
+///   recovery that targets the migration itself.
+fn apply_keystore_recovery_db_cleanup(app: &Arc<AppState>) -> Result<(), String> {
     // Capture the OLD readiness BEFORE any mutation so the post-state logic can
     // branch on it.
     let old_readiness = app.readiness.read().clone();
 
-    // Try the DB cleanup only when a DB handle exists.
-    let db_usable = if let Some(db) = app.db.read().clone() {
-        match db.with_conn(|conn| {
-            let tx = conn.transaction()?;
-            // 1. Disable needs-key providers (their keys are gone after archive).
-            tx.execute(
-                "UPDATE providers SET enabled=0 WHERE needs_key=1",
-                [],
-            )?;
-            // 2-3. Clear active selection + consent.
-            tx.execute(
-                "UPDATE preferences SET primary_uuid=NULL, parallel_uuids='[]', \
-                 fallback_uuid=NULL, parallel_consent_version=NULL, \
-                 parallel_consent_scope=NULL WHERE id=1",
-                [],
-            )?;
-            // 4. Mark migration complete.
-            tx.execute(
-                "UPDATE _schema_migrations SET migration_complete=1 WHERE id=1",
-                [],
-            )?;
-            tx.commit()?;
-            Ok(())
-        }) {
-            Ok(()) => true,
-            Err(e) => {
+    // Try the DB cleanup only when a DB handle exists. A NeedsDatabaseRecovery
+    // state means there's no handle; the cleanup is a no-op and we keep that
+    // state (a keystore archive doesn't fix a corrupt DB).
+    //
+    // `cleanup_result` is Ok(true) when a handle existed and the tx succeeded;
+    // Ok(false) when there was no handle to clean up (NeedsDatabaseRecovery);
+    // Err(_) when a handle existed but the tx failed (the DB is now in an
+    // unknown state).
+    let cleanup_result: Result<bool, String> = match app.db.read().clone() {
+        Some(db) => db
+            .with_conn(|conn| {
+                let tx = conn.transaction()?;
+                // 1. Disable needs-key providers (their keys are gone after archive).
+                tx.execute(
+                    "UPDATE providers SET enabled=0 WHERE needs_key=1",
+                    [],
+                )?;
+                // 2-3. Clear active selection + consent.
+                tx.execute(
+                    "UPDATE preferences SET primary_uuid=NULL, parallel_uuids='[]', \
+                     fallback_uuid=NULL, parallel_consent_version=NULL, \
+                     parallel_consent_scope=NULL WHERE id=1",
+                    [],
+                )?;
+                // 4. Mark migration complete.
+                tx.execute(
+                    "UPDATE _schema_migrations SET migration_complete=1 WHERE id=1",
+                    [],
+                )?;
+                tx.commit()?;
+                Ok(())
+            })
+            .map(|_| true)
+            .map_err(|e| {
+                // Surface the failure: the cleanup tx is part of the recovery's
+                // atomic contract; logging + bumping to Ready would hide a real
+                // consistency break.
                 log::error!("keystore recovery DB cleanup failed: {e}");
-                false
-            }
-        }
-    } else {
-        false
+                e.to_string()
+            }),
+        None => Ok(false), // No DB handle (NeedsDatabaseRecovery): nothing to clean up.
     };
 
-    // Compute the new readiness. Do NOT unconditionally set Ready — a DB problem
-    // is not fixed by a keystore archive.
-    let new_readiness = match (&old_readiness, db_usable) {
-        // Keystore problem fixed and DB is usable → Ready.
-        (DataReadiness::Ready, true) | (DataReadiness::NeedsKeystoreRecovery { .. }, true) => {
-            DataReadiness::Ready
-        }
-        // DB was broken and still is → keep the DB-recovery state.
-        (DataReadiness::NeedsDatabaseRecovery { reason }, _) => {
-            DataReadiness::NeedsDatabaseRecovery {
-                reason: reason.clone(),
+    // Compute the new readiness. The cleanup tx FAILED → MigrationIncomplete
+    // (the DB is in an unknown state). On success, the transition depends on
+    // the OLD readiness (see the doc comment above).
+    let new_readiness = match cleanup_result {
+        Err(_) => DataReadiness::migration_incomplete(
+            "keystore_recovery_cleanup",
+            "DB cleanup transaction failed after keystore archive",
+        ),
+        // No DB handle (NeedsDatabaseRecovery): keep that state regardless of
+        // whether the archive succeeded.
+        Ok(false) => match &old_readiness {
+            DataReadiness::NeedsDatabaseRecovery { reason } => {
+                DataReadiness::NeedsDatabaseRecovery {
+                    reason: reason.clone(),
+                }
             }
-        }
-        // Migration was incomplete; if the cleanup tx succeeded we can promote
-        // to Ready, otherwise keep the incomplete state.
-        (DataReadiness::MigrationIncomplete { .. }, true) => DataReadiness::Ready,
-        (DataReadiness::MigrationIncomplete { checkpoint, reason }, false) => {
-            DataReadiness::MigrationIncomplete {
-                checkpoint: checkpoint.clone(),
-                reason: reason.clone(),
+            // Defensive: cleanup is a no-op but there's no DB handle, so do NOT
+            // claim Ready (Ready implies an open DB). Keep the old state.
+            other => other.clone(),
+        },
+        // Cleanup succeeded against a real DB. Only Ready / NeedsKeystoreRecovery
+        // promote to Ready; MigrationIncomplete is kept (the prior migration was
+        // incomplete for a reason this archive doesn't fix); NeedsDatabaseRecovery
+        // can't reach this arm (no handle → Ok(false)).
+        Ok(true) => match &old_readiness {
+            DataReadiness::Ready | DataReadiness::NeedsKeystoreRecovery { .. } => {
+                DataReadiness::Ready
             }
-        }
-        // Ready readiness but no usable DB (db_usable false) → shouldn't happen
-        // normally (Ready implies an open DB), keep as-is defensively.
-        (_, false) => old_readiness,
+            DataReadiness::MigrationIncomplete { checkpoint, reason } => {
+                DataReadiness::MigrationIncomplete {
+                    checkpoint: checkpoint.clone(),
+                    reason: reason.clone(),
+                }
+            }
+            DataReadiness::NeedsDatabaseRecovery { reason } => {
+                DataReadiness::NeedsDatabaseRecovery {
+                    reason: reason.clone(),
+                }
+            }
+        },
     };
     *app.readiness.write() = new_readiness;
+    // Propagate a cleanup-tx failure so the caller (archive_keystore /
+    // reset_keystore) surfaces it to the frontend; the readiness has already
+    // been set to MigrationIncomplete above.
+    cleanup_result.map(|_| ())
 }
 
 /// Like [`set_active_slots`] but PRESERVES the prior parallel consent
 /// (version + scope). Used by `provider_set_active` when the recomputed scope
 /// matches the stored scope (re-affirming the same selection): we update the
-/// slot pointers without invalidating consent. Caller drives the transaction.
+/// slot pointers without invalidating consent. Runs against the caller's
+/// transaction (P1 #4) — no inner transaction is opened.
 fn set_active_slots_keep_consent(
-    conn: &mut rusqlite::Connection,
+    tx: &rusqlite::Transaction<'_>,
     primary: &str,
     parallel: &[String],
     fallback: Option<&str>,
 ) -> Result<(), DbErr> {
-    let tx = conn.transaction()?;
     let primary_val = if primary.is_empty() {
         None
     } else {
@@ -1153,21 +1279,20 @@ fn set_active_slots_keep_consent(
         "UPDATE preferences SET primary_uuid=?1, parallel_uuids=?2, fallback_uuid=?3 WHERE id=1",
         rusqlite::params![primary_val, parallel_json, fallback_val],
     )?;
-    tx.commit()?;
     Ok(())
 }
 
 /// Write the active selection AND record the consent (scope + bumped version)
-/// in one transaction (P1 #3). Returns the new consent version. Caller drives
-/// the outer `data_gate` write guard; this function owns the DB transaction.
+/// against the caller's transaction (P1 #3 + P1 #4: ALL reads + writes in ONE
+/// tx). Returns the new consent version. The caller owns the transaction and
+/// commits it.
 fn write_consented_selection(
-    conn: &mut rusqlite::Connection,
+    tx: &rusqlite::Transaction<'_>,
     primary: &str,
     parallel: &[String],
     fallback: Option<&str>,
     scope: &str,
 ) -> Result<i64, DbErr> {
-    let tx = conn.transaction()?;
     let primary_val = if primary.is_empty() { None } else { Some(primary) };
     let parallel_json = serde_json::to_string(parallel).unwrap_or_else(|_| "[]".into());
     let fallback_val = fallback.filter(|s| !s.is_empty());
@@ -1183,7 +1308,6 @@ fn write_consented_selection(
         [],
         |r| r.get(0),
     )?;
-    tx.commit()?;
     Ok(new_version)
 }
 
@@ -1465,8 +1589,28 @@ pub fn run() {
             // get_data_readiness) keep working so the user can recover.
             let db_path = dir.join("linguaray.db");
             let keystore_dir = dir.clone();
-            let settings_path = tauri_plugin_store::resolve_store_path(app.handle(), "settings.json")
-                .unwrap_or_else(|_| dir.join("settings.json"));
+            // Resolve the canonical settings path via the store plugin. On
+            // failure we MUST NOT guess a fallback path (a wrong-dir guess would
+            // read/write the wrong settings file — on Windows the store plugin
+            // targets AppData (Roaming) while `dir` here is AppLocalData (Local),
+            // so `dir.join("settings.json")` is a different file). Instead record
+            // the failure and degrade to MigrationIncomplete below; migration is
+            // skipped entirely (it needs the real settings path). The field is
+            // still populated so `AppState` is constructible, but it points at a
+            // non-existent sentinel that `parse_settings_raw` treats as a fresh
+            // install (Ok(None)) — it is never used for a real read/write because
+            // the readiness gate keeps migration from running.
+            let (settings_path, settings_resolution_error) =
+                match tauri_plugin_store::resolve_store_path(app.handle(), "settings.json") {
+                    Ok(p) => (p, None),
+                    Err(e) => {
+                        let reason = format!("settings path resolution failed: {e}");
+                        log::error!("{reason}");
+                        // Sentinel: a path that does not exist and is never read
+                        // (migration is skipped while this error is set).
+                        (dir.join(".settings.unresolved"), Some(reason))
+                    }
+                };
 
             // 1. Open the DB. Err → db=None, NeedsDatabaseRecovery (app keeps running).
             let (db_handle, mut readiness) = match Database::open(&db_path) {
@@ -1478,6 +1622,15 @@ pub fn run() {
                     },
                 ),
             };
+
+            // Settings path resolution failure takes precedence over migration:
+            // we don't know where settings.json lives, so we can't safely migrate
+            // (the migration reads + backs up the legacy settings). Degrade to
+            // MigrationIncomplete so the recovery banner surfaces it; a retry
+            // (next startup) re-resolves.
+            if let Some(reason) = &settings_resolution_error {
+                readiness = DataReadiness::migration_incomplete("settings_path", reason.clone());
+            }
 
             // Review P1 #2: if the keystore couldn't be initialized in the
             // canonical dir (we're now running on a temp fallback), the app is
@@ -1492,9 +1645,10 @@ pub fn run() {
             }
 
             // 2-4. Only run migration + resume + preflight when the DB opened
-            // AND the keystore initialized in its canonical dir (otherwise we
-            // skip migration to avoid touching a keystore dir we can't lock).
-            if keystore_init_error.is_none() {
+            // AND the keystore initialized in its canonical dir AND the settings
+            // path resolved (otherwise we skip migration to avoid touching a
+            // keystore dir we can't lock or reading a guessed settings path).
+            if keystore_init_error.is_none() && settings_resolution_error.is_none() {
                 if let Some(db) = db_handle.clone() {
                     let fp = FailpointCell::none();
                     readiness = match run_migration(&db, &keystore_dir, &settings_path, &fp) {

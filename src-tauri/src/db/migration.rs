@@ -282,11 +282,10 @@ pub fn parse_settings_raw(path: &Path) -> Result<Option<RawSettings>, MigrationE
 /// existence check looks for the FINAL path, not the `.tmp`, so a crashed prior
 /// attempt does not block a replay.
 pub(crate) fn backup_settings(settings_path: &Path) -> Result<(), MigrationError> {
+    // Create-new guard against the FINAL path. A crashed prior attempt's stray
+    // .tmp doesn't fool this check (it lives at the .tmp path, not `bak`).
     let bak = settings_bak_path(settings_path);
     if bak.exists() {
-        // A prior (complete) backup exists — leave it untouched. Checked against
-        // the FINAL path, so a crashed prior attempt's stray .tmp doesn't fool
-        // us into skipping the backup.
         return Ok(());
     }
     // Missing source (fresh install) is a no-op.
@@ -296,8 +295,12 @@ pub(crate) fn backup_settings(settings_path: &Path) -> Result<(), MigrationError
     let bytes = std::fs::read(settings_path).map_err(|e| {
         MigrationError::BackupFailed(format!("read settings for backup: {e}"))
     })?;
-    // Stage the full copy to a sibling .tmp, then atomic-rename onto the final
-    // backup path. The final path only appears once the rename completes, so it
+    // Stage the full copy to a sibling .tmp, SECURE + fsync it, THEN atomic-rename
+    // onto the final backup path. Securing before rename means the file is never
+    // observable on disk in an unprotected state (a crash between an unsecured
+    // write + the rename would leave world-readable settings on disk). fsync
+    // before rename means the rename carries durable bytes (no torn write after a
+    // power loss). The final path only appears once the rename completes, so it
     // is never observed truncated.
     let tmp = settings_bak_tmp_path(settings_path);
     use std::io::Write;
@@ -316,7 +319,20 @@ pub(crate) fn backup_settings(settings_path: &Path) -> Result<(), MigrationError
         dst.write_all(&bytes).map_err(|e| {
             MigrationError::BackupFailed(format!("write settings backup: {e}"))
         })?;
+        // Flush userspace buffers + ask the OS to push the bytes to disk before
+        // we rename, so the post-rename file is durable.
+        dst.flush().map_err(|e| {
+            MigrationError::BackupFailed(format!("flush settings backup: {e}"))
+        })?;
+        dst.sync_all().map_err(|e| {
+            MigrationError::BackupFailed(format!("fsync settings backup: {e}"))
+        })?;
     }
+    // Secure the staged file BEFORE the rename so the on-disk permissions are
+    // correct from the instant the final path appears (no insecure window).
+    crate::fs_acl::secure_file(&tmp).map_err(|e| {
+        MigrationError::BackupFailed(format!("secure settings backup tmp: {e}"))
+    })?;
     match std::fs::rename(&tmp, &bak) {
         Ok(()) => {}
         Err(e) => {
