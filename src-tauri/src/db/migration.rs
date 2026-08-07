@@ -272,22 +272,22 @@ pub fn parse_settings_raw(path: &Path) -> Result<Option<RawSettings>, MigrationE
     }))
 }
 
-/// Copy `settings.json` → `settings.json.bak-pre-migration` with create-new
-/// semantics: skip if the backup already exists (never overwrite a prior
-/// backup). Idempotent across migration replays.
+/// Copy `settings.json` → `settings.json.bak-pre-migration` with TRUE
+/// create-new (no-clobber) semantics: skip if the backup already exists (never
+/// overwrite a prior backup). Idempotent across migration replays.
 ///
-/// The copy is staged to a sibling `.tmp` and then atomically renamed onto the
-/// final backup path, so a crash mid-write never leaves a truncated final
-/// backup (only a stray `.tmp`, which a replay overwrites). The create-new
-/// existence check looks for the FINAL path, not the `.tmp`, so a crashed prior
-/// attempt does not block a replay.
+/// The backup is written DIRECTLY to the final path via `create_new` (O_CREAT |
+/// O_EXCL), so the existence check + creation are one atomic step. A concurrent
+/// migration that already created the backup loses the `O_EXCL` race and we
+/// treat `AlreadyExists` as success (no-clobber). This avoids the
+/// `exists()` + `rename()` TOCTOU of the old shape, where `rename` would
+/// silently clobber a prior backup on Unix.
+///
+/// The bytes are fsynced + the file is secured (`fs_acl::secure_file`) before
+/// the handle is dropped, so the backup is durable and never observable on disk
+/// in an unprotected state.
 pub(crate) fn backup_settings(settings_path: &Path) -> Result<(), MigrationError> {
-    // Create-new guard against the FINAL path. A crashed prior attempt's stray
-    // .tmp doesn't fool this check (it lives at the .tmp path, not `bak`).
     let bak = settings_bak_path(settings_path);
-    if bak.exists() {
-        return Ok(());
-    }
     // Missing source (fresh install) is a no-op.
     if !settings_path.exists() {
         return Ok(());
@@ -295,62 +295,45 @@ pub(crate) fn backup_settings(settings_path: &Path) -> Result<(), MigrationError
     let bytes = std::fs::read(settings_path).map_err(|e| {
         MigrationError::BackupFailed(format!("read settings for backup: {e}"))
     })?;
-    // Stage the full copy to a sibling .tmp, SECURE + fsync it, THEN atomic-rename
-    // onto the final backup path. Securing before rename means the file is never
-    // observable on disk in an unprotected state (a crash between an unsecured
-    // write + the rename would leave world-readable settings on disk). fsync
-    // before rename means the rename carries durable bytes (no torn write after a
-    // power loss). The final path only appears once the rename completes, so it
-    // is never observed truncated.
-    let tmp = settings_bak_tmp_path(settings_path);
+    // Atomically create the FINAL backup path with O_EXCL. If it already exists
+    // (a prior backup from this run or a crashed-but-completed prior attempt),
+    // this returns `AlreadyExists` and we skip — TRUE no-clobber, no overwrite.
     use std::io::Write;
+    let mut dst = match std::fs::OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .open(&bak)
     {
-        let mut dst = std::fs::OpenOptions::new()
-            .create(true)
-            .write(true)
-            .truncate(true)
-            .open(&tmp)
-            .map_err(|e| {
-                MigrationError::BackupFailed(format!(
-                    "create settings backup tmp {}: {e}",
-                    tmp.display()
-                ))
-            })?;
-        dst.write_all(&bytes).map_err(|e| {
-            MigrationError::BackupFailed(format!("write settings backup: {e}"))
-        })?;
-        // Flush userspace buffers + ask the OS to push the bytes to disk before
-        // we rename, so the post-rename file is durable.
-        dst.flush().map_err(|e| {
-            MigrationError::BackupFailed(format!("flush settings backup: {e}"))
-        })?;
-        dst.sync_all().map_err(|e| {
-            MigrationError::BackupFailed(format!("fsync settings backup: {e}"))
-        })?;
-    }
-    // Secure the staged file BEFORE the rename so the on-disk permissions are
-    // correct from the instant the final path appears (no insecure window).
-    crate::fs_acl::secure_file(&tmp).map_err(|e| {
-        MigrationError::BackupFailed(format!("secure settings backup tmp: {e}"))
-    })?;
-    match std::fs::rename(&tmp, &bak) {
-        Ok(()) => {}
+        Ok(f) => f,
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+            // A backup already exists — leave it untouched.
+            return Ok(());
+        }
         Err(e) => {
-            // Best-effort cleanup of the .tmp so a later replay doesn't see it.
-            let _ = std::fs::remove_file(&tmp);
-            // Lost a create-new race (a concurrent migration renamed its own tmp
-            // onto `bak` first): treat as success — create-new semantics leave
-            // the prior backup untouched.
-            if bak.exists() {
-                return Ok(());
-            }
             return Err(MigrationError::BackupFailed(format!(
-                "rename settings backup {} -> {}: {e}",
-                tmp.display(),
+                "create settings backup {}: {e}",
                 bak.display()
             )));
         }
-    }
+    };
+    dst.write_all(&bytes).map_err(|e| {
+        MigrationError::BackupFailed(format!("write settings backup: {e}"))
+    })?;
+    // Flush userspace buffers + ask the OS to push the bytes to disk so the
+    // backup is durable before we secure + close the handle.
+    dst.flush().map_err(|e| {
+        MigrationError::BackupFailed(format!("flush settings backup: {e}"))
+    })?;
+    dst.sync_all().map_err(|e| {
+        MigrationError::BackupFailed(format!("fsync settings backup: {e}"))
+    })?;
+    drop(dst);
+    // Secure the final backup file (0600 / restricted ACL). Done AFTER fsync so
+    // the bytes are durable; the file is private from the moment of creation
+    // because the parent dir is already secured and the create was atomic.
+    crate::fs_acl::secure_file(&bak).map_err(|e| {
+        MigrationError::BackupFailed(format!("secure settings backup: {e}"))
+    })?;
     Ok(())
 }
 
@@ -360,14 +343,6 @@ pub(crate) fn backup_settings(settings_path: &Path) -> Result<(), MigrationError
 pub fn settings_bak_path(settings_path: &Path) -> std::path::PathBuf {
     let mut s = settings_path.as_os_str().to_os_string();
     s.push(".bak-pre-migration");
-    std::path::PathBuf::from(s)
-}
-
-/// Sibling temp path used to stage the settings backup before an atomic rename
-/// onto [`settings_bak_path`], so a crash never leaves a truncated final backup.
-fn settings_bak_tmp_path(settings_path: &Path) -> std::path::PathBuf {
-    let mut s = settings_path.as_os_str().to_os_string();
-    s.push(".bak-pre-migration.tmp");
     std::path::PathBuf::from(s)
 }
 

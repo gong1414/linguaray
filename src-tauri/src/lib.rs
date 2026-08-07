@@ -72,7 +72,8 @@ struct Session {
 /// Managed alongside [`Session`] as `Arc<AppState>` (existing translate/key
 /// commands keep their `State<'_, Arc<Session>>` signature unchanged — least
 /// disruptive). The provider commands added in step 6 take
-/// `State<'_, Arc<AppState>>` and gate on [`DataReadiness`] via [`require_ready`].
+/// `State<'_, Arc<AppState>>` and gate on [`DataReadiness`] via
+/// [`require_ready_gated`] / [`require_ready_gated_write`].
 ///
 /// ## Field semantics
 ///
@@ -85,27 +86,55 @@ struct Session {
 /// - `readiness` — the single source of truth for "can provider commands run?"
 ///   Computed once at startup; mutate only from recovery commands.
 /// - `db_path` / `keystore_dir` / `settings_path` — cached so recovery commands
-///   (and diagnostics) don't re-resolve them.
+///   (and diagnostics) don't re-resolve them. `settings_path` is `Option`:
+///   `None` when `resolve_store_path` failed at startup (we don't know where
+///   settings.json lives, so migration — which reads + backs up the legacy
+///   settings — must be refused rather than run against a guessed path).
 pub struct AppState {
     pub db: parking_lot::RwLock<Option<Arc<Database>>>,
     pub data_gate: parking_lot::RwLock<()>,
     pub readiness: parking_lot::RwLock<DataReadiness>,
     pub db_path: PathBuf,
     pub keystore_dir: PathBuf,
-    pub settings_path: PathBuf,
+    pub settings_path: Option<PathBuf>,
 }
 
-/// Gating check shared by every provider command.
+/// Gating check for provider commands that ALREADY hold the `data_gate` guard.
 ///
-/// Returns a cloned `Arc<Database>` (cheap — one refcount bump) so the caller
-/// can move it into `spawn_blocking` without holding the `RwLock` guard across
-/// the await (the guard is `!Send`).
+/// The `_gate_guard` parameter is proof (by reference) that the caller holds the
+/// gate — it is read once and discarded. Holding the gate guarantees no
+/// archive/reset/recovery (which take the WRITE guard) can mutate the DB handle
+/// or the readiness while this reads them, so the readiness check + `Arc` clone
+/// are atomic w.r.t. those mutators.
 ///
-/// Fails closed: any readiness other than `Ready`, or a `None` DB handle, yields
-/// an `Err` with a human-readable reason. The always-available commands
-/// (`keystore_health`, `archive_keystore`, `reset_keystore`, `get_data_readiness`)
-/// bypass this.
-fn require_ready(state: &AppState) -> Result<Arc<Database>, String> {
+/// Use this INSIDE `spawn_blocking`, after acquiring `data_gate.read()`. The
+/// gate-first ordering is load-bearing: cloning the `Arc` before acquiring the
+/// gate races a concurrent archive/reset/recovery that holds the write guard
+/// and swaps the DB handle, handing the command a stale DB.
+fn require_ready_gated(
+    state: &AppState,
+    _gate_guard: &parking_lot::RwLockReadGuard<'_, ()>,
+) -> Result<Arc<Database>, String> {
+    let readiness = state.readiness.read();
+    if !readiness.is_ready() {
+        return Err(format!("Database not ready: {:?}", *readiness));
+    }
+    drop(readiness);
+    state
+        .db
+        .read()
+        .clone()
+        .ok_or_else(|| "Database not available".to_string())
+}
+
+/// Same as [`require_ready_gated`] but the proof is a WRITE guard (for commands
+/// that need exclusive access: delete/reorder/toggle/set_active). Holding the
+/// write guard excludes every other gate holder, so the readiness + Arc clone
+/// are atomic w.r.t. the DB mutators just the same.
+fn require_ready_gated_write(
+    state: &AppState,
+    _gate_guard: &parking_lot::RwLockWriteGuard<'_, ()>,
+) -> Result<Arc<Database>, String> {
     let readiness = state.readiness.read();
     if !readiness.is_ready() {
         return Err(format!("Database not ready: {:?}", *readiness));
@@ -263,6 +292,18 @@ fn set_key(
     // S2a P0: typed accessor — converges the payload to v2 (a load()+store() or
     // a flat-map write would create a mixed v1/v2 structure post-migration).
     let _gate = app.data_gate.read();
+    // P1 orphan-key guard: a legacy `set_key(provider_id, …)` accepts ANY
+    // provider_id and writes a key under it. Post-2a the keystore is keyed by
+    // `secret_ref` (a bare preset id like "openai" for legacy rows, or
+    // "provider/<uuid>" for v2 rows), and every keystore key MUST be owned by a
+    // non-deleted provider row (verified at migration Phase 5 + on every
+    // translate). Writing a key whose `provider_id` is no row's `secret_ref`
+    // creates an orphan that Phase-5 verification would later reject as
+    // "keystore key has no matching active provider row", surfacing a bogus
+    // recovery banner. So validate ownership BEFORE the write: the `provider_id`
+    // must equal some non-deleted row's `secret_ref`. If the DB isn't available
+    // (NeedsDatabaseRecovery / not yet open) we can't validate, so refuse.
+    assert_secret_ref_owned(&app, &provider_id)?;
     state.keystore.set_key(&provider_id, &key).map_err(|e| e.to_string())?;
     Ok(())
 }
@@ -276,12 +317,56 @@ fn delete_key(
     // See set_key: serialize against archive/reset via the data_gate read guard.
     // S2a P0: typed accessor (idempotent — removing an absent key succeeds).
     let _gate = app.data_gate.read();
+    // P1 orphan-key guard (mirrors set_key): only delete a key whose
+    // `provider_id` is owned by a non-deleted provider row. This stops a stale
+    // frontend from deleting a key under an arbitrary id (harmless to the DB but
+    // inconsistent with the ownership invariant the keystore now maintains).
+    // Unlike set_key, a delete of a key whose owner was just tombstoned is
+    // legitimate (finalize_delete already purged it), so we still require the
+    // row to exist — but a 'deleted' row no longer owns its secret_ref, hence
+    // the `status != 'deleted'` clause. If the DB isn't available, refuse.
+    assert_secret_ref_owned(&app, &provider_id)?;
     state.keystore.delete_key(&provider_id).map_err(|e| e.to_string())?;
     Ok(())
 }
 
+/// P1 orphan-key guard shared by the legacy `set_key` / `delete_key` commands.
+///
+/// Asserts that `provider_id` equals the `secret_ref` of some non-deleted
+/// provider row in the DB. Returns `Err` (refusing the keystore write) when:
+/// - the DB handle is unavailable (can't validate — refuse rather than risk an
+///   orphan), or
+/// - no non-deleted row owns that `secret_ref` (the write would create / touch
+///   an orphan key the migration's Phase-5 verification would later reject).
+///
+/// MUST be called while holding `data_gate.read()` (the legacy commands acquire
+/// it before calling) so the row set can't change under us.
+fn assert_secret_ref_owned(app: &Arc<AppState>, provider_id: &str) -> Result<(), String> {
+    let db = app
+        .db
+        .read()
+        .clone()
+        .ok_or_else(|| "cannot set/delete key: database unavailable".to_string())?;
+    let owned: i64 = db
+        .with_conn(|conn| -> Result<i64, crate::db::DbError> {
+            let n: i64 = conn.query_row(
+                "SELECT COUNT(*) FROM providers WHERE secret_ref=?1 AND status != 'deleted'",
+                rusqlite::params![provider_id],
+                |r| r.get(0),
+            )?;
+            Ok(n)
+        })
+        .map_err(|e| format!("cannot set/delete key: db lookup failed: {e}"))?;
+    if owned == 0 {
+        return Err(format!(
+            "cannot set/delete key: no active provider owns secret_ref '{provider_id}'"
+        ));
+    }
+    Ok(())
+}
+
 /// User-initiated keystore recovery (§A fail-closed): archive the unreadable file
-/// to keystore.json.broken-<ts> so the user can re-enter keys.
+/// to keystore.json.broken-<secs>-<nanos> so the user can re-enter keys.
 ///
 /// Review P1 #2: recovery MUST coordinate with `AppState`, not just `Session.keystore`.
 /// The command acquires the `data_gate` write lock (blocking all provider commands),
@@ -422,13 +507,17 @@ fn keystore_health(state: tauri::State<'_, Arc<Session>>) -> String {
 // ─── S2a data-readiness + provider commands ──────────────────────────────
 //
 // All provider commands follow the same shape:
-//   1. `require_ready(&state)` — gate on DataReadiness, clone the Arc<Database>
-//      (the readiness guard is dropped before the await).
-//   2. `spawn_blocking` — rusqlite is blocking; don't hold the async runtime.
-//   3. Acquire `data_gate` (read or write) INSIDE the blocking closure. The
+//   1. `spawn_blocking` — rusqlite is blocking; don't hold the async runtime.
+//   2. Acquire `data_gate` (read or write) INSIDE the blocking closure. The
 //      parking_lot guards are `!Send`, so they must never cross an `.await`;
 //      keeping them on the blocking thread for the closure's duration is the
 //      one safe pattern.
+//   3. `require_ready_gated` / `require_ready_gated_write` — gate on
+//      DataReadiness + clone the Arc<Database>, passing the guard from step 2
+//      as proof the gate is held. Acquiring the gate BEFORE the clone is
+//      load-bearing: a concurrent archive/reset/recovery holds the write guard
+//      while it swaps the DB handle, so cloning first would race the swap and
+//      could hand the command a stale DB.
 //   4. `db.with_conn(|conn| db_providers::<op>(conn, ...))`.
 //
 // Multi-step cross-store commands (`provider_delete`, `provider_set_key`) run
@@ -452,9 +541,13 @@ async fn provider_list(
     state: tauri::State<'_, Arc<AppState>>,
 ) -> Result<Vec<ProviderProfile>, String> {
     let app = state.inner().clone();
-    let db = require_ready(&app)?;
     tauri::async_runtime::spawn_blocking(move || {
+        // Acquire the gate FIRST so the readiness check + Arc clone are atomic
+        // w.r.t. archive/reset/recovery (which take the write guard + swap the
+        // DB handle). Cloning the Arc before the gate (the old shape) raced the
+        // swap and could hand the command a stale DB.
         let _gate = app.data_gate.read();
+        let db = require_ready_gated(&app, &_gate)?;
         db.with_conn(|conn| db_providers::list(conn)).map_err(|e| e.to_string())
     })
     .await
@@ -473,9 +566,10 @@ async fn provider_create(
     model: Option<String>,
 ) -> Result<ProviderProfile, String> {
     let app = state.inner().clone();
-    let db = require_ready(&app)?;
     tauri::async_runtime::spawn_blocking(move || {
+        // Acquire the gate FIRST (see provider_list).
         let _gate = app.data_gate.read();
+        let db = require_ready_gated(&app, &_gate)?;
         db.with_conn(|conn| {
             db_providers::create(conn, &template_id, &name, &endpoint, model.as_deref())
         })
@@ -494,9 +588,10 @@ async fn provider_update(
     patch: ProviderPatch,
 ) -> Result<ProviderProfile, String> {
     let app = state.inner().clone();
-    let db = require_ready(&app)?;
     tauri::async_runtime::spawn_blocking(move || {
+        // Acquire the gate FIRST (see provider_list).
         let _gate = app.data_gate.read();
+        let db = require_ready_gated(&app, &_gate)?;
         db.with_conn(|conn| db_providers::update(conn, &uuid, &patch)).map_err(|e| e.to_string())
     })
     .await
@@ -511,9 +606,10 @@ async fn provider_duplicate(
     uuid: String,
 ) -> Result<ProviderProfile, String> {
     let app = state.inner().clone();
-    let db = require_ready(&app)?;
     tauri::async_runtime::spawn_blocking(move || {
+        // Acquire the gate FIRST (see provider_list).
         let _gate = app.data_gate.read();
+        let db = require_ready_gated(&app, &_gate)?;
         db.with_conn(|conn| db_providers::duplicate(conn, &uuid)).map_err(|e| e.to_string())
     })
     .await
@@ -531,13 +627,15 @@ async fn provider_delete(
     uuid: String,
 ) -> Result<(), String> {
     let app = state.inner().clone();
-    let db = require_ready(&app)?;
     let keystore_dir = app.keystore_dir.clone();
     tauri::async_runtime::spawn_blocking(move || -> Result<(), String> {
         // Write guard: a delete mutates selection slots + status; no reader/other
         // writer may interleave. Held for all 3 steps (the DB Mutex + keystore
         // flock are still released between steps inside their own calls).
+        // Acquire the gate FIRST (see provider_list) so the readiness check +
+        // Arc clone are atomic w.r.t. the DB swap.
         let _gate = app.data_gate.write();
+        let db = require_ready_gated_write(&app, &_gate)?;
 
         // Step 1: begin_delete under the DB Mutex → returns the secret_ref. The
         // DB guard (with_conn closure) is released before the keystore step.
@@ -568,9 +666,10 @@ async fn provider_reorder(
     uuids: Vec<String>,
 ) -> Result<(), String> {
     let app = state.inner().clone();
-    let db = require_ready(&app)?;
     tauri::async_runtime::spawn_blocking(move || {
+        // Acquire the gate FIRST (see provider_list).
         let _gate = app.data_gate.write();
+        let db = require_ready_gated_write(&app, &_gate)?;
         db.with_conn(|conn| db_providers::reorder(conn, &uuids)).map_err(|e| e.to_string())
     })
     .await
@@ -586,9 +685,10 @@ async fn provider_toggle(
     enabled: bool,
 ) -> Result<(), String> {
     let app = state.inner().clone();
-    let db = require_ready(&app)?;
     tauri::async_runtime::spawn_blocking(move || {
+        // Acquire the gate FIRST (see provider_list).
         let _gate = app.data_gate.write();
+        let db = require_ready_gated_write(&app, &_gate)?;
         db.with_conn(|conn| db_providers::toggle(conn, &uuid, enabled)).map_err(|e| e.to_string())
     })
     .await
@@ -607,10 +707,12 @@ async fn provider_set_key(
     key: String,
 ) -> Result<(), String> {
     let app = state.inner().clone();
-    let db = require_ready(&app)?;
     let keystore_dir = app.keystore_dir.clone();
     tauri::async_runtime::spawn_blocking(move || -> Result<(), String> {
+        // Acquire the gate FIRST (see provider_list) so the readiness check +
+        // Arc clone are atomic w.r.t. the DB swap.
         let _gate = app.data_gate.read();
+        let db = require_ready_gated(&app, &_gate)?;
 
         // 1. Read the secret_ref + status under the DB Mutex, then release.
         //    Reject deleting/deleted profiles: writing a key for a row that's
@@ -659,9 +761,10 @@ async fn provider_set_active(
     fallback: Option<String>,
 ) -> Result<(), String> {
     let app = state.inner().clone();
-    let db = require_ready(&app)?;
     tauri::async_runtime::spawn_blocking(move || -> Result<(), String> {
+        // Acquire the gate FIRST (see provider_list).
         let _gate = app.data_gate.write();
+        let db = require_ready_gated_write(&app, &_gate)?;
         // The `with_conn` closure must return Result<_, DbError> (Database's
         // contract). We carry the consent-required signal out via a SetActiveOutcome
         // so the outer closure can map it to the frontend-facing string without
@@ -745,9 +848,10 @@ async fn provider_confirm_and_set_active(
     expected_scope: String,
 ) -> Result<i64, String> {
     let app = state.inner().clone();
-    let db = require_ready(&app)?;
     tauri::async_runtime::spawn_blocking(move || -> Result<i64, String> {
+        // Acquire the gate FIRST (see provider_list).
         let _gate = app.data_gate.write();
+        let db = require_ready_gated_write(&app, &_gate)?;
         db.with_conn(|conn| -> Result<i64, DbErr> {
             // P1 #4: ALL reads + validation + scope computation + writes run in
             // ONE transaction so no concurrent writer can change the active set
@@ -823,9 +927,10 @@ async fn provider_get_models(
     uuid: String,
 ) -> Result<Vec<ModelInfo>, String> {
     let app = state.inner().clone();
-    let db = require_ready(&app)?;
     tauri::async_runtime::spawn_blocking(move || {
+        // Acquire the gate FIRST (see provider_list).
         let _gate = app.data_gate.read();
+        let db = require_ready_gated(&app, &_gate)?;
         let profile = db
             .with_conn(|conn| db_providers::get(conn, &uuid))
             .map_err(|e| e.to_string())?;
@@ -868,11 +973,12 @@ async fn provider_test_connection(
     uuid: String,
 ) -> Result<ConnectionResult, String> {
     let app = state.inner().clone();
-    let db = require_ready(&app)?;
     // Read the profile on a blocking thread, then hand the endpoint back to the
     // async caller for the HTTP probe.
     let profile = tauri::async_runtime::spawn_blocking(move || -> Result<db_providers::ProviderProfile, String> {
+        // Acquire the gate FIRST (see provider_list).
         let _gate = app.data_gate.read();
+        let db = require_ready_gated(&app, &_gate)?;
         db.with_conn(|conn| db_providers::get(conn, &uuid))
             .map_err(|e| e.to_string())
     })
@@ -985,11 +1091,13 @@ async fn archive_database(
         //    one. On rename failure the original file is still at db_path, so
         //    we can restore the slot by reopening it.
         let archived_path = if db_path.exists() {
-            let ts = std::time::SystemTime::now()
+            // Nanosecond-precision suffix so two archives taken within the same
+            // second don't collide (a second-only suffix would let a rapid
+            // second archive silently overwrite the first via the rename).
+            let now = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_secs())
-                .unwrap_or(0);
-            let dst = db_path.with_extension(format!("db.broken-{ts}"));
+                .unwrap_or_default();
+            let dst = db_path.with_extension(format!("db.broken-{}-{}", now.as_secs(), now.subsec_nanos()));
             match std::fs::rename(&db_path, &dst) {
                 Ok(()) => dst.to_string_lossy().into_owned(),
                 Err(e) => {
@@ -1017,21 +1125,58 @@ async fn archive_database(
         };
 
         // 6-8. Open a fresh DB at the original path + migrate + resume.
+        // `settings_path = None` means the canonical settings path couldn't be
+        // resolved at startup. Migration reads + backs up the legacy settings
+        // file, so running it against a guessed path would touch the wrong file
+        // (on Windows the store plugin targets AppData (Roaming) while `dir` is
+        // AppLocalData (Local)). Refuse: leave the DB installed but incomplete
+        // so the next startup (which re-resolves the path) retries.
+        let settings_path = match app.settings_path.as_ref() {
+            Some(p) => p.clone(),
+            None => {
+                let reason = "settings path unresolved; cannot migrate".to_string();
+                *app.readiness.write() = DataReadiness::migration_incomplete(
+                    "archive_database",
+                    reason.clone(),
+                );
+                // Still install the handle so a later retry can proceed.
+                if let Ok(db) = Database::open(&db_path) {
+                    *app.db.write() = Some(Arc::new(db));
+                }
+                return Err(reason);
+            }
+        };
         match Database::open(&db_path) {
             Ok(db) => {
                 let db = Arc::new(db);
                 let fp = FailpointCell::none();
-                if let Err(e) = run_migration(&db, &app.keystore_dir, &app.settings_path, &fp) {
-                    let reason = format!("migration after archive: {e}");
-                    *app.readiness.write() = DataReadiness::migration_incomplete(
-                        "archive_database",
-                        reason.clone(),
-                    );
-                    // Still install the handle so a later recovery/migration
-                    // retry can proceed (NeedsDatabaseRecovery would hide the
-                    // partially-migrated DB).
-                    *app.db.write() = Some(db);
-                    return Err(reason);
+                match run_migration(&db, &app.keystore_dir, &settings_path, &fp) {
+                    Ok(()) => {}
+                    Err(MigrationError::NeedsKeystoreRecovery(reason)) => {
+                        // A keystore-needs-recovery outcome must surface as
+                        // NeedsKeystoreRecovery (NOT MigrationIncomplete) so the
+                        // recovery banner routes the user to the keystore flow
+                        // rather than the migration flow.
+                        let msg = reason.clone();
+                        *app.readiness.write() = DataReadiness::NeedsKeystoreRecovery {
+                            reason: msg.clone(),
+                        };
+                        // Still install the handle so a later retry can proceed.
+                        *app.db.write() = Some(db);
+                        return Err(msg);
+                    }
+                    Err(e) => {
+                        let reason = format!("migration after archive: {e}");
+                        *app.readiness.write() = DataReadiness::migration_incomplete(
+                            "archive_database",
+                            reason.clone(),
+                        );
+                        // Still install the handle so a later recovery/migration
+                        // retry can proceed (NeedsDatabaseRecovery would hide the
+                        // partially-migrated DB).
+                        *app.db.write() = Some(db);
+                        return Err(reason);
+                    }
                 }
                 // Resume in-flight deletes against the fresh DB. A failure here
                 // is a real consistency problem — surface MigrationIncomplete
@@ -1143,6 +1288,14 @@ fn set_active_slots(
 ///    given for the now-archived key set.
 /// 4. `UPDATE _schema_migrations SET migration_complete=1` — a recovery completes
 ///    migration (the DB is now in a known-good state, just without keys).
+///    **Guaranteed only when the OLD readiness was `Ready` or
+///    `NeedsKeystoreRecovery`.** When the OLD readiness was
+///    `MigrationIncomplete`, this UPDATE is SKIPPED: the prior migration did
+///    not reach `Complete` for a reason this archive does not address (a
+///    half-applied schema, a corrupt settings file, a resume-deletions fault),
+///    so writing `migration_complete=1` would persist a half-migrated DB as
+///    complete and permanently lock it (the next startup sees `Complete` and
+///    skips migration).
 ///
 /// Returns `Err` if the cleanup transaction fails (so the caller can surface
 /// the failure — previously it was only logged and readiness was bumped to
@@ -1163,8 +1316,14 @@ fn set_active_slots(
 ///   recovery that targets the migration itself.
 fn apply_keystore_recovery_db_cleanup(app: &Arc<AppState>) -> Result<(), String> {
     // Capture the OLD readiness BEFORE any mutation so the post-state logic can
-    // branch on it.
+    // branch on it, and so the cleanup tx knows whether it may mark migration
+    // complete (only Ready / NeedsKeystoreRecovery were fully migrated before
+    // the archive; MigrationIncomplete must NOT be promoted on disk).
     let old_readiness = app.readiness.read().clone();
+    let may_mark_complete = matches!(
+        &old_readiness,
+        DataReadiness::Ready | DataReadiness::NeedsKeystoreRecovery { .. }
+    );
 
     // Try the DB cleanup only when a DB handle exists. A NeedsDatabaseRecovery
     // state means there's no handle; the cleanup is a no-op and we keep that
@@ -1190,11 +1349,18 @@ fn apply_keystore_recovery_db_cleanup(app: &Arc<AppState>) -> Result<(), String>
                      parallel_consent_scope=NULL WHERE id=1",
                     [],
                 )?;
-                // 4. Mark migration complete.
-                tx.execute(
-                    "UPDATE _schema_migrations SET migration_complete=1 WHERE id=1",
-                    [],
-                )?;
+                // 4. Mark migration complete — ONLY when the OLD readiness was
+                //    Ready / NeedsKeystoreRecovery. When it was
+                //    MigrationIncomplete, the prior migration did not reach
+                //    Complete and this archive doesn't fix that; writing
+                //    complete=1 would persist the half-migrated DB as final and
+                //    the next startup would skip migration entirely.
+                if may_mark_complete {
+                    tx.execute(
+                        "UPDATE _schema_migrations SET migration_complete=1 WHERE id=1",
+                        [],
+                    )?;
+                }
                 tx.commit()?;
                 Ok(())
             })
@@ -1594,21 +1760,21 @@ pub fn run() {
             // read/write the wrong settings file — on Windows the store plugin
             // targets AppData (Roaming) while `dir` here is AppLocalData (Local),
             // so `dir.join("settings.json")` is a different file). Instead record
-            // the failure and degrade to MigrationIncomplete below; migration is
-            // skipped entirely (it needs the real settings path). The field is
-            // still populated so `AppState` is constructible, but it points at a
-            // non-existent sentinel that `parse_settings_raw` treats as a fresh
-            // install (Ok(None)) — it is never used for a real read/write because
-            // the readiness gate keeps migration from running.
+            // the failure by storing `settings_path = None` and degrade to
+            // MigrationIncomplete below; migration is skipped entirely (it needs
+            // the real settings path). `archive_database` also treats `None` as a
+            // hard stop: it refuses to re-run migration so the user must retry
+            // from a state where the path resolves.
             let (settings_path, settings_resolution_error) =
                 match tauri_plugin_store::resolve_store_path(app.handle(), "settings.json") {
-                    Ok(p) => (p, None),
+                    Ok(p) => (Some(p), None),
                     Err(e) => {
                         let reason = format!("settings path resolution failed: {e}");
                         log::error!("{reason}");
-                        // Sentinel: a path that does not exist and is never read
-                        // (migration is skipped while this error is set).
-                        (dir.join(".settings.unresolved"), Some(reason))
+                        // None: a non-existent sentinel that the readiness gate
+                        // keeps from ever being read. The startup block below
+                        // degrades to MigrationIncomplete.
+                        (None, Some(reason))
                     }
                 };
 
@@ -1651,7 +1817,13 @@ pub fn run() {
             if keystore_init_error.is_none() && settings_resolution_error.is_none() {
                 if let Some(db) = db_handle.clone() {
                     let fp = FailpointCell::none();
-                    readiness = match run_migration(&db, &keystore_dir, &settings_path, &fp) {
+                    // settings_resolution_error.is_none() ⇒ settings_path is Some.
+                    // Unwrap once here (the only consumer of the resolved path
+                    // outside archive_database) and pass a &PathBuf into run_migration.
+                    let settings_path_ref = settings_path
+                        .as_ref()
+                        .expect("settings path is Some when resolution succeeded");
+                    readiness = match run_migration(&db, &keystore_dir, settings_path_ref, &fp) {
                         Ok(()) => {
                             // Resume any in-flight deletes (3-step sweep). A failure
                             // here does NOT exit setup — log + mark incomplete so the

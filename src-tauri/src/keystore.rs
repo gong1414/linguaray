@@ -832,19 +832,18 @@ impl Keystore {
         })
     }
 
-    /// Move keystore.json → keystore.json.broken-<ts> (user-initiated recovery).
-    /// Per §A fail-closed: only an explicit user action does this.
+    /// Move keystore.json → keystore.json.broken-<secs>-<nanos> (user-initiated
+    /// recovery). Per §A fail-closed: only an explicit user action does this.
+    /// The suffix uses nanosecond precision so two archives taken within the same
+    /// second never collide (a second-precision timestamp would silently
+    /// overwrite the prior archive via the `rename`).
     pub fn archive(&self) -> Result<std::path::PathBuf, KeystoreError> {
         self.with_locks(|ks| {
             let src = ks.file();
             if !src.exists() {
                 return Err(KeystoreError::Envelope("no keystore to archive".into()));
             }
-            let ts = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_secs())
-                .unwrap_or(0);
-            let dst = ks.dir.join(format!("keystore.json.broken-{ts}"));
+            let dst = broken_archive_path(&ks.dir);
             std::fs::rename(&src, &dst)?;
             Ok(dst)
         })
@@ -852,18 +851,16 @@ impl Keystore {
 
     /// User-initiated reset (fresh start). Round-2 review P1 #4: per the §A
     /// fail-closed protocol, Reset must NOT unrecoverably delete the canonical file
-    /// — it MOVES it to keystore.json.broken-<ts> (recoverable), then clears tmp.
-    /// A subsequent store() starts a fresh keystore. Returns the archive path if a
-    /// canonical file existed (None if there was nothing to archive).
+    /// — it MOVES it to keystore.json.broken-<secs>-<nanos> (recoverable), then
+    /// clears tmp. A subsequent store() starts a fresh keystore. The nanosecond
+    /// suffix prevents same-second collisions with a prior archive. Returns the
+    /// archive path if a canonical file existed (None if there was nothing to
+    /// archive).
     pub fn reset(&self) -> Result<Option<std::path::PathBuf>, KeystoreError> {
         self.with_locks(|ks| {
             let src = ks.file();
             let archived = if src.exists() {
-                let ts = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .map(|d| d.as_secs())
-                    .unwrap_or(0);
-                let dst = ks.dir.join(format!("keystore.json.broken-{ts}"));
+                let dst = broken_archive_path(&ks.dir);
                 std::fs::rename(&src, &dst)?;
                 Some(dst)
             } else {
@@ -882,13 +879,14 @@ impl Keystore {
     /// assert on it without hardcoding the filename string.
     fn backup_path(&self) -> PathBuf { self.dir.join(BACKUP_PRE_MIGRATION) }
 
-    /// Under BOTH locks: create the pre-migration backup (idempotent — create-new
-    /// only, never overwrites a prior backup). Reads `keystore.json` bytes and
-    /// writes them to `keystore.json.bak-pre-migration`, secured with
-    /// `fs_acl::secure_file`. No-op if the canonical file is absent or the backup
-    /// already exists. This is the locked core shared by `migrate_to_v2_locked_core`
-    /// and the standalone [`backup_keystore`](crate::keystore::backup_keystore) free
-    /// function (Step 1 of the migration coordinator: backup SEPARATE from rewrite).
+    /// Under BOTH locks: create the pre-migration backup (TRUE no-clobber —
+    /// `create_new` only, never overwrites a prior backup). Reads `keystore.json`
+    /// bytes and writes them DIRECTLY to `keystore.json.bak-pre-migration` via
+    /// `create_new` (O_EXCL), secured with `fs_acl::secure_file` + fsync'd. No-op
+    /// if the canonical file is absent or the backup already exists. This is the
+    /// locked core shared by `migrate_to_v2_locked_core` and the standalone
+    /// [`backup_keystore`](crate::keystore::backup_keystore) free function (Step 1
+    /// of the migration coordinator: backup SEPARATE from rewrite).
     fn backup_locked(&self) -> Result<(), KeystoreError> {
         let src = self.file();
         if !src.exists() {
@@ -896,52 +894,30 @@ impl Keystore {
             return Ok(());
         }
         let bak = self.backup_path();
-        if bak.exists() {
-            // A prior backup exists — leave it untouched (create-new semantics).
-            // The check is against the FINAL path (not the .tmp), so a crashed
-            // prior attempt that left a truncated .tmp does NOT block a replay.
-            return Ok(());
-        }
-        // Atomic-create: write the full copy to a sibling .tmp, SECURE + fsync
-        // it, THEN fs::rename onto the final backup path. A crash mid-write
-        // leaves a partial .tmp (cleaned on replay by the `bak.exists()` check
-        // above failing and a fresh .tmp being written); the FINAL backup path
-        // only ever appears once the rename completes, so it is never observed
-        // truncated. Securing the .tmp BEFORE the rename (instead of securing
-        // `bak` after) closes the window where the backup existed on disk in an
-        // unprotected state between the rename and the chmod/ACL call.
-        let tmp = self.dir.join(BACKUP_PRE_MIGRATION_TMP);
         let bytes = std::fs::read(&src)?;
+        // Atomically create the FINAL backup path with O_EXCL (create_new). If
+        // it already exists, this returns `AlreadyExists` and we skip — TRUE
+        // no-clobber. This avoids the `exists()` + `rename()` TOCTOU of the old
+        // shape, where `rename` would silently clobber a prior backup on Unix.
+        use std::io::Write;
+        let mut dst = match std::fs::OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .open(&bak)
         {
-            use std::io::Write;
-            let mut dst = std::fs::OpenOptions::new()
-                .create(true)
-                .write(true)
-                .truncate(true)
-                .open(&tmp)?;
-            dst.write_all(&bytes)?;
-            dst.flush()?;
-            dst.sync_all()?;
-        }
-        // Secure the staged file BEFORE the rename so the on-disk permissions
-        // are correct from the instant the final path appears.
-        crate::fs_acl::secure_file(&tmp)?;
-        match std::fs::rename(&tmp, &bak) {
-            Ok(()) => {}
-            Err(e) => {
-                // Best-effort cleanup of the .tmp on rename failure so a later
-                // replay doesn't see a stray file (the bak.exists() check would
-                // still proceed correctly, but tidy is tidy).
-                let _ = std::fs::remove_file(&tmp);
-                // If the rename lost a create-new race (a concurrent process
-                // renamed its own .tmp onto `bak` first), treat as success —
-                // create-new semantics: a prior backup is left untouched.
-                if bak.exists() {
-                    return Ok(());
-                }
-                return Err(KeystoreError::Io(e));
+            Ok(f) => f,
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                // A prior backup exists — leave it untouched.
+                return Ok(());
             }
-        }
+            Err(e) => return Err(KeystoreError::Io(e)),
+        };
+        dst.write_all(&bytes)?;
+        dst.flush()?;
+        dst.sync_all()?;
+        drop(dst);
+        // Secure the final backup file so on-disk permissions are correct.
+        crate::fs_acl::secure_file(&bak)?;
         Ok(())
     }
 
@@ -969,9 +945,18 @@ impl Keystore {
 
 /// Filename of the one-time pre-migration backup (spec §A, S2a).
 const BACKUP_PRE_MIGRATION: &str = "keystore.json.bak-pre-migration";
-/// Sibling temp path used to stage the backup before an atomic rename onto
-/// [`BACKUP_PRE_MIGRATION`], so a crash never leaves a truncated final backup.
-const BACKUP_PRE_MIGRATION_TMP: &str = "keystore.json.bak-pre-migration.tmp";
+
+/// Derive a fresh, collision-resistant archive path for the broken-keystore
+/// recovery flow (`archive` / `reset`). Uses `<secs>-<nanos>` precision so two
+/// archives taken within the same second land on distinct paths — a
+/// second-only suffix would let a rapid second archive silently overwrite the
+/// first via the `rename`.
+fn broken_archive_path(dir: &Path) -> std::path::PathBuf {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default();
+    dir.join(format!("keystore.json.broken-{}-{}", now.as_secs(), now.subsec_nanos()))
+}
 
 /// Inspect the keystore at `dir` and return its typed load state (S2a). Standalone
 /// entry point (takes a dir, not a `&Keystore`) so callers can probe before
