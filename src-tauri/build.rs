@@ -13,6 +13,11 @@ fn main() {
                         "provider_list", "provider_create", "provider_update",
                         "provider_duplicate", "provider_delete", "provider_reorder",
                         "provider_toggle", "provider_set_key", "provider_set_active",
+                        // P1 #3: multi-engine consent.
+                        "provider_confirm_and_set_active",
+                        // P1 #8: provider diagnostics + DB recovery.
+                        "provider_get_models", "provider_test_connection",
+                        "archive_database",
                     ]),
             ),
     )

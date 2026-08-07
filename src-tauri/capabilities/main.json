@@ -27,6 +27,10 @@
     "allow-provider-reorder",
     "allow-provider-toggle",
     "allow-provider-set-key",
-    "allow-provider-set-active"
+    "allow-provider-set-active",
+    "allow-provider-confirm-and-set-active",
+    "allow-provider-get-models",
+    "allow-provider-test-connection",
+    "allow-archive-database"
   ]
 }

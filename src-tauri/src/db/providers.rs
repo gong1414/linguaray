@@ -713,6 +713,148 @@ fn provider_in_primary_or_parallel(
     Ok(arr.iter().any(|u| u == uuid))
 }
 
+// ─── Parallel consent scope (multi-engine approval, P1 #3) ────────────────
+
+/// Errors raised while computing / validating a parallel-selection consent
+/// scope (P1 #3). The frontend drives the consent dialog off the
+/// [`ConsentError::ConsentRequired`] arm; the other arms are validation faults
+/// surfaced as ordinary errors.
+#[derive(Debug)]
+pub enum ConsentError {
+    /// A UUID appears twice in the (primary + parallel) set. Duplicate
+    /// recipients aren't meaningful (parallel means "distinct upstreams") and
+    /// would silently inflate the consent scope.
+    DuplicateRecipient(String),
+    /// A UUID in the selection isn't a known provider row.
+    UnknownRecipient(String),
+    /// A UUID in the selection is a known provider but is disabled (or not in
+    /// `active` status) — it can't be a callable recipient.
+    NotCallable(String),
+    /// The selection requires explicit consent: the frontend must show the
+    /// parallel-consent dialog, then re-call with `expected_scope = actual_scope`.
+    /// Carries the canonical scope string the backend recomputed.
+    ConsentRequired { actual_scope: String },
+    /// A DB-level error while reading providers / preferences.
+    Db(DbError),
+}
+
+impl std::fmt::Display for ConsentError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ConsentError::DuplicateRecipient(u) => {
+                write!(f, "duplicate recipient in selection: {u}")
+            }
+            ConsentError::UnknownRecipient(u) => {
+                write!(f, "unknown recipient: {u}")
+            }
+            ConsentError::NotCallable(u) => {
+                write!(f, "recipient not callable (disabled/inactive): {u}")
+            }
+            ConsentError::ConsentRequired { actual_scope } => {
+                write!(f, "parallel consent required (scope: {actual_scope})")
+            }
+            ConsentError::Db(e) => write!(f, "db: {e}"),
+        }
+    }
+}
+
+impl std::error::Error for ConsentError {}
+
+impl From<DbError> for ConsentError {
+    fn from(e: DbError) -> Self {
+        ConsentError::Db(e)
+    }
+}
+
+/// Compute the canonical consent scope for a (primary, parallel) selection
+/// against the live provider set (P1 #3).
+///
+/// The scope is a stable string over the set of `(uuid, origin)` pairs the
+/// selection actually targets, so two UI states that reference the same set of
+/// callables produce the same scope (and the frontend can detect "no change →
+/// no re-consent needed"). Fallback is EXCLUDED — it's a traditional engine,
+/// not a parallel AI recipient.
+///
+/// Algorithm:
+/// 1. Iterate `once(primary).chain(parallel)`, skipping empties.
+/// 2. `HashSet::insert` to detect a duplicate UUID (→ `DuplicateRecipient`).
+/// 3. Resolve each UUID against `providers`: missing → `UnknownRecipient`,
+///    present but not active+enabled → `NotCallable`.
+/// 4. Collect `(uuid, normalize_origin(endpoint))` for each resolved recipient.
+/// 5. Sort the pairs (canonical ordering) and join as `uuid=origin` segments
+///    separated by `|`.
+pub fn compute_scope(
+    primary: &str,
+    parallel: &[String],
+    providers: &[ProviderProfile],
+) -> Result<String, ConsentError> {
+    // Index ALL providers by uuid so we can distinguish "unknown" (not in the
+    // table at all) from "not callable" (present but disabled / tombstoned).
+    let by_uuid: HashMap<&str, &ProviderProfile> = providers
+        .iter()
+        .map(|p| (p.uuid.as_str(), p))
+        .collect();
+
+    let mut seen: HashSet<&str> = HashSet::new();
+    let mut pairs: Vec<(String, String)> = Vec::new();
+
+    for uuid in std::iter::once(primary).chain(parallel.iter().map(String::as_str)) {
+        if uuid.is_empty() {
+            continue;
+        }
+        if !seen.insert(uuid) {
+            return Err(ConsentError::DuplicateRecipient(uuid.to_string()));
+        }
+        let p = by_uuid
+            .get(uuid)
+            .ok_or_else(|| ConsentError::UnknownRecipient(uuid.to_string()))?;
+        // Callability: active status AND enabled. A disabled or tombstoned
+        // provider can't be a parallel recipient even though it exists.
+        if !(p.status == ProviderStatus::Active.as_str() && p.enabled) {
+            return Err(ConsentError::NotCallable(uuid.to_string()));
+        }
+        let origin = normalize_origin(&p.endpoint);
+        pairs.push((uuid.to_string(), origin));
+    }
+
+    // Canonical order: sort by (uuid, origin) so two equal sets agree byte-for-byte.
+    pairs.sort();
+    let scope = pairs
+        .into_iter()
+        .map(|(uuid, origin)| format!("{uuid}={origin}"))
+        .collect::<Vec<_>>()
+        .join("|");
+    Ok(scope)
+}
+
+/// Read the currently-stored parallel consent scope from `preferences`.
+/// `None` when no consent has been recorded yet. Caller drives the transaction.
+pub fn read_consent_scope(conn: &Connection) -> Result<Option<String>, DbError> {
+    use rusqlite::OptionalExtension;
+    let scope: Option<String> = conn
+        .query_row(
+            "SELECT parallel_consent_scope FROM preferences WHERE id=1",
+            [],
+            |r| r.get(0),
+        )
+        .optional()?;
+    Ok(scope)
+}
+
+/// Read the current consent version (monotonic counter bumped each time the user
+/// approves a new scope). `None` when consent has never been recorded.
+pub fn read_consent_version(conn: &Connection) -> Result<Option<i64>, DbError> {
+    use rusqlite::OptionalExtension;
+    let v: Option<i64> = conn
+        .query_row(
+            "SELECT parallel_consent_version FROM preferences WHERE id=1",
+            [],
+            |r| r.get(0),
+        )
+        .optional()?;
+    Ok(v)
+}
+
 // ─── TraditionalProviderCatalog ───────────────────────────────────────────
 
 /// Catalog entry for a traditional (non-AI, keyless) translation engine. These
@@ -1368,5 +1510,105 @@ mod tests {
         let _ = &mut p;
         let providers = vec![p];
         validate_active_selection("", &[], Some("u1"), &providers).unwrap();
+    }
+
+    /// Build a minimal active+enabled provider for scope tests.
+    fn scope_provider(uuid: &str, endpoint: &str) -> ProviderProfile {
+        ProviderProfile {
+            uuid: uuid.into(),
+            template_id: "openai".into(),
+            name: uuid.into(),
+            protocol: Protocol::OpenaiChat,
+            endpoint: endpoint.into(),
+            model: None,
+            enabled: true,
+            sort_order: 0,
+            is_local: false,
+            needs_key: true,
+            secret_ref: format!("provider/{uuid}"),
+            capabilities: ProviderCapabilities::default(),
+            status: "active".into(),
+        }
+    }
+
+    #[test]
+    fn compute_scope_empty_for_no_selection() {
+        // No primary, no parallel → empty scope string.
+        let scope = compute_scope("", &[], &[]).unwrap();
+        assert_eq!(scope, "");
+    }
+
+    #[test]
+    fn compute_scope_single_primary() {
+        let providers = vec![scope_provider(
+            "u1",
+            "https://api.openai.com/v1/chat",
+        )];
+        let scope = compute_scope("u1", &[], &providers).unwrap();
+        // Origin drops the path; the pair is uuid=origin.
+        assert_eq!(scope, "u1=https://api.openai.com");
+    }
+
+    #[test]
+    fn compute_scope_sorts_pairs_canonically() {
+        // Two parallel recipients in non-canonical input order — the scope must
+        // sort the pairs so the same set always yields the same string.
+        let providers = vec![
+            scope_provider("u2", "https://api.anthropic.com"),
+            scope_provider("u1", "https://api.openai.com"),
+        ];
+        let scope = compute_scope("", &["u2".into(), "u1".into()], &providers).unwrap();
+        // Sorted by (uuid, origin): u1 before u2.
+        assert_eq!(
+            scope,
+            "u1=https://api.openai.com|u2=https://api.anthropic.com"
+        );
+        // Repeating the call with reversed input order yields the same scope.
+        let scope2 = compute_scope("", &["u1".into(), "u2".into()], &providers).unwrap();
+        assert_eq!(scope, scope2);
+    }
+
+    #[test]
+    fn compute_scope_rejects_duplicate_primary_in_parallel() {
+        let providers = vec![scope_provider("u1", "https://api.openai.com")];
+        let err = compute_scope("u1", &["u1".into()], &providers).unwrap_err();
+        assert!(matches!(err, ConsentError::DuplicateRecipient(_)));
+    }
+
+    #[test]
+    fn compute_scope_rejects_duplicate_within_parallel() {
+        let providers = vec![scope_provider("u1", "https://api.openai.com")];
+        let err =
+            compute_scope("", &["u1".into(), "u1".into()], &providers).unwrap_err();
+        assert!(matches!(err, ConsentError::DuplicateRecipient(_)));
+    }
+
+    #[test]
+    fn compute_scope_rejects_unknown_recipient() {
+        let providers = vec![scope_provider("u1", "https://api.openai.com")];
+        let err = compute_scope("u-missing", &[], &providers).unwrap_err();
+        assert!(matches!(err, ConsentError::UnknownRecipient(_)));
+    }
+
+    #[test]
+    fn compute_scope_rejects_disabled_recipient() {
+        let mut p = scope_provider("u1", "https://api.openai.com");
+        p.enabled = false;
+        let err = compute_scope("u1", &[], &[p]).unwrap_err();
+        assert!(matches!(err, ConsentError::NotCallable(_)));
+    }
+
+    #[test]
+    fn compute_scope_same_origin_different_paths_collide() {
+        // Two providers on the same origin (different paths) produce a scope
+        // keyed by origin — so re-consent isn't required just because the path
+        // changed. This mirrors the consent-invalidation rule in `update`.
+        let providers = vec![
+            scope_provider("u1", "https://api.openai.com/v1/chat"),
+            scope_provider("u1b", "https://api.openai.com/v1/messages"),
+        ];
+        let scope = compute_scope("u1", &["u1b".into()], &providers).unwrap();
+        assert!(scope.contains("u1=https://api.openai.com"));
+        assert!(scope.contains("u1b=https://api.openai.com"));
     }
 }
