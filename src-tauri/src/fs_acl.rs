@@ -53,11 +53,15 @@ pub fn secure_dir(dir: &Path) -> Result<(), AclError> {
 }
 
 /// Secure a file: 0o600 on Unix; protected DACL (non-inheritable) on Windows.
+/// On Windows, only sets the DACL (not the owner) — the file was just created
+/// by the current user who already owns it. Setting OWNER_SECURITY_INFORMATION
+/// requires WRITE_OWNER access which the protected DACL may deny on some
+/// systems (e.g. Windows CI runners).
 pub fn secure_file(path: &Path) -> Result<(), AclError> {
     #[cfg(unix)]
     { set_mode(path, 0o600) }
     #[cfg(windows)]
-    { set_win32_owner_dacl(path, false) }
+    { set_win32_dacl_only(path, false) }
     #[cfg(not(any(unix, windows)))]
     { let _ = path; Ok(()) }
 }
@@ -289,6 +293,65 @@ pub(crate) fn set_win32_owner_dacl(path: &Path, inherit: bool) -> Result<(), Acl
     };
     if rc == 0 {
         return Err(AclError::Win32(format!("SetFileSecurityW failed: {}", std::io::Error::last_os_error())));
+    }
+    Ok(())
+}
+
+/// Windows: set DACL only (no owner change). Used by `secure_file` for files
+/// that were just created by the current user — setting OWNER_SECURITY_INFORMATION
+/// can fail with Access Denied on some Windows configurations (e.g. CI runners
+/// where WRITE_OWNER is restricted). The file already belongs to the current
+/// user, so only the DACL needs to be locked down.
+#[cfg(windows)]
+fn set_win32_dacl_only(path: &Path, inherit: bool) -> Result<(), AclError> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::Foundation::GENERIC_ALL;
+    use windows_sys::Win32::Security::{
+        ACL, ACL_REVISION_DS, AddAccessAllowedAceEx, InitializeAcl,
+        CONTAINER_INHERIT_ACE, DACL_SECURITY_INFORMATION, OBJECT_INHERIT_ACE,
+        PSECURITY_DESCRIPTOR, SE_DACL_PROTECTED,
+        InitializeSecurityDescriptor, SetSecurityDescriptorControl,
+        SetSecurityDescriptorDacl, SetFileSecurityW,
+    };
+
+    let sid_buf = current_user_sid()?;
+    let sid = sid_from_token_user_buf(&sid_buf)?;
+
+    const ACL_BUF_SIZE: usize = 128;
+    let mut acl_buf: [u8; ACL_BUF_SIZE] = [0u8; ACL_BUF_SIZE];
+    let acl: *mut ACL = acl_buf.as_mut_ptr() as *mut ACL;
+    if unsafe { InitializeAcl(acl, ACL_BUF_SIZE as u32, ACL_REVISION_DS) } == 0 {
+        return Err(AclError::Win32("InitializeAcl failed".into()));
+    }
+    let ace_flags = if inherit { OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE } else { 0 };
+    if unsafe { AddAccessAllowedAceEx(acl, ACL_REVISION_DS, ace_flags, GENERIC_ALL, sid) } == 0 {
+        return Err(AclError::Win32("AddAccessAllowedAceEx failed".into()));
+    }
+
+    const SD_BUF_SIZE: usize = 256;
+    let mut sd_buf: [u8; SD_BUF_SIZE] = [0u8; SD_BUF_SIZE];
+    let sd: PSECURITY_DESCRIPTOR = sd_buf.as_mut_ptr() as PSECURITY_DESCRIPTOR;
+    if unsafe { InitializeSecurityDescriptor(sd, 1u32) } == 0 {
+        return Err(AclError::Win32("InitializeSecurityDescriptor failed".into()));
+    }
+    // DACL only — NO owner change (avoids WRITE_OWNER requirement):
+    if unsafe { SetSecurityDescriptorDacl(sd, 1, acl as *const ACL, 0) } == 0 {
+        return Err(AclError::Win32("SetSecurityDescriptorDacl failed".into()));
+    }
+    if unsafe { SetSecurityDescriptorControl(sd, SE_DACL_PROTECTED, SE_DACL_PROTECTED) } == 0 {
+        return Err(AclError::Win32("SetSecurityDescriptorControl (PROTECTED) failed".into()));
+    }
+
+    let path_wide: Vec<u16> = path.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
+    let rc = unsafe {
+        SetFileSecurityW(
+            path_wide.as_ptr(),
+            DACL_SECURITY_INFORMATION,  // DACL only, no OWNER
+            sd,
+        )
+    };
+    if rc == 0 {
+        return Err(AclError::Win32(format!("SetFileSecurityW (DACL only) failed: {}", std::io::Error::last_os_error())));
     }
     Ok(())
 }
