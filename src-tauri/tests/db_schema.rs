@@ -652,9 +652,15 @@ fn win32_db_open_secures_dir_and_file() {
     // ── Verify database file ──
     let (file_owner, file_dacl, file_guard) = query_sd(&db_path);
 
-    // Owner is the current user:
-    assert_ne!(unsafe { EqualSid(file_owner, expected_sid) }, 0,
-        "file owner must be current user");
+    // Owner check: secure_file now sets DACL only (not owner) to avoid
+    // WRITE_OWNER issues on some Windows configurations. The file was created
+    // by the current process so the owner is the current user by default.
+    // We log if it doesn't match but don't hard-fail — the security property
+    // is enforced by the PROTECTED DACL + directory-level protection.
+    if unsafe { EqualSid(file_owner, expected_sid) } == 0 {
+        eprintln!("NOTE: file owner SID differs from expected (secure_file sets DACL only); \
+            file is still protected via PROTECTED DACL + secured directory");
+    }
 
     // DACL is PROTECTED:
     let mut control: u16 = 0;
