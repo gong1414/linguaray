@@ -944,7 +944,13 @@ impl Keystore {
             }
             Ok(())
         };
-        crate::fs_acl::crash_safe_backup(&bytes, &bak, &self.dir, Some(&validate_envelope))?;
+        crate::fs_acl::crash_safe_backup(
+            &bytes,
+            &bak,
+            &self.dir,
+            Some(&validate_envelope),
+            &crate::fs_acl::BackupFailpointCell::none(),
+        )?;
         Ok(())
     }
 

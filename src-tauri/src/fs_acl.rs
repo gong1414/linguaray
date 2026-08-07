@@ -9,6 +9,7 @@
 //!   inheritable ACE so files created inside auto-receive current-user control;
 //!   files get a non-inheritable leaf ACE.
 
+use parking_lot::Mutex;
 use std::path::Path;
 
 #[derive(Debug)]
@@ -78,6 +79,105 @@ impl std::fmt::Display for BackupError {
 }
 
 impl std::error::Error for BackupError {}
+
+// ── Backup failpoint (test-only injection) ────────────────────────────
+
+/// A checkpoint inside [`crash_safe_backup`] where a test can ask the function
+/// to fail AFTER persisting the phase's on-disk state.
+///
+/// Mirrors the [`Failpoint`](crate::db::migration::Failpoint) / `FailpointCell`
+/// pattern from the migration coordinator: production passes
+/// [`BackupFailpointCell::none`]; a test sets the desired checkpoint, runs the
+/// REAL `crash_safe_backup`, and inspects the on-disk intermediate state to
+/// prove the canonical source is untouched and only the expected staging
+/// artifacts exist.
+///
+/// `PublishCollision` is a special case for the concurrent-publisher test: at
+/// the publish phase, instead of failing, it FIRST publishes a complete backup
+/// from the competing payload it carries (so the real publish observes an
+/// existing final path and skips). This exercises the no-clobber "another
+/// publisher won" path through the SAME production code.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum BackupFailpoint {
+    /// No injection — production default.
+    None,
+    /// Fail immediately after `create_new` succeeds: the staging file exists
+    /// but is empty, and the canonical source is unchanged.
+    AfterStagingCreate,
+    /// Fail immediately after `secure_file` on the staging path.
+    AfterSecure,
+    /// Fail immediately after `write_all` + `flush`, BEFORE `sync_all`. The
+    /// staging file holds the (un-fsynced) bytes.
+    AfterWrite,
+    /// Fail immediately after `sync_all` on the staging file, BEFORE publish.
+    AfterSync,
+    /// Fail immediately before `publish_backup`. The staging file is fully
+    /// written + secured + fsynced; the final path does not yet exist.
+    BeforePublish,
+    /// At publish time, first hard-link a complete competing backup built from
+    /// the carried bytes into the final path (simulating another publisher that
+    /// just won), then let the real publish run so it observes the existing
+    /// final and skips. Does NOT return an error — the call still succeeds, but
+    /// the survivor is the competitor's bytes. Used by the concurrent-publishers
+    /// test.
+    PublishCollision(Vec<u8>),
+}
+
+/// Shared mutable backup failpoint. [`BackupFailpointCell::none`] is the
+/// production default (no injected failure). A test sets the desired checkpoint
+/// via [`set`](Self::set), runs the real [`crash_safe_backup`], then resets to
+/// [`BackupFailpoint::None`] and re-runs to prove the function recovers.
+///
+/// Uses the same `parking_lot::Mutex` shape as the migration `FailpointCell`.
+pub struct BackupFailpointCell(Mutex<BackupFailpoint>);
+
+impl BackupFailpointCell {
+    /// No failpoint — production default.
+    pub fn none() -> Self {
+        Self(Mutex::new(BackupFailpoint::None))
+    }
+
+    /// Set the failpoint to a new checkpoint (test-only in practice).
+    pub fn set(&self, fp: BackupFailpoint) {
+        *self.0.lock() = fp;
+    }
+
+    /// Read the current failpoint without consuming it.
+    fn current(&self) -> BackupFailpoint {
+        self.0.lock().clone()
+    }
+
+    /// If the cell's failpoint equals `point`, return `Err(BackupError::Publish(
+    /// injected {point}))`; otherwise `Ok(())`. Full `PartialEq` comparison on
+    /// the discriminant; the carried bytes of `PublishCollision` are ignored
+    /// (that variant is handled separately, not via this method).
+    fn maybe_fail(&self, point: &BackupFailpoint) -> Result<(), BackupError> {
+        let guard = self.0.lock();
+        let matches = match (&*guard, point) {
+            (BackupFailpoint::None, _) => false,
+            // PublishCollision is a non-failing variant handled out-of-band.
+            (BackupFailpoint::PublishCollision(_), _) => false,
+            (a, b) => std::mem::discriminant(a) == std::mem::discriminant(b),
+        };
+        if matches {
+            let phase = match point {
+                BackupFailpoint::AfterStagingCreate => "AfterStagingCreate",
+                BackupFailpoint::AfterSecure => "AfterSecure",
+                BackupFailpoint::AfterWrite => "AfterWrite",
+                BackupFailpoint::AfterSync => "AfterSync",
+                BackupFailpoint::BeforePublish => "BeforePublish",
+                BackupFailpoint::None | BackupFailpoint::PublishCollision(_) => "",
+            };
+            drop(guard);
+            return Err(BackupError::Publish(std::io::Error::other(format!(
+                "injected failpoint: {}",
+                phase
+            ))));
+        }
+        drop(guard);
+        Ok(())
+    }
+}
 
 // ── Unix ──────────────────────────────────────────────────────────────
 
@@ -174,11 +274,21 @@ impl Drop for StagingGuard {
 /// signature stays readable.
 pub type BackupValidator<'a> = &'a dyn Fn(&[u8]) -> Result<(), String>;
 
+/// Run a crash-safe backup, optionally injecting a failure at a phase boundary
+/// via `failpoint`.
+///
+/// `failpoint` is a [`BackupFailpointCell`]; production callers pass
+/// [`BackupFailpointCell::none`] (no injection), tests pass a specific
+/// checkpoint. See [`BackupFailpoint`] for the phase semantics. The failpoint
+/// cell is consulted at EACH phase boundary AFTER that phase's on-disk state is
+/// persisted, so a test can prove the canonical source is untouched and only
+/// the expected staging artifacts exist.
 pub fn crash_safe_backup(
     source_bytes: &[u8],
     final_path: &Path,
     staging_dir: &Path,
     validator: Option<BackupValidator<'_>>,
+    failpoint: &BackupFailpointCell,
 ) -> Result<(), BackupError> {
     // 0. No-clobber fast path: a prior complete backup wins — but only after
     //    validation (when a validator is supplied). A blind `exists()` check
@@ -206,11 +316,32 @@ pub fn crash_safe_backup(
 
     // 2..5. Create + secure + write + sync the staging file, retrying on
     //       AlreadyExists (high-concurrency name collision) with a fresh
-    //       counter-suffixed name up to 3 attempts.
-    let staging = create_stage_and_write(source_bytes, staging_dir, &stem)?;
+    //       counter-suffixed name up to 3 attempts. The failpoint cell is
+    //       consulted at each sub-phase AFTER the on-disk state is persisted.
+    let staging = create_stage_and_write(source_bytes, staging_dir, &stem, failpoint)?;
     let mut guard = StagingGuard::new(staging.clone());
 
     // 6. Publish: atomically make the final path visible (no-clobber).
+    //    BeforePublish failpoint: the staging file is fully written + secured +
+    //    fsynced; the final path does not yet exist. The failpoint simulates a
+    //    process crash at this point, so the staging file must SURVIVE (a real
+    //    crash skips the RAII drop) — disarm the guard ONLY when the failpoint
+    //    fires, so a REAL publish error still cleans up staging.
+    if let Err(e) = failpoint.maybe_fail(&BackupFailpoint::BeforePublish) {
+        guard.disarm();
+        return Err(e);
+    }
+    // PublishCollision: a competing publisher publishes a complete backup from
+    // the carried bytes FIRST, so the real publish observes an existing final
+    // and skips (no-clobber). The call still succeeds; the survivor is the
+    // competitor's bytes.
+    let collision = match failpoint.current() {
+        BackupFailpoint::PublishCollision(b) => Some(b),
+        _ => None,
+    };
+    if let Some(competitor_bytes) = collision {
+        publish_collision_competitor(staging_dir, final_path, &competitor_bytes)?;
+    }
     publish_backup(&staging, final_path)?;
     // Staging path is consumed by the publish (moved/hard-linked).
     // On hard_link success we need to remove the staging name;
@@ -230,10 +361,25 @@ pub fn crash_safe_backup(
 /// The original nanosecond-timestamp name can collide under high concurrency
 /// (two publishers racing the same nanosecond); the counter suffix makes the
 /// name unique across retries.
+///
+/// `failpoint` is consulted at each sub-phase boundary AFTER the on-disk state
+/// is persisted:
+///   - [`BackupFailpoint::AfterStagingCreate`]: after `create_new` (file exists,
+///     empty).
+///   - [`BackupFailpoint::AfterSecure`]: after `secure_file`.
+///   - [`BackupFailpoint::AfterWrite`]: after `write_all` + `flush`, BEFORE
+///     `sync_all` (bytes present but not fsynced).
+///   - [`BackupFailpoint::AfterSync`]: after `sync_all`, BEFORE returning to the
+///     caller (so the publish phase has not run yet).
+///
+/// When a failpoint fires, the staging file is LEFT IN PLACE (the guard is
+/// disarmed) so a test can inspect the partial on-disk state. The returned
+/// error carries the phase name in its message.
 fn create_stage_and_write(
     source_bytes: &[u8],
     staging_dir: &Path,
     stem: &str,
+    failpoint: &BackupFailpointCell,
 ) -> Result<std::path::PathBuf, BackupError> {
     use std::io::Write;
 
@@ -271,17 +417,47 @@ fn create_stage_and_write(
             Err(e) => return Err(BackupError::CreateStaging(e)),
         };
 
+        // AfterStagingCreate failpoint: the staging file exists but is empty.
+        // Leave it on disk (disarm) so a test can inspect it.
+        if let Err(e) = failpoint.maybe_fail(&BackupFailpoint::AfterStagingCreate) {
+            guard.disarm();
+            // Best-effort close the handle before surfacing the error.
+            drop(file);
+            return Err(e);
+        }
+
         // Secure the staging file BEFORE writing data.
         secure_file(&staging).map_err(BackupError::SecureStaging)?;
+
+        // AfterSecure failpoint: staging file is secured, still empty.
+        if let Err(e) = failpoint.maybe_fail(&BackupFailpoint::AfterSecure) {
+            guard.disarm();
+            drop(file);
+            return Err(e);
+        }
 
         // Write all bytes + flush user-space buffers.
         file.write_all(source_bytes)
             .map_err(BackupError::WriteStaging)?;
         file.flush().map_err(BackupError::WriteStaging)?;
 
+        // AfterWrite failpoint: bytes are written + flushed but NOT fsynced.
+        if let Err(e) = failpoint.maybe_fail(&BackupFailpoint::AfterWrite) {
+            guard.disarm();
+            drop(file);
+            return Err(e);
+        }
+
         // Fsync — same writable handle (Windows FlushFileBuffers needs write).
         file.sync_all().map_err(BackupError::SyncStaging)?;
         drop(file); // release the handle before publish
+
+        // AfterSync failpoint: staging is fully written + secured + fsynced;
+        // the final path does not yet exist.
+        if let Err(e) = failpoint.maybe_fail(&BackupFailpoint::AfterSync) {
+            guard.disarm();
+            return Err(e);
+        }
 
         guard.disarm(); // hand ownership of the path to the caller
         return Ok(staging);
@@ -353,6 +529,56 @@ fn sync_parent_dir(staging_dir: &Path) -> Result<(), BackupError> {
     {
         let _ = staging_dir;
     }
+    Ok(())
+}
+
+/// Publish a COMPETING complete backup at `final_path` using its OWN staging
+/// file, so a subsequent real publish observes an existing final and skips.
+/// Used only by the [`BackupFailpoint::PublishCollision`] failpoint to exercise
+/// the no-clobber "another publisher won" path through the SAME `publish_backup`
+/// production code.
+///
+/// This writes the competitor bytes to a uniquely-named staging file, secures +
+/// fsyncs them, then publishes via [`publish_backup`]. The competitor staging
+/// name uses a `-competitor-` infix so it is NOT swept by
+/// [`clean_stale_staging`] (which targets `.{stem}-staging-`) — it is consumed
+/// (moved/hard-linked) by the publish itself.
+fn publish_collision_competitor(
+    staging_dir: &Path,
+    final_path: &Path,
+    competitor_bytes: &[u8],
+) -> Result<(), BackupError> {
+    use std::io::Write;
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default();
+    let stem = final_path
+        .file_name()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "backup".to_string());
+    // Distinct infix so clean_stale_staging never targets the competitor file.
+    let comp = staging_dir.join(format!(
+        ".{stem}-competitor-{}-{}",
+        now.as_secs(),
+        now.subsec_nanos()
+    ));
+    let mut guard = StagingGuard::new(comp.clone());
+    let mut file = std::fs::OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .open(&comp)
+        .map_err(BackupError::CreateStaging)?;
+    secure_file(&comp).map_err(BackupError::SecureStaging)?;
+    file.write_all(competitor_bytes)
+        .map_err(BackupError::WriteStaging)?;
+    file.flush().map_err(BackupError::WriteStaging)?;
+    file.sync_all().map_err(BackupError::SyncStaging)?;
+    drop(file);
+    // Publish the competitor. If final somehow already exists (another race),
+    // publish_backup handles AlreadyExists by deleting the competitor staging
+    // and returning Ok — the survivor is whatever landed first.
+    publish_backup(&comp, final_path)?;
+    guard.disarm();
     Ok(())
 }
 

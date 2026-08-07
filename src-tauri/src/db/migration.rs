@@ -306,7 +306,14 @@ pub(crate) fn backup_settings(settings_path: &Path) -> Result<(), MigrationError
             .map(|_| ())
             .map_err(|e| format!("existing backup is not valid JSON: {e}"))
     };
-    crate::fs_acl::crash_safe_backup(&bytes, &bak, staging_dir, Some(&validate_json)).map_err(|e| {
+    crate::fs_acl::crash_safe_backup(
+        &bytes,
+        &bak,
+        staging_dir,
+        Some(&validate_json),
+        &crate::fs_acl::BackupFailpointCell::none(),
+    )
+    .map_err(|e| {
         MigrationError::BackupFailed(format!("settings backup {}: {e}", bak.display()))
     })?;
     Ok(())
