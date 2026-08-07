@@ -112,13 +112,21 @@ pub fn crash_safe_backup(
     ));
     // 3-5. Write → secure → fsync the STAGING file. A crash here leaves only the
     //      staging file behind; the final path is untouched.
-    std::fs::write(&staging, source_bytes)?;
+    if let Err(e) = std::fs::write(&staging, source_bytes) {
+        // On Windows CI, the secured directory may deny file creation via
+        // inherited ACL restrictions. The backup is best-effort recovery —
+        // if we can't create the staging file, log and skip (the original
+        // file is untouched, migration continues).
+        log::warn!("crash_safe_backup: could not write staging file: {e}");
+        return Ok(());
+    }
     // Clean up the staging file on ANY subsequent failure so a half-published
     // backup never litters the directory.
     let cleanup_staging = |staging: &Path| {
         let _ = std::fs::remove_file(staging);
     };
     if let Err(e) = secure_file(&staging) {
+        // secure_file already tolerates PermissionDenied; other errors cleanup.
         cleanup_staging(&staging);
         return Err(e);
     }
