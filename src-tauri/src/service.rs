@@ -34,12 +34,17 @@ pub async fn translate(
     // Spec §A "Plaintext-key claims": keep the key in memory only for the shortest
     // window between keystore-read and HTTP-send, and zeroize it after use.
     // Zeroizing<String> wipes the heap buffer on drop.
+    //
+    // S2a P0: read via the typed `KeystoreData` accessor so the key is found in
+    // the nested `provider_keys` map after the v2 migration (the old raw
+    // `keys[preset.id]` lookup hit the flat map and returned None for migrated
+    // keystores). For the built-in presets the key name is the preset id; for a
+    // migrated DB-backed provider the row's `secret_ref` carries the same name
+    // (see db::providers), so `preset.id` is the right `secret_ref` here.
     let key = if preset.needs_key {
-        let keys = keystore.load().map_err(Error::Keystore)?;
-        let k = keys
-            .get(&preset.id)
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string())
+        let k = keystore
+            .get_key(&preset.id)
+            .map_err(Error::Keystore)?
             .ok_or_else(|| Error::Config(ConfigKind::MissingKey { provider: preset.id.clone() }))?;
         zeroize::Zeroizing::new(k)
     } else {

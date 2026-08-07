@@ -253,10 +253,9 @@ fn set_key(
     provider_id: String,
     key: String,
 ) -> Result<(), String> {
-    // Atomic read-modify-write under the lock — load()+store() would interleave.
-    state.keystore.update_keys(|keys| {
-        keys[&provider_id] = serde_json::json!(key);
-    }).map_err(|e| e.to_string())?;
+    // S2a P0: typed accessor — converges the payload to v2 (a load()+store() or
+    // a flat-map write would create a mixed v1/v2 structure post-migration).
+    state.keystore.set_key(&provider_id, &key).map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -265,11 +264,8 @@ fn delete_key(
     state: tauri::State<'_, Arc<Session>>,
     provider_id: String,
 ) -> Result<(), String> {
-    state.keystore.update_keys(|keys| {
-        if let Some(obj) = keys.as_object_mut() {
-            obj.remove(&provider_id);
-        }
-    }).map_err(|e| e.to_string())?;
+    // S2a P0: typed accessor (idempotent — removing an absent key succeeds).
+    state.keystore.delete_key(&provider_id).map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -294,17 +290,15 @@ fn key_status(
 ) -> std::collections::HashMap<String, bool> {
     // Review P1 #6: swallow the error (return empty) so frontend onMount never
     // aborts. The recovery banner reads `keystore_health` for the reason.
-    let keys = match state.keystore.load() {
-        Ok(k) => k,
+    //
+    // S2a P0: enumerate via the typed accessor so the map is keyed by
+    // `secret_ref` from the nested v2 `provider_keys` (the old raw-object walk
+    // iterated the flat map and missed migrated keys).
+    let refs = match state.keystore.list_provider_key_refs() {
+        Ok(r) => r,
         Err(_) => return std::collections::HashMap::new(),
     };
-    let mut map = std::collections::HashMap::new();
-    if let Some(obj) = keys.as_object() {
-        for (k, _v) in obj {
-            map.insert(k.clone(), true);
-        }
-    }
-    map
+    refs.into_iter().map(|r| (r, true)).collect()
 }
 
 #[tauri::command]
@@ -491,11 +485,10 @@ async fn provider_delete(
             .map_err(|e| e.to_string())?;
 
         // Step 2: purge the key (keystore flock only, DB NOT locked). Uses the
-        // same sanctioned `update_keys` RMW as the resume sweep. Idempotent — a
+        // typed `delete_key` RMW so the payload converges to v2. Idempotent — a
         // missing key is a successful no-op.
         let ks = keystore::Keystore::new(keystore_dir).map_err(|e| e.to_string())?;
-        ks.update_keys(|keys| remove_secret_ref_mut(keys, &secret_ref))
-            .map_err(|e| e.to_string())?;
+        ks.delete_key(&secret_ref).map_err(|e| e.to_string())?;
 
         // Step 3: finalize the tombstone (DB Mutex only, keystore NOT locked).
         db.with_conn(|conn| db_providers::finalize_delete(conn, &uuid))
@@ -563,11 +556,10 @@ async fn provider_set_key(
             .with_conn(|conn| db_providers::get(conn, &uuid).map(|p| p.secret_ref))
             .map_err(|e| e.to_string())?;
 
-        // 2. Keystore RMW (flock only, DB NOT locked). Handles both v1 flat-map
-        //    and v2 versioned shapes.
+        // 2. Keystore RMW (flock only, DB NOT locked). Typed accessor converges
+        //    the payload to v2 and handles both v1 flat-map and v2 shapes.
         let ks = keystore::Keystore::new(keystore_dir).map_err(|e| e.to_string())?;
-        ks.update_keys(|keys| set_secret_ref_mut(keys, &secret_ref, &key))
-            .map_err(|e| e.to_string())?;
+        ks.set_key(&secret_ref, &key).map_err(|e| e.to_string())?;
         Ok(())
     })
     .await
@@ -612,49 +604,6 @@ async fn provider_set_active(
 /// Type alias so the closures above can name the error without importing the
 /// full path each time.
 type DbErr = crate::db::DbError;
-
-/// Remove `secret_ref` from a decrypted keystore payload, mutating it in place.
-/// Handles both on-disk shapes (v2 nested `provider_keys`, v1 flat map). Mirrors
-/// `crate::db::delete::remove_provider_key_mut` (kept local so lib.rs doesn't reach
-/// into a private fn).
-fn remove_secret_ref_mut(keys: &mut serde_json::Value, secret_ref: &str) {
-    let Some(obj) = keys.as_object_mut() else {
-        return;
-    };
-    if obj.contains_key("provider_keys") {
-        if let Some(inner) = obj.get_mut("provider_keys").and_then(|v| v.as_object_mut()) {
-            inner.remove(secret_ref);
-        }
-        return;
-    }
-    obj.remove(secret_ref);
-}
-
-/// Set `secret_ref` → `key` in a decrypted keystore payload, mutating it in
-/// place. Handles both on-disk shapes (v2 nested `provider_keys`, v1 flat map).
-fn set_secret_ref_mut(keys: &mut serde_json::Value, secret_ref: &str, key: &str) {
-    let Some(obj) = keys.as_object_mut() else {
-        // Non-object ({}/missing): rebuild as a v2 shell so the next write
-        // converges to the versioned shape.
-        let mut data = serde_json::Map::new();
-        data.insert("version".into(), serde_json::json!(2));
-        data.insert(
-            "provider_keys".into(),
-            serde_json::json!({ secret_ref: key }),
-        );
-        *keys = serde_json::Value::Object(data);
-        return;
-    };
-    if obj.contains_key("provider_keys") {
-        if let Some(inner) = obj.get_mut("provider_keys").and_then(|v| v.as_object_mut()) {
-            inner.insert(secret_ref.into(), serde_json::json!(key));
-        }
-        return;
-    }
-    // v1 flat map: insert at the top level (preserves the legacy shape until
-    // the migration rewrites it).
-    obj.insert(secret_ref.into(), serde_json::json!(key));
-}
 
 /// Write the primary/parallel/fallback slots in `preferences` + null consent.
 /// Caller drives the transaction.
