@@ -33,6 +33,40 @@ impl From<std::io::Error> for AclError {
     fn from(e: std::io::Error) -> Self { AclError::Io(e) }
 }
 
+// ── Backup error type (staged, not generic Io) ─────────────────────────
+
+/// Staged backup error: identifies which phase failed.
+#[derive(Debug)]
+pub enum BackupError {
+    /// `OpenOptions::create_new` on the staging path failed.
+    CreateStaging(std::io::Error),
+    /// `secure_file` on the staging path failed.
+    SecureStaging(AclError),
+    /// `write_all` or `flush` on the staging file failed.
+    WriteStaging(std::io::Error),
+    /// `sync_all` on the staging file failed.
+    SyncStaging(std::io::Error),
+    /// Publishing (hard_link / MoveFileExW) failed.
+    Publish(std::io::Error),
+    /// Parent-directory `sync_all` failed (Unix only).
+    SyncParent(std::io::Error),
+}
+
+impl std::fmt::Display for BackupError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BackupError::CreateStaging(e) => write!(f, "create staging: {e}"),
+            BackupError::SecureStaging(e) => write!(f, "secure staging: {e}"),
+            BackupError::WriteStaging(e) => write!(f, "write staging: {e}"),
+            BackupError::SyncStaging(e) => write!(f, "sync staging: {e}"),
+            BackupError::Publish(e) => write!(f, "publish backup: {e}"),
+            BackupError::SyncParent(e) => write!(f, "sync parent dir: {e}"),
+        }
+    }
+}
+
+impl std::error::Error for BackupError {}
+
 // ── Unix ──────────────────────────────────────────────────────────────
 
 #[cfg(unix)]
@@ -43,6 +77,8 @@ fn set_mode(path: &Path, mode: u32) -> Result<(), AclError> {
 }
 
 /// Secure a directory: 0o700 on Unix; protected DACL (inheritable) on Windows.
+/// Failure is a hard error — the directory MUST be secured before any data
+/// is written into it.
 pub fn secure_dir(dir: &Path) -> Result<(), AclError> {
     #[cfg(unix)]
     { set_mode(dir, 0o700) }
@@ -53,6 +89,8 @@ pub fn secure_dir(dir: &Path) -> Result<(), AclError> {
 }
 
 /// Secure a file: 0o600 on Unix; protected DACL (non-inheritable) on Windows.
+/// Failure is a hard error — the file MUST be secured before it is published
+/// as a backup or canonical store.
 pub fn secure_file(path: &Path) -> Result<(), AclError> {
     #[cfg(unix)]
     { set_mode(path, 0o600) }
@@ -62,38 +100,59 @@ pub fn secure_file(path: &Path) -> Result<(), AclError> {
     { let _ = path; Ok(()) }
 }
 
+/// RAII cleanup guard: removes the staging file on drop unless disarmed.
+struct StagingGuard {
+    path: std::path::PathBuf,
+    armed: bool,
+}
+
+impl StagingGuard {
+    fn new(path: std::path::PathBuf) -> Self {
+        Self { path, armed: true }
+    }
+    fn disarm(&mut self) {
+        self.armed = false;
+    }
+}
+
+impl Drop for StagingGuard {
+    fn drop(&mut self) {
+        if self.armed {
+            let _ = std::fs::remove_file(&self.path);
+        }
+    }
+}
+
 /// Crash-safe atomic publish of a backup file (S2a P0).
 ///
-/// Writes `source_bytes` to a unique staging file in `staging_dir` (which MUST be
-/// the same directory as `final_path` so the publish can be an atomic hard link),
-/// secures it (`secure_file`), fsyncs it, then publishes it to `final_path`.
+/// Phases (all must succeed; any failure cleans up staging and returns Err):
+/// 1. `create_new` (O_EXCL) staging file — atomic ownership of a unique name.
+/// 2. `secure_file` on the staging path — permissions are correct before data.
+/// 3. `write_all` + `flush` via the SAME writable handle that created the file.
+/// 4. `sync_all` via the SAME handle — on Windows this calls
+///    `FlushFileBuffers` which requires a writable handle. Using `File::open`
+///    (read-only) would produce Access Denied on Windows.
+/// 5. Publish: Unix `hard_link` (no-clobber) or Windows `MoveFileExW`
+///    (MOVEFILE_WRITE_THROUGH, no replace). If final already exists,
+///    the staging file is cleaned up and `Ok(())` is returned.
+/// 6. Sync parent directory (Unix) so the new entry is durable.
 ///
-/// Publish is **no-clobber**: if `final_path` already exists (a prior backup from
-/// this run or a crashed-but-completed prior attempt), the staging file is
-/// removed and `Ok(())` is returned without touching the existing backup. The
-/// atomic step is a `hard_link(staging → final)`, which fails with
-/// `AlreadyExists` if a concurrent publisher won the race — their backup is
-/// authoritative and we treat that as success.
-///
-/// Why this shape (vs. the old `OpenOptions::create_new` write to the FINAL
-/// path): with `create_new` a crash partway through the write/fsync leaves an
-/// INCOMPLETE file at the final path, so the next startup sees `AlreadyExists`
-/// and skips — no recoverable backup. Here a crash leaves at most a `.staging`
-/// file (cleaned up on the next attempt), and the final path is only ever
-/// observable as a complete, secured, fsynced backup.
-///
-/// After a successful publish the parent directory is fsynced (Unix) so the new
-/// directory entry is durable.
+/// The final backup path is only ever observable as a complete, secured,
+/// synced file. A crash before publish leaves at most a staging file (cleaned
+/// on the next attempt).
 pub fn crash_safe_backup(
     source_bytes: &[u8],
     final_path: &Path,
     staging_dir: &Path,
-) -> Result<(), AclError> {
-    // 1. No-clobber fast path: a prior backup wins.
+) -> Result<(), BackupError> {
+    use std::io::Write;
+
+    // 0. No-clobber fast path: a prior complete backup wins.
     if final_path.exists() {
         return Ok(());
     }
-    // 2. Unique staging name (same dir as final so hard_link is a same-filesystem op).
+
+    // 1. create_new (O_EXCL) on staging — atomic, unique name.
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default();
@@ -106,70 +165,118 @@ pub fn crash_safe_backup(
         now.as_secs(),
         now.subsec_nanos()
     ));
-    // 3-5. Write → secure → fsync the STAGING file. A crash here leaves only the
-    //      staging file behind; the final path is untouched.
-    std::fs::write(&staging, source_bytes)?;
-    // Clean up the staging file on ANY subsequent failure so a half-published
-    // backup never litters the directory.
-    let cleanup_staging = |staging: &Path| {
-        let _ = std::fs::remove_file(staging);
-    };
-    if let Err(e) = secure_file(&staging) {
-        cleanup_staging(&staging);
-        return Err(e);
-    }
-    // Fsync the staging file's contents.
-    {
-        let f = match std::fs::File::open(&staging) {
-            Ok(f) => f,
-            Err(e) => {
-                cleanup_staging(&staging);
-                return Err(AclError::Io(e));
-            }
-        };
-        if let Err(e) = f.sync_all() {
-            drop(f);
-            cleanup_staging(&staging);
-            return Err(AclError::Io(e));
-        }
-        drop(f);
-    }
-    // 6. Atomic publish: hard_link staging → final. On Unix this is a single
-    //    atomic directory entry creation that fails with AlreadyExists if final
-    //    exists; on Windows NTFS hard_link behaves the same way. rename would
-    //    clobber on Unix, so we use hard_link (and then unlink the staging name).
-    match std::fs::hard_link(&staging, final_path) {
-        Ok(()) => {}
-        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
-            // Another publisher (this run or a prior crashed-but-completed one)
-            // already produced an authoritative backup. Drop ours.
-            cleanup_staging(&staging);
-            return Ok(());
-        }
-        Err(e) => {
-            cleanup_staging(&staging);
-            return Err(AclError::Io(e));
-        }
-    }
-    // 7. Remove the staging name (the inode now has two links; unlinking the
-    //    staging name leaves final as the sole link).
-    cleanup_staging(&staging);
-    // 8. Fsync the parent directory so the new final-path entry is durable.
+
+    let mut guard = StagingGuard::new(staging.clone());
+
+    // Create the staging file with a WRITABLE handle via create_new (O_EXCL).
+    // This handle is kept alive through write + sync so FlushFileBuffers
+    // has the write access it needs on Windows.
+    let mut file = std::fs::OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .open(&staging)
+        .map_err(BackupError::CreateStaging)?;
+
+    // 2. Secure the staging file BEFORE writing data.
+    secure_file(&staging).map_err(BackupError::SecureStaging)?;
+
+    // 3. Write all bytes + flush user-space buffers.
+    file.write_all(source_bytes).map_err(BackupError::WriteStaging)?;
+    file.flush().map_err(BackupError::WriteStaging)?;
+
+    // 4. Fsync — same writable handle (Windows FlushFileBuffers needs write).
+    file.sync_all().map_err(BackupError::SyncStaging)?;
+    drop(file); // release the handle before publish
+
+    // 5. Publish: atomically make the final path visible (no-clobber).
+    publish_backup(&staging, final_path)?;
+    // Staging path is consumed by the publish (moved/hard-linked).
+    // On hard_link success we need to remove the staging name;
+    // on MoveFileExW success the staging no longer exists.
+    guard.disarm(); // publish succeeded; don't double-delete
+
+    // 6. Sync parent directory (Unix) so the new directory entry is durable.
     #[cfg(unix)]
     {
-        if let Ok(dir) = std::fs::File::open(staging_dir) {
-            let _ = dir.sync_all();
-        }
+        let dir = std::fs::File::open(staging_dir).map_err(BackupError::SyncParent)?;
+        dir.sync_all().map_err(BackupError::SyncParent)?;
     }
-    #[cfg(not(unix))]
-    {
-        let _ = staging_dir;
-    }
+
     Ok(())
 }
 
+/// Platform-specific atomic no-clobber publish.
+///
+/// - Unix/macOS: `hard_link(staging → final)` — atomic, fails with
+///   `AlreadyExists` if final exists. Then unlink the staging name (the
+///   inode now has two links; unlinking staging leaves final as sole link).
+/// - Windows: `MoveFileExW(MOVEFILE_WRITE_THROUGH)` — atomic rename that
+///   does NOT set `MOVEFILE_REPLACE_EXISTING`. `ERROR_FILE_EXISTS` /
+///   `ERROR_ALREADY_EXISTS` means another complete backup was published:
+///   delete staging, keep the existing final backup.
+#[allow(unused_variables)]
+fn publish_backup(staging: &Path, final_path: &Path) -> Result<(), BackupError> {
+    #[cfg(unix)]
+    {
+        match std::fs::hard_link(staging, final_path) {
+            Ok(()) => {
+                // Staging name still exists (hard link); remove it so final
+                // is the sole link.
+                let _ = std::fs::remove_file(staging);
+                Ok(())
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                // Another publisher won; their backup is authoritative.
+                let _ = std::fs::remove_file(staging);
+                Ok(())
+            }
+            Err(e) => Err(BackupError::Publish(e)),
+        }
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::ffi::OsStrExt;
+        // MoveFileExW with MOVEFILE_WRITE_THROUGH (0x8) — no REPLACE_EXISTING.
+        // The move is atomic and durable; if final exists, the call fails.
+        const MOVEFILE_WRITE_THROUGH: u32 = 0x8;
+        let src_wide: Vec<u16> = staging.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
+        let dst_wide: Vec<u16> = final_path.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
+        let ok = unsafe {
+            windows_sys::Win32::Storage::FileSystem::MoveFileExW(
+                src_wide.as_ptr(),
+                dst_wide.as_ptr(),
+                MOVEFILE_WRITE_THROUGH,
+            )
+        };
+        if ok != 0 {
+            return Ok(()); // staging moved to final; staging no longer exists
+        }
+        let err = std::io::Error::last_os_error();
+        let raw = err.raw_os_error().unwrap_or(0);
+        // ERROR_FILE_EXISTS (80) or ERROR_ALREADY_EXISTS (183) — another
+        // complete backup was published. Delete staging, keep existing.
+        if raw == 80 || raw == 183 {
+            let _ = std::fs::remove_file(staging);
+            return Ok(());
+        }
+        // Other errors propagate; staging will be cleaned by the RAII guard.
+        Err(BackupError::Publish(err))
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        // Fallback: simple rename (not atomic on all platforms).
+        match std::fs::rename(staging, final_path) {
+            Ok(()) => Ok(()),
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                let _ = std::fs::remove_file(staging);
+                Ok(())
+            }
+            Err(e) => Err(BackupError::Publish(e)),
+        }
+    }
+}
+
 // ── Windows Win32 ACL implementation ──────────────────────────────────
-// Extracted verbatim from keystore.rs; the keystore now delegates here.
 
 #[cfg(windows)]
 pub fn current_user_sid() -> Result<Vec<u8>, AclError> {
