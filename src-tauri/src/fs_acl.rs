@@ -62,6 +62,112 @@ pub fn secure_file(path: &Path) -> Result<(), AclError> {
     { let _ = path; Ok(()) }
 }
 
+/// Crash-safe atomic publish of a backup file (S2a P0).
+///
+/// Writes `source_bytes` to a unique staging file in `staging_dir` (which MUST be
+/// the same directory as `final_path` so the publish can be an atomic hard link),
+/// secures it (`secure_file`), fsyncs it, then publishes it to `final_path`.
+///
+/// Publish is **no-clobber**: if `final_path` already exists (a prior backup from
+/// this run or a crashed-but-completed prior attempt), the staging file is
+/// removed and `Ok(())` is returned without touching the existing backup. The
+/// atomic step is a `hard_link(staging → final)`, which fails with
+/// `AlreadyExists` if a concurrent publisher won the race — their backup is
+/// authoritative and we treat that as success.
+///
+/// Why this shape (vs. the old `OpenOptions::create_new` write to the FINAL
+/// path): with `create_new` a crash partway through the write/fsync leaves an
+/// INCOMPLETE file at the final path, so the next startup sees `AlreadyExists`
+/// and skips — no recoverable backup. Here a crash leaves at most a `.staging`
+/// file (cleaned up on the next attempt), and the final path is only ever
+/// observable as a complete, secured, fsynced backup.
+///
+/// After a successful publish the parent directory is fsynced (Unix) so the new
+/// directory entry is durable.
+pub fn crash_safe_backup(
+    source_bytes: &[u8],
+    final_path: &Path,
+    staging_dir: &Path,
+) -> Result<(), AclError> {
+    // 1. No-clobber fast path: a prior backup wins.
+    if final_path.exists() {
+        return Ok(());
+    }
+    // 2. Unique staging name (same dir as final so hard_link is a same-filesystem op).
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default();
+    let stem = final_path
+        .file_name()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "backup".to_string());
+    let staging = staging_dir.join(format!(
+        ".{stem}-staging-{}-{}",
+        now.as_secs(),
+        now.subsec_nanos()
+    ));
+    // 3-5. Write → secure → fsync the STAGING file. A crash here leaves only the
+    //      staging file behind; the final path is untouched.
+    std::fs::write(&staging, source_bytes)?;
+    // Clean up the staging file on ANY subsequent failure so a half-published
+    // backup never litters the directory.
+    let cleanup_staging = |staging: &Path| {
+        let _ = std::fs::remove_file(staging);
+    };
+    if let Err(e) = secure_file(&staging) {
+        cleanup_staging(&staging);
+        return Err(e);
+    }
+    // Fsync the staging file's contents.
+    {
+        let f = match std::fs::File::open(&staging) {
+            Ok(f) => f,
+            Err(e) => {
+                cleanup_staging(&staging);
+                return Err(AclError::Io(e));
+            }
+        };
+        if let Err(e) = f.sync_all() {
+            drop(f);
+            cleanup_staging(&staging);
+            return Err(AclError::Io(e));
+        }
+        drop(f);
+    }
+    // 6. Atomic publish: hard_link staging → final. On Unix this is a single
+    //    atomic directory entry creation that fails with AlreadyExists if final
+    //    exists; on Windows NTFS hard_link behaves the same way. rename would
+    //    clobber on Unix, so we use hard_link (and then unlink the staging name).
+    match std::fs::hard_link(&staging, final_path) {
+        Ok(()) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+            // Another publisher (this run or a prior crashed-but-completed one)
+            // already produced an authoritative backup. Drop ours.
+            cleanup_staging(&staging);
+            return Ok(());
+        }
+        Err(e) => {
+            cleanup_staging(&staging);
+            return Err(AclError::Io(e));
+        }
+    }
+    // 7. Remove the staging name (the inode now has two links; unlinking the
+    //    staging name leaves final as the sole link).
+    cleanup_staging(&staging);
+    // 8. Fsync the parent directory so the new final-path entry is durable.
+    #[cfg(unix)]
+    {
+        if let Ok(dir) = std::fs::File::open(staging_dir) {
+            let _ = dir.sync_all();
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = staging_dir;
+    }
+    Ok(())
+}
+
 // ── Windows Win32 ACL implementation ──────────────────────────────────
 // Extracted verbatim from keystore.rs; the keystore now delegates here.
 

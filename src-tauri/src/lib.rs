@@ -334,6 +334,11 @@ fn delete_key(
 ///
 /// Asserts that `provider_id` equals the `secret_ref` of some non-deleted
 /// provider row in the DB. Returns `Err` (refusing the keystore write) when:
+/// - the DB isn't `Ready` (S2a P1: refuse key writes during
+///   `MigrationIncomplete` / `NeedsDatabaseRecovery` / `NeedsKeystoreRecovery` —
+///   the row set may be mid-migration or absent, so we can't validate ownership
+///   safely and a write could create an orphan the migration's Phase-5
+///   verification would later reject),
 /// - the DB handle is unavailable (can't validate — refuse rather than risk an
 ///   orphan), or
 /// - no non-deleted row owns that `secret_ref` (the write would create / touch
@@ -342,6 +347,19 @@ fn delete_key(
 /// MUST be called while holding `data_gate.read()` (the legacy commands acquire
 /// it before calling) so the row set can't change under us.
 fn assert_secret_ref_owned(app: &Arc<AppState>, provider_id: &str) -> Result<(), String> {
+    // Readiness gate FIRST: refuse key writes unless the DB is Ready. A
+    // MigrationIncomplete / Needs*Recovery state means the row set is in flux
+    // (or absent), so the COUNT below could race the migration or read a
+    // half-built schema. The keystore is independent, but writing a key whose
+    // owner we can't verify would create an orphan.
+    let readiness = app.readiness.read();
+    if !readiness.is_ready() {
+        return Err(format!(
+            "cannot set/delete key: database not ready ({:?})",
+            *readiness
+        ));
+    }
+    drop(readiness);
     let db = app
         .db
         .read()
@@ -1016,196 +1034,38 @@ async fn provider_test_connection(
 
 /// User-initiated database recovery (P1 #8).
 ///
-/// Implements the frozen close/rename/reopen state machine so the DB file
-/// handle is released BEFORE the rename (otherwise Windows refuses to rename a
-/// file with an open SQLite handle, and a cloned `Arc<Database>` could keep
-/// serving queries against the wrong file). Steps:
+/// Thin wrapper around [`crate::db::recovery::archive_database_core`] (the
+/// shared close/rename/reopen/migrate pipeline) with the production failpoint
+/// ([`crate::db::recovery::ArchiveFailpoint::None`]). The core owns the whole
+/// state machine so the production path and the recovery failpoint tests
+/// exercise the SAME logic.
 ///
-/// 1. Acquire `data_gate.write()` FIRST (blocks every provider command — no
-///    new `with_conn` call can start while we're tearing down).
-/// 2. Take the `Arc<Database>` out of the slot (`db.write().take()`).
-/// 3. `Arc::try_unwrap` — the write gate guarantees no in-flight command holds
-///    a clone; if one still does (a programming bug), restore the slot and
-///    bail instead of leaving split-brain handles.
-/// 4. `Database::close(self)` — release the SQLite file handle. On failure,
-///    reopen the slot from the original path (the file still exists there) and
-///    bail.
-/// 5. `fs::rename(db_path, broken_path)` — the file handle is gone, so this
-///    succeeds even on Windows. If it fails, the file is still at the original
-///    path: reopen it, restore the slot, and bail.
-/// 6. Open a fresh DB at the original path + run migration.
-/// 7. `resume_deletions` against the fresh DB. A failure here is a real
-///    problem (not just a logged best-effort one) → MigrationIncomplete, NOT
-///    Ready.
-/// 8. On success install the new handle + Ready.
+/// Pipeline (see the core for the full contract):
+/// 1. PREFLIGHT `settings_path` BEFORE any destructive op (S2a P1). If the
+///    path is `None`, refuse immediately — the DB is untouched and usable. This
+///    avoids closing/renaming a working DB only to discover we can't migrate
+///    because the settings path couldn't be resolved at startup.
+/// 2. Acquire `data_gate.write()` (blocks every provider command).
+/// 3. `Arc::try_unwrap` + `Database::close` — release the SQLite file handle.
+/// 4. `fs::rename(db_path, broken_path)`.
+/// 5. Open a fresh DB + run migration + `resume_deletions`.
+/// 6. Install the new handle + `Ready`.
 ///
-/// Any failure AFTER the rename leaves the slot `None` and readiness
-/// `NeedsDatabaseRecovery` — the file is gone, so the user must retry the
-/// recovery (which will recreate it). Any failure BEFORE the rename leaves the
-/// original DB untouched and usable.
+/// Any failure AFTER the rename leaves the slot `None` (or, for migration
+/// failures, `Some` fresh DB) and a non-`Ready` readiness. Any failure BEFORE
+/// the rename leaves the original DB untouched and usable.
 #[tauri::command]
 async fn archive_database(
     state: tauri::State<'_, Arc<AppState>>,
 ) -> Result<String, String> {
     let app = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || -> Result<String, String> {
-        // 1. data_gate write guard for the whole operation. Acquired FIRST so
-        //    require_ready (which clones the Arc) cannot race us: once we hold
-        //    the write guard no provider command can start a new with_conn.
-        let _gate = app.data_gate.write();
-
-        let db_path = app.db_path.clone();
-
-        // 2-4. Close the existing connection (if any) so the file handle is
-        //      released before the rename. The slot is left None across the
-        //      rename so a concurrent reader observes "no DB" rather than a
-        //      handle pointing at a renamed file.
-        let closed = match app.db.write().take() {
-            Some(arc) => match Arc::try_unwrap(arc) {
-                Ok(owned) => match owned.close() {
-                    Ok(()) => true,
-                    Err((recovered_db, e)) => {
-                        // Close failed — the file handle may still be open but
-                        // the DB object is still usable. Restore the slot so the
-                        // app keeps running against the original file and bail.
-                        let reason = e.to_string();
-                        *app.db.write() = Some(Arc::new(recovered_db));
-                        return Err(format!("close linguaray.db before archive: {reason}"));
-                    }
-                },
-                Err(arc) => {
-                    // Someone still holds a clone. The write gate should make
-                    // this impossible; restore + bail rather than risk a
-                    // split-brain handle racing the rename.
-                    *app.db.write() = Some(arc);
-                    return Err(
-                        "archive_database: DB handle still in use (data_gate violated)".into(),
-                    );
-                }
-            },
-            None => false, // No handle to close (e.g. NeedsDatabaseRecovery).
-        };
-
-        // 5. Rename the DB file aside (recoverable). If the file doesn't exist,
-        //    there's nothing to archive — proceed straight to opening a fresh
-        //    one. On rename failure the original file is still at db_path, so
-        //    we can restore the slot by reopening it.
-        let archived_path = if db_path.exists() {
-            // Nanosecond-precision suffix so two archives taken within the same
-            // second don't collide (a second-only suffix would let a rapid
-            // second archive silently overwrite the first via the rename).
-            let now = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default();
-            let dst = db_path.with_extension(format!("db.broken-{}-{}", now.as_secs(), now.subsec_nanos()));
-            match std::fs::rename(&db_path, &dst) {
-                Ok(()) => dst.to_string_lossy().into_owned(),
-                Err(e) => {
-                    // Rename failed: the file is still at the original path.
-                    // Restore the slot by reopening it (only if we previously
-                    // held a handle, i.e. the app was using this DB) so the
-                    // user isn't left with a None slot over a usable file.
-                    if closed {
-                        if let Ok(db) = Database::open(&db_path) {
-                            *app.db.write() = Some(Arc::new(db));
-                        } else {
-                            *app.readiness.write() = DataReadiness::NeedsDatabaseRecovery {
-                                reason: format!(
-                                    "rename {} failed ({e}) and reopen also failed",
-                                    db_path.display()
-                                ),
-                            };
-                        }
-                    }
-                    return Err(format!("rename linguaray.db aside: {e}"));
-                }
-            }
-        } else {
-            String::new()
-        };
-
-        // 6-8. Open a fresh DB at the original path + migrate + resume.
-        // `settings_path = None` means the canonical settings path couldn't be
-        // resolved at startup. Migration reads + backs up the legacy settings
-        // file, so running it against a guessed path would touch the wrong file
-        // (on Windows the store plugin targets AppData (Roaming) while `dir` is
-        // AppLocalData (Local)). Refuse: leave the DB installed but incomplete
-        // so the next startup (which re-resolves the path) retries.
-        let settings_path = match app.settings_path.as_ref() {
-            Some(p) => p.clone(),
-            None => {
-                let reason = "settings path unresolved; cannot migrate".to_string();
-                *app.readiness.write() = DataReadiness::migration_incomplete(
-                    "archive_database",
-                    reason.clone(),
-                );
-                // Still install the handle so a later retry can proceed.
-                if let Ok(db) = Database::open(&db_path) {
-                    *app.db.write() = Some(Arc::new(db));
-                }
-                return Err(reason);
-            }
-        };
-        match Database::open(&db_path) {
-            Ok(db) => {
-                let db = Arc::new(db);
-                let fp = FailpointCell::none();
-                match run_migration(&db, &app.keystore_dir, &settings_path, &fp) {
-                    Ok(()) => {}
-                    Err(MigrationError::NeedsKeystoreRecovery(reason)) => {
-                        // A keystore-needs-recovery outcome must surface as
-                        // NeedsKeystoreRecovery (NOT MigrationIncomplete) so the
-                        // recovery banner routes the user to the keystore flow
-                        // rather than the migration flow.
-                        let msg = reason.clone();
-                        *app.readiness.write() = DataReadiness::NeedsKeystoreRecovery {
-                            reason: msg.clone(),
-                        };
-                        // Still install the handle so a later retry can proceed.
-                        *app.db.write() = Some(db);
-                        return Err(msg);
-                    }
-                    Err(e) => {
-                        let reason = format!("migration after archive: {e}");
-                        *app.readiness.write() = DataReadiness::migration_incomplete(
-                            "archive_database",
-                            reason.clone(),
-                        );
-                        // Still install the handle so a later recovery/migration
-                        // retry can proceed (NeedsDatabaseRecovery would hide the
-                        // partially-migrated DB).
-                        *app.db.write() = Some(db);
-                        return Err(reason);
-                    }
-                }
-                // Resume in-flight deletes against the fresh DB. A failure here
-                // is a real consistency problem — surface MigrationIncomplete
-                // (NOT Ready) so the user sees the recovery banner.
-                if let Err(e) =
-                    crate::db::delete::provider_resume_deletions(&db, &app.keystore_dir)
-                {
-                    let reason = format!("resume_deletions after archive: {e}");
-                    *app.readiness.write() = DataReadiness::migration_incomplete(
-                        "archive_database",
-                        reason.clone(),
-                    );
-                    *app.db.write() = Some(db);
-                    return Err(reason);
-                }
-                *app.db.write() = Some(db);
-                *app.readiness.write() = DataReadiness::Ready;
-                Ok(archived_path)
-            }
-            Err(e) => {
-                // The file was renamed away (or never existed); the reopen
-                // failed too. There's nothing to serve — NeedsDatabaseRecovery.
-                let reason = format!("reopen linguaray.db: {e}");
-                *app.readiness.write() = DataReadiness::NeedsDatabaseRecovery {
-                    reason: reason.clone(),
-                };
-                Err(reason)
-            }
-        }
+        // Thin wrapper: delegate to the shared core with the production failpoint
+        // (None). The core owns the close → rename → reopen → migrate → resume
+        // pipeline + the settings-path preflight + the readiness transitions, so
+        // the production path and the recovery failpoint tests exercise the SAME
+        // logic (no drift).
+        db::recovery::archive_database_core(&app, db::recovery::ArchiveFailpoint::None)
     })
     .await
     .map_err(|e| e.to_string())?
