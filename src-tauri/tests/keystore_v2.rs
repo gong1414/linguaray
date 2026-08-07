@@ -9,6 +9,10 @@ use linguaray_lib::keystore::{
     Keystore, KeystoreData, KeystoreLoadState, SerializableKey, KEYSTORE_DATA_VERSION,
     migrate_to_v2_with_identity,
 };
+
+// The new typed accessors have `*_with_identity` test seams (injected identity)
+// so these regression tests drive the SAME locked core as production without
+// touching real OS identity.
 use serde_json::json;
 use std::collections::HashMap;
 
@@ -495,4 +499,194 @@ fn load_state_missing_is_fast() {
         elapsed < std::time::Duration::from_millis(500),
         "Missing probe took {elapsed:?} — should skip the lock entirely"
     );
+}
+
+// ── S2a P0 regression: typed keystore accessors ───────────────────────────
+//
+// These guard the bug this change fixes: after migration to KeystoreData v2,
+// keys move into the nested `provider_keys` map, but the runtime used to read
+// `keys[secret_ref]` against the flat `serde_json::Value` → None. The typed
+// accessors (`get_key`/`set_key`/`delete_key`/`key_status`/
+// `list_provider_key_refs`) all go through `KeystoreData`, so they find the key
+// regardless of the on-disk shape and every write converges to v2.
+
+/// The headline P0 regression: seed a v1 keystore, migrate it to v2, then the
+/// typed `get_key` MUST return the original value (not None). The old raw-map
+/// lookup read `keys["openai"]` against the flat map and returned None once the
+/// key moved under `provider_keys`.
+#[test]
+fn p0_get_key_returns_value_after_v1_to_v2_migration() {
+    let dir = tempfile::tempdir().unwrap();
+    // Seed a v1 keystore (flat map, no version field).
+    store_with_identity(
+        dir.path(),
+        ID,
+        IdentitySource::MacosIoplatformuuid,
+        &json!({"openai": "sk-test"}),
+    )
+    .unwrap();
+
+    // Migrate to v2 (the migration coordinator's rewrite).
+    migrate_to_v2_with_identity(dir.path(), map_of("openai", "sk-test"), ID).unwrap();
+
+    // The typed accessor must find the key under provider_keys.
+    let ks = Keystore::new(dir.path().to_path_buf()).unwrap();
+    assert_eq!(
+        ks.get_key_with_identity("openai", ID).unwrap().as_deref(),
+        Some("sk-test"),
+        "get_key must read the v2 provider_keys map (the P0 bug returned None)"
+    );
+    // The translate-path presence check (key_status == get_key().is_some()) holds.
+    assert_eq!(ks.get_key_with_identity("nonexistent", ID).unwrap(), None);
+}
+
+/// Fresh install → set_key → the stored structure MUST be v2 (version +
+/// provider_keys), not a v1 flat map. This is the "new installation" guarantee.
+#[test]
+fn p0_fresh_install_set_key_stores_v2_structure() {
+    let dir = tempfile::tempdir().unwrap();
+    let ks = Keystore::new(dir.path().to_path_buf()).unwrap();
+
+    // No file yet → first key lands via the typed accessor.
+    ks.set_key_with_identity("openai", "sk-fresh", ID).unwrap();
+
+    // Inspect the on-disk payload: it must be a versioned v2 KeystoreData.
+    match ks.load_state_with_identity(ID) {
+        KeystoreLoadState::CurrentV2(d) => {
+            assert_eq!(d.version, KEYSTORE_DATA_VERSION);
+            assert_eq!(d.get_provider_key("openai"), Some("sk-fresh"));
+        }
+        other => panic!("fresh-install set_key must produce CurrentV2, got {other:?}"),
+    }
+}
+
+/// A v1 keystore (NOT yet migrated) must still be readable through the typed
+/// accessor — the runtime translate path can't require migration to have run.
+#[test]
+fn p0_get_key_reads_v1_flat_map_directly() {
+    let dir = tempfile::tempdir().unwrap();
+    store_with_identity(
+        dir.path(),
+        ID,
+        IdentitySource::MacosIoplatformuuid,
+        &json!({"openai": "sk-legacy", "anthropic": "sk-other"}),
+    )
+    .unwrap();
+
+    let ks = Keystore::new(dir.path().to_path_buf()).unwrap();
+    assert_eq!(
+        ks.get_key_with_identity("openai", ID).unwrap().as_deref(),
+        Some("sk-legacy"),
+        "get_key must read a v1 flat map without requiring migration"
+    );
+    assert_eq!(ks.get_key_with_identity("anthropic", ID).unwrap().as_deref(), Some("sk-other"));
+    assert_eq!(ks.get_key_with_identity("absent", ID).unwrap(), None);
+}
+
+/// set_key on an existing v2 payload must overwrite the value (not create a
+/// duplicate / mixed shape) and must preserve the other keys.
+#[test]
+fn p0_set_key_overwrites_and_preserves_v2() {
+    let dir = tempfile::tempdir().unwrap();
+    let ks = Keystore::new(dir.path().to_path_buf()).unwrap();
+    // Seed v2 directly.
+    let seed = KeystoreData::new_v2(map_of("openai", "sk-old"));
+    let seed_value = seed.to_value().unwrap();
+    store_with_identity(dir.path(), ID, IdentitySource::MacosIoplatformuuid, &seed_value).unwrap();
+
+    ks.set_key_with_identity("openai", "sk-new", ID).unwrap();
+    ks.set_key_with_identity("anthropic", "sk-add", ID).unwrap();
+
+    assert_eq!(ks.get_key_with_identity("openai", ID).unwrap().as_deref(), Some("sk-new"));
+    assert_eq!(ks.get_key_with_identity("anthropic", ID).unwrap().as_deref(), Some("sk-add"));
+    // Still a clean v2 structure after multiple writes.
+    assert!(matches!(ks.load_state_with_identity(ID), KeystoreLoadState::CurrentV2(_)));
+}
+
+/// set_key must UPGRADE a v1 flat map to v2 in place (a subsequent write should
+/// never produce a mixed v1/v2 structure). After the call the on-disk payload is
+/// v2 and the previously-flat key is found under provider_keys.
+#[test]
+fn p0_set_key_upgrades_v1_to_v2_in_place() {
+    let dir = tempfile::tempdir().unwrap();
+    store_with_identity(
+        dir.path(),
+        ID,
+        IdentitySource::MacosIoplatformuuid,
+        &json!({"openai": "sk-flat"}),
+    )
+    .unwrap();
+
+    let ks = Keystore::new(dir.path().to_path_buf()).unwrap();
+    ks.set_key_with_identity("anthropic", "sk-add", ID).unwrap();
+
+    // On-disk shape is now v2.
+    match ks.load_state_with_identity(ID) {
+        KeystoreLoadState::CurrentV2(d) => {
+            // Both the original flat key AND the new key survived under provider_keys.
+            assert_eq!(d.get_provider_key("openai"), Some("sk-flat"));
+            assert_eq!(d.get_provider_key("anthropic"), Some("sk-add"));
+        }
+        other => panic!("set_key must upgrade v1→v2, got {other:?}"),
+    }
+}
+
+/// delete_key is idempotent: removing an absent key succeeds and is a no-op on
+/// the stored payload. Removing a present key clears it and leaves v2 intact.
+#[test]
+fn p0_delete_key_idempotent_and_clears() {
+    let dir = tempfile::tempdir().unwrap();
+    let ks = Keystore::new(dir.path().to_path_buf()).unwrap();
+    ks.set_key_with_identity("openai", "sk-x", ID).unwrap();
+    ks.set_key_with_identity("anthropic", "sk-y", ID).unwrap();
+
+    // Delete a missing key first — must not error and must not disturb the rest.
+    ks.delete_key_with_identity("nope", ID).unwrap();
+    assert_eq!(ks.get_key_with_identity("openai", ID).unwrap().as_deref(), Some("sk-x"));
+    assert_eq!(ks.get_key_with_identity("anthropic", ID).unwrap().as_deref(), Some("sk-y"));
+
+    // Delete a real key.
+    ks.delete_key_with_identity("openai", ID).unwrap();
+    assert_eq!(ks.get_key_with_identity("openai", ID).unwrap(), None);
+    assert_eq!(ks.get_key_with_identity("anthropic", ID).unwrap().as_deref(), Some("sk-y"));
+    // Still v2.
+    assert!(matches!(ks.load_state_with_identity(ID), KeystoreLoadState::CurrentV2(_)));
+}
+
+/// list_provider_key_refs must enumerate the secret_refs from provider_keys (not
+/// the raw flat-map top level). This backs the frontend's key_status probe.
+#[test]
+fn p0_list_provider_key_refs_reads_v2() {
+    let dir = tempfile::tempdir().unwrap();
+    let ks = Keystore::new(dir.path().to_path_buf()).unwrap();
+    ks.set_key_with_identity("openai", "sk-a", ID).unwrap();
+    ks.set_key_with_identity("anthropic", "sk-b", ID).unwrap();
+
+    let mut refs = ks.list_provider_key_refs_with_identity(ID).unwrap();
+    refs.sort();
+    assert_eq!(refs, vec!["anthropic".to_string(), "openai".to_string()]);
+
+    // Empty keystore → empty list (not an error).
+    let dir2 = tempfile::tempdir().unwrap();
+    let ks2 = Keystore::new(dir2.path().to_path_buf()).unwrap();
+    assert!(ks2.list_provider_key_refs_with_identity(ID).unwrap().is_empty());
+}
+
+/// key_status (via get_key) reflects presence/absence across both shapes and
+/// after migration. Cheap belt-and-suspenders for the translate-path guard.
+#[test]
+fn p0_key_status_after_migration() {
+    let dir = tempfile::tempdir().unwrap();
+    store_with_identity(
+        dir.path(),
+        ID,
+        IdentitySource::MacosIoplatformuuid,
+        &json!({"openai": "sk-test"}),
+    )
+    .unwrap();
+    migrate_to_v2_with_identity(dir.path(), map_of("openai", "sk-test"), ID).unwrap();
+
+    let ks = Keystore::new(dir.path().to_path_buf()).unwrap();
+    assert!(ks.get_key_with_identity("openai", ID).unwrap().is_some());
+    assert!(ks.get_key_with_identity("missing", ID).unwrap().is_none());
 }

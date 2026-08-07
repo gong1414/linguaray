@@ -263,6 +263,54 @@ fn classify_payload(payload: &serde_json::Value) -> Result<KeystoreLoadState, Ke
     }
 }
 
+/// Normalize a decrypted keystore payload into a v2 [`KeystoreData`], no matter
+/// which on-disk shape it currently has (spec §A, S2a P0).
+///
+/// The runtime translate path and every typed accessor (`Keystore::get_key`,
+/// `set_key`, ...) go through here so they all agree on where a provider key
+/// lives — a single fixpoint instead of N reinvented v1-vs-v2 lookups.
+///
+/// Shapes handled:
+/// - **v2** (`{"version":2,"provider_keys":{...}}`): deserialized directly. A
+///   structurally wrong versioned object (e.g. `provider_keys` not an object)
+///   falls back to an empty v2 payload — this is a best-effort runtime
+///   normalization, not a fail-closed gate; the dedicated `load_state` path
+///   still reports `Corrupt` so the recovery banner can surface it.
+/// - **v1 flat map** (`{"openai":"sk-..."}` with no `version`): upgraded to a v2
+///   payload carrying the same keys. `secret_ref == legacy key name`.
+/// - **Missing / empty / non-object** (fresh install, or a corrupt `{}`): a fresh
+///   empty v2 payload, so the first `set_key` on a brand-new install lands as v2.
+///
+/// `history_key` / `external_api_token` are preserved when reading a v2 payload
+/// and left `None` when upgrading from v1 (those opt-in fields didn't exist in v1).
+fn payload_to_v2(v: &serde_json::Value) -> KeystoreData {
+    if has_version_field(v) {
+        // Already-versioned object: deserialize as KeystoreData. A structurally
+        // wrong v2 payload (e.g. provider_keys not an object) is a real bug, but
+        // the typed accessors are read paths that must not panic — fall back to a
+        // fresh empty v2 so a corrupt file degrades to "no keys" rather than a
+        // crash. (The dedicated load_state path still reports Corrupt for the
+        // recovery banner; this is the best-effort runtime normalization.)
+        match KeystoreData::from_value(v) {
+            Ok(data) => data,
+            Err(_) => KeystoreData::new_v2(HashMap::new()),
+        }
+    } else if v.is_object() {
+        // Legacy v1 flat map. A non-string value here is ignored (filtered out
+        // by serde's HashMap<String,String> deserialization); a fully unparseable
+        // object falls back to empty v2.
+        match serde_json::from_value::<HashMap<String, String>>(v.clone()) {
+            Ok(map) => KeystoreData::new_v2(map),
+            Err(_) => KeystoreData::new_v2(HashMap::new()),
+        }
+    } else {
+        // Missing / null / non-object (fresh install decrypts to `{}`; a totally
+        // empty file decrypts to `null`). Fresh empty v2 so the first write lands
+        // in the versioned shape.
+        KeystoreData::new_v2(HashMap::new())
+    }
+}
+
 /// Encrypt a keys map into an envelope (fresh salt + nonce each call).
 pub fn encrypt(identity: &str, identity_source: IdentitySource, keys: &serde_json::Value) -> Result<Envelope, KeystoreError> {
     let mut salt = [0u8; SALT_LEN];
@@ -610,6 +658,138 @@ impl Keystore {
         F: FnOnce(&mut serde_json::Value),
     {
         self.update_keys_core(mutator, Identity::Injected(identity))
+    }
+
+    // ── Typed KeystoreData accessors (spec §A, S2a P0) ──────────────────────
+    //
+    // The legacy `update_keys`/`load` surface hands callers a raw
+    // `serde_json::Value`, so each call site reinvented the v1-vs-v2 lookup
+    // (and the runtime translate path read `keys[preset.id]` against the flat
+    // map, returning None after v2 migration). These typed accessors are the
+    // single source of truth: every read goes through `KeystoreData` and every
+    // write converges the on-disk payload to v2, so callers can't accidentally
+    // create a mixed v1/v2 structure.
+    //
+    // Every mutating accessor runs through the SAME locked RMW core as
+    // `update_keys` (in-process Mutex + fs2 flock), so atomicity is preserved.
+    // The shared `update_data_core` normalizes the loaded value to v2 BEFORE
+    // handing a typed `&mut KeystoreData` to the mutator and stores the v2
+    // value back — a fresh install (load returns `{}`) therefore lands as a
+    // proper v2 payload, not a v1 flat map.
+
+    /// Read a provider key by `secret_ref`. Returns `Ok(None)` when the key is
+    /// absent (including a fresh-install keystore with no keys yet). Handles
+    /// both on-disk shapes (v1 flat map and v2 nested `provider_keys`), so the
+    /// runtime translate path works whether or not migration has run.
+    pub fn get_key(&self, secret_ref: &str) -> Result<Option<String>, KeystoreError> {
+        self.get_key_with(secret_ref, Identity::Machine)
+    }
+
+    /// Set a provider key by `secret_ref`, atomically. The payload is normalized
+    /// to v2 first (a v1 flat map is upgraded in place), so every write lands as
+    /// the versioned shape — including the very first key on a fresh install.
+    pub fn set_key(&self, secret_ref: &str, key: &str) -> Result<(), KeystoreError> {
+        self.set_key_with(secret_ref, key, Identity::Machine)
+    }
+
+    /// Remove a provider key by `secret_ref`, atomically. Idempotent: removing
+    /// an absent key is a successful no-op. The payload is normalized to v2.
+    pub fn delete_key(&self, secret_ref: &str) -> Result<(), KeystoreError> {
+        self.delete_key_with(secret_ref, Identity::Machine)
+    }
+
+    /// Does a key for `secret_ref` exist? `Ok(false)` for a fresh-install or an
+    /// unset provider. Handles both v1 and v2 on-disk shapes.
+    pub fn key_status(&self, secret_ref: &str) -> Result<bool, KeystoreError> {
+        Ok(self.get_key(secret_ref)?.is_some())
+    }
+
+    /// Enumerate every `secret_ref` currently stored. Used by the frontend's
+    /// "which providers have a key set?" probe (`key_status` Tauri command),
+    /// which previously iterated the raw flat map. Reads the typed payload so a
+    /// v2 keystore reports `provider_keys` (and a v1 keystore still reports its
+    /// flat keys). The order is unspecified (HashMap iteration order).
+    pub fn list_provider_key_refs(&self) -> Result<Vec<String>, KeystoreError> {
+        self.list_provider_key_refs_with(Identity::Machine)
+    }
+
+    /// Test-only: same as [`get_key`](Self::get_key) but decrypts with an
+    /// injected identity. Delegates to the SAME locked-read core as the
+    /// production path.
+    #[doc(hidden)]
+    pub fn get_key_with_identity(&self, secret_ref: &str, identity: &str) -> Result<Option<String>, KeystoreError> {
+        self.get_key_with(secret_ref, Identity::Injected(identity))
+    }
+
+    /// Test-only: same as [`set_key`](Self::set_key) but the RMW uses an
+    /// injected identity. Delegates to the SAME typed-RMW core as the
+    /// production path.
+    #[doc(hidden)]
+    pub fn set_key_with_identity(&self, secret_ref: &str, key: &str, identity: &str) -> Result<(), KeystoreError> {
+        self.set_key_with(secret_ref, key, Identity::Injected(identity))
+    }
+
+    /// Test-only: same as [`delete_key`](Self::delete_key) but the RMW uses an
+    /// injected identity.
+    #[doc(hidden)]
+    pub fn delete_key_with_identity(&self, secret_ref: &str, identity: &str) -> Result<(), KeystoreError> {
+        self.delete_key_with(secret_ref, Identity::Injected(identity))
+    }
+
+    /// Test-only: same as [`list_provider_key_refs`](Self::list_provider_key_refs)
+    /// but decrypts with an injected identity.
+    #[doc(hidden)]
+    pub fn list_provider_key_refs_with_identity(&self, identity: &str) -> Result<Vec<String>, KeystoreError> {
+        self.list_provider_key_refs_with(Identity::Injected(identity))
+    }
+
+    /// Shared read core for [`get_key`](Self::get_key): load + decrypt under
+    /// BOTH locks, normalize to `KeystoreData`, then return the named key.
+    fn get_key_with(&self, secret_ref: &str, id: Identity<'_>) -> Result<Option<String>, KeystoreError> {
+        self.with_locks(|ks| {
+            let v = ks.load_locked_core(id)?;
+            Ok(payload_to_v2(&v).get_provider_key(secret_ref).map(|s| s.to_string()))
+        })
+    }
+
+    /// Shared typed-RMW core for [`set_key`](Self::set_key): load + decrypt under
+    /// BOTH locks, normalize to v2, hand a typed mutator the data, then store the
+    /// v2 value. One core for every mutating typed accessor (set/delete) so the
+    /// v2-convergence guarantee lives in exactly one place.
+    fn update_data_core<F>(&self, mutator: F, id: Identity<'_>) -> Result<(), KeystoreError>
+    where
+        F: FnOnce(&mut KeystoreData),
+    {
+        self.with_locks(|ks| {
+            let raw = ks.load_locked_core(id)?;
+            // Always normalize to v2 BEFORE the mutator: a fresh-install `{}`,
+            // a v1 flat map, and an existing v2 payload all converge here, so a
+            // write can never produce a mixed v1/v2 shape.
+            let mut data = payload_to_v2(&raw);
+            mutator(&mut data);
+            let value = data.to_value()?;
+            ks.store_locked_core(&value, id)
+        })
+    }
+
+    /// Shared set core: typed-RMW with `set_provider_key`.
+    fn set_key_with(&self, secret_ref: &str, key: &str, id: Identity<'_>) -> Result<(), KeystoreError> {
+        self.update_data_core(|data| data.set_provider_key(secret_ref, key), id)
+    }
+
+    /// Shared delete core: typed-RMW with `remove_provider_key` (idempotent).
+    fn delete_key_with(&self, secret_ref: &str, id: Identity<'_>) -> Result<(), KeystoreError> {
+        self.update_data_core(|data| {
+            data.remove_provider_key(secret_ref);
+        }, id)
+    }
+
+    /// Shared list core: load + normalize to v2, return the `secret_ref`s.
+    fn list_provider_key_refs_with(&self, id: Identity<'_>) -> Result<Vec<String>, KeystoreError> {
+        self.with_locks(|ks| {
+            let v = ks.load_locked_core(id)?;
+            Ok(payload_to_v2(&v).provider_keys.into_keys().collect())
+        })
     }
 
     /// Move keystore.json → keystore.json.broken-<ts> (user-initiated recovery).
