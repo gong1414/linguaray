@@ -271,17 +271,62 @@ fn delete_key(
 
 /// User-initiated keystore recovery (§A fail-closed): archive the unreadable file
 /// to keystore.json.broken-<ts> so the user can re-enter keys.
+///
+/// Review P1 #2: recovery MUST coordinate with `AppState`, not just `Session.keystore`.
+/// The command acquires the `data_gate` write lock (blocking all provider commands),
+/// runs the keystore archive, then performs the DB cleanup transaction
+/// (disable needs-key providers, clear active selection + consent, mark
+/// migration complete) and updates `DataReadiness` based on the old state +
+/// whether the DB is still usable.
 #[tauri::command]
-fn archive_keystore(state: tauri::State<'_, Arc<Session>>) -> Result<String, String> {
-    let dst = state.keystore.archive().map_err(|e| e.to_string())?;
-    Ok(dst.to_string_lossy().into_owned())
+async fn archive_keystore(
+    state: tauri::State<'_, Arc<AppState>>,
+) -> Result<String, String> {
+    let app = state.inner().clone();
+    let ks_dir = app.keystore_dir.clone();
+    tauri::async_runtime::spawn_blocking(move || -> Result<String, String> {
+        // 1. data_gate write guard: blocks all provider reads/writes for the
+        //    duration of the recovery so no command observes a half-archived
+        //    keystore + un-updated DB.
+        let _gate = app.data_gate.write();
+        // 2. Keystore archive (existing logic, now under the gate). Construct a
+        //    fresh Keystore for the canonical dir rather than reusing the
+        //    Session's (which may be pointing at a fallback dir after a startup
+        //    init failure).
+        let ks = keystore::Keystore::new(ks_dir.clone()).map_err(|e| e.to_string())?;
+        let dst = ks.archive().map_err(|e| e.to_string())?;
+        let dst_str = dst.to_string_lossy().into_owned();
+        // 3. DB cleanup transaction + 4. readiness update.
+        apply_keystore_recovery_db_cleanup(&app);
+        Ok(dst_str)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
-/// User-initiated: delete the keystore entirely (fresh start).
+/// User-initiated: reset the keystore to a fresh state (archive then clear tmp).
+///
+/// Review P1 #2: like `archive_keystore`, this now coordinates with `AppState`
+/// via the `data_gate` write lock, runs the DB cleanup transaction, and updates
+/// `DataReadiness` based on the old state + DB availability.
 #[tauri::command]
-fn reset_keystore(state: tauri::State<'_, Arc<Session>>) -> Result<Option<String>, String> {
-    // §A: reset ARCHIVES the canonical file (recoverable), it does not delete it.
-    state.keystore.reset().map(|opt| opt.map(|p| p.to_string_lossy().into_owned())).map_err(|e| e.to_string())
+async fn reset_keystore(
+    state: tauri::State<'_, Arc<AppState>>,
+) -> Result<Option<String>, String> {
+    let app = state.inner().clone();
+    let ks_dir = app.keystore_dir.clone();
+    tauri::async_runtime::spawn_blocking(move || -> Result<Option<String>, String> {
+        let _gate = app.data_gate.write();
+        let ks = keystore::Keystore::new(ks_dir.clone()).map_err(|e| e.to_string())?;
+        let archived = ks
+            .reset()
+            .map_err(|e| e.to_string())?
+            .map(|p| p.to_string_lossy().into_owned());
+        apply_keystore_recovery_db_cleanup(&app);
+        Ok(archived)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -581,6 +626,15 @@ async fn provider_set_key(
 /// Set the active selection (primary, parallel, fallback). Empty primary and
 /// empty parallel list mean "no selection". Validates the selection against the
 /// active provider set before writing.
+///
+/// Review P1 #3 (multi-engine consent): when `parallel` is non-empty, the
+/// backend recomputes the canonical consent scope and compares it against the
+/// stored scope. A mismatch (no prior consent, or a different parallel set)
+/// returns [`db_providers::ConsentError::ConsentRequired`] carrying the
+/// `actual_scope`. The frontend shows the consent dialog, then calls
+/// [`provider_confirm_and_set_active`] with `expected_scope = actual_scope` to
+/// record the approval. A matching scope (re-affirming the same selection) is
+/// written immediately.
 #[tauri::command]
 async fn provider_set_active(
     state: tauri::State<'_, Arc<AppState>>,
@@ -590,22 +644,330 @@ async fn provider_set_active(
 ) -> Result<(), String> {
     let app = state.inner().clone();
     let db = require_ready(&app)?;
-    tauri::async_runtime::spawn_blocking(move || {
+    tauri::async_runtime::spawn_blocking(move || -> Result<(), String> {
         let _gate = app.data_gate.write();
-        db.with_conn(|conn| -> Result<(), DbErr> {
-            // Validate against the active set BEFORE writing.
+        // The `with_conn` closure must return Result<_, DbError> (Database's
+        // contract). We carry the consent-required signal out via a SetActiveOutcome
+        // so the outer closure can map it to the frontend-facing string without
+        // smuggling a ConsentError through the DbError boundary.
+        let outcome = db
+            .with_conn(|conn| -> Result<SetActiveOutcome, DbErr> {
+                // Validate against the active set BEFORE writing.
+                let active = db_providers::list(conn)?;
+                db_providers::validate_active_selection(
+                    &primary,
+                    &parallel,
+                    fallback.as_deref(),
+                    &active,
+                )?;
+                // P1 #3: parallel consent gate. A non-empty parallel selection
+                // requires explicit user consent; if the stored scope doesn't
+                // match the recomputed scope, return ConsentRequired so the
+                // frontend can prompt. A matching scope (re-affirming the same
+                // set) is allowed through without re-prompting.
+                if !parallel.is_empty() {
+                    let actual = db_providers::compute_scope(&primary, &parallel, &active)
+                        .map_err(consent_to_db)?;
+                    let stored = db_providers::read_consent_scope(conn)?;
+                    if stored.as_deref() != Some(actual.as_str()) {
+                        return Ok(SetActiveOutcome::NeedsConsent { actual_scope: actual });
+                    }
+                }
+                // Scope matches (or parallel is empty → no consent needed):
+                // write the three slots. Clear prior consent only when there's
+                // no parallel set (membership went to a non-consented shape); a
+                // matching-scope write keeps the consent as-is.
+                if parallel.is_empty() {
+                    set_active_slots(conn, &primary, &parallel, fallback.as_deref())?;
+                } else {
+                    set_active_slots_keep_consent(
+                        conn,
+                        &primary,
+                        &parallel,
+                        fallback.as_deref(),
+                    )?;
+                }
+                Ok(SetActiveOutcome::Written)
+            })
+            .map_err(|e| e.to_string())?;
+        match outcome {
+            SetActiveOutcome::Written => Ok(()),
+            SetActiveOutcome::NeedsConsent { actual_scope } => Err(format!(
+                "consent_required:{actual_scope}"
+            )),
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Confirm the user's explicit consent for a parallel selection and write it
+/// atomically (P1 #3).
+///
+/// Single DB transaction that:
+/// 1. Re-reads ALL active providers (inside the tx — no TOCTOU between the
+///    `provider_set_active` probe and this confirm).
+/// 2. Validates the candidate selection (`validate_active_selection`).
+/// 3. Backend recomputes canonical scope via `compute_scope`.
+/// 4. Asserts the frontend's `expected_scope` matches the backend's
+///    `actual_scope` (rejects a stale frontend that raced a provider change).
+/// 5. Writes the selection + consent scope + bumped version in the SAME tx.
+#[tauri::command]
+async fn provider_confirm_and_set_active(
+    state: tauri::State<'_, Arc<AppState>>,
+    primary: String,
+    parallel: Vec<String>,
+    fallback: Option<String>,
+    expected_scope: String,
+) -> Result<i64, String> {
+    let app = state.inner().clone();
+    let db = require_ready(&app)?;
+    tauri::async_runtime::spawn_blocking(move || -> Result<i64, String> {
+        let _gate = app.data_gate.write();
+        db.with_conn(|conn| -> Result<i64, DbErr> {
+            // 1. Re-read inside the tx (no TOCTOU).
             let active = db_providers::list(conn)?;
+            // 2. Validate.
             db_providers::validate_active_selection(
                 &primary,
                 &parallel,
                 fallback.as_deref(),
                 &active,
             )?;
-            // Write the three slots + clear prior consent (membership changed).
-            set_active_slots(conn, &primary, &parallel, fallback.as_deref())?;
-            Ok(())
+            // 3. Recompute scope.
+            let actual_scope = db_providers::compute_scope(&primary, &parallel, &active)
+                .map_err(consent_to_db)?;
+            // 4. Assert frontend's expectation matches backend reality. A
+            //    mismatch is a stale-frontend guard; surface as Integrity so it
+            //    propagates as a string error (the frontend re-prompts).
+            if expected_scope != actual_scope {
+                return Err(DbErr::Integrity(format!(
+                    "consent_required:{actual_scope}"
+                )));
+            }
+            // 5. Bump version + write selection + record scope atomically.
+            let new_version = write_consented_selection(
+                conn,
+                &primary,
+                &parallel,
+                fallback.as_deref(),
+                &actual_scope,
+            )?;
+            Ok(new_version)
         })
         .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+// ─── P1 #8: missing commands (provider diagnostics + DB recovery) ─────────
+
+/// One selectable model for a provider. The full HTTP model-list fetch is S3
+/// scope; for now [`provider_get_models`] returns a preset-derived list so the
+/// UI has something to render.
+#[derive(Debug, Clone, Serialize)]
+pub struct ModelInfo {
+    pub id: String,
+    pub label: String,
+}
+
+/// Result of a connection probe (P1 #8). `ok` + a human-readable message; the
+/// full connection-test HTTP flow is S3 scope, so the current implementation is
+/// a best-effort "reachable" check.
+#[derive(Debug, Clone, Serialize)]
+pub struct ConnectionResult {
+    pub ok: bool,
+    pub message: String,
+}
+
+/// List the models a provider can use (P1 #8).
+///
+/// Reads the provider profile snapshot in `spawn_blocking` (so the async
+/// runtime isn't held by rusqlite), then returns a preset-derived model list.
+/// The preset catalog is the source of the default model; the profile's own
+/// `model` (if set) is surfaced first as the "current" choice. The full HTTP
+/// `/models` fetch is S3 scope.
+#[tauri::command]
+async fn provider_get_models(
+    state: tauri::State<'_, Arc<AppState>>,
+    uuid: String,
+) -> Result<Vec<ModelInfo>, String> {
+    let app = state.inner().clone();
+    let db = require_ready(&app)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let _gate = app.data_gate.read();
+        let profile = db
+            .with_conn(|conn| db_providers::get(conn, &uuid))
+            .map_err(|e| e.to_string())?;
+        let mut out: Vec<ModelInfo> = Vec::new();
+        // The profile's configured model is the "current" entry, surfaced first.
+        if let Some(m) = &profile.model {
+            if !m.is_empty() {
+                out.push(ModelInfo {
+                    id: m.clone(),
+                    label: m.clone(),
+                });
+            }
+        }
+        // Append the preset default model as a secondary option when it differs
+        // from the configured one (so the UI can offer "reset to default").
+        if let Some(p) = providers::presets().into_iter().find(|p| p.id == profile.template_id) {
+            if profile.model.as_deref() != Some(p.default_model.as_str()) {
+                out.push(ModelInfo {
+                    id: p.default_model.clone(),
+                    label: format!("{} (default)", p.default_model),
+                });
+            }
+        }
+        Ok(out)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Probe whether a provider is reachable (P1 #8).
+///
+/// Reads the profile snapshot in `spawn_blocking`, then runs an async HEAD-ish
+/// request against the endpoint. Full connection testing (auth-balanced probe,
+/// latency buckets, quota introspection) is S3 scope; for now this is a simple
+/// "could we establish a TCP/TLS connection" check that classifies the outcome.
+#[tauri::command]
+async fn provider_test_connection(
+    state: tauri::State<'_, Arc<AppState>>,
+    session: tauri::State<'_, Arc<Session>>,
+    uuid: String,
+) -> Result<ConnectionResult, String> {
+    let app = state.inner().clone();
+    let db = require_ready(&app)?;
+    // Read the profile on a blocking thread, then hand the endpoint back to the
+    // async caller for the HTTP probe.
+    let profile = tauri::async_runtime::spawn_blocking(move || -> Result<db_providers::ProviderProfile, String> {
+        let _gate = app.data_gate.read();
+        db.with_conn(|conn| db_providers::get(conn, &uuid))
+            .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+
+    if profile.endpoint.is_empty() {
+        return Ok(ConnectionResult {
+            ok: false,
+            message: "endpoint not configured".into(),
+        });
+    }
+    // Validate the endpoint shape before sending any bytes.
+    if let Err(e) = providers::validate_endpoint(&profile.endpoint) {
+        return Ok(ConnectionResult {
+            ok: false,
+            message: format!("invalid endpoint: {e}"),
+        });
+    }
+    // Best-effort reachability probe. We don't care about the response body —
+    // any HTTP response (even a 401/404) means the endpoint is reachable; only
+    // a transport-level failure (connect/timeout/TLS) counts as "not ok".
+    let req = session.client.get(&profile.endpoint).send().await;
+    match req {
+        Ok(resp) => Ok(ConnectionResult {
+            ok: true,
+            message: format!("reachable (HTTP {})", resp.status().as_u16()),
+        }),
+        Err(e) => Ok(ConnectionResult {
+            ok: false,
+            message: format!("connection failed: {e}"),
+        }),
+    }
+}
+
+/// User-initiated database recovery (P1 #8).
+///
+/// Simplified version of the full archive_database flow (Arc::try_unwrap +
+/// close + rename + reopen is deferred). This implementation:
+/// 1. Acquires `data_gate.write()` (blocks all provider commands).
+/// 2. Drops the DB handle (sets the slot to `None`) so no query can run
+///    against the file we're about to move.
+/// 3. Renames `linguaray.db` → `linguaray.db.broken-<ts>` (recoverable, like
+///    keystore archive).
+/// 4. Opens a fresh DB + runs migration against the new file.
+/// 5. Updates `DataReadiness` (Ready on success; NeedsDatabaseRecovery if the
+///    reopen/migration fails).
+///
+/// Does NOT yet implement the ArchiveFailpoint / Arc::try_unwrap close path —
+/// that's S3 scope. The basic recovery path is enough for the user to recover
+/// from a corrupt DB file.
+#[tauri::command]
+async fn archive_database(
+    state: tauri::State<'_, Arc<AppState>>,
+) -> Result<String, String> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || -> Result<String, String> {
+        // 1. data_gate write guard for the whole operation.
+        let _gate = app.data_gate.write();
+        // 2. Drop the DB handle. We can only swap to None; the underlying Arc
+        //    may still be held by an in-flight command on another thread, but
+        //    the data_gate write guard guarantees no new with_conn calls start,
+        //    and rusqlite tolerates concurrent access on the same Connection.
+        *app.db.write() = None;
+        // 3. Rename the DB file aside (recoverable). If the file doesn't exist,
+        //    there's nothing to archive — proceed to open a fresh one.
+        let db_path = app.db_path.clone();
+        let archived_path = if db_path.exists() {
+            let ts = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+            let dst = db_path.with_extension(format!("db.broken-{ts}"));
+            std::fs::rename(&db_path, &dst).map_err(|e| e.to_string())?;
+            dst.to_string_lossy().into_owned()
+        } else {
+            String::new()
+        };
+        // 4. Open a fresh DB + run migration. On success, install the handle.
+        //    On failure, leave the slot None and set NeedsDatabaseRecovery.
+        match Database::open(&db_path) {
+            Ok(db) => {
+                let db = Arc::new(db);
+                let fp = FailpointCell::none();
+                let migrate_result = run_migration(
+                    &db,
+                    &app.keystore_dir,
+                    &app.settings_path,
+                    &fp,
+                );
+                match migrate_result {
+                    Ok(()) => {
+                        // Resume in-flight deletes against the fresh DB.
+                        if let Err(e) =
+                            crate::db::delete::provider_resume_deletions(&db, &app.keystore_dir)
+                        {
+                            log::error!("resume_deletions after archive_database: {e}");
+                        }
+                        *app.db.write() = Some(db);
+                        *app.readiness.write() = DataReadiness::Ready;
+                        Ok(archived_path)
+                    }
+                    Err(e) => {
+                        let reason = format!("migration after archive: {e}");
+                        *app.readiness.write() = DataReadiness::migration_incomplete(
+                            "archive_database",
+                            reason.clone(),
+                        );
+                        // Still install the handle so a later recovery/migration
+                        // retry can proceed (NeedsDatabaseRecovery would hide the
+                        // partially-migrated DB).
+                        *app.db.write() = Some(db);
+                        Err(reason)
+                    }
+                }
+            }
+            Err(e) => {
+                let reason = format!("reopen linguaray.db: {e}");
+                *app.readiness.write() = DataReadiness::NeedsDatabaseRecovery {
+                    reason: reason.clone(),
+                };
+                Err(reason)
+            }
+        }
     })
     .await
     .map_err(|e| e.to_string())?
@@ -616,6 +978,33 @@ async fn provider_set_active(
 /// Type alias so the closures above can name the error without importing the
 /// full path each time.
 type DbErr = crate::db::DbError;
+
+/// Type alias for the consent-computation error (P1 #3).
+type ConsentErr = db_providers::ConsentError;
+
+/// Outcome of a `provider_set_active` DB transaction (P1 #3). Carries the
+/// consent-required signal out of the `with_conn` closure (whose error type is
+/// fixed to `DbError`) so the command can surface it to the frontend.
+enum SetActiveOutcome {
+    /// Selection written (no consent needed, or scope already matched).
+    Written,
+    /// A non-empty parallel selection needs explicit consent; carries the
+    /// canonical scope the frontend must echo back via
+    /// `provider_confirm_and_set_active`.
+    NeedsConsent { actual_scope: String },
+}
+
+/// Map a [`ConsentError`] (other than `ConsentRequired`, which is handled by
+/// the caller via `SetActiveOutcome`) into a [`DbError`] so it can cross the
+/// `with_conn` boundary. The consent-required arm is mapped to an Integrity
+/// error carrying the scope (the only place this fires is the
+/// `provider_confirm_and_set_active` stale-scope guard).
+fn consent_to_db(e: ConsentErr) -> DbErr {
+    match e {
+        ConsentErr::Db(d) => d,
+        other => DbErr::Integrity(other.to_string()),
+    }
+}
 
 /// Write the primary/parallel/fallback slots in `preferences` + null consent.
 /// Caller drives the transaction.
@@ -644,6 +1033,158 @@ fn set_active_slots(
     )?;
     tx.commit()?;
     Ok(())
+}
+
+/// Shared DB cleanup + readiness update for keystore recovery
+/// (`archive_keystore` / `reset_keystore`). Review P1 #2.
+///
+/// Must be called while the caller holds the `data_gate` write guard so no
+/// provider command races the cleanup. Performs (inside one DB transaction):
+/// 1. `UPDATE providers SET enabled=0 WHERE needs_key=1` — a provider that needs
+///    a key can't be used until the user re-enters one (the archived keystore
+///    just lost them all). Keyless providers (Ollama, traditional engines) keep
+///    their enabled state.
+/// 2. Clear `primary_uuid`, `parallel_uuids`, `fallback_uuid` — the prior
+///    selection referenced providers whose keys may be gone, so a stale
+///    selection can't drive a translate.
+/// 3. Clear `parallel_consent_version` / `parallel_consent_scope` — consent was
+///    given for the now-archived key set.
+/// 4. `UPDATE _schema_migrations SET migration_complete=1` — a recovery completes
+///    migration (the DB is now in a known-good state, just without keys).
+///
+/// Then updates `DataReadiness` from the OLD state + whether the DB is still
+/// usable:
+/// - `Ready` or `NeedsKeystoreRecovery` + DB still open → `Ready` (keystore
+///   problem fixed).
+/// - `NeedsDatabaseRecovery` → keep (keystore archive doesn't fix a corrupt DB).
+/// - DB handle is `None` → keep `NeedsDatabaseRecovery`.
+///
+/// Errors are logged but NOT propagated: recovery is user-initiated and should
+/// always succeed from the user's perspective even if the DB cleanup hits a
+/// transient error (the keystore archive already happened; the DB will be
+/// cleaned up on the next recovery attempt or next startup).
+fn apply_keystore_recovery_db_cleanup(app: &Arc<AppState>) {
+    // Capture the OLD readiness BEFORE any mutation so the post-state logic can
+    // branch on it.
+    let old_readiness = app.readiness.read().clone();
+
+    // Try the DB cleanup only when a DB handle exists.
+    let db_usable = if let Some(db) = app.db.read().clone() {
+        match db.with_conn(|conn| {
+            let tx = conn.transaction()?;
+            // 1. Disable needs-key providers (their keys are gone after archive).
+            tx.execute(
+                "UPDATE providers SET enabled=0 WHERE needs_key=1",
+                [],
+            )?;
+            // 2-3. Clear active selection + consent.
+            tx.execute(
+                "UPDATE preferences SET primary_uuid=NULL, parallel_uuids='[]', \
+                 fallback_uuid=NULL, parallel_consent_version=NULL, \
+                 parallel_consent_scope=NULL WHERE id=1",
+                [],
+            )?;
+            // 4. Mark migration complete.
+            tx.execute(
+                "UPDATE _schema_migrations SET migration_complete=1 WHERE id=1",
+                [],
+            )?;
+            tx.commit()?;
+            Ok(())
+        }) {
+            Ok(()) => true,
+            Err(e) => {
+                log::error!("keystore recovery DB cleanup failed: {e}");
+                false
+            }
+        }
+    } else {
+        false
+    };
+
+    // Compute the new readiness. Do NOT unconditionally set Ready — a DB problem
+    // is not fixed by a keystore archive.
+    let new_readiness = match (&old_readiness, db_usable) {
+        // Keystore problem fixed and DB is usable → Ready.
+        (DataReadiness::Ready, true) | (DataReadiness::NeedsKeystoreRecovery { .. }, true) => {
+            DataReadiness::Ready
+        }
+        // DB was broken and still is → keep the DB-recovery state.
+        (DataReadiness::NeedsDatabaseRecovery { reason }, _) => {
+            DataReadiness::NeedsDatabaseRecovery {
+                reason: reason.clone(),
+            }
+        }
+        // Migration was incomplete; if the cleanup tx succeeded we can promote
+        // to Ready, otherwise keep the incomplete state.
+        (DataReadiness::MigrationIncomplete { .. }, true) => DataReadiness::Ready,
+        (DataReadiness::MigrationIncomplete { checkpoint, reason }, false) => {
+            DataReadiness::MigrationIncomplete {
+                checkpoint: checkpoint.clone(),
+                reason: reason.clone(),
+            }
+        }
+        // Ready readiness but no usable DB (db_usable false) → shouldn't happen
+        // normally (Ready implies an open DB), keep as-is defensively.
+        (_, false) => old_readiness,
+    };
+    *app.readiness.write() = new_readiness;
+}
+
+/// Like [`set_active_slots`] but PRESERVES the prior parallel consent
+/// (version + scope). Used by `provider_set_active` when the recomputed scope
+/// matches the stored scope (re-affirming the same selection): we update the
+/// slot pointers without invalidating consent. Caller drives the transaction.
+fn set_active_slots_keep_consent(
+    conn: &mut rusqlite::Connection,
+    primary: &str,
+    parallel: &[String],
+    fallback: Option<&str>,
+) -> Result<(), DbErr> {
+    let tx = conn.transaction()?;
+    let primary_val = if primary.is_empty() {
+        None
+    } else {
+        Some(primary)
+    };
+    let parallel_json = serde_json::to_string(parallel).unwrap_or_else(|_| "[]".into());
+    let fallback_val = fallback.filter(|s| !s.is_empty());
+    tx.execute(
+        "UPDATE preferences SET primary_uuid=?1, parallel_uuids=?2, fallback_uuid=?3 WHERE id=1",
+        rusqlite::params![primary_val, parallel_json, fallback_val],
+    )?;
+    tx.commit()?;
+    Ok(())
+}
+
+/// Write the active selection AND record the consent (scope + bumped version)
+/// in one transaction (P1 #3). Returns the new consent version. Caller drives
+/// the outer `data_gate` write guard; this function owns the DB transaction.
+fn write_consented_selection(
+    conn: &mut rusqlite::Connection,
+    primary: &str,
+    parallel: &[String],
+    fallback: Option<&str>,
+    scope: &str,
+) -> Result<i64, DbErr> {
+    let tx = conn.transaction()?;
+    let primary_val = if primary.is_empty() { None } else { Some(primary) };
+    let parallel_json = serde_json::to_string(parallel).unwrap_or_else(|_| "[]".into());
+    let fallback_val = fallback.filter(|s| !s.is_empty());
+    // Bump the version: COALESCE(NULL, 0) + 1 so the first consent is version 1.
+    tx.execute(
+        "UPDATE preferences SET primary_uuid=?1, parallel_uuids=?2, fallback_uuid=?3, \
+         parallel_consent_version=COALESCE(parallel_consent_version, 0) + 1, \
+         parallel_consent_scope=?4 WHERE id=1",
+        rusqlite::params![primary_val, parallel_json, fallback_val, scope],
+    )?;
+    let new_version: i64 = tx.query_row(
+        "SELECT parallel_consent_version FROM preferences WHERE id=1",
+        [],
+        |r| r.get(0),
+    )?;
+    tx.commit()?;
+    Ok(new_version)
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -858,11 +1399,41 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .setup(|app| {
-            let dir = app
-                .path()
-                .app_local_data_dir()
-                .expect("app_local_data_dir");
-            let keystore = keystore::Keystore::new(dir.clone()).expect("keystore init");
+            // Resolve the app-local data dir. Review P1 #2: this MUST NOT crash
+            // setup — if the platform path is unavailable, fall back to a temp
+            // dir so the app still launches (keys simply won't persist; the
+            // recovery banner surfaces the problem). `dir` feeds both the
+            // keystore and the DB, so a fallback here keeps every downstream
+            // `.expect()`-free path alive.
+            let dir = app.path().app_local_data_dir().unwrap_or_else(|e| {
+                log::error!("app_local_data_dir unavailable, falling back to temp dir: {e}");
+                std::env::temp_dir().join("linguaray-data")
+            });
+            // Review P1 #2: keystore init must NOT crash either. On failure,
+            // build the Session against a temp-dir keystore (translate will find
+            // no keys but won't panic) and record the failure so the DB
+            // readiness block below degrades to NeedsKeystoreRecovery.
+            let (keystore, keystore_init_error) = match keystore::Keystore::new(dir.clone()) {
+                Ok(ks) => (ks, None),
+                Err(e) => {
+                    log::error!(
+                        "keystore init in {} failed: {e}; falling back to temp dir",
+                        dir.display()
+                    );
+                    let fallback_dir = std::env::temp_dir().join("linguaray-keystore");
+                    let ks = keystore::Keystore::new(fallback_dir).unwrap_or_else(|e2| {
+                        log::error!("temp keystore fallback also failed: {e2}");
+                        // Last resort: an empty in-memory-shaped dir that won't
+                        // be written until a key is set. Keystore::new on a fresh
+                        // temp subdir must succeed; this branch is effectively
+                        // unreachable but keeps setup panic-free.
+                        let last = std::env::temp_dir().join("linguaray-keystore-lastresort");
+                        keystore::Keystore::new(last)
+                            .expect("temp keystore last-resort must be creatable")
+                    });
+                    (ks, Some(format!("keystore init in {}: {e}", dir.display())))
+                }
+            };
             // Spec §Privacy: every preset endpoint must be HTTPS (loopback HTTP
             // allowed for local engines like Ollama). Reject at config-load so an
             // invalid/leaked preset never ships a request.
@@ -908,47 +1479,63 @@ pub fn run() {
                 ),
             };
 
-            // 2-4. Only run migration + resume + preflight when the DB opened.
-            if let Some(db) = db_handle.clone() {
-                let fp = FailpointCell::none();
-                readiness = match run_migration(&db, &keystore_dir, &settings_path, &fp) {
-                    Ok(()) => {
-                        // Resume any in-flight deletes (3-step sweep). A failure
-                        // here does NOT exit setup — log + mark incomplete so the
-                        // next startup retries.
-                        match crate::db::delete::provider_resume_deletions(&db, &keystore_dir) {
-                            Ok(_) => {
-                                // Final keystore preflight: a Corrupt keystore
-                                // (detected after migration) → recovery.
-                                match keystore::load_state(&keystore_dir) {
-                                    keystore::KeystoreLoadState::Corrupt(e) => {
-                                        DataReadiness::NeedsKeystoreRecovery {
-                                            reason: format!("keystore corrupt: {e}"),
+            // Review P1 #2: if the keystore couldn't be initialized in the
+            // canonical dir (we're now running on a temp fallback), the app is
+            // in keystore-recovery territory regardless of DB state — provider
+            // commands that touch the keystore must stay gated off and the
+            // recovery banner must show. This takes precedence: a healthy DB +
+            // healthy migration are useless without a usable keystore.
+            if let Some(reason) = &keystore_init_error {
+                readiness = DataReadiness::NeedsKeystoreRecovery {
+                    reason: reason.clone(),
+                };
+            }
+
+            // 2-4. Only run migration + resume + preflight when the DB opened
+            // AND the keystore initialized in its canonical dir (otherwise we
+            // skip migration to avoid touching a keystore dir we can't lock).
+            if keystore_init_error.is_none() {
+                if let Some(db) = db_handle.clone() {
+                    let fp = FailpointCell::none();
+                    readiness = match run_migration(&db, &keystore_dir, &settings_path, &fp) {
+                        Ok(()) => {
+                            // Resume any in-flight deletes (3-step sweep). A failure
+                            // here does NOT exit setup — log + mark incomplete so the
+                            // next startup retries.
+                            match crate::db::delete::provider_resume_deletions(&db, &keystore_dir) {
+                                Ok(_) => {
+                                    // Final keystore preflight: a Corrupt keystore
+                                    // (detected after migration) → recovery.
+                                    match keystore::load_state(&keystore_dir) {
+                                        keystore::KeystoreLoadState::Corrupt(e) => {
+                                            DataReadiness::NeedsKeystoreRecovery {
+                                                reason: format!("keystore corrupt: {e}"),
+                                            }
                                         }
+                                        _ => DataReadiness::Ready,
                                     }
-                                    _ => DataReadiness::Ready,
+                                }
+                                Err(e) => {
+                                    log::error!("resume_deletions failed: {e}");
+                                    DataReadiness::migration_incomplete(
+                                        "resume_deletions",
+                                        format!("resume deletions: {e}"),
+                                    )
                                 }
                             }
-                            Err(e) => {
-                                log::error!("resume_deletions failed: {e}");
-                                DataReadiness::migration_incomplete(
-                                    "resume_deletions",
-                                    format!("resume deletions: {e}"),
-                                )
-                            }
                         }
-                    }
-                    Err(MigrationError::NeedsKeystoreRecovery(reason)) => {
-                        DataReadiness::NeedsKeystoreRecovery { reason }
-                    }
-                    Err(MigrationError::SettingsCorrupt(reason)) => {
-                        DataReadiness::migration_incomplete("settings", reason)
-                    }
-                    Err(other) => DataReadiness::migration_incomplete(
-                        "migration",
-                        other.to_string(),
-                    ),
-                };
+                        Err(MigrationError::NeedsKeystoreRecovery(reason)) => {
+                            DataReadiness::NeedsKeystoreRecovery { reason }
+                        }
+                        Err(MigrationError::SettingsCorrupt(reason)) => {
+                            DataReadiness::migration_incomplete("settings", reason)
+                        }
+                        Err(other) => DataReadiness::migration_incomplete(
+                            "migration",
+                            other.to_string(),
+                        ),
+                    };
+                }
             }
 
             app.manage(Arc::new(AppState {
@@ -1002,7 +1589,13 @@ pub fn run() {
             provider_reorder,
             provider_toggle,
             provider_set_key,
-            provider_set_active
+            provider_set_active,
+            // P1 #3: multi-engine consent.
+            provider_confirm_and_set_active,
+            // P1 #8: provider diagnostics + DB recovery.
+            provider_get_models,
+            provider_test_connection,
+            archive_database
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
