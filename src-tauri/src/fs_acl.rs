@@ -43,50 +43,21 @@ fn set_mode(path: &Path, mode: u32) -> Result<(), AclError> {
 }
 
 /// Secure a directory: 0o700 on Unix; protected DACL (inheritable) on Windows.
-/// On Windows, tolerates PermissionDenied on directory ACL changes (some CI
-/// runners restrict WRITE_OWNER/WRITE_DAC on temp dirs). The directory was
-/// created by the current user; the app data dir is additionally protected
-/// by the OS app sandbox.
 pub fn secure_dir(dir: &Path) -> Result<(), AclError> {
     #[cfg(unix)]
     { set_mode(dir, 0o700) }
     #[cfg(windows)]
-    {
-        match set_win32_owner_dacl(dir, true) {
-            Ok(()) => Ok(()),
-            Err(AclError::Io(ref e)) if e.kind() == std::io::ErrorKind::PermissionDenied => {
-                log::warn!("secure_dir: ACL change denied for {} (likely temp-dir restrictions); app sandbox applies", dir.display());
-                Ok(())
-            }
-            Err(AclError::Win32(ref s)) if s.contains("Access is denied") || s.contains("Win32 error 5") => {
-                log::warn!("secure_dir: ACL change denied for {} (likely temp-dir restrictions); app sandbox applies", dir.display());
-                Ok(())
-            }
-            Err(e) => Err(e),
-        }
-    }
+    { set_win32_owner_dacl(dir, true) }
     #[cfg(not(any(unix, windows)))]
     { let _ = dir; Ok(()) }
 }
 
 /// Secure a file: 0o600 on Unix; protected DACL (non-inheritable) on Windows.
-/// On Windows, tolerates any ACL error (PermissionDenied, token access denied,
-/// etc.) because the file is inside a directory already secured by `secure_dir`.
-/// CI runners may restrict WRITE_DAC/WRITE_OWNER/TOKEN_QUERY; the security
-/// property holds at the directory level regardless.
 pub fn secure_file(path: &Path) -> Result<(), AclError> {
     #[cfg(unix)]
     { set_mode(path, 0o600) }
     #[cfg(windows)]
-    {
-        match set_win32_dacl_only(path, false) {
-            Ok(()) => Ok(()),
-            Err(e) => {
-                log::warn!("secure_file: ACL change failed for {}: {e}; directory-level protection applies", path.display());
-                Ok(())
-            }
-        }
-    }
+    { set_win32_owner_dacl(path, false) }
     #[cfg(not(any(unix, windows)))]
     { let _ = path; Ok(()) }
 }
@@ -118,26 +89,6 @@ pub fn crash_safe_backup(
     final_path: &Path,
     staging_dir: &Path,
 ) -> Result<(), AclError> {
-    // Wrap the entire operation: on Windows CI runners, various ACL/token/hardlink
-    // operations may fail due to restricted permissions. The backup is best-effort
-    // recovery — the original file is untouched, migration continues regardless.
-    match crash_safe_backup_inner(source_bytes, final_path, staging_dir) {
-        Ok(()) => Ok(()),
-        #[cfg(windows)]
-        Err(e) => {
-            log::warn!("crash_safe_backup: failed (tolerated): {e}");
-            Ok(())
-        }
-        #[cfg(not(windows))]
-        Err(e) => Err(e),
-    }
-}
-
-fn crash_safe_backup_inner(
-    source_bytes: &[u8],
-    final_path: &Path,
-    staging_dir: &Path,
-) -> Result<(), AclError> {
     // 1. No-clobber fast path: a prior backup wins.
     if final_path.exists() {
         return Ok(());
@@ -157,21 +108,13 @@ fn crash_safe_backup_inner(
     ));
     // 3-5. Write → secure → fsync the STAGING file. A crash here leaves only the
     //      staging file behind; the final path is untouched.
-    if let Err(e) = std::fs::write(&staging, source_bytes) {
-        // On Windows CI, the secured directory may deny file creation via
-        // inherited ACL restrictions. The backup is best-effort recovery —
-        // if we can't create the staging file, log and skip (the original
-        // file is untouched, migration continues).
-        log::warn!("crash_safe_backup: could not write staging file: {e}");
-        return Ok(());
-    }
+    std::fs::write(&staging, source_bytes)?;
     // Clean up the staging file on ANY subsequent failure so a half-published
     // backup never litters the directory.
     let cleanup_staging = |staging: &Path| {
         let _ = std::fs::remove_file(staging);
     };
     if let Err(e) = secure_file(&staging) {
-        // secure_file already tolerates PermissionDenied; other errors cleanup.
         cleanup_staging(&staging);
         return Err(e);
     }
@@ -346,72 +289,6 @@ pub(crate) fn set_win32_owner_dacl(path: &Path, inherit: bool) -> Result<(), Acl
     };
     if rc == 0 {
         return Err(AclError::Win32(format!("SetFileSecurityW failed: {}", std::io::Error::last_os_error())));
-    }
-    Ok(())
-}
-
-/// Windows: set DACL only (no owner change). Used by `secure_file` for files
-/// that were just created by the current user. Falls back to no-op if the
-/// process lacks WRITE_DAC on the target (e.g. inherited temp-dir ACLs on
-/// CI runners). The file is already inside a directory secured by `secure_dir`,
-/// so the security property holds via directory-level protection.
-#[cfg(windows)]
-fn set_win32_dacl_only(path: &Path, inherit: bool) -> Result<(), AclError> {
-    use std::os::windows::ffi::OsStrExt;
-    use windows_sys::Win32::Foundation::GENERIC_ALL;
-    use windows_sys::Win32::Security::{
-        ACL, ACL_REVISION_DS, AddAccessAllowedAceEx, InitializeAcl,
-        CONTAINER_INHERIT_ACE, DACL_SECURITY_INFORMATION, OBJECT_INHERIT_ACE,
-        PSECURITY_DESCRIPTOR, SE_DACL_PROTECTED,
-        InitializeSecurityDescriptor, SetSecurityDescriptorControl,
-        SetSecurityDescriptorDacl, SetFileSecurityW,
-    };
-
-    let sid_buf = current_user_sid()?;
-    let sid = sid_from_token_user_buf(&sid_buf)?;
-
-    const ACL_BUF_SIZE: usize = 128;
-    let mut acl_buf: [u8; ACL_BUF_SIZE] = [0u8; ACL_BUF_SIZE];
-    let acl: *mut ACL = acl_buf.as_mut_ptr() as *mut ACL;
-    if unsafe { InitializeAcl(acl, ACL_BUF_SIZE as u32, ACL_REVISION_DS) } == 0 {
-        return Err(AclError::Win32("InitializeAcl failed".into()));
-    }
-    let ace_flags = if inherit { OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE } else { 0 };
-    if unsafe { AddAccessAllowedAceEx(acl, ACL_REVISION_DS, ace_flags, GENERIC_ALL, sid) } == 0 {
-        return Err(AclError::Win32("AddAccessAllowedAceEx failed".into()));
-    }
-
-    const SD_BUF_SIZE: usize = 256;
-    let mut sd_buf: [u8; SD_BUF_SIZE] = [0u8; SD_BUF_SIZE];
-    let sd: PSECURITY_DESCRIPTOR = sd_buf.as_mut_ptr() as PSECURITY_DESCRIPTOR;
-    if unsafe { InitializeSecurityDescriptor(sd, 1u32) } == 0 {
-        return Err(AclError::Win32("InitializeSecurityDescriptor failed".into()));
-    }
-    if unsafe { SetSecurityDescriptorDacl(sd, 1, acl as *const ACL, 0) } == 0 {
-        return Err(AclError::Win32("SetSecurityDescriptorDacl failed".into()));
-    }
-    if unsafe { SetSecurityDescriptorControl(sd, SE_DACL_PROTECTED, SE_DACL_PROTECTED) } == 0 {
-        return Err(AclError::Win32("SetSecurityDescriptorControl (PROTECTED) failed".into()));
-    }
-
-    let path_wide: Vec<u16> = path.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
-    let rc = unsafe {
-        SetFileSecurityW(
-            path_wide.as_ptr(),
-            DACL_SECURITY_INFORMATION,
-            sd,
-        )
-    };
-    if rc == 0 {
-        let err = std::io::Error::last_os_error();
-        // If we can't write the DACL (Access Denied on inherited temp-dir ACLs),
-        // the file is still inside a secured directory — the security property
-        // holds at the directory level. Log and continue rather than failing.
-        if err.kind() == std::io::ErrorKind::PermissionDenied {
-            log::warn!("secure_file: SetFileSecurityW denied for {} (likely inherited temp-dir ACL); directory-level protection applies", path.display());
-            return Ok(());
-        }
-        return Err(AclError::Win32(format!("SetFileSecurityW failed: {err}")));
     }
     Ok(())
 }
