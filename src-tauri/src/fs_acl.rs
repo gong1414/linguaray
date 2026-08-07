@@ -682,7 +682,6 @@ pub fn atomic_archive_no_clobber(
     // Read the source bytes ONCE (the archive is a copy, not a move — the
     // caller controls the source's lifetime).
     let mut source_file = std::fs::File::open(source)?;
-    let parent = archive_path.parent().unwrap_or_else(|| Path::new("."));
 
     let mut written_path = archive_path.to_path_buf();
     for attempt in 0u32..3 {
@@ -732,6 +731,7 @@ pub fn atomic_archive_no_clobber(
         // Sync the parent dir (Unix) so the archive dirent is durable.
         #[cfg(unix)]
         {
+            let parent = archive_path.parent().unwrap_or_else(|| Path::new("."));
             if let Ok(dir) = std::fs::File::open(parent) {
                 let _ = dir.sync_all();
             }
