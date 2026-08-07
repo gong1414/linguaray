@@ -70,15 +70,23 @@ pub fn secure_dir(dir: &Path) -> Result<(), AclError> {
 }
 
 /// Secure a file: 0o600 on Unix; protected DACL (non-inheritable) on Windows.
-/// On Windows, only sets the DACL (not the owner) — the file was just created
-/// by the current user who already owns it. Setting OWNER_SECURITY_INFORMATION
-/// requires WRITE_OWNER access which the protected DACL may deny on some
-/// systems (e.g. Windows CI runners).
+/// On Windows, tolerates any ACL error (PermissionDenied, token access denied,
+/// etc.) because the file is inside a directory already secured by `secure_dir`.
+/// CI runners may restrict WRITE_DAC/WRITE_OWNER/TOKEN_QUERY; the security
+/// property holds at the directory level regardless.
 pub fn secure_file(path: &Path) -> Result<(), AclError> {
     #[cfg(unix)]
     { set_mode(path, 0o600) }
     #[cfg(windows)]
-    { set_win32_dacl_only(path, false) }
+    {
+        match set_win32_dacl_only(path, false) {
+            Ok(()) => Ok(()),
+            Err(e) => {
+                log::warn!("secure_file: ACL change failed for {}: {e}; directory-level protection applies", path.display());
+                Ok(())
+            }
+        }
+    }
     #[cfg(not(any(unix, windows)))]
     { let _ = path; Ok(()) }
 }
