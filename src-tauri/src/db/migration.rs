@@ -273,19 +273,17 @@ pub fn parse_settings_raw(path: &Path) -> Result<Option<RawSettings>, MigrationE
 }
 
 /// Copy `settings.json` → `settings.json.bak-pre-migration` with TRUE
-/// create-new (no-clobber) semantics: skip if the backup already exists (never
-/// overwrite a prior backup). Idempotent across migration replays.
+/// no-clobber semantics: skip if the backup already exists (never overwrite a
+/// prior backup). Idempotent across migration replays.
 ///
-/// The backup is written DIRECTLY to the final path via `create_new` (O_CREAT |
-/// O_EXCL), so the existence check + creation are one atomic step. A concurrent
-/// migration that already created the backup loses the `O_EXCL` race and we
-/// treat `AlreadyExists` as success (no-clobber). This avoids the
-/// `exists()` + `rename()` TOCTOU of the old shape, where `rename` would
-/// silently clobber a prior backup on Unix.
-///
-/// The bytes are fsynced + the file is secured (`fs_acl::secure_file`) before
-/// the handle is dropped, so the backup is durable and never observable on disk
-/// in an unprotected state.
+/// The backup is published via [`crate::fs_acl::crash_safe_backup`]: bytes are
+/// written to a unique staging file, secured + fsynced, then atomically hard-
+/// linked into place. A crash during the write/fsync leaves only a `.staging`
+/// file behind — the final backup path is only ever observable as a complete,
+/// secured, durable backup (so the next startup's no-clobber check is sound).
+/// This fixes the old `create_new` shape, where a crash partway through the
+/// write left an INCOMPLETE file at the final path and the next startup saw
+/// `AlreadyExists` and skipped — no recoverable backup.
 pub(crate) fn backup_settings(settings_path: &Path) -> Result<(), MigrationError> {
     let bak = settings_bak_path(settings_path);
     // Missing source (fresh install) is a no-op.
@@ -295,44 +293,11 @@ pub(crate) fn backup_settings(settings_path: &Path) -> Result<(), MigrationError
     let bytes = std::fs::read(settings_path).map_err(|e| {
         MigrationError::BackupFailed(format!("read settings for backup: {e}"))
     })?;
-    // Atomically create the FINAL backup path with O_EXCL. If it already exists
-    // (a prior backup from this run or a crashed-but-completed prior attempt),
-    // this returns `AlreadyExists` and we skip — TRUE no-clobber, no overwrite.
-    use std::io::Write;
-    let mut dst = match std::fs::OpenOptions::new()
-        .create_new(true)
-        .write(true)
-        .open(&bak)
-    {
-        Ok(f) => f,
-        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
-            // A backup already exists — leave it untouched.
-            return Ok(());
-        }
-        Err(e) => {
-            return Err(MigrationError::BackupFailed(format!(
-                "create settings backup {}: {e}",
-                bak.display()
-            )));
-        }
-    };
-    dst.write_all(&bytes).map_err(|e| {
-        MigrationError::BackupFailed(format!("write settings backup: {e}"))
-    })?;
-    // Flush userspace buffers + ask the OS to push the bytes to disk so the
-    // backup is durable before we secure + close the handle.
-    dst.flush().map_err(|e| {
-        MigrationError::BackupFailed(format!("flush settings backup: {e}"))
-    })?;
-    dst.sync_all().map_err(|e| {
-        MigrationError::BackupFailed(format!("fsync settings backup: {e}"))
-    })?;
-    drop(dst);
-    // Secure the final backup file (0600 / restricted ACL). Done AFTER fsync so
-    // the bytes are durable; the file is private from the moment of creation
-    // because the parent dir is already secured and the create was atomic.
-    crate::fs_acl::secure_file(&bak).map_err(|e| {
-        MigrationError::BackupFailed(format!("secure settings backup: {e}"))
+    // Staging dir MUST be the same directory as the final path so the publish
+    // (hard_link) is a same-filesystem atomic op.
+    let staging_dir = bak.parent().unwrap_or_else(|| Path::new("."));
+    crate::fs_acl::crash_safe_backup(&bytes, &bak, staging_dir).map_err(|e| {
+        MigrationError::BackupFailed(format!("settings backup {}: {e}", bak.display()))
     })?;
     Ok(())
 }

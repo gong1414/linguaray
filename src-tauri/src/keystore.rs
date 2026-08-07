@@ -879,14 +879,20 @@ impl Keystore {
     /// assert on it without hardcoding the filename string.
     fn backup_path(&self) -> PathBuf { self.dir.join(BACKUP_PRE_MIGRATION) }
 
-    /// Under BOTH locks: create the pre-migration backup (TRUE no-clobber —
-    /// `create_new` only, never overwrites a prior backup). Reads `keystore.json`
-    /// bytes and writes them DIRECTLY to `keystore.json.bak-pre-migration` via
-    /// `create_new` (O_EXCL), secured with `fs_acl::secure_file` + fsync'd. No-op
-    /// if the canonical file is absent or the backup already exists. This is the
-    /// locked core shared by `migrate_to_v2_locked_core` and the standalone
-    /// [`backup_keystore`](crate::keystore::backup_keystore) free function (Step 1
-    /// of the migration coordinator: backup SEPARATE from rewrite).
+    /// Under BOTH locks: create the pre-migration backup (TRUE no-clobber).
+    /// Reads `keystore.json` bytes and publishes them to
+    /// `keystore.json.bak-pre-migration` via [`crate::fs_acl::crash_safe_backup`]
+    /// (write to a unique staging file → secure → fsync → atomic hard-link into
+    /// place). No-op if the canonical file is absent or the backup already
+    /// exists. This is the locked core shared by `migrate_to_v2_locked_core` and
+    /// the standalone [`backup_keystore`](crate::keystore::backup_keystore) free
+    /// function (Step 1 of the migration coordinator: backup SEPARATE from
+    /// rewrite).
+    ///
+    /// Crash-safety (S2a P0): the staging file absorbs a mid-write/fsync crash;
+    /// the final backup path is only ever observable as a complete, secured,
+    /// durable backup, so the next startup's no-clobber check is sound. (The old
+    /// `create_new` shape left an INCOMPLETE file at the final path on crash.)
     fn backup_locked(&self) -> Result<(), KeystoreError> {
         let src = self.file();
         if !src.exists() {
@@ -895,29 +901,9 @@ impl Keystore {
         }
         let bak = self.backup_path();
         let bytes = std::fs::read(&src)?;
-        // Atomically create the FINAL backup path with O_EXCL (create_new). If
-        // it already exists, this returns `AlreadyExists` and we skip — TRUE
-        // no-clobber. This avoids the `exists()` + `rename()` TOCTOU of the old
-        // shape, where `rename` would silently clobber a prior backup on Unix.
-        use std::io::Write;
-        let mut dst = match std::fs::OpenOptions::new()
-            .create_new(true)
-            .write(true)
-            .open(&bak)
-        {
-            Ok(f) => f,
-            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
-                // A prior backup exists — leave it untouched.
-                return Ok(());
-            }
-            Err(e) => return Err(KeystoreError::Io(e)),
-        };
-        dst.write_all(&bytes)?;
-        dst.flush()?;
-        dst.sync_all()?;
-        drop(dst);
-        // Secure the final backup file so on-disk permissions are correct.
-        crate::fs_acl::secure_file(&bak)?;
+        // Staging dir = keystore dir (same filesystem as the final path, so the
+        // hard_link publish is atomic).
+        crate::fs_acl::crash_safe_backup(&bytes, &bak, &self.dir)?;
         Ok(())
     }
 
