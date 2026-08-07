@@ -3,7 +3,8 @@
 //! [`DataReadiness`] is the single source of truth for "can the app serve
 //! provider/data commands right now?" It's computed once at startup from the
 //! DB-open + migration outcomes and held in [`crate::AppState`]. Provider
-//! commands gate on it via [`crate::require_ready`]; a handful of commands
+//! commands gate on it via [`crate::require_ready_gated`] /
+//! [`crate::require_ready_gated_write`]; a handful of commands
 //! (`keystore_health`, `archive_keystore`, `reset_keystore`,
 //! `get_data_readiness`) are always available so the UI can surface the
 //! recovery banner and the user can act on it.
@@ -25,7 +26,8 @@ use serde::{Deserialize, Serialize};
 /// The app's data-readiness state. Held in `AppState.readiness` behind a
 /// `parking_lot::RwLock` and read by every gated command.
 ///
-/// `Clone + PartialEq + Eq` so `require_ready` can compare against `Ready`
+/// `Clone + PartialEq + Eq` so the gated readiness checks can compare against
+/// `Ready` cheaply
 /// cheaply, and so the frontend can diff the serialized form to drive the
 /// recovery banner.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -125,8 +127,8 @@ mod tests {
 
     #[test]
     fn equality_is_value_based() {
-        // require_ready compares `*readiness != DataReadiness::Ready`, so the
-        // variants must be `Eq` on the full payload.
+        // The gated readiness checks compare `*readiness != DataReadiness::Ready`,
+        // so the variants must be `Eq` on the full payload.
         let a = DataReadiness::NeedsKeystoreRecovery {
             reason: "corrupt".into(),
         };
