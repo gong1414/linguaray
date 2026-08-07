@@ -766,3 +766,190 @@ fn load_state_accepts_clean_v2_with_optional_fields() {
         other => panic!("expected CurrentV2 for clean v2 payload, got {other:?}"),
     }
 }
+
+// ─── P0 regression: payload_to_v2 fail-closed ───────────────────────────────
+//
+// Guards the bug this change fixes: `payload_to_v2` used to swallow ANY error
+// (unsupported version, mixed v1/v2 payload, malformed provider_keys,
+// unparseable legacy map) and return an empty v2 KeystoreData. Then `set_key`
+// (via update_data_core) wrote that empty v2 back to disk — silently wiping the
+// authenticated keystore contents.
+//
+// The fix makes payload_to_v2 return Result and propagate Corrupt as Err so
+// set_key/delete_key/get_key abort before touching the file. Each test below
+// seeds a corrupt keystore, attempts the operation, asserts an Err, and asserts
+// the on-disk bytes are byte-for-byte unchanged (the file was NOT rewritten).
+
+/// Helper: snapshot the on-disk keystore bytes (must already exist).
+fn snapshot_keystore(dir: &tempfile::TempDir) -> Vec<u8> {
+    std::fs::read(dir.path().join("keystore.json")).unwrap()
+}
+
+/// `set_key` on a version=3 keystore MUST fail (not silently overwrite the
+/// authenticated contents with an empty v2). The on-disk bytes stay unchanged.
+#[test]
+fn p0_set_key_on_unsupported_version_fails_closed() {
+    let dir = tempfile::tempdir().unwrap();
+    let bad = json!({
+        "version": 3,
+        "provider_keys": {"openai": "sk-x"},
+    });
+    store_with_identity(dir.path(), ID, IdentitySource::MacosIoplatformuuid, &bad).unwrap();
+    let before = snapshot_keystore(&dir);
+
+    let ks = Keystore::new(dir.path().to_path_buf()).unwrap();
+    let err = ks
+        .set_key_with_identity("anthropic", "sk-add", ID)
+        .expect_err("set_key on version=3 keystore must FAIL, not silently overwrite");
+    // Surface the failure kind so a silent Ok(()) regression trips this.
+    let _ = err.to_string();
+
+    // The file was NOT rewritten — bytes are identical.
+    let after = snapshot_keystore(&dir);
+    assert_eq!(
+        before, after,
+        "set_key must leave a version=3 keystore untouched (fail-closed)"
+    );
+}
+
+/// `set_key` on a mixed v1/v2 payload (version:2 + a stray top-level legacy
+/// key) MUST fail-closed. The on-disk bytes stay unchanged.
+#[test]
+fn p0_set_key_on_mixed_v1_v2_payload_fails_closed() {
+    let dir = tempfile::tempdir().unwrap();
+    let mixed = json!({
+        "version": 2,
+        "provider_keys": {"openai": "sk-v2"},
+        "openai": "sk-v1-leak",
+    });
+    store_with_identity(dir.path(), ID, IdentitySource::MacosIoplatformuuid, &mixed).unwrap();
+    let before = snapshot_keystore(&dir);
+
+    let ks = Keystore::new(dir.path().to_path_buf()).unwrap();
+    let err = ks
+        .set_key_with_identity("anthropic", "sk-add", ID)
+        .expect_err("set_key on mixed v1/v2 payload must FAIL, not silently overwrite");
+    let _ = err.to_string();
+
+    let after = snapshot_keystore(&dir);
+    assert_eq!(
+        before, after,
+        "set_key must leave a mixed v1/v2 keystore untouched (fail-closed)"
+    );
+}
+
+/// `set_key` on a v2 envelope whose `provider_keys` is the wrong type (not an
+/// object) MUST fail-closed. The on-disk bytes stay unchanged.
+#[test]
+fn p0_set_key_on_malformed_provider_keys_fails_closed() {
+    let dir = tempfile::tempdir().unwrap();
+    let malformed = json!({
+        "version": 2,
+        "provider_keys": "not-an-object",
+    });
+    store_with_identity(dir.path(), ID, IdentitySource::MacosIoplatformuuid, &malformed).unwrap();
+    let before = snapshot_keystore(&dir);
+
+    let ks = Keystore::new(dir.path().to_path_buf()).unwrap();
+    let err = ks
+        .set_key_with_identity("anthropic", "sk-add", ID)
+        .expect_err("set_key on malformed provider_keys must FAIL, not silently overwrite");
+    let _ = err.to_string();
+
+    let after = snapshot_keystore(&dir);
+    assert_eq!(
+        before, after,
+        "set_key must leave a malformed-v2 keystore untouched (fail-closed)"
+    );
+}
+
+/// `get_key` on a corrupt payload MUST return Err (NOT Ok(None), which would
+/// mask the corruption as "no key set"). Covers version=3, mixed v1/v2, and
+/// malformed provider_keys in one sweep.
+#[test]
+fn p0_get_key_on_corrupt_payload_errors_not_none() {
+    let cases = [
+        ("unsupported version", json!({"version": 3, "provider_keys": {"openai": "sk-x"}})),
+        ("mixed v1/v2 payload", json!({
+            "version": 2, "provider_keys": {"openai": "sk-x"}, "openai": "sk-leak"
+        })),
+        ("malformed provider_keys", json!({"version": 2, "provider_keys": "not-an-object"})),
+    ];
+
+    for (label, bad) in cases {
+        let dir = tempfile::tempdir().unwrap();
+        store_with_identity(dir.path(), ID, IdentitySource::MacosIoplatformuuid, &bad).unwrap();
+        let before = snapshot_keystore(&dir);
+
+        let ks = Keystore::new(dir.path().to_path_buf()).unwrap();
+        let res = ks.get_key_with_identity("openai", ID);
+        assert!(
+            res.is_err(),
+            "get_key on corrupt payload ({label}) must return Err, got {res:?}"
+        );
+        // get_key is read-only; bytes must be unchanged regardless.
+        let after = snapshot_keystore(&dir);
+        assert_eq!(before, after, "get_key ({label}) must not rewrite the file");
+    }
+}
+
+/// `delete_key` on a corrupt payload MUST return Err — never silently succeed
+/// (which would silently converge the file to an empty v2 on the next write).
+#[test]
+fn p0_delete_key_on_corrupt_payload_errors() {
+    let dir = tempfile::tempdir().unwrap();
+    let bad = json!({"version": 3, "provider_keys": {"openai": "sk-x"}});
+    store_with_identity(dir.path(), ID, IdentitySource::MacosIoplatformuuid, &bad).unwrap();
+    let before = snapshot_keystore(&dir);
+
+    let ks = Keystore::new(dir.path().to_path_buf()).unwrap();
+    let err = ks
+        .delete_key_with_identity("openai", ID)
+        .expect_err("delete_key on corrupt payload must FAIL, not silently succeed");
+    let _ = err.to_string();
+
+    let after = snapshot_keystore(&dir);
+    assert_eq!(
+        before, after,
+        "delete_key must leave a corrupt keystore untouched (fail-closed)"
+    );
+}
+
+/// `list_provider_key_refs` on a corrupt payload MUST return Err. The frontend's
+/// "which providers have a key?" probe must surface the failure rather than
+/// silently reporting "no providers".
+#[test]
+fn p0_list_provider_key_refs_on_corrupt_payload_errors() {
+    let dir = tempfile::tempdir().unwrap();
+    let bad = json!({"version": 3, "provider_keys": {"openai": "sk-x"}});
+    store_with_identity(dir.path(), ID, IdentitySource::MacosIoplatformuuid, &bad).unwrap();
+
+    let ks = Keystore::new(dir.path().to_path_buf()).unwrap();
+    let res = ks.list_provider_key_refs_with_identity(ID);
+    assert!(
+        res.is_err(),
+        "list_provider_key_refs on corrupt payload must return Err, got {res:?}"
+    );
+}
+
+/// Regression baseline: the legitimate empty case (fresh install, no file →
+/// decrypt returns `{}`) MUST still succeed and produce a clean v2 payload. This
+/// guards against the fail-closed gate accidentally breaking the first-ever
+/// `set_key` on a brand-new install.
+#[test]
+fn p0_fresh_install_set_key_still_succeeds_after_fail_closed() {
+    let dir = tempfile::tempdir().unwrap();
+    let ks = Keystore::new(dir.path().to_path_buf()).unwrap();
+
+    // No file on disk — this is the only legitimate empty case.
+    ks.set_key_with_identity("openai", "sk-fresh", ID)
+        .expect("set_key on a fresh install (empty {}) must SUCCEED");
+
+    match ks.load_state_with_identity(ID) {
+        KeystoreLoadState::CurrentV2(d) => {
+            assert_eq!(d.version, KEYSTORE_DATA_VERSION);
+            assert_eq!(d.get_provider_key("openai"), Some("sk-fresh"));
+        }
+        other => panic!("fresh-install set_key must produce CurrentV2, got {other:?}"),
+    }
+}

@@ -307,44 +307,41 @@ fn classify_payload(payload: &serde_json::Value) -> Result<KeystoreLoadState, Ke
 /// `set_key`, ...) go through here so they all agree on where a provider key
 /// lives — a single fixpoint instead of N reinvented v1-vs-v2 lookups.
 ///
-/// Shapes handled:
-/// - **v2** (`{"version":2,"provider_keys":{...}}`): deserialized directly. A
-///   structurally wrong versioned object (e.g. `provider_keys` not an object)
-///   falls back to an empty v2 payload — this is a best-effort runtime
-///   normalization, not a fail-closed gate; the dedicated `load_state` path
-///   still reports `Corrupt` so the recovery banner can surface it.
+/// **Fail-closed (P0):** reuses [`classify_payload`] so the typed accessors apply
+/// the SAME strict classification as the dedicated `load_state` path. Any payload
+/// [`classify_payload`] marks `Corrupt` — unsupported version, mixed v1/v2 shape,
+/// malformed `provider_keys`, a non-object without a `version` field, ... —
+/// propagates as `Err` here. The caller therefore must NOT write a normalized
+/// empty v2 over authenticated contents; it bails out before touching the file.
+///
+/// Shapes accepted (`Ok`):
+/// - **v2** (`{"version":2,"provider_keys":{...}}`): deserialized directly.
 /// - **v1 flat map** (`{"openai":"sk-..."}` with no `version`): upgraded to a v2
 ///   payload carrying the same keys. `secret_ref == legacy key name`.
-/// - **Missing / empty / non-object** (fresh install, or a corrupt `{}`): a fresh
-///   empty v2 payload, so the first `set_key` on a brand-new install lands as v2.
+/// - **Empty object `{}`** (fresh-install decrypt): upgraded to an empty v2
+///   payload, so the first `set_key` on a brand-new install lands as v2. This is
+///   the ONLY legitimate empty case.
+///
+/// Shapes rejected (`Err`):
+/// - Versioned but `version != KEYSTORE_DATA_VERSION` → `Err`.
+/// - Versioned v2 with extra top-level keys (mixed v1/v2) → `Err`.
+/// - Versioned v2 with a malformed `provider_keys` (e.g. not an object) → `Err`.
+/// - Non-object without a `version` field (`null`, array, string, ...) → `Err`.
 ///
 /// `history_key` / `external_api_token` are preserved when reading a v2 payload
 /// and left `None` when upgrading from v1 (those opt-in fields didn't exist in v1).
-fn payload_to_v2(v: &serde_json::Value) -> KeystoreData {
-    if has_version_field(v) {
-        // Already-versioned object: deserialize as KeystoreData. A structurally
-        // wrong v2 payload (e.g. provider_keys not an object) is a real bug, but
-        // the typed accessors are read paths that must not panic — fall back to a
-        // fresh empty v2 so a corrupt file degrades to "no keys" rather than a
-        // crash. (The dedicated load_state path still reports Corrupt for the
-        // recovery banner; this is the best-effort runtime normalization.)
-        match KeystoreData::from_value(v) {
-            Ok(data) => data,
-            Err(_) => KeystoreData::new_v2(HashMap::new()),
-        }
-    } else if v.is_object() {
-        // Legacy v1 flat map. A non-string value here is ignored (filtered out
-        // by serde's HashMap<String,String> deserialization); a fully unparseable
-        // object falls back to empty v2.
-        match serde_json::from_value::<HashMap<String, String>>(v.clone()) {
-            Ok(map) => KeystoreData::new_v2(map),
-            Err(_) => KeystoreData::new_v2(HashMap::new()),
-        }
-    } else {
-        // Missing / null / non-object (fresh install decrypts to `{}`; a totally
-        // empty file decrypts to `null`). Fresh empty v2 so the first write lands
-        // in the versioned shape.
-        KeystoreData::new_v2(HashMap::new())
+fn payload_to_v2(v: &serde_json::Value) -> Result<KeystoreData, KeystoreError> {
+    // Delegate to classify_payload so this path and the dedicated load_state path
+    // can never drift apart on what counts as Corrupt. A Corrupt classification
+    // becomes Err here (fail-closed); CurrentV2/LegacyV1 are unwrapped to a v2
+    // KeystoreData.
+    match classify_payload(v)? {
+        KeystoreLoadState::CurrentV2(data) => Ok(data),
+        KeystoreLoadState::LegacyV1(map) => Ok(KeystoreData::new_v2(map)),
+        // classify_payload classifies a VALUE, never a file, so it cannot return
+        // Missing in practice; treat a defensive Missing as a fresh empty payload.
+        KeystoreLoadState::Missing => Ok(KeystoreData::new_v2(HashMap::new())),
+        KeystoreLoadState::Corrupt(e) => Err(e),
     }
 }
 
@@ -785,7 +782,9 @@ impl Keystore {
     fn get_key_with(&self, secret_ref: &str, id: Identity<'_>) -> Result<Option<String>, KeystoreError> {
         self.with_locks(|ks| {
             let v = ks.load_locked_core(id)?;
-            Ok(payload_to_v2(&v).get_provider_key(secret_ref).map(|s| s.to_string()))
+            // Fail-closed: payload_to_v2 propagates Corrupt as Err (a corrupt
+            // payload must NOT degrade to a silent Ok(None) that masks the failure).
+            Ok(payload_to_v2(&v)?.get_provider_key(secret_ref).map(|s| s.to_string()))
         })
     }
 
@@ -802,7 +801,11 @@ impl Keystore {
             // Always normalize to v2 BEFORE the mutator: a fresh-install `{}`,
             // a v1 flat map, and an existing v2 payload all converge here, so a
             // write can never produce a mixed v1/v2 shape.
-            let mut data = payload_to_v2(&raw);
+            //
+            // Fail-closed (P0): payload_to_v2 propagates Corrupt as Err. A corrupt
+            // keystore therefore NEVER gets silently overwritten with an empty v2
+            // by set_key/delete_key — the write is aborted before the mutator runs.
+            let mut data = payload_to_v2(&raw)?;
             mutator(&mut data);
             let value = data.to_value()?;
             ks.store_locked_core(&value, id)
@@ -825,7 +828,7 @@ impl Keystore {
     fn list_provider_key_refs_with(&self, id: Identity<'_>) -> Result<Vec<String>, KeystoreError> {
         self.with_locks(|ks| {
             let v = ks.load_locked_core(id)?;
-            Ok(payload_to_v2(&v).provider_keys.into_keys().collect())
+            Ok(payload_to_v2(&v)?.provider_keys.into_keys().collect())
         })
     }
 
