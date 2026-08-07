@@ -19,6 +19,8 @@ pub enum KeystoreError {
     UnsupportedVersion(u64),
     #[error("acl: {0}")]
     Acl(#[from] crate::fs_acl::AclError),
+    #[error("backup: {0}")]
+    Backup(#[from] crate::fs_acl::BackupError),
 }
 
 /// Where the machine identity comes from. Recorded at creation; frozen for the
