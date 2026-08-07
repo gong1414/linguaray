@@ -535,9 +535,12 @@ fn m12_existing_settings_bak_is_not_overwritten() {
     let (dir, db) = fresh_db();
     write_upgrade_fixture(&dir);
 
-    // Pre-create the backup with sentinel content.
+    // Pre-create the backup with VALID JSON sentinel content. The backup_settings
+    // validator parses the existing backup as JSON (fail-closed: a corrupt
+    // existing backup is rejected, not silently trusted), so the sentinel must
+    // be a parseable JSON value to be accepted as authoritative.
     let bak = linguaray_lib::db::migration_settings_bak_path(&settings_path(&dir));
-    std::fs::write(&bak, b"PRE-EXISTING-SENTINEL").unwrap();
+    std::fs::write(&bak, b"{\"pre-existing\":\"sentinel\"}").unwrap();
     let sentinel_before = std::fs::read(&bak).unwrap();
 
     // Capture original settings content too.
@@ -553,6 +556,33 @@ fn m12_existing_settings_bak_is_not_overwritten() {
         settings_before,
         "original settings preserved"
     );
+}
+
+#[test]
+fn m12b_existing_settings_bak_invalid_json_is_rejected() {
+    // Fail-closed: a pre-existing backup that isn't valid JSON (empty /
+    // truncated / corrupt) must NOT be silently accepted. backup_settings
+    // surfaces a BackupFailed error rather than treating the corrupt file as
+    // authoritative.
+    let (dir, db) = fresh_db();
+    write_upgrade_fixture(&dir);
+
+    let bak = linguaray_lib::db::migration_settings_bak_path(&settings_path(&dir));
+    std::fs::write(&bak, b"").unwrap();
+
+    let fp = FailpointCell::none();
+    let err = run(&dir, &db, &fp).unwrap_err();
+    match err {
+        MigrationError::BackupFailed(msg) => {
+            assert!(
+                msg.contains("not valid JSON") || msg.contains("existing backup"),
+                "error must mention the invalid existing backup: {msg}"
+            );
+        }
+        other => panic!("expected BackupFailed for corrupt existing backup, got {other:?}"),
+    }
+    // The corrupt backup file is untouched (never overwritten).
+    assert_eq!(std::fs::read(&bak).unwrap(), b"");
 }
 
 // ─── M13: settings corrupt JSON ───────────────────────────────────────────

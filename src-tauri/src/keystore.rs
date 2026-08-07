@@ -834,11 +834,14 @@ impl Keystore {
         })
     }
 
-    /// Move keystore.json → keystore.json.broken-<secs>-<nanos> (user-initiated
-    /// recovery). Per §A fail-closed: only an explicit user action does this.
-    /// The suffix uses nanosecond precision so two archives taken within the same
-    /// second never collide (a second-precision timestamp would silently
-    /// overwrite the prior archive via the `rename`).
+    /// Copy keystore.json → keystore.json.broken-<secs>-<nanos> (user-initiated
+    /// recovery) with TRUE no-clobber semantics. Per §A fail-closed: only an
+    /// explicit user action does this. The suffix uses nanosecond precision so two
+    /// archives taken within the same second are unlikely to collide; on a rare
+    /// same-nanosecond collision the publish is retried with a counter suffix
+    /// (`broken-<secs>-<nanos>-N`) so a prior recoverable archive is NEVER
+    /// overwritten. The original keystore.json is removed AFTER the archive is
+    /// durable (atomic copy-then-remove rather than the old clobbering rename).
     pub fn archive(&self) -> Result<std::path::PathBuf, KeystoreError> {
         self.with_locks(|ks| {
             let src = ks.file();
@@ -846,16 +849,22 @@ impl Keystore {
                 return Err(KeystoreError::Envelope("no keystore to archive".into()));
             }
             let dst = broken_archive_path(&ks.dir);
-            std::fs::rename(&src, &dst)?;
-            Ok(dst)
+            // Atomic no-clobber copy: the archive is created + secured + fsynced
+            // via create_new (O_EXCL); on a same-name collision a counter suffix
+            // is tried. Only AFTER the archive is durable is the source removed.
+            let written = crate::fs_acl::atomic_archive_no_clobber(&src, &dst)?;
+            std::fs::remove_file(&src)?;
+            Ok(written)
         })
     }
 
     /// User-initiated reset (fresh start). Round-2 review P1 #4: per the §A
     /// fail-closed protocol, Reset must NOT unrecoverably delete the canonical file
-    /// — it MOVES it to keystore.json.broken-<secs>-<nanos> (recoverable), then
-    /// clears tmp. A subsequent store() starts a fresh keystore. The nanosecond
-    /// suffix prevents same-second collisions with a prior archive. Returns the
+    /// — it copies it to keystore.json.broken-<secs>-<nanos> (recoverable) with
+    /// no-clobber semantics, then removes the canonical file and clears tmp. A
+    /// subsequent store() starts a fresh keystore. The nanosecond suffix avoids
+    /// same-second collisions; on a rare same-nanosecond collision a counter
+    /// suffix is tried so a prior archive is never overwritten. Returns the
     /// archive path if a canonical file existed (None if there was nothing to
     /// archive).
     pub fn reset(&self) -> Result<Option<std::path::PathBuf>, KeystoreError> {
@@ -863,8 +872,9 @@ impl Keystore {
             let src = ks.file();
             let archived = if src.exists() {
                 let dst = broken_archive_path(&ks.dir);
-                std::fs::rename(&src, &dst)?;
-                Some(dst)
+                let written = crate::fs_acl::atomic_archive_no_clobber(&src, &dst)?;
+                std::fs::remove_file(&src)?;
+                Some(written)
             } else {
                 None
             };
@@ -905,7 +915,36 @@ impl Keystore {
         let bytes = std::fs::read(&src)?;
         // Staging dir = keystore dir (same filesystem as the final path, so the
         // hard_link publish is atomic).
-        crate::fs_acl::crash_safe_backup(&bytes, &bak, &self.dir)?;
+        // Validate any existing backup before trusting it (fail-closed): an
+        // empty / truncated / non-JSON file at the backup path must NOT be
+        // silently accepted. The backup is a verbatim copy of the encrypted
+        // keystore envelope, which is always a JSON object — we do a STRUCTURAL
+        // check only (non-empty + starts with `{`), not a decrypt: the source
+        // bytes were just read from the live keystore and will be re-encrypted
+        // by the caller's rewrite, so a structural envelope check on the
+        // existing backup is the right fidelity here.
+        let validate_envelope = |existing: &[u8]| -> Result<(), String> {
+            if existing.is_empty() {
+                return Err("existing backup is empty".into());
+            }
+            // The encrypted envelope is always a JSON object. A leading `{`
+            // (after any whitespace) is the cheapest sound structural check
+            // without decrypting. serde_json::Value would also catch malformed
+            // JSON, but parse cost on a (possibly large) backup is unnecessary
+            // — the byte-level check is the documented envelope invariant.
+            let first = existing
+                .iter()
+                .copied()
+                .find(|b| !b.is_ascii_whitespace())
+                .ok_or_else(|| "existing backup is whitespace-only".to_string())?;
+            if first != b'{' {
+                return Err(format!(
+                    "existing backup is not a JSON object envelope (first byte {first:#x})"
+                ));
+            }
+            Ok(())
+        };
+        crate::fs_acl::crash_safe_backup(&bytes, &bak, &self.dir, Some(&validate_envelope))?;
         Ok(())
     }
 

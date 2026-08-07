@@ -261,9 +261,10 @@ fn migrate_to_v2_creates_backup() {
 #[test]
 fn migrate_to_v2_backup_is_create_new_not_overwrite() {
     // If a backup already exists from a prior run, migrate_to_v2 must NOT
-    // overwrite it (create-new semantics). We pre-create the backup, capture its
-    // bytes, run a migration that would otherwise overwrite, and assert the bytes
-    // are unchanged.
+    // overwrite it (create-new semantics). We pre-create the backup with a
+    // VALID envelope (so the fail-closed validator accepts it as authoritative),
+    // capture its bytes, run a migration that would otherwise overwrite, and
+    // assert the bytes are unchanged.
     let dir = tempfile::tempdir().unwrap();
     // Seed a v1 keystore.
     store_with_identity(
@@ -274,10 +275,20 @@ fn migrate_to_v2_backup_is_create_new_not_overwrite() {
     )
     .unwrap();
 
-    // Pre-create the backup with sentinel content (simulating a prior migration's
-    // backup). secure_file it so perms match the prod path.
+    // Pre-create the backup with a real envelope as the sentinel (simulating a
+    // prior migration's backup). The backup_locked validator only does a
+    // structural check (non-empty + leading `{`), so any envelope JSON object
+    // passes; we encrypt a distinct payload so the bytes differ from what the
+    // migration would write.
+    let sentinel_env = encrypt(
+        ID,
+        IdentitySource::MacosIoplatformuuid,
+        &json!({"sentinel": "PRE-EXISTING-BACKUP"}),
+    )
+    .unwrap();
+    let sentinel_bytes = serde_json::to_vec(&sentinel_env).unwrap();
     let bak = backup_path_in(dir.path());
-    std::fs::write(&bak, b"PRE-EXISTING-BACKUP-SENTINEL").unwrap();
+    std::fs::write(&bak, &sentinel_bytes).unwrap();
     let before = std::fs::read(&bak).unwrap();
 
     // Now migrate — this would overwrite the backup if the logic were wrong.
@@ -287,6 +298,60 @@ fn migrate_to_v2_backup_is_create_new_not_overwrite() {
     assert_eq!(
         before, after,
         "prior backup must NOT be overwritten (create-new semantics)"
+    );
+}
+
+#[test]
+fn backup_locked_rejects_invalid_existing_backup() {
+    // Fail-closed: an existing backup that isn't a valid envelope (empty,
+    // truncated, or non-JSON-object) must NOT be silently accepted. The
+    // backup_locked validator rejects it and surfaces InvalidExisting.
+    let dir = tempfile::tempdir().unwrap();
+    store_with_identity(
+        dir.path(),
+        ID,
+        IdentitySource::MacosIoplatformuuid,
+        &json!({"openai": "sk-x"}),
+    )
+    .unwrap();
+
+    // Pre-create a corrupt backup (empty file — the classic crash-truncation).
+    let bak = backup_path_in(dir.path());
+    std::fs::write(&bak, b"").unwrap();
+
+    // backup_keystore surfaces the validator failure as an error rather than
+    // silently accepting the empty file as authoritative.
+    let err = backup_keystore_with_identity(dir.path(), ID).unwrap_err();
+    let msg = err.to_string();
+    assert!(
+        msg.contains("existing backup") || msg.contains("empty"),
+        "error must mention the invalid existing backup: {msg}"
+    );
+    // The empty file is untouched (we never overwrote it).
+    assert_eq!(std::fs::read(&bak).unwrap(), b"");
+}
+
+#[test]
+fn backup_locked_rejects_non_object_existing_backup() {
+    // A backup that doesn't start with `{` (e.g. a truncated/foreign file) is
+    // rejected by the structural envelope check.
+    let dir = tempfile::tempdir().unwrap();
+    store_with_identity(
+        dir.path(),
+        ID,
+        IdentitySource::MacosIoplatformuuid,
+        &json!({"openai": "sk-x"}),
+    )
+    .unwrap();
+
+    let bak = backup_path_in(dir.path());
+    std::fs::write(&bak, b"not-a-json-object-envelope").unwrap();
+
+    let err = backup_keystore_with_identity(dir.path(), ID).unwrap_err();
+    let msg = err.to_string();
+    assert!(
+        msg.contains("JSON object") || msg.contains("not a JSON"),
+        "error must mention the structural envelope check: {msg}"
     );
 }
 
