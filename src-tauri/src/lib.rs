@@ -551,9 +551,21 @@ async fn provider_set_key(
     tauri::async_runtime::spawn_blocking(move || -> Result<(), String> {
         let _gate = app.data_gate.read();
 
-        // 1. Read the secret_ref under the DB Mutex, then release.
+        // 1. Read the secret_ref + status under the DB Mutex, then release.
+        //    Reject deleting/deleted profiles: writing a key for a row that's
+        //    mid-deletion would resurrect a secret whose owner is being torn
+        //    down, and the next finalize_delete would orphan it silently.
         let secret_ref = db
-            .with_conn(|conn| db_providers::get(conn, &uuid).map(|p| p.secret_ref))
+            .with_conn(|conn| {
+                let p = db_providers::get(conn, &uuid)?;
+                if p.status != "active" {
+                    return Err(crate::db::DbError::Integrity(format!(
+                        "provider {} status is '{}'; cannot set key on a non-active profile",
+                        uuid, p.status
+                    )));
+                }
+                Ok(p.secret_ref)
+            })
             .map_err(|e| e.to_string())?;
 
         // 2. Keystore RMW (flock only, DB NOT locked). Typed accessor converges
