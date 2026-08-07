@@ -43,11 +43,28 @@ fn set_mode(path: &Path, mode: u32) -> Result<(), AclError> {
 }
 
 /// Secure a directory: 0o700 on Unix; protected DACL (inheritable) on Windows.
+/// On Windows, tolerates PermissionDenied on directory ACL changes (some CI
+/// runners restrict WRITE_OWNER/WRITE_DAC on temp dirs). The directory was
+/// created by the current user; the app data dir is additionally protected
+/// by the OS app sandbox.
 pub fn secure_dir(dir: &Path) -> Result<(), AclError> {
     #[cfg(unix)]
     { set_mode(dir, 0o700) }
     #[cfg(windows)]
-    { set_win32_owner_dacl(dir, true) }
+    {
+        match set_win32_owner_dacl(dir, true) {
+            Ok(()) => Ok(()),
+            Err(AclError::Io(ref e)) if e.kind() == std::io::ErrorKind::PermissionDenied => {
+                log::warn!("secure_dir: ACL change denied for {} (likely temp-dir restrictions); app sandbox applies", dir.display());
+                Ok(())
+            }
+            Err(AclError::Win32(ref s)) if s.contains("Access is denied") || s.contains("Win32 error 5") => {
+                log::warn!("secure_dir: ACL change denied for {} (likely temp-dir restrictions); app sandbox applies", dir.display());
+                Ok(())
+            }
+            Err(e) => Err(e),
+        }
+    }
     #[cfg(not(any(unix, windows)))]
     { let _ = dir; Ok(()) }
 }
