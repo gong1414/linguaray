@@ -50,6 +50,14 @@ pub enum BackupError {
     Publish(std::io::Error),
     /// Parent-directory `sync_all` failed (Unix only).
     SyncParent(std::io::Error),
+    /// An existing backup at the final path failed the caller-supplied
+    /// validator (fail-closed: we never trust an existing file blindly). The
+    /// string is the validator's reason.
+    InvalidExisting(String),
+    /// Removing a stale staging file left over from a prior crashed attempt
+    /// failed. Surfaces so a stale cleanup regression doesn't silently mask
+    /// a `create_new` AlreadyExists.
+    CleanStaging(std::io::Error),
 }
 
 impl std::fmt::Display for BackupError {
@@ -61,6 +69,10 @@ impl std::fmt::Display for BackupError {
             BackupError::SyncStaging(e) => write!(f, "sync staging: {e}"),
             BackupError::Publish(e) => write!(f, "publish backup: {e}"),
             BackupError::SyncParent(e) => write!(f, "sync parent dir: {e}"),
+            BackupError::InvalidExisting(s) => {
+                write!(f, "existing backup failed validation: {s}")
+            }
+            BackupError::CleanStaging(e) => write!(f, "clean stale staging: {e}"),
         }
     }
 }
@@ -126,82 +138,221 @@ impl Drop for StagingGuard {
 /// Crash-safe atomic publish of a backup file (S2a P0).
 ///
 /// Phases (all must succeed; any failure cleans up staging and returns Err):
-/// 1. `create_new` (O_EXCL) staging file — atomic ownership of a unique name.
-/// 2. `secure_file` on the staging path — permissions are correct before data.
-/// 3. `write_all` + `flush` via the SAME writable handle that created the file.
-/// 4. `sync_all` via the SAME handle — on Windows this calls
+/// 0. No-clobber fast path. If `final_path` already exists:
+///    - When `validator` is `Some`, the existing bytes are read and passed to
+///      it. A valid existing backup wins (return `Ok(())`); an INVALID one
+///      fails closed (`Err(InvalidExisting)`). We never blindly trust an
+///      existing file — empty / truncated / corrupt backups must not pass.
+///    - When `validator` is `None`, the existing file is accepted as-is
+///      (backwards-compatible for callers that have no structural check).
+///    - In both cases the parent directory is synced on Unix so the existing
+///      entry is durable even if the directory was just created.
+/// 1. Stale staging cleanup. A prior crashed attempt may have left a
+///    `.{stem}-staging-*` file in `staging_dir`; before `create_new` we scan
+///    for files matching the precise prefix `.{final_stem}-staging-` and remove
+///    them, so the next attempt doesn't trip on `AlreadyExists`.
+/// 2. `create_new` (O_EXCL) staging file — atomic ownership of a unique name.
+///    On `AlreadyExists` (true concurrency / a cleanup race) a new name with an
+///    incremented counter suffix is tried, up to 3 times total.
+/// 3. `secure_file` on the staging path — permissions are correct before data.
+/// 4. `write_all` + `flush` via the SAME writable handle that created the file.
+/// 5. `sync_all` via the SAME handle — on Windows this calls
 ///    `FlushFileBuffers` which requires a writable handle. Using `File::open`
 ///    (read-only) would produce Access Denied on Windows.
-/// 5. Publish: Unix `hard_link` (no-clobber) or Windows `MoveFileExW`
+/// 6. Publish: Unix `hard_link` (no-clobber) or Windows `MoveFileExW`
 ///    (MOVEFILE_WRITE_THROUGH, no replace). If final already exists,
 ///    the staging file is cleaned up and `Ok(())` is returned.
-/// 6. Sync parent directory (Unix) so the new entry is durable.
+/// 7. Sync parent directory (Unix) so the new entry is durable.
 ///
 /// The final backup path is only ever observable as a complete, secured,
 /// synced file. A crash before publish leaves at most a staging file (cleaned
-/// on the next attempt).
+/// up on the next attempt via the stale-staging sweep).
+/// Caller-supplied structural check for an existing backup at the final path.
+/// Returning `Err(msg)` rejects the existing backup as untrustworthy
+/// (`BackupError::InvalidExisting(msg)`); `Ok(())` accepts it (no-clobber,
+/// existing wins). Kept as a dedicated alias so the `crash_safe_backup`
+/// signature stays readable.
+pub type BackupValidator<'a> = &'a dyn Fn(&[u8]) -> Result<(), String>;
+
 pub fn crash_safe_backup(
     source_bytes: &[u8],
     final_path: &Path,
     staging_dir: &Path,
+    validator: Option<BackupValidator<'_>>,
 ) -> Result<(), BackupError> {
-    use std::io::Write;
-
-    // 0. No-clobber fast path: a prior complete backup wins.
+    // 0. No-clobber fast path: a prior complete backup wins — but only after
+    //    validation (when a validator is supplied). A blind `exists()` check
+    //    would accept an empty / truncated / corrupt file (fail-open).
     if final_path.exists() {
+        if let Some(v) = validator {
+            let bytes = std::fs::read(final_path).map_err(BackupError::WriteStaging)?;
+            v(&bytes).map_err(BackupError::InvalidExisting)?;
+        }
+        // Existing backup is authoritative (validated or validator-None). Still
+        // sync the parent dir on Unix: if the directory was just created, the
+        // existing entry's dirent may not yet be durable.
+        sync_parent_dir(staging_dir)?;
         return Ok(());
     }
 
-    // 1. create_new (O_EXCL) on staging — atomic, unique name.
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default();
+    // 1. Stale-staging cleanup: remove `.{stem}-staging-*` left over from a
+    //    prior crashed attempt BEFORE create_new, otherwise the stale file
+    //    would trip AlreadyExists on this attempt.
     let stem = final_path
         .file_name()
         .map(|s| s.to_string_lossy().into_owned())
         .unwrap_or_else(|| "backup".to_string());
-    let staging = staging_dir.join(format!(
-        ".{stem}-staging-{}-{}",
-        now.as_secs(),
-        now.subsec_nanos()
-    ));
+    clean_stale_staging(staging_dir, &stem)?;
 
+    // 2..5. Create + secure + write + sync the staging file, retrying on
+    //       AlreadyExists (high-concurrency name collision) with a fresh
+    //       counter-suffixed name up to 3 attempts.
+    let staging = create_stage_and_write(source_bytes, staging_dir, &stem)?;
     let mut guard = StagingGuard::new(staging.clone());
 
-    // Create the staging file with a WRITABLE handle via create_new (O_EXCL).
-    // This handle is kept alive through write + sync so FlushFileBuffers
-    // has the write access it needs on Windows.
-    let mut file = std::fs::OpenOptions::new()
-        .create_new(true)
-        .write(true)
-        .open(&staging)
-        .map_err(BackupError::CreateStaging)?;
-
-    // 2. Secure the staging file BEFORE writing data.
-    secure_file(&staging).map_err(BackupError::SecureStaging)?;
-
-    // 3. Write all bytes + flush user-space buffers.
-    file.write_all(source_bytes).map_err(BackupError::WriteStaging)?;
-    file.flush().map_err(BackupError::WriteStaging)?;
-
-    // 4. Fsync — same writable handle (Windows FlushFileBuffers needs write).
-    file.sync_all().map_err(BackupError::SyncStaging)?;
-    drop(file); // release the handle before publish
-
-    // 5. Publish: atomically make the final path visible (no-clobber).
+    // 6. Publish: atomically make the final path visible (no-clobber).
     publish_backup(&staging, final_path)?;
     // Staging path is consumed by the publish (moved/hard-linked).
     // On hard_link success we need to remove the staging name;
     // on MoveFileExW success the staging no longer exists.
     guard.disarm(); // publish succeeded; don't double-delete
 
-    // 6. Sync parent directory (Unix) so the new directory entry is durable.
+    // 7. Sync parent directory (Unix) so the new directory entry is durable.
+    sync_parent_dir(staging_dir)?;
+
+    Ok(())
+}
+
+/// Create the staging file, secure it, write the bytes, and fsync — retrying
+/// the `create_new` on `AlreadyExists` with a fresh counter-suffixed name (up
+/// to 3 attempts total). Returns the path of the staging file that was written.
+///
+/// The original nanosecond-timestamp name can collide under high concurrency
+/// (two publishers racing the same nanosecond); the counter suffix makes the
+/// name unique across retries.
+fn create_stage_and_write(
+    source_bytes: &[u8],
+    staging_dir: &Path,
+    stem: &str,
+) -> Result<std::path::PathBuf, BackupError> {
+    use std::io::Write;
+
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default();
+    let secs = now.as_secs();
+    let nanos = now.subsec_nanos();
+
+    let mut last_err: Option<std::io::Error> = None;
+    for attempt in 0u32..3 {
+        // First attempt uses the bare timestamp; subsequent attempts add a
+        // counter suffix so a name collision is resolved deterministically.
+        let staging = if attempt == 0 {
+            staging_dir.join(format!(".{stem}-staging-{secs}-{nanos}"))
+        } else {
+            staging_dir.join(format!(".{stem}-staging-{secs}-{nanos}-{attempt}"))
+        };
+
+        let mut guard = StagingGuard::new(staging.clone());
+
+        // create_new (O_EXCL) — atomic, unique ownership of the name.
+        let mut file = match std::fs::OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .open(&staging)
+        {
+            Ok(f) => f,
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                // Collision with a concurrent publisher (or a sweep that
+                // raced). Try the next counter suffix.
+                last_err = Some(e);
+                continue;
+            }
+            Err(e) => return Err(BackupError::CreateStaging(e)),
+        };
+
+        // Secure the staging file BEFORE writing data.
+        secure_file(&staging).map_err(BackupError::SecureStaging)?;
+
+        // Write all bytes + flush user-space buffers.
+        file.write_all(source_bytes)
+            .map_err(BackupError::WriteStaging)?;
+        file.flush().map_err(BackupError::WriteStaging)?;
+
+        // Fsync — same writable handle (Windows FlushFileBuffers needs write).
+        file.sync_all().map_err(BackupError::SyncStaging)?;
+        drop(file); // release the handle before publish
+
+        guard.disarm(); // hand ownership of the path to the caller
+        return Ok(staging);
+    }
+
+    // Exhausted retries —surface the last AlreadyExists.
+    Err(BackupError::CreateStaging(
+        last_err.unwrap_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::AlreadyExists, "staging name collision")
+        }),
+    ))
+}
+
+/// Scan `staging_dir` for stale staging files belonging to `stem` and remove
+/// them. Only files whose name starts with `.{stem}-staging-` are touched —
+/// unrelated files (other backups' staging, other final files) are left alone.
+///
+/// Best-effort on read errors (a transient read_dir failure shouldn't abort a
+/// backup); a removal failure of an actual stale file is surfaced so the
+/// subsequent `create_new` AlreadyExists isn't masked.
+fn clean_stale_staging(staging_dir: &Path, stem: &str) -> Result<(), BackupError> {
+    let prefix = format!(".{stem}-staging-");
+    let entries = match std::fs::read_dir(staging_dir) {
+        Ok(e) => e,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            // Staging dir doesn't exist yet — nothing to clean. create_new
+            // will surface the real error if the dir can't be created by the
+            // caller's setup.
+            return Ok(());
+        }
+        Err(_) => {
+            // A transient read_dir failure is best-effort: don't abort the
+            // backup over an unreadable dir (the subsequent create_new is the
+            // authoritative check).
+            return Ok(());
+        }
+    };
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        if name.starts_with(&prefix) {
+            // Remove the stale staging file. An error here is surfaced so a
+            // stuck stale file doesn't manifest as a confusing create_new
+            // AlreadyExists on the next attempt.
+            if let Err(e) = std::fs::remove_file(entry.path()) {
+                // If it vanished between the readdir and the remove, that's
+                // fine (another sweeper or publisher cleaned it). Anything
+                // else is a real cleanup failure.
+                if e.kind() != std::io::ErrorKind::NotFound {
+                    return Err(BackupError::CleanStaging(e));
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Sync the parent directory on Unix so a freshly-created directory entry is
+/// durable. No-op on non-Unix. Used both after a publish and after the
+/// existing-valid fast path.
+#[allow(unused_variables)]
+fn sync_parent_dir(staging_dir: &Path) -> Result<(), BackupError> {
     #[cfg(unix)]
     {
         let dir = std::fs::File::open(staging_dir).map_err(BackupError::SyncParent)?;
         dir.sync_all().map_err(BackupError::SyncParent)?;
     }
-
+    #[cfg(not(unix))]
+    {
+        let _ = staging_dir;
+    }
     Ok(())
 }
 
@@ -274,6 +425,117 @@ fn publish_backup(staging: &Path, final_path: &Path) -> Result<(), BackupError> 
             Err(e) => Err(BackupError::Publish(e)),
         }
     }
+}
+
+/// Atomic no-clobber archive publish (S2a P0).
+///
+/// Used by the broken-keystore / broken-DB archive flows
+/// (`keystore.json.broken-<secs>-<nanos>`, `linguaray.db.broken-<secs>-<nanos>`).
+/// The old shape was `fs::rename(src, archive)`, which OVERWRITES an existing
+/// archive on Unix — a rapid second archive within the same nanosecond window,
+/// or a colliding suffix, would silently clobber a recoverable prior archive.
+/// This helper NEVER overwrites: it creates the archive path with
+/// `create_new(true)` (O_EXCL), writes + secures + fsyncs the bytes, and on
+/// `AlreadyExists` tries a new name with an incremented `-N` suffix (loop up to
+/// 3 times). The source bytes are read from `source` and copied into the new
+/// archive; the source file is NOT removed by this helper (the caller decides
+/// whether to remove the source — e.g. `archive` removes it, `reset` removes
+/// the canonical file).
+///
+/// Returns the archive path that was actually written (which may carry an `-N`
+/// suffix if the bare name collided).
+///
+/// The archive path's parent directory is fsynced on Unix so the new entry is
+/// durable.
+pub fn atomic_archive_no_clobber(
+    source: &Path,
+    archive_path: &Path,
+) -> Result<std::path::PathBuf, AclError> {
+    use std::io::{Read, Seek, Write};
+
+    // Read the source bytes ONCE (the archive is a copy, not a move — the
+    // caller controls the source's lifetime).
+    let mut source_file = std::fs::File::open(source)?;
+    let parent = archive_path.parent().unwrap_or_else(|| Path::new("."));
+
+    let mut written_path = archive_path.to_path_buf();
+    for attempt in 0u32..3 {
+        // First attempt uses the caller's path verbatim; subsequent attempts
+        // append/extend a counter suffix on the file stem.
+        if attempt > 0 {
+            written_path = with_counter_suffix(archive_path, attempt);
+        }
+        let mut guard = StagingGuard::new(written_path.clone());
+
+        // create_new (O_EXCL) — never overwrite an existing archive.
+        let mut file = match std::fs::OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .open(&written_path)
+        {
+            Ok(f) => f,
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                // Another archive landed on the same name; try the next suffix.
+                continue;
+            }
+            Err(e) => return Err(AclError::Io(e)),
+        };
+
+        // Secure the archive BEFORE writing data (owner-only on Unix,
+        // protected DACL on Windows — same perms as the canonical file).
+        secure_file(&written_path)?;
+
+        // Stream-copy source → archive. Rewind the source for each attempt.
+        source_file
+            .seek(std::io::SeekFrom::Start(0))
+            .map_err(AclError::Io)?;
+        let mut buf = [0u8; 8192];
+        loop {
+            let n = source_file.read(&mut buf)?;
+            if n == 0 {
+                break;
+            }
+            file.write_all(&buf[..n])?;
+        }
+        file.flush()?;
+        file.sync_all()?; // durable archive bytes
+        drop(file);
+
+        guard.disarm(); // archive path is now authoritative
+
+        // Sync the parent dir (Unix) so the archive dirent is durable.
+        #[cfg(unix)]
+        {
+            if let Ok(dir) = std::fs::File::open(parent) {
+                let _ = dir.sync_all();
+            }
+        }
+
+        return Ok(written_path);
+    }
+
+    // Exhausted retries.
+    Err(AclError::Io(std::io::Error::new(
+        std::io::ErrorKind::AlreadyExists,
+        format!(
+            "archive name collision after retries: {}",
+            archive_path.display()
+        ),
+    )))
+}
+
+/// Append a counter suffix to a path's file name. `foo.broken-1-2` with `n=1`
+/// → `foo.broken-1-2-1`. Used by [`atomic_archive_no_clobber`] to disambiguate
+/// same-timestamp archive collisions.
+fn with_counter_suffix(path: &Path, n: u32) -> std::path::PathBuf {
+    let mut name = path
+        .file_name()
+        .map(|s| s.to_os_string())
+        .unwrap_or_default();
+    name.push(format!("-{n}"));
+    let mut out = path.to_path_buf();
+    out.set_file_name(name);
+    out
 }
 
 // ── Windows Win32 ACL implementation ──────────────────────────────────

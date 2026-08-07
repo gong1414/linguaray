@@ -187,10 +187,13 @@ pub fn archive_database_core(
         }
     };
 
-    // ── 4. Rename the DB file aside (recoverable). If the file doesn't exist,
+    // ── 4. Archive the DB file aside (recoverable). If the file doesn't exist,
     //      there's nothing to archive — proceed straight to opening a fresh
-    //      one. On rename failure the original file is still at db_path, so we
-    //      can restore the slot by reopening it.
+    //      one. The archive is published with atomic no-clobber semantics
+    //      (create_new + retry on collision) so a prior recoverable archive is
+    //      NEVER overwritten by a same-nanosecond collision — the old `rename`
+    //      silently clobbered on Unix. On archive failure the original file is
+    //      still at db_path, so we can restore the slot by reopening it.
     let archived_path = if afp == ArchiveFailpoint::RenameError {
         // Simulate rename failure WITHOUT moving the file. Restore the slot by
         // reopening the original (only if we previously held a handle) so the
@@ -210,8 +213,10 @@ pub fn archive_database_core(
         return Err("rename linguaray.db aside: simulated rename failure".into());
     } else if db_path.exists() {
         // Nanosecond-precision suffix so two archives taken within the same
-        // second don't collide (a second-only suffix would let a rapid second
-        // archive silently overwrite the first via the rename).
+        // second are unlikely to collide; on a rare same-nanosecond collision
+        // the atomic publish retries with a counter suffix so a prior archive
+        // is preserved (the old second-only suffix + rename would silently
+        // overwrite the first).
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default();
@@ -220,13 +225,37 @@ pub fn archive_database_core(
             now.as_secs(),
             now.subsec_nanos()
         ));
-        match std::fs::rename(&db_path, &dst) {
-            Ok(()) => dst.to_string_lossy().into_owned(),
+        // Atomic no-clobber copy: archive is created + secured + fsynced via
+        // create_new; the canonical file is removed only AFTER the archive is
+        // durable. On failure the original file is still at db_path.
+        match crate::fs_acl::atomic_archive_no_clobber(&db_path, &dst) {
+            Ok(written) => {
+                // Archive durable — remove the canonical file so a fresh open
+                // at db_path starts clean. A remove failure here leaves both
+                // the archive AND the original; reopen the original so the app
+                // keeps serving, and surface the error.
+                if let Err(e) = std::fs::remove_file(&db_path) {
+                    if closed {
+                        if let Ok(db) = Database::open(&db_path) {
+                            *app.db.write() = Some(Arc::new(db));
+                        } else {
+                            *app.readiness.write() = DataReadiness::NeedsDatabaseRecovery {
+                                reason: format!(
+                                    "rename {} failed ({e}) and reopen also failed",
+                                    db_path.display()
+                                ),
+                            };
+                        }
+                    }
+                    return Err(format!("rename linguaray.db aside: {e}"));
+                }
+                written.to_string_lossy().into_owned()
+            }
             Err(e) => {
-                // Rename failed: the file is still at the original path.
-                // Restore the slot by reopening it (only if we previously held
-                // a handle, i.e. the app was using this DB) so the user isn't
-                // left with a None slot over a usable file.
+                // Archive failed: the original file is still at the original
+                // path. Restore the slot by reopening it (only if we previously
+                // held a handle, i.e. the app was using this DB) so the user
+                // isn't left with a None slot over a usable file.
                 if closed {
                     if let Ok(db) = Database::open(&db_path) {
                         *app.db.write() = Some(Arc::new(db));

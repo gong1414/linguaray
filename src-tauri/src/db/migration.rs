@@ -296,7 +296,17 @@ pub(crate) fn backup_settings(settings_path: &Path) -> Result<(), MigrationError
     // Staging dir MUST be the same directory as the final path so the publish
     // (hard_link) is a same-filesystem atomic op.
     let staging_dir = bak.parent().unwrap_or_else(|| Path::new("."));
-    crate::fs_acl::crash_safe_backup(&bytes, &bak, staging_dir).map_err(|e| {
+    // Validate any existing backup before trusting it (fail-closed): an empty /
+    // truncated / non-JSON file at the backup path must NOT be silently
+    // accepted as authoritative. A valid `serde_json::Value` (any JSON node)
+    // is enough — the backup is a verbatim copy of settings.json, which we
+    // already parse as JSON above, so a parseable backup is structurally sound.
+    let validate_json = |existing: &[u8]| -> Result<(), String> {
+        serde_json::from_slice::<serde_json::Value>(existing)
+            .map(|_| ())
+            .map_err(|e| format!("existing backup is not valid JSON: {e}"))
+    };
+    crate::fs_acl::crash_safe_backup(&bytes, &bak, staging_dir, Some(&validate_json)).map_err(|e| {
         MigrationError::BackupFailed(format!("settings backup {}: {e}", bak.display()))
     })?;
     Ok(())
