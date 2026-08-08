@@ -1,0 +1,86 @@
+/* WindowChrome — top-level application shell: optional sidebar + main column
+ * with a header (title + window controls) and a content region. */
+
+.window-chrome {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  background: var(--color-canvas);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+}
+
+.window-chrome__sidebar {
+  flex: 0 0 auto;
+  height: 100%;
+  background: var(--color-surface-subtle);
+  border-right: 1px solid var(--color-border-subtle);
+  overflow: auto;
+}
+
+.window-chrome__main {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+}
+
+.window-chrome__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  flex: 0 0 auto;
+  height: var(--height-lg);
+  padding: 0 var(--space-md);
+  background: var(--color-surface-default);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.window-chrome__title {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: var(--text-md--weight);
+  line-height: 1;
+  color: var(--color-text-primary);
+}
+
+.window-chrome__controls {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.window-chrome__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--height-sm);
+  height: var(--height-sm);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard);
+}
+
+.window-chrome__btn:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+
+.window-chrome__btn:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.window-chrome__content {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}

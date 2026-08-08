@@ -1,168 +1,224 @@
 /**
- * LinguaRay Design Tokens — frozen from MASTER.md §1–§5.
+ * LinguaRay Design Tokens — R1 三层结构（Core / Semantic / Aliases）.
  *
- * DO NOT edit individual values here to "tune" a screen. These are the single
- * source of truth and are mirrored 1:1 from design-system/linguaray/MASTER.md.
- * To change a token, edit MASTER.md first (per MASTER §9 Page Overrides Boundary).
+ * Frozen 1:1 from design-system/linguaray/token-map.md (R0).
+ *
+ * Layer model:
+ *   §1.0 Core / Primitives    — 97 Penpot-frozen primitives, theme-independent (:root)
+ *   §1.1 Semantic / Light     — 28 Penpot tokens + engineering extensions ([data-theme="light"])
+ *   §1.2 Semantic / Dark      — 28 Penpot tokens + engineering extensions ([data-theme="dark"])
+ *   §1.4 ALIASES              — old names → new semantic names, one-way (:root)
+ *
+ * Theme-independent primitives (font / spacing / radius / motion) live in :root
+ * so they apply to both themes. Per-theme color/shadow values live in the
+ * [data-theme="..."] blocks.
+ *
+ * DO NOT edit individual values to "tune" a screen. To change a token, edit
+ * token-map.md / MASTER.md first.
  */
 
-/* §1.1 Light Theme — applied via [data-theme="light"] (default :root) */
-:root,
-[data-theme="light"] {
-  /* Semantic fills */
-  --color-primary-fill: #2563eb;
-  --color-on-primary-fill: #ffffff;
-  --color-primary-fg: #2563eb;
-
-  --color-link: #1d4ed8;
-
-  --color-success-fill: #15803d;
-  --color-on-success-fill: #ffffff;
-  --color-success-fg: #15803d;
-
-  --color-destructive-fill: #b91c1c;
-  --color-on-destructive-fill: #ffffff;
-  --color-destructive-fg: #b91c1c;
-
-  --color-warning-fill: #b45309;
-  --color-on-warning-fill: #ffffff;
-  --color-warning-fg: #b45309;
-
-  --color-info-fill: #1d4ed8;
-  --color-on-info-fill: #ffffff;
-  --color-info-fg: #1d4ed8;
-
-  /* Surfaces & text */
-  --color-bg: #ffffff;
-  --color-fg: #0f172a;
-  --color-bg-elevated: #f8fafc;
-  --color-fg-elevated: #0f172a;
-  --color-bg-hover: #f1f5f9;
-  --color-bg-selected: #dbeafe;
-  --color-selected-fg: #1d4ed8;
-  --color-bg-overlay: rgba(0, 0, 0, 0.4);
-  --color-fg-muted: #475569;
-
-  /* Borders & state */
-  --color-border: #e2e8f0;
-  --color-border-strong: #64748b;
-  --color-ring: #2563eb;
-  --color-disabled-fg: #94a3b8;
-  --color-disabled-bg: #f1f5f9;
-
-  /* §4 Shadows — light */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.08);
-  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
-}
-
-/* §1.2 Dark Theme */
-[data-theme="dark"] {
-  --color-primary-fill: #2563eb;
-  --color-on-primary-fill: #ffffff;
-  --color-primary-fg: #60a5fa;
-
-  --color-link: #60a5fa;
-
-  --color-success-fill: #166534;
-  --color-on-success-fill: #ffffff;
-  --color-success-fg: #4ade80;
-
-  --color-destructive-fill: #991b1b;
-  --color-on-destructive-fill: #ffffff;
-  --color-destructive-fg: #f87171;
-
-  --color-warning-fill: #92400e;
-  --color-on-warning-fill: #ffffff;
-  --color-warning-fg: #fbbf24;
-
-  --color-info-fill: #1e40af;
-  --color-on-info-fill: #ffffff;
-  --color-info-fg: #60a5fa;
-
-  --color-bg: #0f172a;
-  --color-fg: #f1f5f9;
-  --color-bg-elevated: #1e293b;
-  --color-fg-elevated: #f1f5f9;
-  --color-bg-hover: #334155;
-  --color-bg-selected: #1e3a5f;
-  --color-selected-fg: #60a5fa;
-  --color-bg-overlay: rgba(0, 0, 0, 0.6);
-  --color-fg-muted: #94a3b8;
-
-  --color-border: rgba(255, 255, 255, 0.08);
-  --color-border-strong: #64748b;
-  --color-ring: #60a5fa;
-  --color-disabled-fg: #475569;
-  --color-disabled-bg: #1e293b;
-
-  /* §4 Shadows — dark */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5);
-}
-
-/* §2 Typography */
+/* ============================================================
+ * §1.0 Core / Primitives — 97 Token (theme-independent, :root)
+ * ========================================================== */
 :root {
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue",
-    "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
-  --font-mono: "SF Mono", "Cascadia Code", "Consolas", "Noto Sans Mono CJK SC",
-    monospace;
+  /* --- colors — 44 --- */
+  --core-color-white: #FFFFFF;
+  --core-color-black: #000000;
+  --core-color-neutral-50: #F8FAFC;
+  --core-color-neutral-100: #F1F5F9;
+  --core-color-neutral-200: #E2E8F0;
+  --core-color-neutral-300: #CBD5E1;
+  --core-color-neutral-400: #94A3B8;
+  --core-color-neutral-500: #64748B;
+  --core-color-neutral-600: #475569;
+  --core-color-neutral-700: #334155;
+  --core-color-neutral-800: #1E293B;
+  --core-color-neutral-900: #0F172A;
+  --core-color-neutral-950: #020617;
+  --core-color-indigo-50: #EEF2FF;
+  --core-color-indigo-100: #E0E7FF;
+  --core-color-indigo-200: #C7D2FE;
+  --core-color-indigo-300: #A5B4FC;
+  --core-color-indigo-400: #818CF8;
+  --core-color-indigo-500: #6366F1;
+  --core-color-indigo-600: #4F46E5;
+  --core-color-indigo-700: #4338CA;
+  --core-color-indigo-800: #3730A3;
+  --core-color-indigo-900: #312E81;
+  --core-color-cyan-50: #ECFEFF;
+  --core-color-cyan-100: #CFFAFE;
+  --core-color-cyan-200: #A5F3FC;
+  --core-color-cyan-300: #67E8F9;
+  --core-color-cyan-400: #22D3EE;
+  --core-color-cyan-500: #06B6D4;
+  --core-color-cyan-600: #0891B2;
+  --core-color-cyan-700: #0E7490;
+  --core-color-cyan-800: #155E75;
+  --core-color-green-50: #F0FDF4;
+  --core-color-green-500: #22C55E;
+  --core-color-green-600: #16A34A;
+  --core-color-green-700: #15803D;
+  --core-color-amber-50: #FFFBEB;
+  --core-color-amber-500: #F59E0B;
+  --core-color-amber-600: #D97706;
+  --core-color-amber-700: #B45309;
+  --core-color-red-50: #FEF2F2;
+  --core-color-red-500: #EF4444;
+  --core-color-red-600: #DC2626;
+  --core-color-red-700: #B91C1C;
 
-  --text-xs: 12px;
+  /* --- spacing — 14 --- */
+  --core-space-0: 0px;
+  --core-space-2: 2px;
+  --core-space-4: 4px;
+  --core-space-6: 6px;
+  --core-space-8: 8px;
+  --core-space-10: 10px;
+  --core-space-12: 12px;
+  --core-space-16: 16px;
+  --core-space-20: 20px;
+  --core-space-24: 24px;
+  --core-space-32: 32px;
+  --core-space-40: 40px;
+  --core-space-48: 48px;
+  --core-space-64: 64px;
+
+  /* --- radius — 9 --- */
+  --core-radius-0: 0px;
+  --core-radius-4: 4px;
+  --core-radius-6: 6px;
+  --core-radius-8: 8px;
+  --core-radius-10: 10px;
+  --core-radius-12: 12px;
+  --core-radius-16: 16px;
+  --core-radius-20: 20px;
+  --core-radius-full: 9999px;
+
+  /* --- border width — 2 --- */
+  --core-border-1: 1px;
+  --core-border-2: 2px;
+
+  /* --- opacity — 2 --- */
+  --core-opacity-disabled: 0.5;
+  --core-opacity-muted: 0.7;
+
+  /* --- font families — 3 --- */
+  --core-font-family-sans: "Inter", "Noto Sans SC", -apple-system, BlinkMacSystemFont,
+    "Segoe UI", "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --core-font-family-cjk: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --core-font-family-mono: "IBM Plex Mono", "SF Mono", "Cascadia Code", "Consolas",
+    "Noto Sans Mono CJK SC", monospace;
+
+  /* --- font sizes — 9 --- */
+  --core-font-size-11: 11px;
+  --core-font-size-12: 12px;
+  --core-font-size-13: 13px;
+  --core-font-size-14: 14px;
+  --core-font-size-16: 16px;
+  --core-font-size-18: 18px;
+  --core-font-size-20: 20px;
+  --core-font-size-24: 24px;
+  --core-font-size-32: 32px;
+
+  /* --- font weights — 4 --- */
+  --core-font-weight-400: 400;
+  --core-font-weight-500: 500;
+  --core-font-weight-600: 600;
+  --core-font-weight-700: 700;
+
+  /* --- typography composite — 10 (size / weight / line-height) --- */
+  /* type.display */
+  --core-type-display-size: var(--core-font-size-32);
+  --core-type-display-weight: var(--core-font-weight-700);
+  --core-type-display-line-height: 1.25;
+  /* type.title.lg */
+  --core-type-title-lg-size: var(--core-font-size-24);
+  --core-type-title-lg-weight: var(--core-font-weight-700);
+  --core-type-title-lg-line-height: 1.33;
+  /* type.title.md */
+  --core-type-title-md-size: var(--core-font-size-20);
+  --core-type-title-md-weight: var(--core-font-weight-600);
+  --core-type-title-md-line-height: 1.4;
+  /* type.title.sm */
+  --core-type-title-sm-size: var(--core-font-size-16);
+  --core-type-title-sm-weight: var(--core-font-weight-600);
+  --core-type-title-sm-line-height: 1.5;
+  /* type.body.lg */
+  --core-type-body-lg-size: var(--core-font-size-16);
+  --core-type-body-lg-weight: var(--core-font-weight-400);
+  --core-type-body-lg-line-height: 1.5;
+  /* type.body.md */
+  --core-type-body-md-size: var(--core-font-size-14);
+  --core-type-body-md-weight: var(--core-font-weight-400);
+  --core-type-body-md-line-height: 1.43;
+  /* type.body.sm */
+  --core-type-body-sm-size: var(--core-font-size-12);
+  --core-type-body-sm-weight: var(--core-font-weight-400);
+  --core-type-body-sm-line-height: 1.5;
+  /* type.label.md */
+  --core-type-label-md-size: var(--core-font-size-13);
+  --core-type-label-md-weight: var(--core-font-weight-600);
+  --core-type-label-md-line-height: 1.23;
+  /* type.label.sm */
+  --core-type-label-sm-size: var(--core-font-size-11);
+  --core-type-label-sm-weight: var(--core-font-weight-600);
+  --core-type-label-sm-line-height: 1.27;
+  /* type.code */
+  --core-type-code-size: var(--core-font-size-12);
+  --core-type-code-weight: var(--core-font-weight-500);
+  --core-type-code-line-height: 1.5;
+  --core-type-code-font-family: var(--core-font-family-mono);
+
+  /* --- Theme-independent engineering scales (font / spacing / radius / control / motion) ---
+   * Shared by both themes; kept in :root so neither [data-theme] block duplicates them.
+   * These are the host-facing scales already used across components/ui-lab. */
+  --font-sans: var(--core-font-family-sans);
+  --font-mono: var(--core-font-family-mono);
+
+  --text-xs: var(--core-font-size-12);
   --text-xs--line-height: 16px;
-  --text-xs--weight: 400;
+  --text-xs--weight: var(--core-font-weight-400);
 
-  --text-sm: 13px;
+  --text-sm: var(--core-font-size-13);
   --text-sm--line-height: 18px;
-  --text-sm--weight: 400;
+  --text-sm--weight: var(--core-font-weight-400);
 
-  --text-base: 14px;
+  --text-base: var(--core-font-size-14);
   --text-base--line-height: 20px;
-  --text-base--weight: 400;
+  --text-base--weight: var(--core-font-weight-400);
 
-  --text-md: 16px;
+  --text-md: var(--core-font-size-16);
   --text-md--line-height: 24px;
-  --text-md--weight: 500;
+  --text-md--weight: var(--core-font-weight-500);
 
-  --text-lg: 20px;
+  --text-lg: var(--core-font-size-20);
   --text-lg--line-height: 28px;
-  --text-lg--weight: 600;
+  --text-lg--weight: var(--core-font-weight-600);
 
-  --text-xl: 24px;
+  --text-xl: var(--core-font-size-24);
   --text-xl--line-height: 32px;
-  --text-xl--weight: 700;
-}
+  --text-xl--weight: var(--core-font-weight-700);
 
-/* §3 Spacing, Controls, Radius, Icons */
-:root {
-  /* Spacing (density 8) */
-  --space-xs: 2px;
-  --space-sm: 4px;
-  --space-md: 8px;
-  --space-lg: 12px;
-  --space-xl: 16px;
-  --space-2xl: 24px;
-  --space-3xl: 32px;
+  --space-xs: var(--core-space-2);
+  --space-sm: var(--core-space-4);
+  --space-md: var(--core-space-8);
+  --space-lg: var(--core-space-12);
+  --space-xl: var(--core-space-16);
+  --space-2xl: var(--core-space-24);
+  --space-3xl: var(--core-space-32);
 
-  /* Control heights */
   --height-sm: 28px;
   --height-md: 32px;
   --height-lg: 36px;
 
-  /* Border radius */
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
+  --radius-sm: var(--core-radius-6);
+  --radius-md: var(--core-radius-8);
+  --radius-lg: var(--core-radius-12);
 
-  /* Icon sizes */
   --icon-sm: 14px;
   --icon-md: 16px;
   --icon-lg: 20px;
-}
 
-/* §5 Motion */
-:root {
   --duration-fast: 120ms;
   --duration-base: 180ms;
   --duration-slow: 240ms;
@@ -170,4 +226,198 @@
   --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
   --ease-in: cubic-bezier(0.4, 0, 1, 1);
   --ease-out: cubic-bezier(0, 0, 0.2, 1);
+}
+
+/* ============================================================
+ * §1.1 Semantic / Light — 28 Penpot + engineering extensions
+ * ========================================================== */
+[data-theme="light"] {
+  /* Penpot semantic — 28 */
+  --color-canvas: #F8FAFC;
+  --color-surface-default: #FFFFFF;
+  --color-surface-subtle: #F1F5F9;
+  --color-surface-raised: #FFFFFF;
+  --color-surface-inverse: #0F172A;
+  --color-text-primary: #0F172A;
+  --color-text-secondary: #475569;
+  --color-text-tertiary: #64748B;
+  --color-text-disabled: #94A3B8;
+  --color-text-inverse: #F8FAFC;
+  --color-brand-default: #4F46E5;
+  --color-brand-hover: #4338CA;
+  --color-brand-soft: #EEF2FF;
+  --color-accent-default: #06B6D4;
+  --color-accent-soft: #ECFEFF;
+  --color-border-subtle: #E2E8F0;
+  --color-border-default: #CBD5E1;
+  --color-border-strong: #94A3B8;
+  --color-focus: #0891B2;
+  --color-status-success: #16A34A;
+  --color-status-success-soft: #F0FDF4;
+  --color-status-warning: #D97706;
+  --color-status-warning-soft: #FFFBEB;
+  --color-status-danger: #DC2626;
+  --color-status-danger-soft: #FEF2F2;
+  --color-overlay: rgba(0, 0, 0, 0.4);
+  /* Shadow — MASTER §4 canonical names define values directly. */
+  --shadow-raised: 0 8px 24px -2px rgba(15, 23, 42, 0.08);
+  --shadow-overlay: 0 16px 40px -4px rgba(15, 23, 42, 0.1);
+  /* --color-shadow-* kept as backward-compat aliases. */
+  --color-shadow-raised: var(--shadow-raised);
+  --color-shadow-overlay: var(--shadow-overlay);
+
+  /* Engineering extensions [工程扩展] */
+  --color-surface-hover: #F1F5F9;
+  --color-surface-selected: #DBEAFE;
+  --color-text-selected: #1D4ED8;
+  --color-brand-on-fill: #FFFFFF;
+  --color-brand-fg: #4F46E5;
+  --color-status-info: #2563EB;
+  --color-status-info-soft: #EFF6FF;
+  --color-disabled-bg: #F1F5F9;
+  --color-border-control: #64748B;
+  --color-strong-fill-success: #15803D;
+  --color-strong-fill-warning: #B45309;
+  --color-strong-fill-danger: #DC2626;
+  --color-strong-fill-info: #2563EB;
+  --color-strong-on-success: #FFFFFF;
+  --color-strong-on-warning: #FFFFFF;
+  --color-strong-on-danger: #FFFFFF;
+  --color-strong-on-info: #FFFFFF;
+
+  /* status-*-fg [工程扩展] — WCAG AA-correct soft-badge foregrounds.
+   * Penpot has success/warning/danger.default only; those values (e.g. danger
+   * #DC2626 on #FEF2F2 soft = 4.41) miss AA 4.5, so StatusBadge soft mode must
+   * consume these dedicated darker foregrounds. info.* has no Penpot source. */
+  --color-status-success-fg: #15803D;
+  --color-status-warning-fg: #B45309;
+  --color-status-danger-fg: #B91C1C;
+  --color-status-info-fg: #1D4ED8;
+
+  /* Same-name legacy tokens defined directly here (not aliases, per token-map §栏 3). */
+  --color-border: var(--color-border-subtle);
+  --color-disabled-fg: var(--color-text-disabled);
+}
+
+/* ============================================================
+ * §1.2 Semantic / Dark — 28 Penpot + engineering extensions
+ * ========================================================== */
+[data-theme="dark"] {
+  /* Penpot semantic — 28 */
+  --color-canvas: #020617;
+  --color-surface-default: #0F172A;
+  --color-surface-subtle: #1E293B;
+  --color-surface-raised: #1E293B;
+  --color-surface-inverse: #F8FAFC;
+  --color-text-primary: #F8FAFC;
+  --color-text-secondary: #CBD5E1;
+  --color-text-tertiary: #94A3B8;
+  --color-text-disabled: #475569;
+  --color-text-inverse: #0F172A;
+  --color-brand-default: #818CF8;
+  --color-brand-hover: #A5B4FC;
+  --color-brand-soft: #312E81;
+  --color-accent-default: #22D3EE;
+  --color-accent-soft: #164E63;
+  --color-border-subtle: #1E293B;
+  --color-border-default: #334155;
+  --color-border-strong: #475569;
+  --color-focus: #22D3EE;
+  --color-status-success: #22C55E;
+  --color-status-success-soft: #15803D;
+  --color-status-warning: #F59E0B;
+  --color-status-warning-soft: #B45309;
+  --color-status-danger: #EF4444;
+  --color-status-danger-soft: #B91C1C;
+  --color-overlay: rgba(0, 0, 0, 0.6);
+  /* Shadow — MASTER §4 canonical names define values directly. */
+  --shadow-raised: 0 8px 24px -2px rgba(0, 0, 0, 0.4);
+  --shadow-overlay: 0 16px 40px -4px rgba(0, 0, 0, 0.5);
+  /* --color-shadow-* kept as backward-compat aliases. */
+  --color-shadow-raised: var(--shadow-raised);
+  --color-shadow-overlay: var(--shadow-overlay);
+
+  /* Engineering extensions [工程扩展] */
+  --color-surface-hover: #334155;
+  --color-surface-selected: #1E3A5F;
+  --color-text-selected: #60A5FA;
+  --color-brand-on-fill: #0F172A;
+  --color-brand-fg: #818CF8;
+  --color-status-info: #60A5FA;
+  --color-status-info-soft: #1E3A8A;
+  --color-disabled-bg: #1E293B;
+  --color-border-control: #64748B;
+  --color-strong-fill-success: #15803D;
+  --color-strong-fill-warning: #B45309;
+  --color-strong-fill-danger: #DC2626;
+  --color-strong-fill-info: #2563EB;
+  --color-strong-on-success: #FFFFFF;
+  --color-strong-on-warning: #FFFFFF;
+  --color-strong-on-danger: #FFFFFF;
+  --color-strong-on-info: #FFFFFF;
+
+  /* status-*-fg [工程扩展] — WCAG AA-correct soft-badge foregrounds (Light
+   * values do not satisfy AA on Dark softs, so Dark uses canvas text #F8FAFC). */
+  --color-status-success-fg: #F8FAFC;
+  --color-status-warning-fg: #F8FAFC;
+  --color-status-danger-fg: #F8FAFC;
+  --color-status-info-fg: #F8FAFC;
+
+  /* Same-name legacy tokens defined directly here (not aliases, per token-map §栏 3). */
+  --color-border: var(--color-border-subtle);
+  --color-disabled-fg: var(--color-text-disabled);
+}
+
+/* ============================================================
+ * §1.4 ALIASES — old names → new semantic names (one-way refs)
+ * Defined in :root so they apply to BOTH themes. Targets resolve
+ * via the per-theme [data-theme] blocks. Delete after the 16
+ * surfaces migrate (token-map.md §栏 3 deletion gate).
+ * ========================================================== */
+:root {
+  /* brand / primary */
+  --color-primary-fill: var(--color-brand-default);
+  --color-on-primary-fill: var(--color-brand-on-fill);
+  --color-primary-fg: var(--color-brand-fg);
+
+  /* canvas / surface / text */
+  --color-bg: var(--color-canvas);
+  --color-fg: var(--color-text-primary);
+  --color-bg-elevated: var(--color-surface-default);
+  --color-fg-elevated: var(--color-text-primary);
+  --color-bg-hover: var(--color-surface-hover);
+  --color-bg-selected: var(--color-surface-selected);
+  --color-bg-overlay: var(--color-overlay);
+  --color-fg-muted: var(--color-text-secondary);
+  --color-selected-fg: var(--color-text-selected);
+
+  /* focus */
+  --color-ring: var(--color-focus);
+
+  /* status — success */
+  --color-success-fill: var(--color-strong-fill-success);
+  --color-on-success-fill: var(--color-strong-on-success);
+  --color-success-fg: var(--color-status-success);
+
+  /* status — warning */
+  --color-warning-fill: var(--color-strong-fill-warning);
+  --color-on-warning-fill: var(--color-strong-on-warning);
+  --color-warning-fg: var(--color-status-warning);
+
+  /* status — destructive / danger */
+  --color-destructive-fill: var(--color-strong-fill-danger);
+  --color-on-destructive-fill: var(--color-strong-on-danger);
+  --color-destructive-fg: var(--color-status-danger);
+
+  /* status — info */
+  --color-info-fill: var(--color-strong-fill-info);
+  --color-on-info-fill: var(--color-strong-on-info);
+  --color-info-fg: var(--color-status-info);
+
+  /* shadow — legacy three-tier aliases → new two-token model (MASTER §4).
+   * Declared once in :root so they apply to both themes; targets resolve via
+   * the per-theme --shadow-raised / --shadow-overlay definitions. */
+  --shadow-sm: var(--shadow-raised);
+  --shadow-md: var(--shadow-raised);
+  --shadow-lg: var(--shadow-overlay);
 }

@@ -82,6 +82,9 @@ export type LabStrings = {
     tts: string;
     externalApi: string;
     updater: string;
+    componentGallery: string;
+    sidebarIsolated: string;
+    confirmIsolated: string;
   };
   navGroupLabel: string;
   upcomingSlice: string;
@@ -238,6 +241,90 @@ export type LabStrings = {
   };
 };
 
+/**
+ * ComponentGallery + sidebar-isolated copy. Separated from LabStrings so the
+ * gallery owns its own complete dictionary (18 components × key state matrix)
+ * without bloating the page-level surface strings.
+ */
+export type GalleryStrings = {
+  title: string;
+  variantsLabel: string;
+  statesLabel: string;
+  button: { title: string; primary: string; secondary: string; ghost: string; destructive: string; loading: string; disabled: string };
+  iconButton: { title: string; copy: string; translate: string; delete: string };
+  segmentedControl: { title: string; en: string; zh: string };
+  shortcutChip: { title: string; labels: { recording: string; conflict: string; clear: string } };
+  textField: { title: string; apiKey: string; helper: string; error: string };
+  select: { title: string; model: string; options: { value: string; label: string }[] };
+  switch: { title: string; on: string; off: string; disabled: string };
+  statusBadge: { title: string; success: string; warning: string; danger: string; info: string; neutral: string };
+  inlineError: { title: string; network: string; config: string };
+  toast: { title: string; info: string; success: string; warning: string; destructive: string };
+  confirm: { title: string; primary: string; open: string; deleteTitle: string; deleteMsg: string; confirm: string; cancel: string };
+  emptyState: { title: string; title2: string; desc: string; action: string };
+  translationCard: { title: string; source: string; loading: string; result: string };
+  resultCard: { title: string; success: string; failure: string; copy: string; pin: string };
+  providerRow: { title: string; labels: { edit: string; delete: string; enabled: string; statusText: Record<"active" | "available" | "key-missing" | "disabled", string> } };
+  historyRow: { title: string; source: string; preview: string; time: string; addFav: string; removeFav: string };
+  sidebarItem: { title: string; settings: string; history: string };
+  windowChrome: { title: string; title2: string; body: string; labels: { minimize: string; close: string } };
+  spinner: { title: string; loading: string };
+  overflow: { title: string; buttonLong: string; fieldLabel: string; placeholder: string; badge: string };
+};
+
+export const galleryStrings: Record<Locale, GalleryStrings> = {
+  en: {
+    title: "Component Gallery",
+    variantsLabel: "Variants",
+    statesLabel: "States",
+    button: { title: "Button", primary: "Translate", secondary: "Secondary", ghost: "Ghost", destructive: "Delete", loading: "Loading", disabled: "Disabled" },
+    iconButton: { title: "Icon Button", copy: "Copy", translate: "Translate", delete: "Delete" },
+    segmentedControl: { title: "Segmented Control", en: "EN", zh: "中文" },
+    shortcutChip: { title: "Shortcut Chip", labels: { recording: "Recording…", conflict: "Conflict", clear: "Clear shortcut" } },
+    textField: { title: "Text Field", apiKey: "API key", helper: "Used to authenticate requests", error: "API key is required" },
+    select: { title: "Select", model: "Model", options: [{ value: "gpt-4o", label: "gpt-4o" }, { value: "gpt-4o-mini", label: "gpt-4o-mini" }, { value: "o1", label: "o1" }] },
+    switch: { title: "Switch", on: "Enabled", off: "Disabled", disabled: "Disabled" },
+    statusBadge: { title: "Status Badge", success: "Active", warning: "Key missing", danger: "Error", info: "Synced", neutral: "Available" },
+    inlineError: { title: "Inline Error", network: "Network error — check your connection", config: "Configuration error — check your API key" },
+    toast: { title: "Toast", info: "New version available", success: "Settings saved", warning: "Rate limit approaching", destructive: "Failed to save provider" },
+    confirm: { title: "Confirm", primary: "Open confirm", open: "Open dialog", deleteTitle: "Delete provider?", deleteMsg: "History references will be preserved.", confirm: "Delete", cancel: "Cancel" },
+    emptyState: { title: "Empty State", title2: "No providers yet", desc: "Add your first provider to start translating.", action: "Add provider" },
+    translationCard: { title: "Translation Card", source: "The quick brown fox", loading: "Translating…", result: "敏捷的棕色狐狸" },
+    resultCard: { title: "Result Card", success: "敏捷的棕色狐狸", failure: "Translation failed", copy: "Copy", pin: "Pin" },
+    providerRow: { title: "Provider Row", labels: { edit: "Edit", delete: "Delete", enabled: "Enabled", statusText: { active: "Active", available: "Available", "key-missing": "Key missing", disabled: "Disabled" } } },
+    historyRow: { title: "History Row", source: "The quick brown fox", preview: "敏捷的棕色狐狸", time: "2 min ago", addFav: "Add to favorites", removeFav: "Remove from favorites" },
+    sidebarItem: { title: "Sidebar Item", settings: "Settings", history: "History" },
+    windowChrome: { title: "Window Chrome", title2: "LinguaRay", body: "Window content area", labels: { minimize: "Minimize", close: "Close" } },
+    spinner: { title: "Spinner", loading: "Loading…" },
+    overflow: { title: "Overflow · long CJK", buttonLong: "这是一个非常长的中文按钮文本测试溢出情况", fieldLabel: "超长中文标签占位测试", placeholder: "请在此输入一段非常长的中文内容用于测试占位文本溢出表现", badge: "这是一个非常长的中文状态徽章标签文本" },
+  },
+  zh: {
+    title: "组件画廊",
+    variantsLabel: "变体",
+    statesLabel: "状态",
+    button: { title: "按钮", primary: "翻译", secondary: "次要", ghost: "幽灵", destructive: "删除", loading: "加载中", disabled: "已禁用" },
+    iconButton: { title: "图标按键", copy: "复制", translate: "翻译", delete: "删除" },
+    segmentedControl: { title: "分段控件", en: "EN", zh: "中文" },
+    shortcutChip: { title: "快捷键", labels: { recording: "录制中…", conflict: "冲突", clear: "清除快捷键" } },
+    textField: { title: "文本输入框", apiKey: "API 密钥", helper: "用于请求鉴权", error: "API 密钥不能为空" },
+    select: { title: "下拉选择", model: "模型", options: [{ value: "gpt-4o", label: "gpt-4o" }, { value: "gpt-4o-mini", label: "gpt-4o-mini" }, { value: "o1", label: "o1" }] },
+    switch: { title: "开关", on: "已启用", off: "已禁用", disabled: "已禁用" },
+    statusBadge: { title: "状态徽章", success: "活跃", warning: "缺少密钥", danger: "错误", info: "已同步", neutral: "可用" },
+    inlineError: { title: "行内错误", network: "网络错误 —— 请检查连接", config: "配置错误 —— 请检查 API 密钥" },
+    toast: { title: "提示", info: "发现新版本", success: "设置已保存", warning: "即将触发限流", destructive: "保存服务商失败" },
+    confirm: { title: "确认", primary: "打开确认", open: "打开对话框", deleteTitle: "删除服务商？", deleteMsg: "历史引用将被保留。", confirm: "删除", cancel: "取消" },
+    emptyState: { title: "空状态", title2: "尚无服务商", desc: "添加你的第一个服务商以开始翻译。", action: "添加服务商" },
+    translationCard: { title: "翻译卡片", source: "The quick brown fox", loading: "正在翻译…", result: "敏捷的棕色狐狸" },
+    resultCard: { title: "结果卡片", success: "敏捷的棕色狐狸", failure: "翻译失败", copy: "复制", pin: "固定" },
+    providerRow: { title: "服务商行", labels: { edit: "编辑", delete: "删除", enabled: "已启用", statusText: { active: "活跃", available: "可用", "key-missing": "缺少密钥", disabled: "已禁用" } } },
+    historyRow: { title: "历史行", source: "The quick brown fox", preview: "敏捷的棕色狐狸", time: "2 分钟前", addFav: "添加到收藏", removeFav: "从收藏移除" },
+    sidebarItem: { title: "侧栏项", settings: "设置", history: "历史" },
+    windowChrome: { title: "窗口边框", title2: "LinguaRay", body: "窗口内容区域", labels: { minimize: "最小化", close: "关闭" } },
+    spinner: { title: "加载指示器", loading: "加载中…" },
+    overflow: { title: "溢出 · 长中文", buttonLong: "这是一个非常长的中文按钮文本测试溢出情况", fieldLabel: "超长中文标签占位测试", placeholder: "请在此输入一段非常长的中文内容用于测试占位文本溢出表现", badge: "这是一个非常长的中文状态徽章标签文本" },
+  },
+};
+
 export const strings: Record<Locale, LabStrings> = {
   en: {
     appTitle: "LinguaRay · UI Lab",
@@ -259,6 +346,9 @@ export const strings: Record<Locale, LabStrings> = {
       tts: "TTS",
       externalApi: "External API",
       updater: "Updater",
+      componentGallery: "Component Gallery",
+      sidebarIsolated: "Sidebar (isolated)",
+      confirmIsolated: "Confirm (isolated)",
     },
     navGroupLabel: "Prototypes",
     upcomingSlice: "Upcoming slice",
@@ -469,6 +559,9 @@ export const strings: Record<Locale, LabStrings> = {
       tts: "朗读",
       externalApi: "外部 API",
       updater: "更新",
+      componentGallery: "组件画廊",
+      sidebarIsolated: "侧栏（隔离）",
+      confirmIsolated: "确认（隔离）",
     },
     navGroupLabel: "原型列表",
     upcomingSlice: "后续切片",
