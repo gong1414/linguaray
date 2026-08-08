@@ -28,7 +28,23 @@ pub enum Error {
     LocalNoFallback,
 }
 
-#[derive(Debug, Clone, Error)]
+/// R2a: serialize `Error` as a plain string (its `Display` form) so that
+/// `TranslationOutcome { result: Result<Translation, Error> }` can be serialized
+/// for the `translate_session` IPC command result. `Keystore(KeystoreError)`
+/// wraps a non-Serializable `std::io::Error`, so we can't derive `Serialize`;
+/// serializing the Display string keeps the message human-readable and avoids
+/// leaking internal error structure to the frontend. (Task 5's popup path uses
+/// a dedicated flattened `TranslationOutcomeSerialized` for richer fields.)
+impl serde::Serialize for Error {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize, Error)]
 pub enum FallbackKind {
     #[error("network error: {0}")]
     Network(String),
@@ -40,7 +56,7 @@ pub enum FallbackKind {
     Parse(String),
 }
 
-#[derive(Debug, Clone, Error)]
+#[derive(Debug, Clone, serde::Serialize, Error)]
 pub enum ConfigKind {
     #[error("no API key set for provider {provider}")]
     MissingKey { provider: String },

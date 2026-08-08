@@ -37,9 +37,11 @@ use tauri::Manager;
 use tauri_plugin_global_shortcut::{Builder as GlobalShortcutBuilder, GlobalShortcutExt, ShortcutState};
 
 use crate::db::migration::{run_migration, FailpointCell, MigrationError};
-use crate::db::providers::{self as db_providers, ProviderPatch, ProviderProfile};
+use crate::adapter::profile_to_preset;
+use crate::db::providers::{self as db_providers, ActiveSelection, ProviderPatch, ProviderProfile, ProviderStatus};
 use crate::db::readiness::DataReadiness;
 use crate::db::Database;
+use crate::service::{translate_parallel, translate_with_fallback_ref, TranslationOutcome};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TranslateRequest {
@@ -382,6 +384,182 @@ async fn translate_clipboard(
         }
     }
     Ok(())
+}
+
+// ─── R2a: translate_session ──────────────────────────────────────────────
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct TranslateSessionRequest {
+    pub text: String,
+    pub from: String,
+    pub to: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct TranslateSessionResult {
+    /// 每个引擎的结果（成功或分类过的错误）。单引擎路径长度=1，并行=primary+parallel 数。
+    pub outcomes: Vec<TranslationOutcome>,
+    /// 单引擎成功时的实际 engine id（preset.id=secret_ref）；并行或全失败时 None。
+    /// 老前端可只读这个字段保持单结果 UI 工作；新前端读 outcomes 渲染多结果。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub actual_engine: Option<String>,
+}
+
+/// 翻译会话核心逻辑（纯函数，无 Tauri State 依赖）。
+///
+/// 被两个入口共享：
+/// - `translate_session` 命令（带 AppHandle，从 settings 读 fallback_engine）
+/// - `translate_clipboard`（同上）
+/// - 测试用 `run_translate_session_no_settings`（fallback=None，避开 settings）
+///
+/// 流程见 plan Task 4：read_active_selection → list → 过滤 active+enabled →
+/// 单引擎 or translate_parallel。
+async fn run_translate_session(
+    db: &Arc<Database>,
+    client: &reqwest::Client,
+    keystore: &keystore::Keystore,
+    app: &tauri::AppHandle,
+    text: &str,
+    from: &str,
+    to: &str,
+) -> Result<TranslateSessionResult, String> {
+    // 读 fallback_engine（§G opt-in，默认 None）。
+    let fallback_box = settings::load(app).fallback_engine.as_deref().and_then(engines::find);
+    let fallback: Option<Arc<dyn engines::TraditionalEngine>> =
+        fallback_box.map(Arc::<dyn engines::TraditionalEngine>::from);
+    run_translate_session_with_fallback(db, client, keystore, text, from, to, fallback).await
+}
+
+/// 测试入口：不读 settings，fallback 直接传 None（聚焦核心路径）。
+pub async fn run_translate_session_no_settings(
+    db: &Arc<Database>,
+    client: &reqwest::Client,
+    keystore: &keystore::Keystore,
+    text: &str,
+    from: &str,
+    to: &str,
+) -> Result<TranslateSessionResult, String> {
+    run_translate_session_with_fallback(db, client, keystore, text, from, to, None).await
+}
+
+async fn run_translate_session_with_fallback(
+    db: &Arc<Database>,
+    client: &reqwest::Client,
+    keystore: &keystore::Keystore,
+    text: &str,
+    from: &str,
+    to: &str,
+    fallback: Option<Arc<dyn engines::TraditionalEngine>>,
+) -> Result<TranslateSessionResult, String> {
+    // 读 active selection + 全量 list（一个 blocking 块内，gate 保护）。
+    // 注意：调用方（命令）已持有 data_gate + require_ready_gated；这里为了
+    // 让纯函数可测，直接用 db（测试里 db 是健康的）。命令路径会在外层先 gate。
+    let (selection, all_profiles): (ActiveSelection, Vec<ProviderProfile>) = {
+        let sel = db
+            .with_conn(|conn| db_providers::read_active_selection(conn))
+            .map_err(|e| e.to_string())?;
+        let list = db
+            .with_conn(|conn| db_providers::list(conn))
+            .map_err(|e| e.to_string())?;
+        (sel, list)
+    };
+
+    // 过滤出 active+enabled 的 profile，按 selection 顺序（primary 先，parallel 次）。
+    // 与 validate_active_selection 的 active+enabled 判定一致。
+    let is_callable = |p: &ProviderProfile| {
+        p.status == ProviderStatus::Active.as_str() && p.enabled
+    };
+    let mut profiles: Vec<ProviderProfile> = Vec::new();
+    if let Some(primary_uuid) = &selection.primary {
+        if let Some(p) = all_profiles.iter().find(|p| &p.uuid == primary_uuid) {
+            if is_callable(p) {
+                profiles.push(p.clone());
+            }
+        }
+    }
+    for uuid in &selection.parallel {
+        if let Some(p) = all_profiles.iter().find(|p| &p.uuid == uuid) {
+            if is_callable(p) && !profiles.iter().any(|q| q.uuid == p.uuid) {
+                profiles.push(p.clone());
+            }
+        }
+    }
+    if profiles.is_empty() {
+        return Err("no active provider selected".into());
+    }
+
+    // 单引擎 vs 并行。
+    if selection.parallel.is_empty() {
+        // 单引擎：用 primary profile + translate_with_fallback_ref。
+        let preset = profile_to_preset(&profiles[0])
+            .map_err(|e| format!("adapter error: {e}"))?;
+        let input = service::TranslateInput {
+            text,
+            from,
+            to,
+            options: wire::AppOptions::default(),
+        };
+        let fb_ref: Option<&dyn engines::TraditionalEngine> = fallback.as_deref();
+        let result = translate_with_fallback_ref(
+            client, keystore, &preset, input, fb_ref,
+        )
+        .await;
+        let actual_engine = match &result {
+            Ok(t) => Some(t.engine.clone()),
+            Err(_) => None,
+        };
+        Ok(TranslateSessionResult {
+            outcomes: vec![TranslationOutcome {
+                uuid: profiles[0].uuid.clone(),
+                result,
+            }],
+            actual_engine,
+        })
+    } else {
+        // 并行。
+        let outcomes = translate_parallel(
+            client,
+            keystore,
+            profiles,
+            text,
+            from,
+            to,
+            wire::AppOptions::default(),
+            fallback,
+        )
+        .await;
+        Ok(TranslateSessionResult {
+            outcomes,
+            actual_engine: None,
+        })
+    }
+}
+
+/// 并行/单引擎翻译命令（R2a）。前端用 `invoke('translate_session', { req })` 调用。
+///
+/// 从 AppState 读 active selection + providers，从 Session 读 client/keystore，
+/// 从 settings 读 fallback_engine。parallel 为空时退化为单引擎（actual_engine=Some）。
+#[tauri::command]
+async fn translate_session(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, Arc<Session>>,
+    app_state: tauri::State<'_, Arc<AppState>>,
+    req: TranslateSessionRequest,
+) -> Result<TranslateSessionResult, String> {
+    let client = session_client(&state)?.clone();
+    let keystore = session_keystore(&state)?;
+    let app_arc = app_state.inner().clone();
+    // 在 blocking 内 gate + 读 DB 快照（gate 必须在 clone Arc 之前，见 provider_list 注释）。
+    // 这里我们让 run_translate_session 自己用 db.with_conn 读；但 gate 要由命令持有。
+    // 所以：spawn_blocking 里 gate + require_ready_gated 拿到 db Arc，直接交给核心。
+    let db = tauri::async_runtime::spawn_blocking(move || -> Result<Arc<Database>, String> {
+        let _gate = app_arc.data_gate.read();
+        let db = require_ready_gated(&app_arc, &_gate)?;
+        Ok(db)
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+    run_translate_session(&db, &client, keystore, &app, &req.text, &req.from, &req.to).await
 }
 
 #[tauri::command]
@@ -2181,6 +2359,7 @@ pub fn run() {
             translate,
             translate_default,
             translate_clipboard,
+            translate_session,
             list_engines,
             set_key,
             delete_key,
