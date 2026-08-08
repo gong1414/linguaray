@@ -8,9 +8,12 @@ import {
   createEffect,
   type Component,
 } from "solid-js";
-import { strings, type Locale, type SelectionState, type ProviderState } from "./i18n";
+import { strings, galleryStrings, type Locale, type SelectionState, type ProviderState } from "./i18n";
 import SelectionPopup from "./pages/SelectionPopup";
 import ProviderCenter from "./pages/ProviderCenter";
+import { ComponentGallery } from "./pages/ComponentGallery";
+import { SidebarItem, Confirm } from "@linguaray/ui";
+import { Settings } from "lucide-solid";
 import "./App.css";
 
 type Theme = "light" | "dark";
@@ -38,7 +41,10 @@ type NavKey =
   | "dictionary"
   | "tts"
   | "external-api"
-  | "updater";
+  | "updater"
+  | "component-gallery"
+  | "sidebar-isolated"
+  | "confirm-isolated";
 
 // Complete S0 §4.1 state matrix.
 const SELECTION_STATES: SelectionState[] = [
@@ -81,10 +87,13 @@ const NAV_ITEMS: {
   { key: "tts", labelKey: "tts" },
   { key: "external-api", labelKey: "externalApi" },
   { key: "updater", labelKey: "updater" },
+  { key: "component-gallery", labelKey: "componentGallery" },
+  { key: "sidebar-isolated", labelKey: "sidebarIsolated" },
+  { key: "confirm-isolated", labelKey: "confirmIsolated" },
 ];
 
 // Implemented surfaces.
-const IMPLEMENTED: NavKey[] = ["selection-popup", "provider-center"];
+const IMPLEMENTED: NavKey[] = ["selection-popup", "provider-center", "component-gallery", "sidebar-isolated"];
 
 const PROVIDER_STATES: ProviderState[] = [
   "empty",
@@ -113,10 +122,24 @@ const PROVIDER_STATES: ProviderState[] = [
 ];
 
 const App: Component = () => {
+  // Read URL query params so Playwright e2e can deep-link a surface/theme
+  // (e.g. ?nav=component-gallery&theme=dark). Falls back to defaults.
+  const params = new URLSearchParams(
+    typeof window !== "undefined" ? window.location.search : "",
+  );
+  const validNav = (NAV_ITEMS.map((i) => i.key) as NavKey[]);
+  const initialNav = validNav.includes(params.get("nav") as NavKey)
+    ? (params.get("nav") as NavKey)
+    : "selection-popup";
+  const initialTheme =
+    params.get("theme") === "dark" || params.get("theme") === "light"
+      ? (params.get("theme") as Theme)
+      : "light";
+
   const [locale, setLocale] = createSignal<Locale>("en");
-  const [theme, setTheme] = createSignal<Theme>("light");
+  const [theme, setTheme] = createSignal<Theme>(initialTheme);
   const [motion, setMotion] = createSignal<Motion>("full");
-  const [nav, setNav] = createSignal<NavKey>("selection-popup");
+  const [nav, setNav] = createSignal<NavKey>(initialNav);
   const [selState, setSelState] = createSignal<SelectionState>("success-single");
   const [provState, setProvState] = createSignal<ProviderState>("empty");
   const [settingsSize, setSettingsSize] = createSignal<"min" | "default" | "narrow-699" | "boundary-700">("default");
@@ -152,6 +175,45 @@ const App: Component = () => {
     html.setAttribute("data-motion", motion());
     html.setAttribute("lang", locale());
   });
+
+  // sidebar-isolated: bare fixture for Playwright keyboard e2e — renders ONLY
+  // a single SidebarItem with no header/nav/controls, so the first Tab always
+  // lands on it. Bypasses the full lab shell entirely.
+  if (nav() === "sidebar-isolated") {
+    return (
+      <div class="gallery__iso">
+        <SidebarItem
+          label={t().nav.componentGallery}
+          icon={<Settings size={16} />}
+          active
+          onClick={() => {}}
+        />
+      </div>
+    );
+  }
+
+  // confirm-isolated: bare fixture for Playwright visual baseline — renders
+  // ONLY an open Confirm dialog (open=true) with no header/nav/controls, so
+  // the screenshot captures the dialog body instead of just its trigger
+  // button. Reuses the gallery's confirm copy for consistency.
+  if (nav() === "confirm-isolated") {
+    const g = galleryStrings[locale()].confirm;
+    return (
+      <div class="gallery__iso">
+        <Confirm
+          open={true}
+          onOpenChange={() => {}}
+          title={g.deleteTitle}
+          message={g.deleteMsg}
+          confirmLabel={g.confirm}
+          cancelLabel={g.cancel}
+          variant="destructive"
+          onConfirm={() => {}}
+          onCancel={() => {}}
+        />
+      </div>
+    );
+  }
 
   return (
     <div class="lab lr-u-surface">
@@ -308,6 +370,10 @@ const App: Component = () => {
                   : "800×600"} ·{" "}
                 {t().provider.states[provState()]}
               </span>
+            </Match>
+
+            <Match when={nav() === "component-gallery"}>
+              <ComponentGallery locale={locale()} theme={theme()} />
             </Match>
 
             <Match when={!IMPLEMENTED.includes(nav())}>

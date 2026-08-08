@@ -49,7 +49,7 @@ const ResultCard: Component<ResultCardProps> = (props) => {
         when={props.outcome === "success"}
         fallback={
           <p class="lr-result-card__error">
-            {props.errorText ?? "Translation failed"}
+            {props.errorText}
           </p>
         }
       >
