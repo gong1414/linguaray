@@ -61,6 +61,7 @@ tauri-plugin-global-shortcut = "2"
 mouse_position = "0.1"
 arboard = "3"
 enigo = "0.2"
+futures = "0.3"
 windows-sys = { version = "0.59", features = [
   "Win32_Foundation",
   "Win32_Graphics_Gdi",

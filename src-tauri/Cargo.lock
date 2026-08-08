@@ -2476,6 +2476,7 @@ dependencies = [
  "crossbeam-channel",
  "enigo",
  "fs2",
+ "futures",
  "log",
  "mouse_position",
  "objc2 0.6.4",

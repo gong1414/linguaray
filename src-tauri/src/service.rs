@@ -3,11 +3,14 @@
 //! traditional engine. `Config`/`Keystore` errors propagate; LOCAL primaries are
 //! sacred (never silently degrade to a remote fallback).
 
+use crate::adapter::profile_to_preset;
+use crate::db::providers::ProviderProfile;
 use crate::engines::TraditionalEngine;
 use crate::error::{ConfigKind, Error};
 use crate::keystore::Keystore;
 use crate::providers::ProviderPreset;
 use crate::wire::{build_prompt, call, AppOptions, WireParams};
+use std::sync::Arc;
 
 pub struct TranslateInput<'a> {
     pub text: &'a str,
@@ -75,12 +78,40 @@ pub async fn translate(
 /// resolved from settings inside this fn) so the §G branches are unit-testable
 /// with a fake engine instead of the real Google network call. Callers resolve it
 /// via `settings.fallback_engine.as_deref().and_then(engines::find)`.
+/// Translate with §G classified fallback（公开入口，向后兼容旧调用方）。
+///
+/// 把 `Box<dyn TraditionalEngine>` 转成 `&dyn` 后委托给
+/// [`translate_with_fallback_ref`]。新代码（如 `translate_parallel`）应直接
+/// 用 `_ref` 变体以共享 fallback 而不需要 per-call owned `Box`。
 pub async fn translate_with_fallback(
     client: &reqwest::Client,
     keystore: &Keystore,
     primary_preset: &ProviderPreset,
     input: TranslateInput<'_>,
     fallback: Option<Box<dyn TraditionalEngine>>,
+) -> Result<Translation, Error> {
+    translate_with_fallback_ref(client, keystore, primary_preset, input, fallback.as_deref()).await
+}
+
+/// §G classified fallback 的真正实现（按引用接收 fallback）。
+///
+/// 与 `translate_with_fallback` 行为完全一致，唯一区别是 fallback 用引用
+/// 而非 owned `Box`，使 `translate_parallel` 可以用 `Arc<dyn TraditionalEngine>`
+/// 把同一个 fallback 共享给 N 个并发引擎。
+///
+/// 行为（不变）：
+/// - primary 先跑；成功则返回（engine == primary preset id）。
+/// - `FallbackEligible`（network/timeout/429/5xx/parse）：
+///   - LOCAL primary（loopback）→ `LocalNoFallback`（local-sacred，绝不退化到远程）。
+///   - 否则有 fallback → 跑一次传统引擎，结果 tagged fallback engine id。
+///   - 否则无 fallback → `LocalNoFallback`。
+/// - `Config`/`Keystore` → 原样传播，绝不 fallback。
+pub async fn translate_with_fallback_ref(
+    client: &reqwest::Client,
+    keystore: &Keystore,
+    primary_preset: &ProviderPreset,
+    input: TranslateInput<'_>,
+    fallback: Option<&dyn TraditionalEngine>,
 ) -> Result<Translation, Error> {
     // Primary attempt — clone the options because `translate` takes AppOptions by
     // value and we may still need `input`'s fields for the fallback attempt below.
@@ -120,6 +151,95 @@ pub async fn translate_with_fallback(
         // Config/Auth/Keystore → propagate, do NOT fall back.
         Err(other) => Err(other),
     }
+}
+
+// ─── R2a: 并行翻译编排 ────────────────────────────────────────────────────
+
+/// 单个引擎的翻译结果（成功或分类过的错误）。uuid 来自原 ProviderProfile，
+/// 与 `result` 内的 engine 字段（preset.id=secret_ref）相互独立——调用方用 uuid
+/// 把结果关联回用户选的那个 provider row。
+//
+// 注：未派生 `Clone`，因为 `result` 持有 `Error`，而 `Error::Keystore` 包装了
+// `KeystoreError`（含 `std::io::Error`，不可 Clone）。计划的测试不需要 clone
+// outcome（`sorted_by_uuid` 按值接收并原地排序），所以 `Debug` 足够。
+#[derive(Debug)]
+pub struct TranslationOutcome {
+    pub uuid: String,
+    pub result: Result<Translation, Error>,
+}
+
+/// 并行调用多个 AI 引擎，每个独立走 §G fallback 分类。
+///
+/// - 每个 profile 经 [`profile_to_preset`] 转 preset；转换失败（如 google_translate
+///   协议）→ 该引擎产出 `Err(Config::Unsupported)` outcome，**不** panic、**不**丢弃。
+/// - 所有引擎用 `futures::future::join_all` 并发驱动，各自跑
+///   [`translate_with_fallback_ref`]（带各自的 fallback 机会）。
+/// - `fallback` 是 `Option<Arc<dyn TraditionalEngine>>`，所有引擎共享同一个
+///   （传统引擎 `translate` 是 `&self`，Arc 允许并发只读共享）。
+/// - 返回顺序不保证与输入顺序一致（并发完成顺序不定）；调用方按 `uuid` 关联。
+///
+/// §G 不变量：每个引擎独立分类错误。`Config`/`Keystore` 错误绝不因另一个引擎
+/// 成功而被"覆盖"——它们作为各自 outcome 的 Err 保留，前端按 Surface 03 的
+/// "partial success" 渲染。
+//
+// 8 个参数是计划的既定签名（R2a 测试直接位置调用），收敛成一个 ctx struct
+// 会让所有调用点更绕；与 `translate`/`translate_with_fallback` 的扁平签名保持
+// 一致更易读。clippy 的 7 参数阈值是经验值，这里故意放宽。
+#[allow(clippy::too_many_arguments)]
+pub async fn translate_parallel(
+    client: &reqwest::Client,
+    keystore: &Keystore,
+    profiles: Vec<ProviderProfile>,
+    text: &str,
+    from: &str,
+    to: &str,
+    options: AppOptions,
+    fallback: Option<Arc<dyn TraditionalEngine>>,
+) -> Vec<TranslationOutcome> {
+    // 先把 profile→preset 的同步转换做完（不放进 async block，避免借用混乱）。
+    // 转换失败的先记成 outcome，成功的进入并发池。
+    let mut ready: Vec<(String, ProviderPreset)> = Vec::with_capacity(profiles.len());
+    let mut outcomes: Vec<TranslationOutcome> = Vec::new();
+    for p in profiles {
+        let uuid = p.uuid.clone();
+        match profile_to_preset(&p) {
+            Ok(preset) => ready.push((uuid, preset)),
+            Err(reason) => outcomes.push(TranslationOutcome {
+                uuid,
+                result: Err(Error::Config(ConfigKind::Unsupported {
+                    provider: p.uuid.clone(),
+                    reason,
+                })),
+            }),
+        }
+    }
+
+    // 并发驱动所有 ready 引擎。每个 async block 按引用捕获 client/keystore/text
+    // /from/to/fallback，按值捕获自己的 (uuid, preset)。
+    let futs: Vec<_> = ready
+        .into_iter()
+        .map(|(uuid, preset)| {
+            // `.map` 的闭包是 `FnMut`，会被调用多次，不能把外层按引用捕获的
+            // `options` 直接 move 进 `async move`。每个 future 各 clone 一份。
+            // `text`/`from`/`to`/`fb_ref` 是 `&str`/`Option<&dyn>`（Copy），无此问题。
+            let options = options.clone();
+            let fb_ref: Option<&dyn TraditionalEngine> = fallback.as_deref();
+            async move {
+                let input = TranslateInput {
+                    text,
+                    from,
+                    to,
+                    options,
+                };
+                let result =
+                    translate_with_fallback_ref(client, keystore, &preset, input, fb_ref).await;
+                TranslationOutcome { uuid, result }
+            }
+        })
+        .collect();
+    let mut all = futures::future::join_all(futs).await;
+    outcomes.append(&mut all);
+    outcomes
 }
 
 /// §G: a provider is LOCAL iff its endpoint is loopback. Matches all loopback
