@@ -22,7 +22,7 @@ pub struct TranslateInput<'a> {
 /// A translation result + the engine id that ACTUALLY produced it (primary on
 /// success; fallback id when the fallback fired). Review P2: callers must not tag
 /// the result with the primary preset id when the fallback produced it.
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 pub struct Translation {
     pub text: String,
     pub engine: String,
@@ -159,10 +159,11 @@ pub async fn translate_with_fallback_ref(
 /// 与 `result` 内的 engine 字段（preset.id=secret_ref）相互独立——调用方用 uuid
 /// 把结果关联回用户选的那个 provider row。
 //
-// 注：未派生 `Clone`，因为 `result` 持有 `Error`，而 `Error::Keystore` 包装了
-// `KeystoreError`（含 `std::io::Error`，不可 Clone）。计划的测试不需要 clone
-// outcome（`sorted_by_uuid` 按值接收并原地排序），所以 `Debug` 足够。
-#[derive(Debug)]
+// 未派生 `Clone`：`result` 持有 `Error`，而 `Error::Keystore` 包装 `KeystoreError`
+// （含 `std::io::Error`，不可 Clone）。`translate_session` 命令路径只 `Serialize` outcome
+// 发给前端，从不 clone 它；`translate_parallel` 测试按值消费 vec（`sorted_by_uuid`）。
+// `Serialize`：`Error` 有手写 Serialize impl（Display 字符串），见 error.rs。
+#[derive(Debug, serde::Serialize)]
 pub struct TranslationOutcome {
     pub uuid: String,
     pub result: Result<Translation, Error>,
