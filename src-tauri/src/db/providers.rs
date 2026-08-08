@@ -641,6 +641,50 @@ pub fn finalize_delete(conn: &mut Connection, uuid: &str) -> Result<(), DbError>
     Ok(())
 }
 
+// ─── ActiveSelection reader (R2a) ────────────────────────────────────────
+
+/// 当前 (primary, parallel, fallback) 选择快照，从 `preferences` singleton 读出。
+/// 用于 `translate_session` 决定要并行调用哪些引擎。
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ActiveSelection {
+    /// primary_uuid；NULL/空 → None。
+    pub primary: Option<String>,
+    /// parallel_uuids JSON 数组解析结果；'[]' → 空 vec。
+    pub parallel: Vec<String>,
+    /// fallback_uuid；NULL/空 → None。
+    pub fallback: Option<String>,
+}
+
+/// 读 preferences singleton 的三个 active 槽位。
+///
+/// `parallel_uuids` 经 [`parse_parallel_uuids`] 解析——corrupt JSON 报
+/// `DbError::Integrity`（与 toggle/update 一致，不静默空数组）。
+/// 若 singleton 行不存在（理论上 seed 保证存在），返回全空默认值
+/// （防御性兜底，与 `read_consent_scope` 的 `optional()` 容忍风格一致）。
+pub fn read_active_selection(conn: &Connection) -> Result<ActiveSelection, DbError> {
+    use rusqlite::OptionalExtension;
+    let row: Option<(Option<String>, String, Option<String>)> = conn
+        .query_row(
+            "SELECT primary_uuid, parallel_uuids, fallback_uuid \
+             FROM preferences WHERE id=1",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+        )
+        .optional()?;
+    match row {
+        None => Ok(ActiveSelection::default()),
+        Some((primary, parallel_json, fallback)) => {
+            let parallel = parse_parallel_uuids(&parallel_json)?;
+            Ok(ActiveSelection {
+                // 空字符串视为未选（与 set_active_slots 的 "" 语义一致）。
+                primary: primary.filter(|s| !s.is_empty()),
+                parallel,
+                fallback: fallback.filter(|s| !s.is_empty()),
+            })
+        }
+    }
+}
+
 // ─── preferences active-slot helpers ──────────────────────────────────────
 
 /// Parse the `parallel_uuids` JSON blob stored in `preferences` (S2a Task 5c).

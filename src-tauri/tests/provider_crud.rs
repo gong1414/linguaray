@@ -1062,3 +1062,98 @@ fn update_endpoint_change_with_corrupt_parallel_uuids_errors() {
         "corrupt parallel_uuids must surface as Integrity error on update, got {err:?}"
     );
 }
+
+// ─── R2a Task 2: read_active_selection ──────────────────────────────────────
+
+#[test]
+fn read_active_selection_default_when_no_slots_set() {
+    // fresh_db 已 seed 了 preferences singleton（parallel_uuids 默认 '[]'，其余 NULL）。
+    let (_dir, db) = fresh_db();
+    let sel = db.with_conn(|conn| providers::read_active_selection(conn)).unwrap();
+    assert!(sel.primary.is_none(), "primary default None");
+    assert!(sel.parallel.is_empty(), "parallel default empty");
+    assert!(sel.fallback.is_none(), "fallback default None");
+}
+
+#[test]
+fn read_active_selection_reads_primary_only() {
+    let (_dir, db, p) = fresh_with_one_openai();
+    db.with_conn(|conn| {
+        conn.execute(
+            "UPDATE preferences SET primary_uuid=?1 WHERE id=1",
+            rusqlite::params![p.uuid],
+        )?;
+        Ok(())
+    })
+    .unwrap();
+    let sel = db.with_conn(|conn| providers::read_active_selection(conn)).unwrap();
+    assert_eq!(sel.primary.as_deref(), Some(p.uuid.as_str()));
+    assert!(sel.parallel.is_empty());
+    assert!(sel.fallback.is_none());
+}
+
+#[test]
+fn read_active_selection_reads_parallel_json_array() {
+    let (_dir, db, p1) = fresh_with_one_openai();
+    let p2 = db
+        .with_conn(|conn| {
+            providers::create(conn, "anthropic", "Claude", "https://api.anthropic.com/v1/messages", None)
+        })
+        .unwrap();
+    let _ = &p1;
+    let arr = serde_json::to_string(&[&p1.uuid, &p2.uuid]).unwrap();
+    db.with_conn(|conn| {
+        conn.execute(
+            "UPDATE preferences SET parallel_uuids=?1 WHERE id=1",
+            rusqlite::params![arr],
+        )?;
+        Ok(())
+    })
+    .unwrap();
+    let sel = db.with_conn(|conn| providers::read_active_selection(conn)).unwrap();
+    assert_eq!(sel.parallel, vec![p1.uuid.clone(), p2.uuid.clone()]);
+}
+
+#[test]
+fn read_active_selection_reads_all_three_slots() {
+    let (_dir, db, p) = fresh_with_one_openai();
+    db.with_conn(|conn| {
+        conn.execute(
+            "UPDATE preferences SET primary_uuid=?1, parallel_uuids=?2, fallback_uuid=?1 WHERE id=1",
+            rusqlite::params![p.uuid, serde_json::to_string(&[&p.uuid]).unwrap()],
+        )?;
+        Ok(())
+    })
+    .unwrap();
+    let sel = db.with_conn(|conn| providers::read_active_selection(conn)).unwrap();
+    assert_eq!(sel.primary.as_deref(), Some(p.uuid.as_str()));
+    assert_eq!(sel.parallel, vec![p.uuid.clone()]);
+    assert_eq!(sel.fallback.as_deref(), Some(p.uuid.as_str()));
+}
+
+#[test]
+fn read_active_selection_corrupt_parallel_errors() {
+    // 与 toggle/update 的 parse_parallel_uuids 一致：corrupt JSON 必须报 Integrity，
+    // 不能静默返回空数组（否则会丢一个仍 active 的 uuid）。
+    let (_dir, db) = fresh_db();
+    db.with_conn(|conn| {
+        conn.execute(
+            "UPDATE preferences SET parallel_uuids=?1 WHERE id=1",
+            rusqlite::params!["not-valid-json{{{"],
+        )?;
+        Ok(())
+    })
+    .unwrap();
+    let err = db
+        .with_conn(|conn| providers::read_active_selection(conn))
+        .unwrap_err();
+    assert!(matches!(err, DbError::Integrity(_)), "corrupt parallel_uuids must be Integrity, got {err:?}");
+}
+
+#[test]
+fn read_active_selection_empty_parallel_json_yields_empty_vec() {
+    let (_dir, db) = fresh_db();
+    // 默认 '[]' → 空 vec（不是 None，因为 parallel 本就是 Vec）。
+    let sel = db.with_conn(|conn| providers::read_active_selection(conn)).unwrap();
+    assert!(sel.parallel.is_empty());
+}
