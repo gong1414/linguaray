@@ -1,7 +1,10 @@
-/* App.css — legacy settings window styles.
- * All hard-coded hex values have been replaced with @linguaray/ui semantic
- * tokens. The :root block no longer redefines color/background — those come
- * from @linguaray/ui/styles tokens.css. Only layout + font-smoothing remain. */
+/* App.css — R3a trimmed.
+ * The legacy settings window styles (.settings-group, .result, .error, the
+ * select/textarea/button block, label, .subtitle) have been removed — the
+ * settings window is now SettingsShell + Provider Center + KeystoreRecovery.
+ * Only the .container layout (still used by Popup.tsx + InputPanel.tsx) and
+ * the root font-smoothing reset remain. Colors/spacing come from
+ * @linguaray/ui token CSS. No hardcoded hex outside var() fallbacks. */
 
 :root {
   font-synthesis: none;
@@ -20,80 +23,4 @@
   background: var(--color-canvas, #ffffff);
   color: var(--color-text-primary, #0f172a);
   min-height: 100vh;
-}
-
-.settings-group {
-  margin-top: 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
-
-label {
-  font-size: 0.85rem;
-  color: var(--color-text-secondary, #475569);
-}
-
-h1 {
-  margin: 0;
-}
-
-.subtitle {
-  margin: 0;
-  color: var(--color-text-secondary, #475569);
-  font-size: 0.9rem;
-}
-
-select,
-textarea,
-button {
-  border-radius: var(--radius-md, 8px);
-  border: 1px solid var(--color-border-strong, #64748b);
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  color: var(--color-text-primary, #0f172a);
-  background-color: var(--color-surface-default, #ffffff);
-  transition: border-color var(--duration-fast, 120ms) var(--ease-standard, ease);
-  box-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.05));
-}
-
-textarea {
-  resize: vertical;
-  font-weight: 400;
-  box-shadow: none;
-  border: 1px solid var(--color-border-strong, #64748b);
-}
-
-button {
-  cursor: pointer;
-  align-self: flex-start;
-}
-
-button:hover:not(:disabled) {
-  border-color: var(--color-brand-default, #4f46e5);
-}
-
-button:disabled {
-  opacity: var(--core-opacity-disabled, 0.5);
-  cursor: default;
-}
-
-.result {
-  padding: 0.75em 1em;
-  border-radius: var(--radius-md, 8px);
-  background: var(--color-surface-default, #ffffff);
-  border: 1px solid var(--color-border-subtle, #e2e8f0);
-  white-space: pre-wrap;
-  color: var(--color-text-primary, #0f172a);
-}
-
-.error {
-  padding: 0.75em 1em;
-  border-radius: var(--radius-md, 8px);
-  background: var(--color-status-danger-soft, #fef2f2);
-  border: 1px solid var(--color-border-subtle, #e2e8f0);
-  color: var(--color-status-danger, #dc2626);
-  white-space: pre-wrap;
 }
