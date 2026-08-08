@@ -1,17 +1,14 @@
 import { Show, Switch as FlowSwitch, Match, type Component, type JSX } from "solid-js";
 import { Check, AlertTriangle, Server, Pencil, Trash2 } from "lucide-solid";
 import Switch from "./Switch";
+import { providerKeyStatus } from "./providerPresentation";
+import type { ProviderRole } from "./providerTypes";
 import "./ProviderCard.css";
 
-/**
- * Discriminated union — cannot represent illegal role overlap (primary +
- * fallback, etc.). The page computes this from a validated ActiveSelection.
- */
-export type ProviderRole =
-  | { kind: "none" }
-  | { kind: "primary" }
-  | { kind: "parallel"; index: number } // 1-based for display
-  | { kind: "fallback" };
+// Re-export so existing consumers (`import { ProviderRole } from "./ProviderCard"`)
+// keep working without a behavior change. The canonical definition lives in
+// providerTypes.ts, shared with ProviderRow + providerPresentation.
+export type { ProviderRole };
 
 export type ProviderProfile = {
   name: string;
@@ -78,6 +75,11 @@ const ProviderCard: Component<ProviderCardProps> = (props) => {
   const isPrimary = () => role().kind === "primary";
   const isDeleting = () => props.profile.status === "deleting";
 
+  // Key status is independent of enabled/disabled — a disabled provider can still
+  // have a missing key that must be visible. Using providerKeyStatus avoids the
+  // priority issue where providerStatus returns "disabled" before "key-missing".
+  const keyMissing = () => providerKeyStatus(props.hasKey) === "missing";
+
   const editLabel = () => labels().edit.replace("{name}", props.profile.name);
   const deleteLabel = () => labels().delete.replace("{name}", props.profile.name);
 
@@ -122,9 +124,10 @@ const ProviderCard: Component<ProviderCardProps> = (props) => {
             </div>
           </Show>
 
-          {/* Key status */}
+          {/* Key status — driven by the shared providerStatus model so the
+              indicator matches ProviderRow's StatusBadge. */}
           <Show
-            when={props.hasKey}
+            when={!keyMissing()}
             fallback={
               <span class="lr-provider-card__key-status lr-provider-card__key-status--missing">
                 <AlertTriangle size={12} aria-hidden="true" />

@@ -1,0 +1,28 @@
+/* InlineError — alert-region message for form/validation errors.
+ * Uses status-danger-fg on status-danger-soft so the foreground clears AA 4.5
+ * in both Light and Dark (per WCAG table). */
+
+.inline-error {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-sm);
+  background: var(--color-status-danger-soft);
+  color: var(--color-status-danger-fg);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+}
+
+.inline-error__icon {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.inline-error__text {
+  color: inherit;
+}

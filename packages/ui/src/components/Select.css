@@ -80,7 +80,7 @@
   transform: rotate(180deg);
 }
 
-/* Dropdown content */
+/* Dropdown content — Portal mounts to <body>, must set font explicitly. */
 .lr-select__content {
   background: var(--color-bg-elevated);
   border-radius: var(--radius-md);
@@ -90,6 +90,7 @@
   max-height: 240px;
   overflow-y: auto;
   z-index: 1000;
+  font-family: var(--font-sans);
   /* Reduced-motion guard */
   animation: lr-select-fade var(--duration-fast) var(--ease-out);
 }

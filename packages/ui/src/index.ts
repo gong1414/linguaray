@@ -57,3 +57,39 @@ export type {
   ProviderCardLabels,
 } from "./components/ProviderCard";
 export { defaultProviderCardLabels } from "./components/ProviderCard";
+
+// R1 新增组件导出
+export { default as SegmentedControl } from "./components/SegmentedControl";
+export type { SegmentedControlProps, SegmentedOption } from "./components/SegmentedControl";
+
+export { default as ShortcutChip } from "./components/ShortcutChip";
+export type { ShortcutChipProps, ShortcutChipLabels } from "./components/ShortcutChip";
+
+export { default as StatusBadge } from "./components/StatusBadge";
+export type { StatusBadgeProps, StatusBadgeVariant } from "./components/StatusBadge";
+
+export { default as InlineError } from "./components/InlineError";
+export type { InlineErrorProps } from "./components/InlineError";
+
+export { default as WindowChrome } from "./components/WindowChrome";
+export type { WindowChromeProps, WindowChromeLabels } from "./components/WindowChrome";
+
+export { default as SidebarItem } from "./components/SidebarItem";
+export type { SidebarItemProps } from "./components/SidebarItem";
+
+export { default as HistoryRow } from "./components/HistoryRow";
+export type { HistoryRowProps, HistoryRowLabels } from "./components/HistoryRow";
+
+export { default as ProviderRow } from "./components/ProviderRow";
+export type { ProviderRowProps, ProviderRowLabels } from "./components/ProviderRow";
+
+export { default as TranslationCard } from "./components/TranslationCard";
+export type {
+  TranslationCardProps,
+  TranslationCardLabels,
+  TranslationState,
+} from "./components/TranslationCard";
+
+// 共享逻辑
+export { providerStatus } from "./components/providerPresentation";
+export type { ProviderStatus } from "./components/providerTypes";

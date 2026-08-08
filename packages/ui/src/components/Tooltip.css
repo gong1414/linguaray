@@ -3,6 +3,7 @@
 .lr-tooltip__content {
   background: var(--color-bg-elevated);
   color: var(--color-fg);
+  font-family: var(--font-sans);
   font-size: var(--text-sm);
   line-height: var(--text-sm--line-height);
   padding: var(--space-sm) var(--space-md);
