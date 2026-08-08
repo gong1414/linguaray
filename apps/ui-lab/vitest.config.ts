@@ -1,5 +1,6 @@
 import { defineConfig } from "vitest/config";
 import solid from "vite-plugin-solid";
+import { fileURLToPath, URL } from "node:url";
 
 export default defineConfig({
   plugins: [solid()],
@@ -12,5 +13,10 @@ export default defineConfig({
   },
   resolve: {
     conditions: ["browser", "solid"],
+    // Mirror vite.config.ts: let lab tests import the production state model
+    // (`@app/features/translation/types`) for parity assertions.
+    alias: {
+      "@app": fileURLToPath(new URL("../../src", import.meta.url)),
+    },
   },
 });

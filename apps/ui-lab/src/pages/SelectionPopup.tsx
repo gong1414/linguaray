@@ -16,6 +16,7 @@ import {
   type ResultOutcome,
 } from "@linguaray/ui";
 import type { Locale, LabStrings, SelectionState } from "../i18n";
+import { labStateToTranslationState } from "./selectionStateMap";
 import "./SelectionPopup.css";
 
 export type SelectionPopupProps = {
@@ -120,6 +121,51 @@ const SelectionPopup: Component<SelectionPopupProps> = (props) => {
   // true when the body should fill a compact ~200×40 frame (loading only;
   // initial-hidden is not rendered by App at all).
   const isCompact = createMemo(() => props.state === "loading");
+
+  // Parity contract (R2b Task 6): the lab maps its mock state onto the production
+  // TranslationState discriminant. The render still uses the lab's rich mock
+  // interactions below, but the accessible name + error/success branching keys
+  // off the PRODUCTION state shape, so a future lab↔production divergence
+  // surfaces here as a visible mismatch (and a compile error in the map).
+  const productionState = createMemo(() => labStateToTranslationState(props.state));
+
+  // Headline copy keyed off the production state `kind`, mirroring production's
+  // headline-key mapping (Popup.tsx `headlineKey`). Reuses the lab's localized
+  // strings so the locale switch still works.
+  const headline = createMemo<string>(() => {
+    const t = props.t;
+    // Bind once so TS narrows the union across the nested switch.
+    const s = productionState();
+    switch (s.kind) {
+      case "loading":
+        return t.loading;
+      case "single-success":
+      case "multi-success":
+      case "partial":
+        return t.multiTitle;
+      case "error":
+        switch (s.sub) {
+          case "network":
+            return t.networkError;
+          case "config-key":
+            return t.configErrorKey;
+          case "config-401":
+            return t.configError401;
+          case "no-provider":
+            return t.noProvider;
+          default:
+            return t.states[props.state];
+        }
+      case "offline":
+        return t.offlineError;
+      case "no-selection":
+        return t.noSelection;
+      case "no-permission":
+        return t.noPermission;
+      case "keystore-corrupt":
+        return t.keystoreCorrupt;
+    }
+  });
 
   const baseResults = createMemo<MockResult[]>(() => {
     const t = props.t;
@@ -307,9 +353,7 @@ const SelectionPopup: Component<SelectionPopupProps> = (props) => {
       classList={{ "sel-popup__body--compact": isCompact() }}
       data-multi={isMulti() ? "true" : undefined}
       role="region"
-      aria-label={
-        isMulti() ? props.t.multiTitle : props.t.states[props.state]
-      }
+      aria-label={headline()}
       aria-busy={retrying() ? "true" : undefined}
     >
       {/* Loading — fills the compact ~200×40 frame. Uses the frozen Spinner
