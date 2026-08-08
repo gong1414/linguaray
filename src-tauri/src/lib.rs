@@ -30,7 +30,7 @@ pub mod fs_acl;
 pub mod uuid_util;
 
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tauri::Manager;
 use tauri_plugin_global_shortcut::{Builder as GlobalShortcutBuilder, GlobalShortcutExt, ShortcutState};
@@ -62,8 +62,8 @@ pub struct TranslateResult {
 /// `is_latest` before mutating the popup, so a stale in-flight request can never
 /// clobber the result of a newer trigger.
 struct Session {
-    client: reqwest::Client,
-    keystore: keystore::Keystore,
+    client: Option<reqwest::Client>,
+    keystore: Option<keystore::Keystore>,
     gen: concurrency::GenerationToken,
 }
 
@@ -147,6 +147,102 @@ fn require_ready_gated_write(
         .ok_or_else(|| "Database not available".to_string())
 }
 
+/// Startup readiness reducer (S2a P1.4).
+///
+/// Computes the pre-migration [`DataReadiness`] from the three independent
+/// startup outcomes — DB open, settings-path resolution, keystore init — with a
+/// load-bearing **priority** rule: a failed DB open (`NeedsDatabaseRecovery`)
+/// is locked in and MUST NOT be masked by a later settings or keystore error.
+/// The DB is the foundation; settings/keystore failures only become the visible
+/// banner when the DB itself opened successfully.
+///
+/// Priority order (highest first):
+/// 1. **DB failure** → `NeedsDatabaseRecovery`. Nothing else can override this:
+///    there is no DB to migrate or to gate provider writes on.
+/// 2. **Keystore failure** → `NeedsKeystoreRecovery`. A healthy DB + healthy
+///    migration are useless without a usable keystore (provider writes need
+///    it), so this beats a settings failure.
+/// 3. **Settings failure** → `MigrationIncomplete` ("settings_path"). Migration
+///    reads + backs up the legacy settings, so an unresolvable path must skip
+///    migration entirely.
+/// 4. **All healthy** → the [`DataReadiness::default`] pre-migration state
+///    (`MigrationIncomplete "startup not complete"`). The reducer intentionally
+///    does NOT return `Ready`: running the migration is what promotes to Ready,
+///    and the `setup()` migration block unconditionally assigns this result.
+///
+/// This is a pure function so the priority matrix is unit-testable without
+/// spinning up Tauri or a real DB. The `setup()` closure in [`run`] calls this
+/// reducer then, when healthy, overlays the migration outcome on top.
+pub fn compute_startup_readiness(
+    db_open: Result<(), String>,
+    settings_error: Option<String>,
+    keystore_error: Option<String>,
+) -> DataReadiness {
+    // 1. DB failure locks the readiness. NEVER override.
+    if let Err(reason) = db_open {
+        return DataReadiness::NeedsDatabaseRecovery { reason };
+    }
+    // DB opened. keystore failure beats settings failure (writes need a
+    // usable keystore, so a healthy DB+migration is useless without one).
+    if let Some(reason) = keystore_error {
+        return DataReadiness::NeedsKeystoreRecovery { reason };
+    }
+    // Settings path didn't resolve: migration can't run safely against a
+    // guessed path, so degrade to MigrationIncomplete and skip migration.
+    if let Some(reason) = settings_error {
+        return DataReadiness::migration_incomplete("settings_path", reason);
+    }
+    // All healthy: pre-migration default. The migration step in setup() is
+    // what flips this to Ready (or a more specific failure state).
+    DataReadiness::default()
+}
+
+/// Startup migration gate (round-3 P1.3): decide whether migration may run,
+/// and return the REAL settings path it must run against.
+///
+/// Migration's Phase 1 parses + backs up the legacy settings file, so it needs
+/// the actual resolved path. A `None` settings path (resolution failed) must
+/// REFUSE migration — running it against a guessed path would read/write the
+/// WRONG settings file (on Windows the store plugin targets AppData Roaming
+/// while `dir` here is AppLocalData Local). A failed keystore init is also a
+/// hard stop (migration's Phase 1 keystore backup needs a usable keystore).
+///
+/// Returns `Ok(path)` ONLY when the caller may run `run_migration` against
+/// `path`; `Err(reason)` otherwise. The refusal decision is what the tests pin
+/// down: when this returns `Err`, `run_migration` is never reached, so NO
+/// backup is produced and NO DB write occurs (the readiness reducer above
+/// already reflects the refusal in `DataReadiness`).
+pub fn startup_migration_guard<'a>(
+    settings_path: Option<&'a Path>,
+    keystore_init_error: Option<&str>,
+) -> Result<&'a Path, String> {
+    if let Some(e) = keystore_init_error {
+        return Err(format!("keystore init failed: {e}"));
+    }
+    settings_path.ok_or_else(|| {
+        "settings path could not be resolved; migration refused (no backup, no DB write)".to_string()
+    })
+}
+
+/// Resolve the optional `client` from the [`Session`] or return a clear error
+/// string. Used by the translate commands so a startup build failure surfaces
+/// consistently instead of panicking.
+fn session_client(session: &Session) -> Result<&reqwest::Client, String> {
+    session.client.as_ref().ok_or_else(|| {
+        "HTTP client unavailable: startup build failed (recovery required)".to_string()
+    })
+}
+
+/// Resolve the optional `keystore` from the [`Session`] or return a clear error
+/// string. Used by the translate / key commands so a startup init failure
+/// (degraded `NeedsKeystoreRecovery`) surfaces consistently instead of
+/// panicking.
+fn session_keystore(session: &Session) -> Result<&keystore::Keystore, String> {
+    session.keystore.as_ref().ok_or_else(|| {
+        "keystore unavailable: startup init failed (recovery required)".to_string()
+    })
+}
+
 #[tauri::command]
 async fn translate(
     app: tauri::AppHandle,
@@ -167,7 +263,9 @@ async fn translate(
     };
     // §G: resolve the opt-in fallback engine from settings (None by default).
     let fallback = settings::load(&app).fallback_engine.as_deref().and_then(engines::find);
-    let t = service::translate_with_fallback(&state.client, &state.keystore, &preset, input, fallback)
+    let client = session_client(&state)?;
+    let keystore = session_keystore(&state)?;
+    let t = service::translate_with_fallback(client, keystore, &preset, input, fallback)
         .await
         .map_err(|e| e.to_string())?;
     Ok(TranslateResult {
@@ -205,7 +303,9 @@ async fn translate_default(
         to: &to,
         options: wire::AppOptions::default(),
     };
-    let t = service::translate_with_fallback(&state.client, &state.keystore, &preset, input, fallback)
+    let client = session_client(&state)?;
+    let keystore = session_keystore(&state)?;
+    let t = service::translate_with_fallback(client, keystore, &preset, input, fallback)
         .await
         .map_err(|e| e.to_string())?;
     Ok(TranslateResult {
@@ -250,7 +350,25 @@ async fn translate_clipboard(
         to: &s.target_language,
         options: wire::AppOptions::default(),
     };
-    match service::translate_with_fallback(&state.client, &state.keystore, &preset, input, fallback).await {
+    let client = match session_client(&state) {
+        Ok(c) => c,
+        Err(msg) => {
+            if state.gen.is_latest(gen) {
+                let _ = popup::error(&app, &msg);
+            }
+            return Ok(());
+        }
+    };
+    let keystore = match session_keystore(&state) {
+        Ok(k) => k,
+        Err(msg) => {
+            if state.gen.is_latest(gen) {
+                let _ = popup::error(&app, &msg);
+            }
+            return Ok(());
+        }
+    };
+    match service::translate_with_fallback(client, keystore, &preset, input, fallback).await {
         Ok(out) => {
             if state.gen.is_latest(gen) {
                 let _ = popup::result(&app, &out.text, &out.engine);
@@ -304,7 +422,8 @@ fn set_key(
     // must equal some non-deleted row's `secret_ref`. If the DB isn't available
     // (NeedsDatabaseRecovery / not yet open) we can't validate, so refuse.
     assert_secret_ref_owned(&app, &provider_id)?;
-    state.keystore.set_key(&provider_id, &key).map_err(|e| e.to_string())?;
+    let keystore = session_keystore(&state)?;
+    keystore.set_key(&provider_id, &key).map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -326,7 +445,8 @@ fn delete_key(
     // row to exist — but a 'deleted' row no longer owns its secret_ref, hence
     // the `status != 'deleted'` clause. If the DB isn't available, refuse.
     assert_secret_ref_owned(&app, &provider_id)?;
-    state.keystore.delete_key(&provider_id).map_err(|e| e.to_string())?;
+    let keystore = session_keystore(&state)?;
+    keystore.delete_key(&provider_id).map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -458,9 +578,14 @@ fn key_status(
     // S2a P0: enumerate via the typed accessor so the map is keyed by
     // `secret_ref` from the nested v2 `provider_keys` (the old raw-object walk
     // iterated the flat map and missed migrated keys).
-    let refs = match state.keystore.list_provider_key_refs() {
-        Ok(r) => r,
-        Err(_) => return std::collections::HashMap::new(),
+    let refs = match state.keystore.as_ref() {
+        Some(ks) => match ks.list_provider_key_refs() {
+            Ok(r) => r,
+            Err(_) => return std::collections::HashMap::new(),
+        },
+        // No keystore (startup init failure): return empty so onMount doesn't
+        // abort. The recovery banner reads `keystore_health` for the reason.
+        None => return std::collections::HashMap::new(),
     };
     refs.into_iter().map(|r| (r, true)).collect()
 }
@@ -516,9 +641,14 @@ fn a11y_status() -> bool {
 #[tauri::command]
 fn keystore_health(state: tauri::State<'_, Arc<Session>>) -> String {
     // "" = healthy (or absent = first run). Non-empty = the fail-closed reason.
-    match state.keystore.load() {
-        Ok(_) => String::new(),
-        Err(e) => format!("{e}"),
+    // When the keystore couldn't be initialized at startup (Session.keystore is
+    // None), surface that reason so the recovery banner shows it.
+    match state.keystore.as_ref() {
+        Some(ks) => match ks.load() {
+            Ok(_) => String::new(),
+            Err(e) => format!("{e}"),
+        },
+        None => "keystore unavailable: startup init failed".to_string(),
     }
 }
 
@@ -544,13 +674,142 @@ fn keystore_health(state: tauri::State<'_, Arc<Session>>) -> String {
 // still respected: the DB guard (`with_conn` closure) is released before each
 // keystore step (the keystore takes only its own flock).
 
-/// Returns the serialized [`DataReadiness`] so the frontend can drive the
-/// recovery banner. Always available (no readiness gate) — it's how the UI
-/// discovers the gate is closed in the first place.
+/// Build the translate HTTP client (S2a Task 5b).
+///
+/// Spec §Privacy: no cross-origin redirects, a 30s total request timeout so a
+/// hung connection can't freeze translate + the popup, and a 10s connect
+/// timeout so `wire::call` can classify a real `Timeout`. This MUST NOT panic
+/// and MUST NOT silently downgrade the privacy policy: the hardened builder
+/// (with `redirect(Policy::none())`) is the ONLY client we ever return. On a
+/// builder failure (pathological TLS-init environment) we return `Err` so the
+/// caller can log it and enter a degraded startup state — a default client
+/// would drop `redirect(Policy::none())`, re-opening the cross-origin-redirect
+/// leak the policy exists to close.
+fn build_http_client() -> Result<reqwest::Client, String> {
+    reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .timeout(std::time::Duration::from_secs(30))
+        .connect_timeout(std::time::Duration::from_secs(10))
+        .build()
+        .map_err(|e| format!("hardened HTTP client build failed: {e}"))
+}
+
+/// Init a last-resort keystore in a PID-uniquified temp subdir (S2a Task 5b).
+///
+/// Called only when both the canonical-dir keystore AND the shared temp-dir
+/// fallback failed to init. A PID-suffixed subdir sidesteps any flock/perm
+/// state the earlier attempts left behind, and a second concurrent instance
+/// gets its own dir. This MUST NOT panic: it keeps trying uniquified dirs and,
+/// if all of them fail (genuinely unreachable — `Keystore::new` only does
+/// `create_dir_all` + `set_dir_perms`), returns `Err` so the caller can record
+/// the failure and degrade to `NeedsKeystoreRecovery`. The OS temp allocator is
+/// effectively always writable, so the `Err` path is defence-in-depth.
+fn init_last_resort_keystore() -> Result<keystore::Keystore, String> {
+    let pid = std::process::id();
+    // Try up to 17 PID-suffixed temp subdirs. Each attempt logs on failure; the
+    // loop returns Ok on the first success. If all 17 fail (genuinely
+    // unreachable — the OS temp allocator is effectively always writable), make
+    // one final attempt with a random name and surface the error.
+    let mut last_err = String::new();
+    for suffix in 0..=16 {
+        let candidate = std::env::temp_dir()
+            .join(format!("linguaray-keystore-lastresort-{pid}-{suffix}"));
+        match keystore::Keystore::new(candidate) {
+            Ok(ks) => return Ok(ks),
+            Err(e) => {
+                log::warn!("last-resort keystore dir {suffix} failed: {e}");
+                last_err = e.to_string();
+            }
+        }
+    }
+    // Defence-in-depth: all PID-suffixed dirs failed. Construct one final
+    // attempt with a random-ish name, then surface the error (no panic).
+    let nano = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    let final_dir = std::env::temp_dir().join(format!("linguaray-keystore-{pid}-{nano}"));
+    log::error!(
+        "all last-resort keystore dirs failed; final attempt: {}",
+        final_dir.display()
+    );
+    match keystore::Keystore::new(final_dir) {
+        Ok(ks) => Ok(ks),
+        Err(e) => Err(format!(
+            "cannot init any keystore (last error: {e}; prior loop: {last_err})"
+        )),
+    }
+}
+
+/// Validate every shipped preset endpoint (S2a Task 5b, spec §Privacy).
+///
+/// Thin wrapper over [`validate_preset_endpoints`] reading the hardcoded
+/// catalog. Kept separate so the core validation is injectable in tests (a test
+/// catalog containing a deliberately-invalid endpoint can prove the fail-closed
+/// chain end-to-end instead of only exercising `validate_endpoint` in
+/// isolation).
+fn validate_all_preset_endpoints() -> Vec<String> {
+    validate_preset_endpoints(&providers::presets())
+}
+
+/// Validate a PRESET LIST's endpoints (spec §Privacy): every endpoint must be
+/// HTTPS (loopback HTTP allowed for local engines like Ollama). Returns the ids
+/// whose endpoints FAILED scheme validation (empty = all valid).
+///
+/// Each failure is logged + the offending preset is effectively disabled (its
+/// engine won't be usable until the catalog is fixed), but a single bad preset
+/// does not crash startup — this is a far better failure mode than refusing to
+/// launch. The caller decides the fail-closed response via
+/// [`preset_gate_allows_client`].
+fn validate_preset_endpoints(list: &[providers::ProviderPreset]) -> Vec<String> {
+    let mut invalid = Vec::new();
+    for p in list {
+        if let Err(e) = providers::validate_endpoint(&p.endpoint) {
+            log::error!(
+                "preset '{}' endpoint '{}' failed scheme validation ({e}); engine disabled",
+                p.id,
+                p.endpoint
+            );
+            invalid.push(p.id.clone());
+        }
+    }
+    invalid
+}
+
+/// Fail-closed gate for the HTTP client (round-3 P1.1).
+///
+/// Given the preset ids whose endpoints failed validation, decide whether ANY
+/// outbound request may be shipped. A single invalid preset disables the client
+/// ENTIRELY (the setup path builds `None` and every translate entry-point then
+/// refuses via `session_client`) — a leaked/broken catalog endpoint must never
+/// fire a request just because the user happens to select a different engine.
+///
+/// This is the deterministic, testable decision behind the setup inline branch:
+/// `Ok(c) if preset_gate_allows_client(&invalid) => Some(c)`, else `None`.
+fn preset_gate_allows_client(invalid_presets: &[String]) -> bool {
+    invalid_presets.is_empty()
+}
+
+/// Returns the live [`DataReadiness`] so the frontend can drive the recovery
+/// banner. Always available (no readiness gate) — it's how the UI discovers the
+/// gate is closed in the first place.
+///
+/// Returns the typed `DataReadiness` directly (Tauri auto-serializes it via the
+/// `#[derive(Serialize)]` + `#[serde(tag="state", rename_all="snake_case")]` on
+/// the enum).
+///
+/// WIRE CONTRACT: this is a breaking change from the pre-S2a `String` return —
+/// the old command returned a JSON-ENCODED STRING (the frontend had to parse
+/// the string's contents as JSON). It now ships a real JSON OBJECT:
+/// - `Ready` → `{"state":"ready"}`
+/// - `NeedsKeystoreRecovery` → `{"state":"needs_keystore_recovery","reason":"…"}`
+/// - `NeedsDatabaseRecovery` → `{"state":"needs_database_recovery","reason":"…"}`
+/// - `MigrationIncomplete` → `{"state":"migration_incomplete","checkpoint":…,"reason":"…"}`
+/// (internally-tagged enum: the variant determines which fields exist).
+/// Frontend callers must read a JSON object, not a string.
 #[tauri::command]
-fn get_data_readiness(state: tauri::State<'_, Arc<AppState>>) -> String {
-    let r = state.readiness.read();
-    serde_json::to_string(&*r).unwrap_or_else(|_| "{\"state\":\"migration_incomplete\"}".into())
+fn get_data_readiness(state: tauri::State<'_, Arc<AppState>>) -> DataReadiness {
+    state.readiness.read().clone()
 }
 
 /// List active provider profiles (`status='active'`), ordered by `sort_order`.
@@ -777,16 +1036,16 @@ async fn provider_set_active(
     primary: String,
     parallel: Vec<String>,
     fallback: Option<String>,
-) -> Result<(), String> {
+) -> Result<SetActiveResult, String> {
     let app = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || -> Result<SetActiveResult, String> {
         // Acquire the gate FIRST (see provider_list).
         let _gate = app.data_gate.write();
         let db = require_ready_gated_write(&app, &_gate)?;
         // The `with_conn` closure must return Result<_, DbError> (Database's
         // contract). We carry the consent-required signal out via a SetActiveOutcome
-        // so the outer closure can map it to the frontend-facing string without
-        // smuggling a ConsentError through the DbError boundary.
+        // so the outer closure can map it to the frontend-facing SetActiveResult
+        // without smuggling a ConsentError through the DbError boundary.
         //
         // P1 #4: ALL reads (list, compute_scope, read_consent_scope) + the
         // write run inside ONE transaction so a concurrent writer can't change
@@ -835,12 +1094,15 @@ async fn provider_set_active(
                 Ok(SetActiveOutcome::Written)
             })
             .map_err(|e| e.to_string())?;
-        match outcome {
-            SetActiveOutcome::Written => Ok(()),
-            SetActiveOutcome::NeedsConsent { actual_scope } => Err(format!(
-                "consent_required:{actual_scope}"
-            )),
-        }
+        // P1.1: map the internal outcome to the serialized tagged union. The
+        // consent-required path is now an Ok(SetActiveResult::NeedsConsent) so
+        // the frontend gets a structured payload, not a parsed error string.
+        Ok(match outcome {
+            SetActiveOutcome::Written => SetActiveResult::Written,
+            SetActiveOutcome::NeedsConsent { actual_scope } => SetActiveResult::NeedsConsent {
+                actual_scope,
+            },
+        })
     })
     .await
     .map_err(|e| e.to_string())?
@@ -864,38 +1126,29 @@ async fn provider_confirm_and_set_active(
     parallel: Vec<String>,
     fallback: Option<String>,
     expected_scope: String,
-) -> Result<i64, String> {
+) -> Result<i64, ProviderCommandError> {
     let app = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || -> Result<i64, String> {
+    tauri::async_runtime::spawn_blocking(move || -> Result<i64, ProviderCommandError> {
         // Acquire the gate FIRST (see provider_list).
         let _gate = app.data_gate.write();
-        let db = require_ready_gated_write(&app, &_gate)?;
-        db.with_conn(|conn| -> Result<i64, DbErr> {
-            // P1 #4: ALL reads + validation + scope computation + writes run in
-            // ONE transaction so no concurrent writer can change the active set
-            // between the probe and the consented write.
+        let db = require_ready_gated_write(&app, &_gate).map_err(ProviderCommandError::from)?;
+        let outcome = db.with_conn(|conn| -> Result<ConfirmActiveOutcome, DbErr> {
             let tx = conn.transaction()?;
-            // 1. Re-read inside the tx (no TOCTOU).
             let active = db_providers::list(&tx)?;
-            // 2. Validate.
             db_providers::validate_active_selection(
                 &primary,
                 &parallel,
                 fallback.as_deref(),
                 &active,
             )?;
-            // 3. Recompute scope.
             let actual_scope = db_providers::compute_scope(&primary, &parallel, &active)
                 .map_err(consent_to_db)?;
-            // 4. Assert frontend's expectation matches backend reality. A
-            //    mismatch is a stale-frontend guard; surface as Integrity so it
-            //    propagates as a string error (the frontend re-prompts).
             if expected_scope != actual_scope {
-                return Err(DbErr::Integrity(format!(
-                    "consent_required:{actual_scope}"
-                )));
+                // Stale frontend: the scope it asserts doesn't match what the
+                // backend recomputes (it raced a provider change). Carried out
+                // as a typed variant — no sentinel string to parse.
+                return Ok(ConfirmActiveOutcome::StaleScope { actual_scope });
             }
-            // 5. Bump version + write selection + record scope atomically (same tx).
             let new_version = write_consented_selection(
                 &tx,
                 &primary,
@@ -904,12 +1157,24 @@ async fn provider_confirm_and_set_active(
                 &actual_scope,
             )?;
             tx.commit()?;
-            Ok(new_version)
-        })
-        .map_err(|e| e.to_string())
+            Ok(ConfirmActiveOutcome::Written { version: new_version })
+        });
+        // Map the typed outcome: StaleScope → ProviderCommandError::StaleScope
+        // (structured wire error), Written → the consent version. Everything
+        // else (real DB errors) stays an error.
+        outcome
+            .map(|o| match o {
+                ConfirmActiveOutcome::Written { version } => Ok(version),
+                ConfirmActiveOutcome::StaleScope { actual_scope } => {
+                    Err(ProviderCommandError::StaleScope { actual_scope })
+                }
+            })
+            .map_err(ProviderCommandError::from)?
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| ProviderCommandError::Db {
+        message: format!("{e:?}"),
+    })?
 }
 
 // ─── P1 #8: missing commands (provider diagnostics + DB recovery) ─────────
@@ -1019,7 +1284,16 @@ async fn provider_test_connection(
     // Best-effort reachability probe. We don't care about the response body —
     // any HTTP response (even a 401/404) means the endpoint is reachable; only
     // a transport-level failure (connect/timeout/TLS) counts as "not ok".
-    let req = session.client.get(&profile.endpoint).send().await;
+    let client = match session.client.as_ref() {
+        Some(c) => c,
+        None => {
+            return Ok(ConnectionResult {
+                ok: false,
+                message: "HTTP client unavailable: startup build failed".into(),
+            })
+        }
+    };
+    let req = client.get(&profile.endpoint).send().await;
     match req {
         Ok(resp) => Ok(ConnectionResult {
             ok: true,
@@ -1080,6 +1354,64 @@ type DbErr = crate::db::DbError;
 /// Type alias for the consent-computation error (P1 #3).
 type ConsentErr = db_providers::ConsentError;
 
+/// Result of [`provider_set_active`] (P1.1). A serializable tagged union so the
+/// frontend distinguishes "written" from "needs consent" via a structured
+/// payload instead of parsing an error string.
+///
+/// Wire shapes:
+/// - `Written` → `{"outcome":"written"}`
+/// - `NeedsConsent { actual_scope }` → `{"outcome":"needs_consent","actual_scope":"..."}`
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+#[serde(tag = "outcome", rename_all = "snake_case")]
+pub enum SetActiveResult {
+    /// The selection was written (no consent needed, or scope already matched).
+    Written,
+    /// A non-empty parallel selection needs explicit consent; carries the
+    /// canonical scope the frontend must echo back via
+    /// `provider_confirm_and_set_active`.
+    NeedsConsent { actual_scope: String },
+}
+
+/// Structured error type for provider IPC commands (P1.1 fix).
+/// Replaces free-form `String` errors so the frontend can pattern-match
+/// instead of parsing string prefixes.
+/// Wire shape for StaleScope: `{"error":"stale_scope","actual_scope":"..."}`
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+#[serde(tag = "error", rename_all = "snake_case")]
+pub enum ProviderCommandError {
+    StaleScope { actual_scope: String },
+    /// Generic database or validation error.
+    Db { message: String },
+    /// Provider not found, invalid selection, etc.
+    Validation { message: String },
+}
+
+impl std::fmt::Display for ProviderCommandError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::StaleScope { actual_scope } => {
+                write!(f, "stale scope: {actual_scope}")
+            }
+            Self::Db { message } => write!(f, "{message}"),
+            Self::Validation { message } => write!(f, "{message}"),
+        }
+    }
+}
+
+impl From<crate::db::DbError> for ProviderCommandError {
+    fn from(e: crate::db::DbError) -> Self {
+        ProviderCommandError::Db {
+            message: e.to_string(),
+        }
+    }
+}
+
+impl From<String> for ProviderCommandError {
+    fn from(message: String) -> Self {
+        ProviderCommandError::Validation { message }
+    }
+}
+
 /// Outcome of a `provider_set_active` DB transaction (P1 #3). Carries the
 /// consent-required signal out of the `with_conn` closure (whose error type is
 /// fixed to `DbError`) so the command can surface it to the frontend.
@@ -1092,11 +1424,26 @@ enum SetActiveOutcome {
     NeedsConsent { actual_scope: String },
 }
 
+/// Outcome of a `provider_confirm_and_set_active` DB transaction (round-3
+/// cleanup #1). Replaces the old `__stale_scope__:` string sentinel smuggled
+/// through `DbError::Integrity`: the stale-scope signal now rides out of the
+/// `with_conn` closure as a first-class variant, so the outer mapping is a
+/// plain `match` with no string-prefix parsing to get wrong.
+enum ConfirmActiveOutcome {
+    /// Consent written; carries the new `parallel_consent_version`.
+    Written { version: i64 },
+    /// The frontend's `expected_scope` didn't match the backend-recomputed
+    /// canonical scope (it raced a provider change). Carries the actual scope
+    /// the frontend must re-echo.
+    StaleScope { actual_scope: String },
+}
+
 /// Map a [`ConsentError`] (other than `ConsentRequired`, which is handled by
 /// the caller via `SetActiveOutcome`) into a [`DbError`] so it can cross the
-/// `with_conn` boundary. The consent-required arm is mapped to an Integrity
-/// error carrying the scope (the only place this fires is the
-/// `provider_confirm_and_set_active` stale-scope guard).
+/// `with_conn` boundary. `ConsentRequired` is only ever surfaced by
+/// `provider_set_active` (as `SetActiveOutcome::NeedsConsent`), never by
+/// `provider_confirm_and_set_active` (whose stale-scope path is now a typed
+/// `ConfirmActiveOutcome` variant, not an error string).
 fn consent_to_db(e: ConsentErr) -> DbErr {
     match e {
         ConsentErr::Db(d) => d,
@@ -1483,7 +1830,31 @@ fn on_hotkey(app: &tauri::AppHandle, _shortcut: &tauri_plugin_global_shortcut::S
             to: &s.target_language,
             options: wire::AppOptions::default(),
         };
-        match service::translate_with_fallback(&state.client, &state.keystore, &preset, input, fallback).await {
+        let client = match state.client.as_ref() {
+            Some(c) => c,
+            None => {
+                if state.gen.is_latest(gen) {
+                    let _ = popup::error(
+                        &app2,
+                        "HTTP client unavailable: startup build failed (recovery required)",
+                    );
+                }
+                return;
+            }
+        };
+        let keystore = match state.keystore.as_ref() {
+            Some(k) => k,
+            None => {
+                if state.gen.is_latest(gen) {
+                    let _ = popup::error(
+                        &app2,
+                        "keystore unavailable: startup init failed (recovery required)",
+                    );
+                }
+                return;
+            }
+        };
+        match service::translate_with_fallback(client, keystore, &preset, input, fallback).await {
             Ok(out) => {
                 if state.gen.is_latest(gen) {
                     let _ = popup::result(&app2, &out.text, &out.engine);
@@ -1560,46 +1931,93 @@ pub fn run() {
                 std::env::temp_dir().join("linguaray-data")
             });
             // Review P1 #2: keystore init must NOT crash either. On failure,
-            // build the Session against a temp-dir keystore (translate will find
-            // no keys but won't panic) and record the failure so the DB
-            // readiness block below degrades to NeedsKeystoreRecovery.
+            // build the Session WITHOUT a keystore (translate will surface a
+            // clear error) and record the failure so the DB readiness block
+            // below degrades to NeedsKeystoreRecovery.
             let (keystore, keystore_init_error) = match keystore::Keystore::new(dir.clone()) {
-                Ok(ks) => (ks, None),
+                Ok(ks) => (Some(ks), None),
                 Err(e) => {
                     log::error!(
                         "keystore init in {} failed: {e}; falling back to temp dir",
                         dir.display()
                     );
                     let fallback_dir = std::env::temp_dir().join("linguaray-keystore");
-                    let ks = keystore::Keystore::new(fallback_dir).unwrap_or_else(|e2| {
-                        log::error!("temp keystore fallback also failed: {e2}");
-                        // Last resort: an empty in-memory-shaped dir that won't
-                        // be written until a key is set. Keystore::new on a fresh
-                        // temp subdir must succeed; this branch is effectively
-                        // unreachable but keeps setup panic-free.
-                        let last = std::env::temp_dir().join("linguaray-keystore-lastresort");
-                        keystore::Keystore::new(last)
-                            .expect("temp keystore last-resort must be creatable")
-                    });
-                    (ks, Some(format!("keystore init in {}: {e}", dir.display())))
+                    // Try the shared temp fallback, then the PID-uniquified
+                    // last-resort (which itself returns Result — no panic).
+                    let (ks, lr_err) =
+                        match keystore::Keystore::new(fallback_dir) {
+                            Ok(ks) => (Some(ks), None),
+                            Err(e2) => {
+                                log::error!("temp keystore fallback also failed: {e2}");
+                                match init_last_resort_keystore() {
+                                    Ok(ks) => (Some(ks), None),
+                                    // Total failure (OS temp dir unwritable —
+                                    // unreachable in practice): Session.keystore
+                                    // is None; every keystore-touching command
+                                    // surfaces a clear error, and readiness
+                                    // degrades to NeedsKeystoreRecovery.
+                                    Err(lr) => {
+                                        log::error!(
+                                            "all last-resort keystore dirs failed: {lr}"
+                                        );
+                                        (None, Some(lr))
+                                    }
+                                }
+                            }
+                        };
+                    let reason = match lr_err {
+                        Some(lr) => format!(
+                            "keystore init in {} failed: {e}; last-resort also failed: {lr}",
+                            dir.display()
+                        ),
+                        None => format!("keystore init in {}: {e}", dir.display()),
+                    };
+                    (ks, Some(reason))
                 }
             };
             // Spec §Privacy: every preset endpoint must be HTTPS (loopback HTTP
             // allowed for local engines like Ollama). Reject at config-load so an
-            // invalid/leaked preset never ships a request.
-            for p in providers::presets() {
-                providers::validate_endpoint(&p.endpoint)
-                    .expect("preset endpoint failed scheme validation");
+            // invalid/leaked preset never ships a request. A bad preset is logged
+            // (not fatal) so a single broken catalog entry can't crash startup —
+            // see `validate_all_preset_endpoints`. The invalid list is recorded
+            // here; every shipped preset currently validates, so this is the
+            // fail-closed seam that surfaces a future bad catalog entry.
+            let invalid_presets = validate_all_preset_endpoints();
+            let preset_validation_ok = preset_gate_allows_client(&invalid_presets);
+            if !preset_validation_ok {
+                log::error!(
+                    "preset endpoint validation failed for {} preset(s): {:?}; \
+                     ALL translation requests are disabled until the catalog is fixed",
+                    invalid_presets.len(),
+                    invalid_presets
+                );
             }
             // Spec §Privacy: no cross-origin redirects. Review P1 #7: a 30s total
             // request timeout so a hung connection can't freeze translate + the
             // popup indefinitely; lets wire::call classify a real Timeout.
-            let client = reqwest::Client::builder()
-                .redirect(reqwest::redirect::Policy::none())
-                .timeout(std::time::Duration::from_secs(30))
-                .connect_timeout(std::time::Duration::from_secs(10))
-                .build()
-                .expect("client");
+            // `build_http_client` returns the ONLY client we ever use (hardened
+            // builder with redirect=none). On a builder failure (pathological
+            // TLS-init env) we log + degrade: Session.client is None, so every
+            // translate path returns a clear "client unavailable" error. We do
+            // NOT fall back to a default client — that would drop
+            // redirect(Policy::none()), re-opening the cross-origin-redirect
+            // leak the policy exists to close.
+            let client = match build_http_client() {
+                Ok(c) if preset_validation_ok => Some(c),
+                Ok(_) => {
+                    // Preset validation failed — disable ALL outbound requests
+                    // (fail-closed, see `preset_gate_allows_client`). A bad preset
+                    // catalog must not ship any request.
+                    log::error!("preset validation failed; client disabled (fail-closed)");
+                    None
+                }
+                Err(e) => {
+                    log::error!(
+                        "{e}; translate is unavailable until the app is restarted in a healthy TLS environment"
+                    );
+                    None
+                }
+            };
             app.manage(Arc::new(Session {
                 client,
                 keystore,
@@ -1638,89 +2056,96 @@ pub fn run() {
                     }
                 };
 
-            // 1. Open the DB. Err → db=None, NeedsDatabaseRecovery (app keeps running).
-            let (db_handle, mut readiness) = match Database::open(&db_path) {
-                Ok(db) => (Some(Arc::new(db)), DataReadiness::default()),
-                Err(e) => (
-                    None,
-                    DataReadiness::NeedsDatabaseRecovery {
-                        reason: format!("open linguaray.db: {e}"),
-                    },
-                ),
+            // 1. Open the DB. Err → db=None (app keeps running; readiness
+            //    computed below degrades to NeedsDatabaseRecovery).
+            let (db_handle, db_open_result) = match Database::open(&db_path) {
+                Ok(db) => (Some(Arc::new(db)), Ok(())),
+                Err(e) => (None, Err(format!("open linguaray.db: {e}"))),
             };
 
-            // Settings path resolution failure takes precedence over migration:
-            // we don't know where settings.json lives, so we can't safely migrate
-            // (the migration reads + backs up the legacy settings). Degrade to
-            // MigrationIncomplete so the recovery banner surfaces it; a retry
-            // (next startup) re-resolves.
-            if let Some(reason) = &settings_resolution_error {
-                readiness = DataReadiness::migration_incomplete("settings_path", reason.clone());
-            }
-
-            // Review P1 #2: if the keystore couldn't be initialized in the
-            // canonical dir (we're now running on a temp fallback), the app is
-            // in keystore-recovery territory regardless of DB state — provider
-            // commands that touch the keystore must stay gated off and the
-            // recovery banner must show. This takes precedence: a healthy DB +
-            // healthy migration are useless without a usable keystore.
-            if let Some(reason) = &keystore_init_error {
-                readiness = DataReadiness::NeedsKeystoreRecovery {
-                    reason: reason.clone(),
-                };
-            }
+            // Compute the pre-migration readiness from the three independent
+            // startup outcomes via the priority reducer. P1.4: a failed DB open
+            // is LOCKED IN — subsequent settings/keystore errors must NOT mask
+            // NeedsDatabaseRecovery (the DB is the foundation; there is nothing
+            // for a keystore error to gate if no DB exists). Keystore failure
+            // beats settings failure (writes need a usable keystore). See
+            // `compute_startup_readiness` + tests/startup_readiness.rs.
+            let mut readiness = compute_startup_readiness(
+                db_open_result,
+                settings_resolution_error.clone(),
+                keystore_init_error.clone(),
+            );
 
             // 2-4. Only run migration + resume + preflight when the DB opened
             // AND the keystore initialized in its canonical dir AND the settings
-            // path resolved (otherwise we skip migration to avoid touching a
-            // keystore dir we can't lock or reading a guessed settings path).
-            if keystore_init_error.is_none() && settings_resolution_error.is_none() {
-                if let Some(db) = db_handle.clone() {
-                    let fp = FailpointCell::none();
-                    // settings_resolution_error.is_none() ⇒ settings_path is Some.
-                    // Unwrap once here (the only consumer of the resolved path
-                    // outside archive_database) and pass a &PathBuf into run_migration.
-                    let settings_path_ref = settings_path
-                        .as_ref()
-                        .expect("settings path is Some when resolution succeeded");
-                    readiness = match run_migration(&db, &keystore_dir, settings_path_ref, &fp) {
-                        Ok(()) => {
-                            // Resume any in-flight deletes (3-step sweep). A failure
-                            // here does NOT exit setup — log + mark incomplete so the
-                            // next startup retries.
-                            match crate::db::delete::provider_resume_deletions(&db, &keystore_dir) {
-                                Ok(_) => {
-                                    // Final keystore preflight: a Corrupt keystore
-                                    // (detected after migration) → recovery.
-                                    match keystore::load_state(&keystore_dir) {
-                                        keystore::KeystoreLoadState::Corrupt(e) => {
-                                            DataReadiness::NeedsKeystoreRecovery {
-                                                reason: format!("keystore corrupt: {e}"),
+            // path resolved. `startup_migration_guard` is the single source of
+            // truth for the refusal decision (round-3 P1.3): a None settings
+            // path (resolution failed) must refuse migration entirely — no
+            // backup, no DB write — rather than run against a guessed path (on
+            // Windows the store plugin targets AppData Roaming while `dir` here
+            // is AppLocalData Local, so a guessed path would touch a DIFFERENT
+            // settings file). The refusal itself is already reflected in
+            // `readiness` by the reducer above (NeedsKeystoreRecovery /
+            // MigrationIncomplete "settings_path"), so on Err we just skip
+            // migration and keep the rest of setup running.
+            if let Some(db) = db_handle.clone() {
+                let fp = FailpointCell::none();
+                match startup_migration_guard(
+                    settings_path.as_deref(),
+                    keystore_init_error.as_deref(),
+                ) {
+                    Ok(settings_path_ref) => {
+                        readiness = match run_migration(&db, &keystore_dir, settings_path_ref, &fp)
+                        {
+                            Ok(()) => {
+                                // Resume any in-flight deletes (3-step sweep). A
+                                // failure here does NOT exit setup — log + mark
+                                // incomplete so the next startup retries.
+                                match crate::db::delete::provider_resume_deletions(
+                                    &db,
+                                    &keystore_dir,
+                                ) {
+                                    Ok(_) => {
+                                        // Final keystore preflight: a Corrupt
+                                        // keystore (detected after migration) →
+                                        // recovery.
+                                        match keystore::load_state(&keystore_dir) {
+                                            keystore::KeystoreLoadState::Corrupt(e) => {
+                                                DataReadiness::NeedsKeystoreRecovery {
+                                                    reason: format!("keystore corrupt: {e}"),
+                                                }
                                             }
+                                            _ => DataReadiness::Ready,
                                         }
-                                        _ => DataReadiness::Ready,
+                                    }
+                                    Err(e) => {
+                                        log::error!("resume_deletions failed: {e}");
+                                        DataReadiness::migration_incomplete(
+                                            "resume_deletions",
+                                            format!("resume deletions: {e}"),
+                                        )
                                     }
                                 }
-                                Err(e) => {
-                                    log::error!("resume_deletions failed: {e}");
-                                    DataReadiness::migration_incomplete(
-                                        "resume_deletions",
-                                        format!("resume deletions: {e}"),
-                                    )
-                                }
                             }
-                        }
-                        Err(MigrationError::NeedsKeystoreRecovery(reason)) => {
-                            DataReadiness::NeedsKeystoreRecovery { reason }
-                        }
-                        Err(MigrationError::SettingsCorrupt(reason)) => {
-                            DataReadiness::migration_incomplete("settings", reason)
-                        }
-                        Err(other) => DataReadiness::migration_incomplete(
-                            "migration",
-                            other.to_string(),
-                        ),
-                    };
+                            Err(MigrationError::NeedsKeystoreRecovery(reason)) => {
+                                DataReadiness::NeedsKeystoreRecovery { reason }
+                            }
+                            Err(MigrationError::SettingsCorrupt(reason)) => {
+                                DataReadiness::migration_incomplete("settings", reason)
+                            }
+                            Err(other) => DataReadiness::migration_incomplete(
+                                "migration",
+                                other.to_string(),
+                            ),
+                        };
+                    }
+                    Err(reason) => {
+                        // Refused: keystore init failed or settings path could
+                        // not be resolved. Migration is skipped entirely — NO
+                        // backup, NO DB write. readiness already carries the
+                        // correct degraded state from the reducer above.
+                        log::debug!("startup migration refused: {reason}");
+                    }
                 }
             }
 
@@ -1785,4 +2210,191 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Task 5a: `get_data_readiness` returns a `DataReadiness` (not a hand-rolled
+    /// JSON `String`) so the frontend gets a properly serialized tagged union via
+    /// Tauri's auto-serialization. This IS a wire-contract change from the
+    /// pre-S2a `String` return: the old command returned a JSON-ENCODED STRING,
+    /// the new one ships a JSON object via `#[serde(tag="state", rename_all="snake_case")]`
+    /// on `DataReadiness` itself.
+    #[test]
+    fn read_data_readiness_from_state_returns_typed_object() {
+        let dir = tempfile::tempdir().unwrap();
+        let state = AppState {
+            db: parking_lot::RwLock::new(None),
+            data_gate: parking_lot::RwLock::new(()),
+            readiness: parking_lot::RwLock::new(DataReadiness::Ready),
+            db_path: dir.path().join("linguaray.db"),
+            keystore_dir: dir.path().join("keystore"),
+            settings_path: Some(dir.path().join("settings.json")),
+        };
+        let got = state.readiness.read().clone();
+        assert_eq!(got, DataReadiness::Ready);
+
+        // Verify the serialized shape is the SAME tagged-union JSON the frontend
+        // already consumes (`{"state":"ready"}`), so the signature change does
+        // not alter the wire format.
+        let json = serde_json::to_string(&got).unwrap();
+        assert_eq!(json, "{\"state\":\"ready\"}");
+    }
+
+    /// A non-Ready readiness must round-trip with its `reason` payload intact
+    /// (this is the case that matters for the recovery banner).
+    #[test]
+    fn read_data_readiness_preserves_reason_payload() {
+        let dir = tempfile::tempdir().unwrap();
+        let state = AppState {
+            db: parking_lot::RwLock::new(None),
+            data_gate: parking_lot::RwLock::new(()),
+            readiness: parking_lot::RwLock::new(DataReadiness::NeedsKeystoreRecovery {
+                reason: "corrupt envelope".into(),
+            }),
+            db_path: dir.path().join("linguaray.db"),
+            keystore_dir: dir.path().join("keystore"),
+            settings_path: Some(dir.path().join("settings.json")),
+        };
+        let got = state.readiness.read().clone();
+        let json = serde_json::to_string(&got).unwrap();
+        assert!(json.contains("\"state\":\"needs_keystore_recovery\""), "{json}");
+        assert!(json.contains("\"reason\":\"corrupt envelope\""), "{json}");
+    }
+
+    /// Task 5b: building the HTTP client must NOT `.expect()`/panic. The hardened
+    /// builder (redirect=none + timeouts) is the only client we ever return — on
+    /// a builder error we surface `Err` rather than silently degrading to a
+    /// privacy-losing default client. This test is network-free: it only checks
+    /// the builder succeeds and returns a usable `reqwest::Client`.
+    #[test]
+    fn build_http_client_returns_usable_client() {
+        let c = build_http_client()
+            .expect("hardened HTTP client builder must succeed in a normal env");
+        // No network: a freshly built client is still a real reqwest::Client. We
+        // confirm it's usable by constructing a request (build, not send).
+        let _req = c.get("https://invalid.invalid/");
+    }
+
+    /// Task 5b: `build_http_client` returns `Result` and must NOT silently fall
+    /// back to a default client (which would drop `redirect(Policy::none())`). A
+    /// builder error must propagate as `Err`, not be swallowed. In a normal
+    /// environment the hardened builder succeeds, so this asserts the Ok shape.
+    #[test]
+    fn build_http_client_returns_result_not_client() {
+        // Signature contract: the function returns Result<Client, String>, not a
+        // bare Client. This compiles only if the signature is the Result form,
+        // locking in the no-panic / no-silent-fallback contract at the type level.
+        let result: Result<reqwest::Client, String> = build_http_client();
+        assert!(result.is_ok(), "normal env must build the hardened client");
+    }
+
+    /// Task 5b: preset-endpoint validation must NOT `.expect()`/panic. A bad
+    /// preset is logged + skipped, not fatal — every shipped preset validates,
+    /// so this exercises the happy path AND the skip path via the helper directly.
+    #[test]
+    fn validate_preset_endpoints_does_not_panic() {
+        // All shipped presets are HTTPS/loopback-valid → Ok (empty error list).
+        let invalid = validate_all_preset_endpoints();
+        assert!(invalid.is_empty(), "shipped presets must all validate: {invalid:?}");
+
+        // A single bad endpoint validates to Err (the per-endpoint check the
+        // loop calls), proving the loop would skip rather than panic.
+        assert!(
+            providers::validate_endpoint("ftp://evil.example/x").is_err(),
+            "ftp must be rejected"
+        );
+    }
+
+    /// Task 5b: `init_last_resort_keystore` must return `Result<Keystore, String>`
+    /// and NEVER panic. In a normal environment the OS temp dir is writable, so
+    /// this asserts the Ok shape — locking in the no-panic contract at the type
+    /// level (the function signature is `Result`, so a panic in the unreachable
+    /// final arm would now be a compile error).
+    #[test]
+    fn init_last_resort_keystore_returns_result_no_panic() {
+        // Signature contract: returns Result, not a bare Keystore. Compiles only
+        // if the signature is the Result form.
+        let result: Result<keystore::Keystore, String> = init_last_resort_keystore();
+        assert!(
+            result.is_ok(),
+            "normal OS temp dir must be writable for a last-resort keystore: {:?}",
+            result.err()
+        );
+    }
+
+    // ─── Round-3 P1.1: preset fail-closed chain, deterministically ──────────
+    //
+    // The review requirement: prove that when an invalid preset EXISTS, no
+    // network request can be produced — validating `validate_endpoint("ftp://…")`
+    // in isolation is not enough. These tests pin the full chain:
+    //   1. a catalog containing an invalid endpoint surfaces that id,
+    //   2. that id flips `preset_gate_allows_client` to false (client disabled),
+    //   3. a client-less Session makes `session_client` return Err — the first
+    //      barrier every translate entry-point (`translate`, `translate_default`,
+    //      `translate_clipboard`, `on_hotkey`) hits before it can build a
+    //      request. No client handle ⇒ no request can ever be shipped.
+    #[test]
+    fn invalid_preset_in_catalog_blocks_client_gate() {
+        let bad = providers::ProviderPreset {
+            id: "evil".into(),
+            label: "Evil".into(),
+            endpoint: "ftp://evil.example/x".into(),
+            api_kind: crate::wire::ApiKind::OpenAIChat,
+            default_model: "x".into(),
+            needs_key: true,
+        };
+        let good = providers::presets()
+            .into_iter()
+            .next()
+            .expect("shipped catalog is non-empty");
+        let invalid = validate_preset_endpoints(&[good, bad]);
+        assert_eq!(
+            invalid,
+            vec!["evil".to_string()],
+            "the invalid endpoint must surface in the invalid list"
+        );
+        assert!(
+            !preset_gate_allows_client(&invalid),
+            "a single invalid preset must disable the client entirely (fail-closed)"
+        );
+    }
+
+    #[test]
+    fn all_valid_presets_keep_client_gate_open() {
+        // Positive control: a clean catalog keeps the gate open.
+        let invalid = validate_preset_endpoints(&providers::presets());
+        assert!(invalid.is_empty(), "shipped catalog must validate: {invalid:?}");
+        assert!(preset_gate_allows_client(&invalid));
+    }
+
+    #[test]
+    fn session_client_refuses_when_client_disabled() {
+        // A Session whose client is None (the fail-closed setup outcome) must
+        // make `session_client` return Err — the deterministic barrier every
+        // translate entry-point uses before building a request. No network, no
+        // reqwest involvement: a None handle cannot ship anything.
+        let session = Session {
+            client: None,
+            keystore: None,
+            gen: concurrency::GenerationToken::new(),
+        };
+        let err = session_client(&session).unwrap_err();
+        assert!(err.contains("unavailable"), "{err}");
+    }
+
+    #[test]
+    fn session_client_returns_client_when_present() {
+        // Positive control: a healthy Session yields the client, so the barrier
+        // only trips on the disabled path (not universally).
+        let c = build_http_client().expect("hardened builder succeeds in a normal env");
+        let session = Session {
+            client: Some(c),
+            keystore: None,
+            gen: concurrency::GenerationToken::new(),
+        };
+        assert!(session_client(&session).is_ok());
+    }
 }

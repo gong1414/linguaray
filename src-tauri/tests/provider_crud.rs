@@ -822,3 +822,243 @@ fn enumerate_candidates_missing_keystore_settings_only() {
     assert_eq!(v.len(), 1);
     assert!(matches!(v[0], CandidateSource::LegacyId(_)));
 }
+
+// ─── P1.1: SetActiveResult / ProviderCommandError IPC serialization ─────────
+//
+// provider_set_active must return a tagged union (Ok variant) instead of an
+// error string for the consent-required path, and provider_confirm_and_set_active
+// must encode its stale-scope error as a structured JSON tag. These tests pin
+// the on-the-wire shapes the frontend parses. (The earlier `SetActiveError`
+// type was removed as redundant — `ProviderCommandError` is the single
+// structured error type for provider IPC commands.)
+
+use linguaray_lib::{ProviderCommandError, SetActiveResult};
+
+#[test]
+fn set_active_result_written_serializes_to_outcome_tag() {
+    // Ok(SetActiveResult::Written) → {"outcome":"written"}
+    let json = serde_json::to_value(SetActiveResult::Written).unwrap();
+    assert_eq!(json, serde_json::json!({"outcome":"written"}));
+    // Round-trip back to the same variant.
+    let back: SetActiveResult = serde_json::from_value(json).unwrap();
+    assert!(matches!(back, SetActiveResult::Written));
+}
+
+#[test]
+fn set_active_result_needs_consent_carries_actual_scope() {
+    // NeedsConsent → {"outcome":"needs_consent","actual_scope":"..."}
+    let r = SetActiveResult::NeedsConsent {
+        actual_scope: "u1=https://a|u2=https://b".to_string(),
+    };
+    let json = serde_json::to_value(&r).unwrap();
+    assert_eq!(
+        json,
+        serde_json::json!({
+            "outcome": "needs_consent",
+            "actual_scope": "u1=https://a|u2=https://b"
+        })
+    );
+    let back: SetActiveResult = serde_json::from_value(json).unwrap();
+    match back {
+        SetActiveResult::NeedsConsent { actual_scope } => {
+            assert_eq!(actual_scope, "u1=https://a|u2=https://b");
+        }
+        other => panic!("expected NeedsConsent, got {other:?}"),
+    }
+}
+
+#[test]
+fn provider_command_error_stale_scope_serializes_to_error_tag() {
+    // provider_confirm_and_set_active stale-scope error →
+    // {"error":"stale_scope","actual_scope":"..."}
+    let e = ProviderCommandError::StaleScope {
+        actual_scope: "u1=https://a".to_string(),
+    };
+    let json = serde_json::to_value(&e).unwrap();
+    assert_eq!(
+        json,
+        serde_json::json!({
+            "error": "stale_scope",
+            "actual_scope": "u1=https://a"
+        })
+    );
+    let back: ProviderCommandError = serde_json::from_value(json).unwrap();
+    match back {
+        ProviderCommandError::StaleScope { actual_scope } => {
+            assert_eq!(actual_scope, "u1=https://a");
+        }
+        other => panic!("expected StaleScope, got {other:?}"),
+    }
+}
+
+// ─── P1.2: preset endpoint unified validation ─────────────────────────────
+//
+// provider_create must validate the FINAL endpoint via validate_endpoint for
+// BOTH branches (preset + caller-supplied). The preset catalog's default
+// endpoints are trusted, but a caller-supplied override on a known preset must
+// still be checked — otherwise a remote HTTP override sneaks through.
+
+#[test]
+fn create_preset_remote_http_override_rejected() {
+    // Known preset "openai" + a caller-supplied REMOTE http endpoint → reject.
+    // (The preset's own endpoint is https, but the override wins and must be
+    // checked.) Remote http is forbidden by spec §Privacy.
+    let (_dir, db) = fresh_db();
+    let err = db
+        .with_conn(|conn| {
+            providers::create(conn, "openai", "OpenAI", "http://api.openai.com/v1/chat", None)
+        })
+        .unwrap_err();
+    assert!(matches!(err, DbError::Integrity(_)), "got {err:?}");
+}
+
+#[test]
+fn create_preset_ftp_endpoint_rejected() {
+    // Known preset "openai" + an FTP endpoint → reject (non-http(s) scheme).
+    let (_dir, db) = fresh_db();
+    let err = db
+        .with_conn(|conn| {
+            providers::create(conn, "openai", "OpenAI", "ftp://example.com", None)
+        })
+        .unwrap_err();
+    assert!(matches!(err, DbError::Integrity(_)), "got {err:?}");
+}
+
+#[test]
+fn create_preset_https_override_accepted() {
+    // Known preset "openai" + a valid HTTPS override → accepted.
+    let (_dir, db) = fresh_db();
+    let p = db
+        .with_conn(|conn| {
+            providers::create(
+                conn,
+                "openai",
+                "OpenAI",
+                "https://my-openai-proxy.example.com/v1/chat/completions",
+                None,
+            )
+        })
+        .expect("valid HTTPS override on a known preset should be accepted");
+    assert_eq!(
+        p.endpoint,
+        "https://my-openai-proxy.example.com/v1/chat/completions"
+    );
+}
+
+#[test]
+fn create_preset_local_http_override_accepted() {
+    // Known preset "ollama" + a localhost http override → accepted (loopback
+    // http is allowed by spec §Privacy for local engines).
+    let (_dir, db) = fresh_db();
+    let p = db
+        .with_conn(|conn| {
+            providers::create(conn, "ollama", "Ollama", "http://localhost:8000/v1/chat", None)
+        })
+        .expect("valid loopback http override on a known preset should be accepted");
+    assert_eq!(p.endpoint, "http://localhost:8000/v1/chat");
+    assert!(p.is_local);
+}
+
+// ─── P1.3: fallback validates protocol, not just template_id ──────────────
+//
+// A traditional-engine fallback slot must be a REAL traditional engine. The
+// template_id alone is not proof: a "deepl" template_id row built as a
+// CustomHttp repair shell (e.g. via build_profile's repair arm, or a
+// hand-crafted row) would pass the template_id check but isn't an implemented
+// traditional protocol. validate_active_selection must also require
+// Protocol::GoogleTranslate (the only currently-implemented traditional protocol).
+
+#[test]
+fn vas_fallback_custom_http_protocol_rejected_even_with_traditional_template() {
+    // A provider whose template_id is "deepl" (a traditional template) BUT whose
+    // protocol is CustomHttp (a repair/AI shell, NOT an implemented traditional
+    // engine). The current check only looks at template_id → this passes wrongly.
+    let mut p = active_profile("u1", "deepl", true);
+    p.protocol = Protocol::CustomHttp;
+    let provs = vec![p];
+    let err = providers::validate_active_selection("", &[], Some("u1"), &provs).unwrap_err();
+    assert!(
+        matches!(err, DbError::Integrity(_)),
+        "a CustomHttp-protocol row must not satisfy the fallback slot even if its template_id is 'deepl', got {err:?}"
+    );
+}
+
+#[test]
+fn vas_fallback_google_translate_protocol_with_traditional_template_accepted() {
+    // Positive control: template_id "google" + Protocol::GoogleTranslate → ok.
+    let mut p = active_profile("u1", "google", true);
+    p.protocol = Protocol::GoogleTranslate;
+    let provs = vec![p];
+    providers::validate_active_selection("", &[], Some("u1"), &provs)
+        .expect("google template + GoogleTranslate protocol is a valid fallback");
+}
+
+// ─── Task 5c: parallel_uuids corruption must error, not silently empty ──────
+
+/// Helper: corrupt the `parallel_uuids` JSON in the singleton preferences row,
+/// then assert that a path which parses it returns `Err` instead of treating
+/// the corrupt blob as an empty array.
+fn corrupt_parallel_uuids(db: &Database, blob: &str) {
+    db.with_conn(|conn| {
+        conn.execute(
+            "UPDATE preferences SET parallel_uuids=?1 WHERE id=1",
+            rusqlite::params![blob],
+        )?;
+        Ok(())
+    })
+    .unwrap();
+}
+
+/// `remove_from_active_slots` (exercised via `toggle`→disable) parses
+/// `parallel_uuids`. A corrupt JSON blob must surface as `Err`, not silently
+/// become an empty array (which would hide a real integrity violation and
+/// could drop a still-active uuid from the selection).
+#[test]
+fn toggle_disable_with_corrupt_parallel_uuids_errors() {
+    let (_dir, db, p) = fresh_with_one_openai();
+    corrupt_parallel_uuids(&db, "not-valid-json{{{");
+    let err = db
+        .with_conn(|conn| providers::toggle(conn, &p.uuid, false))
+        .unwrap_err();
+    assert!(
+        matches!(err, DbError::Integrity(_)),
+        "corrupt parallel_uuids must surface as Integrity error, got {err:?}"
+    );
+}
+
+/// `provider_in_primary_or_parallel` (exercised via `update` when an endpoint
+/// origin changes) parses `parallel_uuids`. A corrupt blob must error rather
+/// than silently reporting "not present" (which would skip a needed consent
+/// invalidation).
+#[test]
+fn update_endpoint_change_with_corrupt_parallel_uuids_errors() {
+    let (_dir, db, p) = fresh_with_one_openai();
+    // Put the provider into the PARALLEL slot only (NOT primary) so the
+    // origin-changed path is forced to parse parallel_uuids to decide
+    // membership. primary_uuid is left NULL so the primary short-circuit in
+    // provider_in_primary_or_parallel doesn't skip the parse.
+    db.with_conn(|conn| {
+        conn.execute(
+            "UPDATE preferences SET primary_uuid=NULL, parallel_uuids='garbage][' WHERE id=1",
+            [],
+        )?;
+        Ok(())
+    })
+    .unwrap();
+    // Use a DIFFERENT valid HTTPS origin so origin_changed is true (the existing
+    // endpoint is https://api.openai.com — switch host to api.anthropic.com).
+    let patch = ProviderPatch {
+        name: None,
+        endpoint: Some("https://api.anthropic.com/v1/messages".to_string()),
+        model: None,
+        enabled: None,
+        sort_order: None,
+    };
+    let err = db
+        .with_conn(|conn| providers::update(conn, &p.uuid, &patch))
+        .unwrap_err();
+    assert!(
+        matches!(err, DbError::Integrity(_)),
+        "corrupt parallel_uuids must surface as Integrity error on update, got {err:?}"
+    );
+}

@@ -371,6 +371,11 @@ pub fn create(
             Some(d) => {
                 // Caller-supplied endpoint/model win over preset defaults.
                 let ep = if endpoint.is_empty() { d.endpoint } else { endpoint.to_string() };
+                // P1.2: validate the FINAL endpoint for preset rows too. The preset
+                // catalog's own endpoints are trusted (asserted at startup), but a
+                // caller-supplied override on a known preset must be checked —
+                // otherwise a remote HTTP / FTP override sneaks through unvalidated.
+                crate::providers::validate_endpoint(&ep).map_err(DbError::Integrity)?;
                 let md = model.map(String::from).or(d.default_model);
                 (d.protocol, ep, md, d.needs_key)
             }
@@ -638,6 +643,21 @@ pub fn finalize_delete(conn: &mut Connection, uuid: &str) -> Result<(), DbError>
 
 // ─── preferences active-slot helpers ──────────────────────────────────────
 
+/// Parse the `parallel_uuids` JSON blob stored in `preferences` (S2a Task 5c).
+///
+/// The column is stored as a normalized `["uuid", ...]` JSON array. A corrupt
+/// blob is a real integrity violation: silently treating it as an empty array
+/// would hide the problem and could drop a still-active uuid from the parallel
+/// selection (or skip a needed consent invalidation). Surface it as an
+/// `Integrity` error so the caller can fail closed.
+pub(crate) fn parse_parallel_uuids(blob: &str) -> Result<Vec<String>, DbError> {
+    serde_json::from_str::<Vec<String>>(blob).map_err(|e| {
+        DbError::Integrity(format!(
+            "parallel_uuids is not a valid JSON string array: {e}"
+        ))
+    })
+}
+
 /// Remove `uuid` from `primary_uuid`, every entry of the `parallel_uuids`
 /// JSON array, and `fallback_uuid`. Idempotent — a no-op if the uuid isn't in a
 /// slot. Caller must be in a transaction.
@@ -654,13 +674,15 @@ fn remove_from_active_slots(conn: &Connection, uuid: &str) -> Result<(), DbError
     )?;
     // parallel: read JSON array, filter, write back. We hand-parse via serde_json
     // so the stored shape is normalized (no trailing whitespace drift).
+    // S2a Task 5c: a corrupt parallel_uuids blob must surface as Integrity err
+    // — silently treating it as empty would hide a real violation and could drop
+    // a still-active uuid from the selection.
     let parallel_json: String = conn.query_row(
         "SELECT parallel_uuids FROM preferences WHERE id=1",
         [],
         |r| r.get(0),
     )?;
-    let arr: Vec<String> = serde_json::from_str::<Vec<String>>(&parallel_json)
-        .unwrap_or_default()
+    let arr: Vec<String> = parse_parallel_uuids(&parallel_json)?
         .into_iter()
         .filter(|u| u != uuid)
         .collect();
@@ -708,8 +730,9 @@ fn provider_in_primary_or_parallel(
         [],
         |r| r.get(0),
     )?;
-    let arr: Vec<String> = serde_json::from_str::<Vec<String>>(&parallel_json)
-        .unwrap_or_default();
+    // S2a Task 5c: corrupt JSON must error, not silently report "not present"
+    // (which would skip a needed consent invalidation on an endpoint change).
+    let arr: Vec<String> = parse_parallel_uuids(&parallel_json)?;
     Ok(arr.iter().any(|u| u == uuid))
 }
 
@@ -946,12 +969,21 @@ pub fn validate_active_selection(
     }
     if let Some(fb) = fallback {
         check(fb, "fallback")?;
-        // Fallback must be a traditional engine.
+        // Fallback must be a REAL traditional engine. P1.3: check BOTH the
+        // template_id (catalog identity) AND the protocol (proof it's an
+        // implemented traditional engine, not a repair/AI shell reusing a
+        // traditional template_id). The only currently-implemented traditional
+        // protocol is GoogleTranslate; when DeepL/Microsoft/etc. land, extend
+        // this to a TRADITIONAL_PROTOCOLS set. A template_id like "deepl" with
+        // Protocol::CustomHttp must be rejected — it isn't a real traditional
+        // engine, just a repair row borrowing the name.
         if let Some(p) = active.get(fb) {
-            if !is_traditional_template(&p.template_id) {
+            if !is_traditional_template(&p.template_id)
+                || p.protocol != Protocol::GoogleTranslate
+            {
                 return Err(DbError::Integrity(format!(
-                    "fallback uuid {fb} template_id '{}' is not a traditional engine",
-                    p.template_id
+                    "fallback uuid {fb} template_id '{}' protocol '{:?}' is not a traditional engine",
+                    p.template_id, p.protocol
                 )));
             }
         }
