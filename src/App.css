@@ -1,12 +1,9 @@
+/* App.css — legacy settings window styles.
+ * All hard-coded hex values have been replaced with @linguaray/ui semantic
+ * tokens. The :root block no longer redefines color/background — those come
+ * from @linguaray/ui/styles tokens.css. Only layout + font-smoothing remain. */
+
 :root {
-  font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
-  font-size: 16px;
-  line-height: 24px;
-  font-weight: 400;
-
-  color: #0f0f0f;
-  background-color: #f6f6f6;
-
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -20,6 +17,9 @@
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  background: var(--color-canvas, #ffffff);
+  color: var(--color-text-primary, #0f172a);
+  min-height: 100vh;
 }
 
 .settings-group {
@@ -31,7 +31,7 @@
 
 label {
   font-size: 0.85rem;
-  color: #555;
+  color: var(--color-text-secondary, #475569);
 }
 
 h1 {
@@ -40,30 +40,30 @@ h1 {
 
 .subtitle {
   margin: 0;
-  color: #6b6b6b;
+  color: var(--color-text-secondary, #475569);
   font-size: 0.9rem;
 }
 
 select,
 textarea,
 button {
-  border-radius: 8px;
-  border: 1px solid transparent;
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--color-border-strong, #64748b);
   padding: 0.6em 1.2em;
   font-size: 1em;
   font-weight: 500;
   font-family: inherit;
-  color: #0f0f0f;
-  background-color: #ffffff;
-  transition: border-color 0.25s;
-  box-shadow: 0 2px 2px rgba(0, 0, 0, 0.2);
+  color: var(--color-text-primary, #0f172a);
+  background-color: var(--color-surface-default, #ffffff);
+  transition: border-color var(--duration-fast, 120ms) var(--ease-standard, ease);
+  box-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.05));
 }
 
 textarea {
   resize: vertical;
   font-weight: 400;
   box-shadow: none;
-  border: 1px solid #d0d0d0;
+  border: 1px solid var(--color-border-strong, #64748b);
 }
 
 button {
@@ -72,55 +72,28 @@ button {
 }
 
 button:hover:not(:disabled) {
-  border-color: #396cd8;
+  border-color: var(--color-brand-default, #4f46e5);
 }
 
 button:disabled {
-  opacity: 0.55;
+  opacity: var(--core-opacity-disabled, 0.5);
   cursor: default;
 }
 
 .result {
   padding: 0.75em 1em;
-  border-radius: 8px;
-  background: #eef4ff;
-  border: 1px solid #cdddfa;
+  border-radius: var(--radius-md, 8px);
+  background: var(--color-surface-default, #ffffff);
+  border: 1px solid var(--color-border-subtle, #e2e8f0);
   white-space: pre-wrap;
+  color: var(--color-text-primary, #0f172a);
 }
 
 .error {
   padding: 0.75em 1em;
-  border-radius: 8px;
-  background: #fdeeee;
-  border: 1px solid #f0c9c9;
-  color: #a33;
+  border-radius: var(--radius-md, 8px);
+  background: var(--color-status-danger-soft, #fef2f2);
+  border: 1px solid var(--color-border-subtle, #e2e8f0);
+  color: var(--color-status-danger, #dc2626);
   white-space: pre-wrap;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    color: #f6f6f6;
-    background-color: #2f2f2f;
-  }
-
-  select,
-  textarea,
-  button {
-    color: #ffffff;
-    background-color: #0f0f0f98;
-  }
-
-  textarea {
-    background-color: #1c1c1c;
-  }
-
-  .result {
-    background: #1e2a3f;
-    border-color: #2c3e5e;
-  }
-
-  .error {
-    background: #3a2222;
-    border-color: #5a3030;
-  }
 }
