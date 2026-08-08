@@ -42,19 +42,7 @@ async fn mount_ok(server: &MockServer, body: &str) {
         })))
         .mount(server)
         .await;
-}
-
-/// 最小 AppHandle 替身：run_translate_session 只用它做 settings::load，
-/// 而 settings 在测试环境下会回退到默认值（fallback_engine=None）。
-/// 这里传一个未初始化 plugin-store 的 handle 也能让 settings::load 返回默认。
-/// 若 settings::load 强依赖 plugin-store，则改用一个不读 settings 的入口
-/// （见下方 run_translate_session_with_fallback 测试变体）。
-#[allow(dead_code)]
-fn test_app_handle() -> tauri::AppHandle {
-    // tauri::test 不可用；run_translate_session 接收 &AppHandle 仅用于 settings::load。
-    // 我们用一个 helper 入口避开 AppHandle（见 lib.rs 的 pub fn run_translate_session_no_settings）。
-    panic!("use run_translate_session_no_settings in tests")
-}
+    }
 
 #[tokio::test]
 async fn single_engine_path_primary_only() {
