@@ -33,6 +33,9 @@ pub mod uuid_util;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use tauri::menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem};
+use tauri::tray::{MouseButton, TrayIconBuilder, TrayIconEvent};
+use tauri::Emitter;
 use tauri::Manager;
 use tauri_plugin_global_shortcut::{Builder as GlobalShortcutBuilder, GlobalShortcutExt, ShortcutState};
 
@@ -2143,6 +2146,113 @@ fn on_input_hotkey(
     });
 }
 
+// ─── R2b Surface 04: system tray menu ──────────────────────────────────────
+
+/// Build the Surface 04 system tray menu and register it on the app.
+///
+/// Called once from `setup()`. Menu item IDs are stable strings so the
+/// [`handle_tray_menu_event`] handler can match them. IDs MUST stay in sync with
+/// the match arms there. Built last in setup so a tray-init failure does not
+/// block DB/keystore/window setup; the caller logs and continues on `Err`.
+fn build_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
+    // Quick actions group.
+    let sel = MenuItem::with_id(app, "tray.translate-selection", "Translate Selection", true, None::<&str>)?;
+    let inp = MenuItem::with_id(app, "tray.translate-input", "Translate Input", true, None::<&str>)?;
+    let clip = MenuItem::with_id(app, "tray.translate-clipboard", "Translate Clipboard", true, None::<&str>)?;
+    let ocr = MenuItem::with_id(app, "tray.ocr-capture", "OCR Translate", true, None::<&str>)?;
+    let sep1 = PredefinedMenuItem::separator(app)?;
+    // Active provider group (a live submenu populated from list_engines at click
+    // time is a follow-up; R2b ships a static status + switch affordance).
+    let provider_ready = MenuItem::with_id(app, "tray.provider-status", "Ready", false, None::<&str>)?;
+    let switch = MenuItem::with_id(app, "tray.switch-provider", "Switch Provider", true, None::<&str>)?;
+    let sep2 = PredefinedMenuItem::separator(app)?;
+    // Navigation + system group.
+    let history = MenuItem::with_id(app, "tray.history", "History", true, None::<&str>)?;
+    let settings = MenuItem::with_id(app, "tray.settings", "Settings", true, None::<&str>)?;
+    let sep3 = PredefinedMenuItem::separator(app)?;
+    let quit = MenuItem::with_id(app, "tray.quit", "Quit", true, None::<&str>)?;
+
+    let menu = Menu::with_items(app, &[
+        &sel, &inp, &clip, &ocr, &sep1,
+        &provider_ready, &switch, &sep2,
+        &history, &settings, &sep3,
+        &quit,
+    ])?;
+
+    TrayIconBuilder::with_id("main-tray")
+        .icon(app.default_window_icon().cloned().expect("default window icon"))
+        .menu(&menu)
+        .show_menu_on_left_click(false)
+        .on_menu_event(handle_tray_menu_event)
+        .on_tray_icon_event(|tray, event| {
+            // Double-click on the icon surfaces the main window for
+            // discoverability (macOS left-click opens the menu by default;
+            // DoubleClick is documented as Windows-only but harmless to match).
+            if let TrayIconEvent::DoubleClick {
+                button: MouseButton::Left,
+                ..
+            } = event
+            {
+                let app = tray.app_handle();
+                if let Some(w) = app.get_webview_window("main") {
+                    let _ = w.show();
+                    let _ = w.set_focus();
+                }
+            }
+        })
+        .build(app)?;
+    Ok(())
+}
+
+/// Menu item handler. Each arm matches a `with_id` string from [`build_tray`].
+///
+/// The translation entry points emit a `tray-action` event that the main window
+/// forwards to the existing commands (those commands depend on `tauri::State`
+/// handles only resolvable through the invoke handler, so we do not call them as
+/// plain functions here). Window-showing actions (`input`/`history`/`settings`)
+/// go through the manager directly.
+fn handle_tray_menu_event(app: &tauri::AppHandle, event: MenuEvent) {
+    match event.id().as_ref() {
+        "tray.translate-selection" => {
+            // Forward to the main window; its listener reuses the selection
+            // trigger path that emits popup-state / popup-multi-result.
+            let _ = app.emit("tray-action", "translate-selection");
+        }
+        "tray.translate-input" => {
+            if let Some(w) = app.get_webview_window("input") {
+                let _ = w.show();
+                let _ = w.set_focus();
+            }
+        }
+        "tray.translate-clipboard" => {
+            // Forward to the main window, which can invoke the clipboard command
+            // (its State dependencies are not callable as a plain function).
+            let _ = app.emit("tray-action", "translate-clipboard");
+        }
+        "tray.ocr-capture" => {
+            let _ = app.emit("tray-action", "ocr-capture");
+        }
+        "tray.history" => {
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.show();
+                let _ = w.set_focus();
+                let _ = w.emit("navigate", "history");
+            }
+        }
+        "tray.settings" => {
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.show();
+                let _ = w.set_focus();
+                let _ = w.emit("navigate", "settings");
+            }
+        }
+        "tray.quit" => {
+            app.exit(0);
+        }
+        _ => {}
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Round-2 review P1 #2: the REAL registration failure point is the plugin's
@@ -2424,6 +2534,13 @@ pub fn run() {
                 on_input_hotkey(&handle_for_ctrl, _s, ev);
             }) {
                 log::warn!("Ctrl+Space registration failed (conflict?): {e} — input hotkey disabled");
+            }
+
+            // Surface 04: system tray (R2b). Built LAST so a tray init failure
+            // does not block DB/keystore/window/shortcut setup. Log-only on
+            // error — the app stays usable without a tray.
+            if let Err(e) = build_tray(app.handle()) {
+                log::error!("tray init failed: {e}");
             }
             Ok(())
         })
