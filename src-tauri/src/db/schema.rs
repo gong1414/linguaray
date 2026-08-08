@@ -17,6 +17,12 @@ pub enum MigrationState {
     Incomplete,
     /// `migration_complete = 1`.
     Complete,
+    /// `schema_version` is HIGHER than the app's `SCHEMA_VERSION`: the DB was
+    /// written by a NEWER app build. A downgrade must NOT run the migration
+    /// (it doesn't understand the schema) NOR trust `migration_complete=1`. The
+    /// migration core treats this as a hard stop: it returns `Err` so no backup
+    /// is produced and no writes occur. The user must upgrade or archive.
+    Incompatible,
 }
 
 /// Create all 8 tables + seed singletons. Must be called inside a transaction.
@@ -180,13 +186,46 @@ pub fn migration_state_if_exists(conn: &Connection) -> Result<MigrationState, Db
     if exists.is_none() {
         return Ok(MigrationState::NotStarted);
     }
-    let complete: Option<i64> = conn
+    // Read schema_version + migration_complete in one row. Use `optional()` so
+    // ONLY a missing row (QueryReturnedNoRows) maps to None; a corrupt-header /
+    // NotADatabase / IO error propagates as Err (fail-closed) instead of being
+    // swallowed into a silent Incomplete by a blanket `.unwrap_or`.
+    //
+    // schema_version is validated (S2a Task 5d): a version higher than
+    // SCHEMA_VERSION means the DB was written by a NEWER app build. A downgrade
+    // must NOT silently treat that DB as Complete, AND must NOT run the
+    // migration against an unknown schema. We return `Incompatible` so the
+    // migration core treats it as a hard stop (no backup, no writes). (A
+    // lower/equal version is fine.)
+    let row: Option<(i64, i64)> = conn
         .query_row(
-            "SELECT migration_complete FROM _schema_migrations WHERE id=1",
+            "SELECT schema_version, migration_complete FROM _schema_migrations WHERE id=1",
             [],
-            |r| r.get(0),
+            |r| Ok((r.get(0)?, r.get(1)?)),
         )
         .optional()?;
+    let (schema_version, complete) = match row {
+        Some((sv, mc)) => (Some(sv), Some(mc)),
+        // Row missing entirely → treat as an incomplete migration (the singleton
+        // seed didn't run, or the row was deleted).
+        None => (None, None),
+    };
+    if let Some(v) = schema_version {
+        if v > SCHEMA_VERSION as i64 {
+            // Future schema → hard stop. The migration core must NOT proceed
+            // (it would back up + write against an unknown schema), so return
+            // Incompatible rather than Incomplete.
+            return Ok(MigrationState::Incompatible);
+        }
+        if v < SCHEMA_VERSION as i64 {
+            // Older schema with migration_complete=1 → must NOT trust Complete.
+            // A future SCHEMA_VERSION bump (e.g. 1→2) would cause v1 DBs to
+            // silently skip the v2 migration. Force Incomplete so the migration
+            // runs and upgrades the schema.
+            return Ok(MigrationState::Incomplete);
+        }
+        // v == SCHEMA_VERSION: trust migration_complete below.
+    }
     match complete {
         None => Ok(MigrationState::Incomplete),
         Some(0) => Ok(MigrationState::Incomplete),

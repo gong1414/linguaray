@@ -511,6 +511,20 @@ fn run_migration_core<K: KeystoreIo>(
         preflight_keystore(ks, keystore_dir)?;
         return Ok(());
     }
+    if state == MigrationState::Incompatible {
+        // The DB was written by a NEWER app build (schema_version >
+        // SCHEMA_VERSION). A downgrade must NOT run the migration — the older
+        // build doesn't understand the schema, so a backup + rewrite could
+        // produce garbage. Hard-stop BEFORE Phase 1 (no backup, no writes): the
+        // user must upgrade or archive. Surfacing as `Other` keeps it distinct
+        // from the recoverable keystore/settings arms so the readiness banner
+        // can route the user correctly.
+        return Err(MigrationError::Other(
+            "database schema_version is newer than this app build (downgrade not supported); \
+             upgrade to a newer build or archive the database"
+                .to_string(),
+        ));
+    }
     // Incomplete or NotStarted → proceed (replay-safe).
 
     // ── PHASE 1: Backup (FIRST persistent action) ────────────────────────
