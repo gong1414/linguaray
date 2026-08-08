@@ -1,14 +1,11 @@
 /*
- * Popup-only overrides: make the WebView root transparent so the native
- * window's transparency (macOSPrivateApi) shows through. App.css's :root
- * sets background-color: #f6f6f6, which fills the entire popup WebView.
- * This file is imported AFTER App.css in Popup.tsx, so it wins the cascade.
- *
- * Without this, the popup has a solid rectangle background even though the
- * native window is transparent — the card-looking popup is meant to float
- * with no visible window chrome or background.
+ * Popup-only overrides. The WebView root is transparent so the native
+ * window's transparency (macOSPrivateApi) shows through. Card backgrounds
+ * come from @linguaray/ui tokens (--color-bg-elevated), NOT hardcoded hex.
+ * Tokens are defined in @linguaray/ui/styles (imported once globally via
+ * popup-entry.tsx). The hex values inside var(--…, fallback) are CSS fallbacks
+ * used only if a token is undefined; tokens win whenever the global CSS loads.
  */
-
 html,
 body,
 #root {
@@ -18,13 +15,37 @@ body,
   background: transparent;
 }
 
-body {
-  overflow: hidden;
-}
+body { overflow: hidden; }
 
-/* The popup card itself keeps a visible background (the translation result card),
-   but the AREA OUTSIDE the card is transparent. The .container in App.css has
-   padding; the card is the inner div. */
 .container {
   background: transparent;
+  padding: var(--space-2, 8px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 8px);
+  outline: none;
+}
+
+.container--compact {
+  min-height: 40px;
+  padding: var(--space-1, 4px);
+}
+
+.popup-results {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(200px, 1fr);
+  gap: var(--space-2, 8px);
+}
+
+.popup-results[data-multi="true"] {
+  overflow-x: auto;
+}
+
+.popup-loading,
+.popup-error {
+  background: var(--color-bg-elevated, #fff);
+  border-radius: var(--radius-lg, 12px);
+  box-shadow: var(--shadow-lg, 0 4px 16px rgba(0, 0, 0, 0.12));
+  padding: var(--space-3, 12px);
 }
