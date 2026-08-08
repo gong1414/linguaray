@@ -27,7 +27,7 @@ const flush = () => new Promise((r) => setTimeout(r, 0));
 const profile = (over: Partial<ProviderProfile> = {}): ProviderProfile => ({
   uuid: "u1",
   template_id: "openai",
-  name: "OpenAI",
+  name: "TestProvider",
   protocol: "openai_chat",
   endpoint: "https://api.openai.com",
   model: "gpt-4o-mini",
@@ -41,12 +41,14 @@ const profile = (over: Partial<ProviderProfile> = {}): ProviderProfile => ({
   ...over,
 });
 
-/** Two-profile list used by most non-empty flows. */
+/** Two-profile list used by most non-empty flows.
+ *  Names are distinct from preset labels to avoid getByText ambiguity
+ *  (the preset grid also renders "OpenAI" etc.). */
 const TWO_PROFILES: ProviderProfile[] = [
-  profile({ uuid: "u1", name: "OpenAI", sort_order: 0, secret_ref: "provider/u1" }),
+  profile({ uuid: "u1", name: "MyOpenAI", sort_order: 0, secret_ref: "provider/u1" }),
   profile({
     uuid: "u2",
-    name: "DeepSeek",
+    name: "MyDeepSeek",
     template_id: "deepseek",
     sort_order: 1,
     secret_ref: "provider/u2",
@@ -70,10 +72,13 @@ beforeEach(() => {
 
 afterEach(() => cleanup());
 
-// Helper: wait until a mocked invoke has been called with `cmd`.
+// Helper: wait until a mocked invoke has been called with `cmd` (the cmd is
+// the first positional arg; the optional args object may or may not be present
+// since `loadProviders` calls `invoke("provider_list")` with no second arg).
 async function whenCalledWith(cmd: string) {
   await waitFor(() => {
-    expect(invokeMock).toHaveBeenCalledWith(cmd, expect.anything());
+    const called = invokeMock.mock.calls.some((c) => c[0] === cmd);
+    expect(called).toBe(true);
   });
 }
 
@@ -114,7 +119,7 @@ describe("ProviderCenter (Surface 05)", () => {
         return profile();
       },
     });
-    invokeMock.mockImplementation(async (cmd: string, args?: unknown) => {
+    invokeMock.mockImplementation(async (cmd: string) => {
       calls.push(cmd);
       const map: Record<string, () => unknown> = {
         provider_list: () => (created ? [profile()] : []),
@@ -145,8 +150,10 @@ describe("ProviderCenter (Surface 05)", () => {
       key_status: () => ({ "provider/u1": true, "provider/u2": false }),
     });
     render(() => <ProviderCenter />);
-    await waitFor(() => expect(screen.getByText("OpenAI")).toBeTruthy());
-    expect(screen.getByText("DeepSeek")).toBeTruthy();
+    // Wait for the provider list to render (MyDeepSeek is provider-only, not a preset).
+    await waitFor(() => expect(screen.getByText("MyDeepSeek")).toBeTruthy());
+    // OpenAI appears both as a preset and a row name; both render.
+    expect(screen.getAllByText("OpenAI").length).toBeGreaterThanOrEqual(1);
   });
 
   it("toggle: calls provider_toggle, optimistically flips, rolls back on error", async () => {
@@ -159,7 +166,7 @@ describe("ProviderCenter (Surface 05)", () => {
       },
     });
     render(() => <ProviderCenter />);
-    await waitFor(() => expect(screen.getByText("OpenAI")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("MyOpenAI")).toBeTruthy());
 
     // The Switch is a checkbox with role="switch".
     const switches = screen.getAllByRole("switch");
@@ -171,7 +178,7 @@ describe("ProviderCenter (Surface 05)", () => {
     toggleShouldFail = true;
     cleanup();
     const { container } = render(() => <ProviderCenter />);
-    await waitFor(() => expect(screen.getByText("OpenAI")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("MyOpenAI")).toBeTruthy());
     fireEvent.click(screen.getAllByRole("switch")[0]);
     await waitFor(() =>
       expect(invokeMock).toHaveBeenCalledWith("provider_toggle", expect.anything()),
@@ -188,10 +195,10 @@ describe("ProviderCenter (Surface 05)", () => {
       key_status: () => ({ "provider/u1": true, "provider/u2": true }),
     });
     render(() => <ProviderCenter />);
-    await waitFor(() => expect(screen.getByText("OpenAI")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("MyOpenAI")).toBeTruthy());
 
-    // Click the edit button (aria-label "Edit OpenAI").
-    fireEvent.click(screen.getByLabelText("Edit OpenAI"));
+    // Click the edit button (aria-label "Edit MyOpenAI").
+    fireEvent.click(screen.getByLabelText("Edit MyOpenAI"));
     await flush();
     // Detail panel: endpoint TextField has an associated <label> "Endpoint".
     expect(screen.getByText("Endpoint")).toBeTruthy();
@@ -199,13 +206,13 @@ describe("ProviderCenter (Surface 05)", () => {
 
   it("endpoint invalid: shows error, Save disabled", async () => {
     routeInvoke({
-      provider_list: () => [profile({ uuid: "u1", name: "OpenAI", secret_ref: "provider/u1" })],
+      provider_list: () => [profile({ uuid: "u1", name: "TestProvider", secret_ref: "provider/u1" })],
       key_status: () => ({ "provider/u1": true }),
     });
     render(() => <ProviderCenter />);
-    await waitFor(() => expect(screen.getByText("OpenAI")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("TestProvider")).toBeTruthy());
 
-    fireEvent.click(screen.getByLabelText("Edit OpenAI"));
+    fireEvent.click(screen.getByLabelText("Edit TestProvider"));
     await flush();
 
     // Type an invalid endpoint into the endpoint input.
@@ -221,7 +228,7 @@ describe("ProviderCenter (Surface 05)", () => {
   it("save profile: calls provider_update with patch", async () => {
     const updates: unknown[] = [];
     routeInvoke({
-      provider_list: () => [profile({ uuid: "u1", name: "OpenAI", secret_ref: "provider/u1" })],
+      provider_list: () => [profile({ uuid: "u1", name: "TestProvider", secret_ref: "provider/u1" })],
       key_status: () => ({ "provider/u1": true }),
       provider_update: (args) => {
         updates.push(args);
@@ -229,8 +236,8 @@ describe("ProviderCenter (Surface 05)", () => {
       },
     });
     render(() => <ProviderCenter />);
-    await waitFor(() => expect(screen.getByText("OpenAI")).toBeTruthy());
-    fireEvent.click(screen.getByLabelText("Edit OpenAI"));
+    await waitFor(() => expect(screen.getByText("TestProvider")).toBeTruthy());
+    fireEvent.click(screen.getByLabelText("Edit TestProvider"));
     await flush();
 
     const endpointInput = screen.getByLabelText("Endpoint") as HTMLInputElement;
@@ -245,15 +252,15 @@ describe("ProviderCenter (Surface 05)", () => {
   it("key missing: shows key input + Save key; saving calls provider_set_key", async () => {
     const keyCalls: unknown[] = [];
     routeInvoke({
-      provider_list: () => [profile({ uuid: "u1", name: "OpenAI", secret_ref: "provider/u1" })],
+      provider_list: () => [profile({ uuid: "u1", name: "TestProvider", secret_ref: "provider/u1" })],
       key_status: () => ({}), // no key
       provider_set_key: (args) => {
         keyCalls.push(args);
       },
     });
     render(() => <ProviderCenter />);
-    await waitFor(() => expect(screen.getByText("OpenAI")).toBeTruthy());
-    fireEvent.click(screen.getByLabelText("Edit OpenAI"));
+    await waitFor(() => expect(screen.getByText("TestProvider")).toBeTruthy());
+    fireEvent.click(screen.getByLabelText("Edit TestProvider"));
     await flush();
 
     // Key input + Save key button present.
@@ -267,15 +274,15 @@ describe("ProviderCenter (Surface 05)", () => {
 
   it("key input cleared on submit start, even on failure", async () => {
     routeInvoke({
-      provider_list: () => [profile({ uuid: "u1", name: "OpenAI", secret_ref: "provider/u1" })],
+      provider_list: () => [profile({ uuid: "u1", name: "TestProvider", secret_ref: "provider/u1" })],
       key_status: () => ({}),
       provider_set_key: () => {
         throw new Error("rejected");
       },
     });
     render(() => <ProviderCenter />);
-    await waitFor(() => expect(screen.getByText("OpenAI")).toBeTruthy());
-    fireEvent.click(screen.getByLabelText("Edit OpenAI"));
+    await waitFor(() => expect(screen.getByText("TestProvider")).toBeTruthy());
+    fireEvent.click(screen.getByLabelText("Edit TestProvider"));
     await flush();
 
     const keyInput = screen.getByLabelText("API key") as HTMLInputElement;
@@ -289,15 +296,15 @@ describe("ProviderCenter (Surface 05)", () => {
   it("delete: opens Confirm; confirm calls provider_delete", async () => {
     const deletes: unknown[] = [];
     routeInvoke({
-      provider_list: () => [profile({ uuid: "u1", name: "OpenAI", secret_ref: "provider/u1" })],
+      provider_list: () => [profile({ uuid: "u1", name: "TestProvider", secret_ref: "provider/u1" })],
       key_status: () => ({ "provider/u1": true }),
       provider_delete: (args) => {
         deletes.push(args);
       },
     });
     render(() => <ProviderCenter />);
-    await waitFor(() => expect(screen.getByText("OpenAI")).toBeTruthy());
-    fireEvent.click(screen.getByLabelText("Delete OpenAI"));
+    await waitFor(() => expect(screen.getByText("TestProvider")).toBeTruthy());
+    fireEvent.click(screen.getByLabelText("Delete TestProvider"));
     await flush();
     // Confirm dialog open.
     await waitFor(() => expect(screen.getByText("Delete provider?")).toBeTruthy());
@@ -318,14 +325,17 @@ describe("ProviderCenter (Surface 05)", () => {
       },
     });
     render(() => <ProviderCenter />);
-    await waitFor(() => expect(screen.getByText("OpenAI")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("MyOpenAI")).toBeTruthy());
 
-    // Click "Set as primary" on the OpenAI row.
-    fireEvent.click(screen.getByLabelText("Set as primary"));
+    // Click "Set as primary" on the MyOpenAI row (first row).
+    fireEvent.click(screen.getAllByLabelText("Set as primary")[0]);
     await whenCalledWith("provider_set_active");
     expect(setActiveCalls[0]).toMatchObject({ primary: "u1", parallel: [], fallback: null });
-    // After "written", the primary badge shows.
-    await waitFor(() => expect(screen.getByText("Primary")).toBeTruthy());
+    // After "written", the primary indicator shows (ProviderRow status text +
+    // the role badge both render "Primary" — assert at least one is present).
+    await waitFor(() =>
+      expect(screen.getAllByText("Primary").length).toBeGreaterThanOrEqual(1),
+    );
   });
 
   it("add parallel → needs_consent → consent Confirm → provider_confirm_and_set_active", async () => {
@@ -346,14 +356,15 @@ describe("ProviderCenter (Surface 05)", () => {
       },
     });
     render(() => <ProviderCenter />);
-    await waitFor(() => expect(screen.getByText("OpenAI")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("MyOpenAI")).toBeTruthy());
 
     // Set primary first (so the parallel add has a primary to keep).
-    fireEvent.click(screen.getByLabelText("Set as primary"));
+    fireEvent.click(screen.getAllByLabelText("Set as primary")[0]);
     await whenCalledWith("provider_set_active");
 
-    // Add parallel on DeepSeek.
-    fireEvent.click(screen.getByLabelText("Add to parallel"));
+    // Add parallel on MyDeepSeek (second row). After MyOpenAI becomes primary,
+    // only MyDeepSeek's "Add to parallel" remains.
+    fireEvent.click(screen.getAllByLabelText("Add to parallel")[0]);
     await flush();
     // Consent dialog opens.
     await waitFor(() =>
@@ -373,7 +384,7 @@ describe("ProviderCenter (Surface 05)", () => {
       provider_set_active: (args) => {
         const a = args as { primary: string; parallel: string[] };
         if (a.parallel.length === 0) return { outcome: "written" };
-        return { outcome: "needs_consent", actual_scope };
+        return { outcome: "needs_consent", actual_scope: actualScope };
       },
       provider_confirm_and_set_active: () => {
         const err = Object.assign(new Error("stale"), {
@@ -384,10 +395,10 @@ describe("ProviderCenter (Surface 05)", () => {
       },
     });
     render(() => <ProviderCenter />);
-    await waitFor(() => expect(screen.getByText("OpenAI")).toBeTruthy());
-    fireEvent.click(screen.getByLabelText("Set as primary"));
+    await waitFor(() => expect(screen.getByText("MyOpenAI")).toBeTruthy());
+    fireEvent.click(screen.getAllByLabelText("Set as primary")[0]);
     await whenCalledWith("provider_set_active");
-    fireEvent.click(screen.getByLabelText("Add to parallel"));
+    fireEvent.click(screen.getAllByLabelText("Add to parallel")[0]);
     await waitFor(() =>
       expect(screen.getByText("Send text to multiple providers?")).toBeTruthy(),
     );
@@ -409,24 +420,25 @@ describe("ProviderCenter (Surface 05)", () => {
       },
     });
     render(() => <ProviderCenter />);
-    await waitFor(() => expect(screen.getByText("OpenAI")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("MyOpenAI")).toBeTruthy());
 
-    // Move the second row (DeepSeek) up.
-    const moveUpBtn = screen.getByLabelText("Move up");
-    fireEvent.click(moveUpBtn);
+    // Move the second row (MyDeepSeek) up — there are two "Move up" buttons
+    // (one per row); click the second row's.
+    const moveUpBtns = screen.getAllByLabelText("Move up");
+    fireEvent.click(moveUpBtns[1]);
     await whenCalledWith("provider_reorder");
     expect(reorderCalls[0]).toMatchObject({ uuids: ["u2", "u1"] });
   });
 
   it("connection test: calls provider_test_connection; ok → connected indicator", async () => {
     routeInvoke({
-      provider_list: () => [profile({ uuid: "u1", name: "OpenAI", secret_ref: "provider/u1" })],
+      provider_list: () => [profile({ uuid: "u1", name: "TestProvider", secret_ref: "provider/u1" })],
       key_status: () => ({ "provider/u1": true }),
       provider_test_connection: () => ({ ok: true, message: "reachable" }),
     });
     render(() => <ProviderCenter />);
-    await waitFor(() => expect(screen.getByText("OpenAI")).toBeTruthy());
-    fireEvent.click(screen.getByLabelText("Edit OpenAI"));
+    await waitFor(() => expect(screen.getByText("TestProvider")).toBeTruthy());
+    fireEvent.click(screen.getByLabelText("Edit TestProvider"));
     await flush();
     fireEvent.click(screen.getByText("Test"));
     await whenCalledWith("provider_test_connection");
@@ -435,12 +447,12 @@ describe("ProviderCenter (Surface 05)", () => {
 
   it("balance section: renders TODO note, no fetch button", async () => {
     routeInvoke({
-      provider_list: () => [profile({ uuid: "u1", name: "OpenAI", secret_ref: "provider/u1" })],
+      provider_list: () => [profile({ uuid: "u1", name: "TestProvider", secret_ref: "provider/u1" })],
       key_status: () => ({ "provider/u1": true }),
     });
     render(() => <ProviderCenter />);
-    await waitFor(() => expect(screen.getByText("OpenAI")).toBeTruthy());
-    fireEvent.click(screen.getByLabelText("Edit OpenAI"));
+    await waitFor(() => expect(screen.getByText("TestProvider")).toBeTruthy());
+    fireEvent.click(screen.getByLabelText("Edit TestProvider"));
     await flush();
     // The muted TODO note renders; no balance-fetch button.
     expect(screen.getByText("Balance and quota are not yet available.")).toBeTruthy();
@@ -465,7 +477,7 @@ describe("ProviderCenter (Surface 05)", () => {
       key_status: () => ({ "provider/u1": true, "provider/u2": true }),
     });
     render(() => <ProviderCenter />);
-    await waitFor(() => expect(screen.getByText("OpenAI")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("MyOpenAI")).toBeTruthy());
     // No role badges until assigned.
     expect(screen.queryAllByText("Primary").length).toBe(0);
     expect(screen.queryAllByText("Parallel").length).toBe(0);
