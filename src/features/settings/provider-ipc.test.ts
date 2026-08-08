@@ -7,11 +7,13 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// Mock `invoke` before importing the wrapper module.
-const invokeMock = vi.fn();
-vi.mock("@tauri-apps/api/core", () => ({
-  invoke: (...args: unknown[]) => invokeMock(...args),
+// vi.hoisted lets us reference the mock inside the hoisted vi.mock factory.
+// Default implementation resolves undefined; per-test mocks override returns.
+const { invokeMock } = vi.hoisted(() => ({
+  invokeMock: vi.fn(async (_cmd: string, _args?: unknown): Promise<unknown> => undefined),
 }));
+
+vi.mock("@tauri-apps/api/core", () => ({ invoke: invokeMock }));
 
 import {
   loadProviders,
@@ -185,11 +187,21 @@ describe("provider command wrappers", () => {
   });
 
   it("providerConfirmAndSetActive surfaces stale_scope error (rejection propagates)", async () => {
-    const stale = { error: "stale_scope", actual_scope: "v1:{changed}" };
-    invokeMock.mockRejectedValue(stale);
+    // The rejection carries the { error, actual_scope } shape. The wrapper does
+    // NOT swallow it; the component catches and narrows on `error` +
+    // `actual_scope`. We assert via `rejects.toMatchObject` which tolerates the
+    // extra envelope fields Tauri's runtime may attach.
+    const staleErr = Object.assign(new Error("stale_scope"), {
+      error: "stale_scope",
+      actual_scope: "v1:{changed}",
+    });
+    invokeMock.mockRejectedValueOnce(staleErr);
     await expect(
       providerConfirmAndSetActive("u1", ["u2"], null, "v1:{old}"),
-    ).rejects.toEqual(stale);
+    ).rejects.toMatchObject({
+      error: "stale_scope",
+      actual_scope: "v1:{changed}",
+    });
   });
 
   it("providerGetModels invokes with { uuid }", async () => {
