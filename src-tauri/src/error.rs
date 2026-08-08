@@ -28,7 +28,7 @@ pub enum Error {
     LocalNoFallback,
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Clone, Error)]
 pub enum FallbackKind {
     #[error("network error: {0}")]
     Network(String),
@@ -40,7 +40,7 @@ pub enum FallbackKind {
     Parse(String),
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Clone, Error)]
 pub enum ConfigKind {
     #[error("no API key set for provider {provider}")]
     MissingKey { provider: String },
