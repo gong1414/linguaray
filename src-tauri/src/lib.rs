@@ -12,6 +12,7 @@
 
 pub mod engines;
 pub mod a11y;
+pub mod adapter;
 pub mod clipboard;
 pub mod concurrency;
 pub mod cursor;

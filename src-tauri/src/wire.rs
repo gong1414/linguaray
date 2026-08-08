@@ -8,7 +8,7 @@
 
 use serde::Serialize;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ApiKind {
     OpenAIChat,
     Anthropic,

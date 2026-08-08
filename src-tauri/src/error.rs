@@ -53,4 +53,9 @@ pub enum ConfigKind {
     /// provider would needlessly send the text elsewhere.
     #[error("invalid request ({status}) for {provider}")]
     InvalidRequest { provider: String, status: u16 },
+    /// 适配失败：DB-backed provider 的协议不是可调用的 AI 协议
+    /// （google_translate/custom_http 无法走 wire::call）。NOT fallback-eligible：
+    /// 同一段文本不会因为换一个 AI 引擎而变好，应直接告诉用户去 Settings 修复。
+    #[error("unsupported protocol for {provider}: {reason}")]
+    Unsupported { provider: String, reason: String },
 }
