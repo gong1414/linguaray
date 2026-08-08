@@ -15,16 +15,14 @@ function installMatchMedia(matchesWide: boolean) {
     removeListener() {},
     dispatchEvent: () => false,
   });
-  // @ts-expect-error partial mock
-  window.matchMedia = vi.fn(impl);
+  (window.matchMedia as unknown) = vi.fn(impl);
 }
 
 beforeEach(() => installMatchMedia(true));
 afterEach(() => {
   cleanup();
   // restore the setup.ts default stub
-  // @ts-expect-error partial mock
-  window.matchMedia = () => ({
+  (window.matchMedia as unknown) = () => ({
     matches: false,
     addEventListener() {},
     removeEventListener() {},
@@ -94,10 +92,11 @@ describe("SettingsShell", () => {
     const root = container.querySelector("[data-layout]");
     expect(root).not.toBeNull();
     expect(root!.getAttribute("data-layout")).toBe("rail");
-    // In rail mode each nav item is wrapped in a Tooltip; the tooltip content
-    // carries the label so the accessible name survives the visual collapse.
-    const tooltips = container.querySelectorAll(".lr-tooltip__content");
-    expect(tooltips.length).toBeGreaterThanOrEqual(1);
+    // In rail mode each nav item is wrapped in a Tooltip so the label survives
+    // the visual collapse. The Tooltip trigger wrapper (not the lazily-opened
+    // portal content) is present in the rendered tree at mount.
+    const triggers = container.querySelectorAll(".lr-tooltip__trigger");
+    expect(triggers.length).toBeGreaterThanOrEqual(1);
   });
 
   it("initial active section defaults to provider-center", () => {
