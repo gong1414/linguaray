@@ -326,10 +326,9 @@ async fn translate_default(
 async fn translate_clipboard(
     app: tauri::AppHandle,
     state: tauri::State<'_, Arc<Session>>,
+    app_state: tauri::State<'_, Arc<AppState>>,
 ) -> Result<(), String> {
-    // Participate in latest-wins + the selection mutex so we can't read a sentinel
-    // mid-selection-capture (which would send `__linguaray_sel_*__` to a remote
-    // provider), and so two entry points can't clobber one popup.
+    // latest-wins：先分配 gen（同步，保证 press 顺序）。
     let gen = state.gen.next();
     let text = {
         let _g = state.gen.selection_lock();
@@ -341,20 +340,9 @@ async fn translate_clipboard(
     let (x, y) = cursor::position();
     let _ = popup::show_at(&app, x, y);
     let s = settings::load(&app);
-    let preset = providers::presets()
-        .into_iter()
-        .find(|p| p.id == s.default_provider)
-        .ok_or_else(|| format!("default provider '{}' not found", s.default_provider))?;
-    // §G: opt-in fallback engine from settings (None by default).
-    let fallback = s.fallback_engine.as_deref().and_then(engines::find);
-    let input = service::TranslateInput {
-        text: &text,
-        from: "auto",
-        to: &s.target_language,
-        options: wire::AppOptions::default(),
-    };
+
     let client = match session_client(&state) {
-        Ok(c) => c,
+        Ok(c) => c.clone(),
         Err(msg) => {
             if state.gen.is_latest(gen) {
                 let _ = popup::error(&app, &msg);
@@ -371,16 +359,54 @@ async fn translate_clipboard(
             return Ok(());
         }
     };
-    match service::translate_with_fallback(client, keystore, &preset, input, fallback).await {
-        Ok(out) => {
+
+    // gate + require_ready_gated 拿 db（spawn_blocking 内，与 translate_session 一致）。
+    let app_arc = app_state.inner().clone();
+    let db = match tauri::async_runtime::spawn_blocking(move || -> Result<Arc<Database>, String> {
+        let _gate = app_arc.data_gate.read();
+        require_ready_gated(&app_arc, &_gate)
+    })
+    .await
+    {
+        Ok(Ok(db)) => db,
+        Ok(Err(msg)) => {
             if state.gen.is_latest(gen) {
-                let _ = popup::result(&app, &out.text, &out.engine);
+                let _ = popup::error(&app, &msg);
             }
+            return Ok(());
         }
         Err(e) => {
             if state.gen.is_latest(gen) {
-                let _ = popup::error(&app, &e.to_string());
+                let _ = popup::error(&app, &format!("join error: {e}"));
             }
+            return Ok(());
+        }
+    };
+
+    // 走统一核心（从 settings 读 fallback_engine；target_language 来自 settings）。
+    let session_result = run_translate_session(
+        &db, &client, keystore, &app, &text, "auto", &s.target_language,
+    )
+    .await;
+
+    // latest-wins：完成后检查 gen 才发事件。
+    if !state.gen.is_latest(gen) {
+        return Ok(());
+    }
+    match session_result {
+        Ok(r) => match decide_clipboard_popup(&r) {
+            ClipboardPopupDecision::SingleSuccess { text, engine } => {
+                let _ = popup::result(&app, &text, &engine);
+            }
+            ClipboardPopupDecision::Multi => {
+                let _ = popup::multi_result(&app, &r.outcomes);
+            }
+            ClipboardPopupDecision::Error(msg) => {
+                let _ = popup::error(&app, &msg);
+            }
+        },
+        Err(msg) => {
+            let _ = popup::error(&app, &msg);
         }
     }
     Ok(())
@@ -403,6 +429,52 @@ pub struct TranslateSessionResult {
     /// 老前端可只读这个字段保持单结果 UI 工作；新前端读 outcomes 渲染多结果。
     #[serde(skip_serializing_if = "Option::is_none")]
     pub actual_engine: Option<String>,
+}
+
+/// translate_clipboard 根据翻译结果决定发哪种 popup 事件的纯函数决策。
+/// 抽出来便于测试（translate_clipboard 本身依赖 Tauri runtime 不可单测）。
+#[derive(Debug)]
+enum ClipboardPopupDecision {
+    /// 单引擎成功 → 走老 popup-state 事件（向后兼容）。
+    SingleSuccess { text: String, engine: String },
+    /// 并行（含部分成功）→ 走 popup-multi-result 事件。
+    Multi,
+    /// 单引擎失败 / 并行全失败 / 核心错误 → 走 popup-state error。
+    Error(String),
+}
+
+fn decide_clipboard_popup(result: &TranslateSessionResult) -> ClipboardPopupDecision {
+    if result.outcomes.is_empty() {
+        return ClipboardPopupDecision::Error("translation produced no outcomes".into());
+    }
+    // 单引擎路径：actual_engine=Some 表示成功。
+    if let Some(engine) = &result.actual_engine {
+        // 长度必为 1（run_translate_session 单引擎路径契约）。
+        if let Some(o) = result.outcomes.first() {
+            if let Ok(t) = &o.result {
+                return ClipboardPopupDecision::SingleSuccess {
+                    text: t.text.clone(),
+                    engine: engine.clone(),
+                };
+            }
+        }
+        // actual_engine=Some 但 outcome 失败（理论不应发生）→ 当错误处理。
+        return ClipboardPopupDecision::Error("single engine failed unexpectedly".into());
+    }
+    // actual_engine=None：并行路径。
+    if result.outcomes.len() == 1 {
+        // 退化单引擎但失败。
+        if let Some(err) = result.outcomes.first().and_then(|o| o.result.as_ref().err()) {
+            return ClipboardPopupDecision::Error(err.to_string());
+        }
+    }
+    // 并行全失败？
+    let all_failed = result.outcomes.iter().all(|o| o.result.is_err());
+    if all_failed {
+        return ClipboardPopupDecision::Error("all engines failed".into());
+    }
+    // 并行（含部分成功）。
+    ClipboardPopupDecision::Multi
 }
 
 /// 翻译会话核心逻辑（纯函数，无 Tauri State 依赖）。
@@ -2576,5 +2648,72 @@ mod tests {
             gen: concurrency::GenerationToken::new(),
         };
         assert!(session_client(&session).is_ok());
+    }
+
+    // ─── R2a Task 6: translate_clipboard 分支决策 ──────────────────────────────
+
+    #[test]
+    fn clipboard_decision_single_success_uses_legacy_event() {
+        let result = TranslateSessionResult {
+            outcomes: vec![TranslationOutcome {
+                uuid: "u1".into(),
+                result: Ok(service::Translation { text: "你好".into(), engine: "provider/u1".into() }),
+            }],
+            actual_engine: Some("provider/u1".into()),
+        };
+        let d = decide_clipboard_popup(&result);
+        assert!(matches!(d, ClipboardPopupDecision::SingleSuccess { .. }));
+        if let ClipboardPopupDecision::SingleSuccess { text, engine } = d {
+            assert_eq!(text, "你好");
+            assert_eq!(engine, "provider/u1");
+        }
+    }
+
+    #[test]
+    fn clipboard_decision_parallel_uses_multi_event() {
+        let result = TranslateSessionResult {
+            outcomes: vec![
+                TranslationOutcome {
+                    uuid: "u1".into(),
+                    result: Ok(service::Translation { text: "a".into(), engine: "p/u1".into() }),
+                },
+                TranslationOutcome {
+                    uuid: "u2".into(),
+                    result: Err(crate::error::Error::LocalNoFallback),
+                },
+            ],
+            actual_engine: None,
+        };
+        let d = decide_clipboard_popup(&result);
+        assert!(matches!(d, ClipboardPopupDecision::Multi));
+    }
+
+    #[test]
+    fn clipboard_decision_single_failure_is_error() {
+        let result = TranslateSessionResult {
+            outcomes: vec![TranslationOutcome {
+                uuid: "u1".into(),
+                result: Err(crate::error::Error::LocalNoFallback),
+            }],
+            actual_engine: None,
+        };
+        let d = decide_clipboard_popup(&result);
+        match d {
+            ClipboardPopupDecision::Error(msg) => assert!(msg.contains("no fallback"), "{msg}"),
+            other => panic!("expected Error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn clipboard_decision_all_parallel_failed_is_error() {
+        let result = TranslateSessionResult {
+            outcomes: vec![
+                TranslationOutcome { uuid: "u1".into(), result: Err(crate::error::Error::LocalNoFallback) },
+                TranslationOutcome { uuid: "u2".into(), result: Err(crate::error::Error::LocalNoFallback) },
+            ],
+            actual_engine: None,
+        };
+        let d = decide_clipboard_popup(&result);
+        assert!(matches!(d, ClipboardPopupDecision::Error(_)));
     }
 }
