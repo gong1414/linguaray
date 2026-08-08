@@ -1,0 +1,72 @@
+/* ProviderRow — compact row variant of ProviderCard.
+   Non-interactive <div>; Switch/Edit/Delete are sibling buttons. */
+.provider-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-default);
+  border-left: 3px solid transparent;
+}
+
+.provider-row:hover {
+  background: var(--color-surface-hover);
+}
+
+/* MASTER §7 ProviderRow / ProviderCard: active provider accent —
+   3px --color-surface-selected border-left. */
+.provider-row--active {
+  border-left: 3px solid var(--color-surface-selected);
+}
+
+.provider-row__info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  gap: var(--space-xs);
+}
+
+.provider-row__name {
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+  font-weight: var(--text-md--weight);
+  color: var(--color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.provider-row__template {
+  font-size: var(--text-xs);
+  line-height: var(--text-xs--line-height);
+  color: var(--color-text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.provider-row__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: var(--space-lg);
+  height: var(--space-lg);
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+}
+
+.provider-row__btn:hover {
+  background: var(--color-surface-subtle);
+  color: var(--color-text-primary);
+}
+
+.provider-row__btn:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}

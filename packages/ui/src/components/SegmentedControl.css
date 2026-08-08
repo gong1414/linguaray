@@ -1,0 +1,38 @@
+/* SegmentedControl — roving-tabindex tablist. */
+.seg-control {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-default);
+}
+
+.seg-control__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border: none;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font: inherit;
+}
+
+.seg-control__tab[aria-selected="true"] {
+  background: var(--color-surface-selected);
+  color: var(--color-text-selected);
+}
+
+.seg-control__tab:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.seg-control__tab:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
