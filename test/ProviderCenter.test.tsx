@@ -540,6 +540,54 @@ describe("ProviderCenter (Surface 05)", () => {
     expect(invokeMock.mock.calls.some((c) => c[0] === "provider_set_active")).toBe(false);
   });
 
+  it("empty key: Save key disabled when needs_key provider has no key text", async () => {
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => [profile({ uuid: "u1", name: "TestProvider", secret_ref: "provider/u1" })],
+      key_status: () => ({}), // no key
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("TestProvider")).toBeTruthy());
+    fireEvent.click(screen.getByLabelText("Edit TestProvider"));
+    await flush();
+
+    // The Save key button exists but is disabled while the key input is empty.
+    const saveKeyBtn = screen.getByText("Save key").closest("button") as HTMLButtonElement;
+    expect(saveKeyBtn).toBeTruthy();
+    expect(saveKeyBtn.disabled).toBe(true);
+
+    // Typing a key enables the Save key button.
+    const keyInput = screen.getByLabelText("API key") as HTMLInputElement;
+    fireEvent.input(keyInput, { target: { value: "sk-test" } });
+    await flush();
+    expect(saveKeyBtn.disabled).toBe(false);
+  });
+
+  it("save key conflict: UNIQUE constraint surfaces localized 'already exists' error", async () => {
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => [profile({ uuid: "u1", name: "TestProvider", secret_ref: "provider/u1" })],
+      key_status: () => ({}),
+      provider_set_key: () => {
+        throw new Error("UNIQUE constraint failed: providers.secret_ref");
+      },
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("TestProvider")).toBeTruthy());
+    fireEvent.click(screen.getByLabelText("Edit TestProvider"));
+    await flush();
+
+    const keyInput = screen.getByLabelText("API key") as HTMLInputElement;
+    fireEvent.input(keyInput, { target: { value: "sk-test" } });
+    fireEvent.click(screen.getByText("Save key"));
+    await flush();
+    // The localized "already exists" message surfaces — as an inline field
+    // error and/or a toast. Assert at least one such element is present.
+    await waitFor(() =>
+      expect(screen.getAllByText(/already exists|已存在/).length).toBeGreaterThanOrEqual(1),
+    );
+  });
+
   it("duplicate: clicking Duplicate calls provider_duplicate", async () => {
     const dupCalls: unknown[] = [];
     routeInvoke({
