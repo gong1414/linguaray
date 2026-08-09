@@ -12,9 +12,8 @@
  * (ProviderRow has no `extraActions` slot).
  *
  * Known R3a limitations (degrade gracefully + TODO, do NOT touch backend):
- *  1. No read-active-selection IPC — `selection()` is a CLIENT SESSION MIRROR.
- *     Cold-load renders all roles as "none". See the `// TODO(r3b)` note at the
- *     role-rendering site below.
+ *  1. Active selection cold-loads via `provider_get_active_selection` (fail-
+ *     closed: a read failure blocks `providerSetActive` until a retry succeeds).
  *  2. Balance / quota introspection not implemented — the balance section
  *     renders a muted TODO note (no fetch button).
  */
@@ -68,6 +67,7 @@ import {
   providerConfirmAndSetActive,
   providerTestConnection,
   providerGetModels,
+  providerGetActiveSelection,
 } from "./provider-ipc";
 import type { ProviderRole } from "@linguaray/ui";
 import { validateEndpoint } from "./provider-domain";
@@ -75,15 +75,14 @@ import "./ProviderCenter.css";
 
 // --- Presets (template ids from `src-tauri/src/providers.rs`) -------------
 // `name` may be null to signal "use the localized Ollama label" at render.
+// R2/C2: only the 4 supported AI presets are exposed. Traditional MT engines
+// (google / deepl) are no longer offered as presets.
 type Preset = { templateId: string; name: string | null; endpoint: string; model: string | null };
 const PRESETS: Preset[] = [
   { templateId: "openai", name: "OpenAI", endpoint: "https://api.openai.com/v1/chat/completions", model: "gpt-4o-mini" },
   { templateId: "anthropic", name: "Anthropic", endpoint: "https://api.anthropic.com/v1/messages", model: "claude-sonnet-4-5" },
   { templateId: "gemini", name: "Gemini", endpoint: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", model: "gemini-3.6-flash" },
   { templateId: "ollama", name: null, endpoint: "http://localhost:11434/v1/chat/completions", model: "qwen2.5:7b" },
-  // Traditional MT presets (also valid fallback engines).
-  { templateId: "google", name: "Google Translate", endpoint: "https://translation.googleapis.com/", model: null },
-  { templateId: "deepl", name: "DeepL", endpoint: "https://api-free.deepl.com/v2/", model: null },
 ];
 
 const ProviderCenter: Component = () => {
@@ -92,14 +91,19 @@ const ProviderCenter: Component = () => {
 
   // --- Core state ---
   const [providers, setProviders] = createSignal<ProviderProfileFE[]>([]);
-  // TODO(r3b): no read-active-selection IPC — roles are session-only.
-  // Cold-load renders all roles as "none" until the user assigns them.
+  // Active selection is cold-loaded via `provider_get_active_selection` and then
+  // kept in sync as a session mirror. Fail-closed: while loading or after a
+  // read failure, role-assignment handlers are disabled (no `providerSetActive`).
   const [selection, setSelection] = createSignal<ActiveSelection>({
     primaryUuid: null,
     parallelUuids: [],
     fallbackUuid: null,
   });
   const [loadError, setLoadError] = createSignal(false);
+  // Cold-load in-flight (initial + retries) — gates role mutations.
+  const [selectionLoading, setSelectionLoading] = createSignal(true);
+  // Cold-load read failed — gates role mutations until a successful retry.
+  const [selectionError, setSelectionError] = createSignal(false);
 
   // --- Detail panel state (per-UUID to prevent cross-provider leakage) ---
   const [selectedUuid, setSelectedUuid] = createSignal<string | null>(null);
@@ -133,15 +137,31 @@ const ProviderCenter: Component = () => {
   const dismissToast = (id: number) =>
     setToasts((prev) => prev.filter((x) => x.id !== id));
 
-  // --- Initial load ---
+  // --- Initial load (fail-closed) ---
+  // BOTH the provider list AND the stored active selection must resolve before
+  // roles are applied. If either rejects, no `providerSetActive` is allowed
+  // (handlers short-circuit on `selectionError()`/`selectionLoading()`).
   const refresh = async () => {
+    setSelectionLoading(true);
+    setSelectionError(false);
     try {
-      const list = await loadProviders();
+      const [list, active] = await Promise.all([
+        loadProviders(),
+        providerGetActiveSelection(),
+      ]);
       setProviders(list);
+      setSelection({
+        primaryUuid: active.primary,
+        parallelUuids: active.parallel,
+        fallbackUuid: active.fallback,
+      });
       setLoadError(false);
     } catch (e) {
       setLoadError(true);
+      setSelectionError(true);
       pushToast("destructive", t.saveFailed);
+    } finally {
+      setSelectionLoading(false);
     }
   };
 
@@ -212,6 +232,10 @@ const ProviderCenter: Component = () => {
   };
 
   const handleSetPrimary = async (uuid: string) => {
+    // Fail-closed: never call providerSetActive while the cold-load read is
+    // in-flight or has failed (prevents overwriting a stored selection we
+    // failed to read).
+    if (selectionLoading() || selectionError()) return;
     const candidate = buildCandidatePrimary(uuid);
     try {
       const result = await providerSetActive(
@@ -229,6 +253,7 @@ const ProviderCenter: Component = () => {
   };
 
   const handleAddParallel = (uuid: string, triggerEl?: HTMLElement) => {
+    if (selectionLoading() || selectionError()) return;
     if (triggerEl) consentTriggerRef.current = triggerEl;
     const candidate: ActiveSelection = {
       ...selection(),
@@ -258,6 +283,7 @@ const ProviderCenter: Component = () => {
   const confirmConsent = async () => {
     const uuid = pendingParallelUuid();
     if (!uuid) return;
+    if (selectionLoading() || selectionError()) return;
     const candidate: ActiveSelection = {
       ...selection(),
       parallelUuids: [...selection().parallelUuids, uuid],
@@ -295,6 +321,7 @@ const ProviderCenter: Component = () => {
   };
 
   const handleSetFallback = async (uuid: string) => {
+    if (selectionLoading() || selectionError()) return;
     const prev = selection();
     const candidate: ActiveSelection = {
       primaryUuid: prev.primaryUuid === uuid ? null : prev.primaryUuid,
@@ -314,6 +341,7 @@ const ProviderCenter: Component = () => {
   };
 
   const handleRemoveParallel = async (uuid: string) => {
+    if (selectionLoading() || selectionError()) return;
     const candidate: ActiveSelection = {
       ...selection(),
       parallelUuids: selection().parallelUuids.filter((u) => u !== uuid),
@@ -486,6 +514,17 @@ const ProviderCenter: Component = () => {
         </div>
       </Show>
 
+      {/* Cold-load failure: selection read failed → fail-closed. Role mutations
+          are disabled (see handler guards) until a successful retry. */}
+      <Show when={selectionError()}>
+        <div class="pc__retry" role="alert">
+          <span class="pc__load-failed">{t.loadFailed}</span>
+          <Button variant="secondary" size="sm" onClick={() => void refresh()}>
+            {t.retry}
+          </Button>
+        </div>
+      </Show>
+
       <div class="pc__layout">
         {/* Sidebar: provider list */}
         <aside class="pc__sidebar" aria-label={t.providerListLabel}>
@@ -599,9 +638,8 @@ const ProviderCenter: Component = () => {
                           </button>
                         </div>
                       </div>
-                      {/* Role badge row (session mirror; cold-load = none).
-                        // TODO(r3b): no read-active-selection IPC — roles are
-                        // session-only; cold-load renders none until assigned. */}
+                      {/* Role badge row (cold-loaded + session mirror). On read
+                          failure all roles render as "none" (fail-closed). */}
                       <Show when={role().kind !== "none"}>
                         <div class="pc__role-badge-row">
                           <Show when={role().kind === "primary"}>

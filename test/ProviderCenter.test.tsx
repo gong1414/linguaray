@@ -65,9 +65,23 @@ function routeInvoke(routes: Record<string, (args?: unknown) => unknown>): void 
   });
 }
 
+/**
+ * Default route table re-installed in `beforeEach` after `mockReset()`. The
+ * C1 cold-load calls `provider_get_active_selection` on every refresh, so a
+ * bare `provider_list` + `key_status` table is no longer sufficient — omitting
+ * the selection read makes `refresh()` reject and never populate the list.
+ * Tests that need a custom route pass `{ ...DEFAULT_ROUTES, ...custom }`.
+ */
+const DEFAULT_ROUTES: Record<string, (args?: unknown) => unknown> = {
+  provider_list: () => [],
+  key_status: () => ({}),
+  provider_get_active_selection: () => ({ primary: null, parallel: [], fallback: null }),
+};
+
 beforeEach(() => {
   localeMock.current = "en";
   invokeMock.mockReset();
+  routeInvoke(DEFAULT_ROUTES);
 });
 
 afterEach(() => cleanup());
@@ -84,20 +98,14 @@ async function whenCalledWith(cmd: string) {
 
 describe("ProviderCenter (Surface 05)", () => {
   it("on mount, calls provider_list + key_status", async () => {
-    routeInvoke({
-      provider_list: () => [],
-      key_status: () => ({}),
-    });
+    routeInvoke({ ...DEFAULT_ROUTES });
     render(() => <ProviderCenter />);
     await whenCalledWith("provider_list");
     await whenCalledWith("key_status");
   });
 
   it("empty: shows EmptyState + preset grid", async () => {
-    routeInvoke({
-      provider_list: () => [],
-      key_status: () => ({}),
-    });
+    routeInvoke({ ...DEFAULT_ROUTES });
     render(() => <ProviderCenter />);
     await waitFor(() =>
       expect(screen.getByText("Add your first provider")).toBeTruthy(),
@@ -111,8 +119,8 @@ describe("ProviderCenter (Surface 05)", () => {
     const calls: string[] = [];
     let created = false;
     routeInvoke({
+      ...DEFAULT_ROUTES,
       provider_list: () => (created ? [profile()] : []),
-      key_status: () => ({}),
       provider_create: () => {
         created = true;
         calls.push("create");
@@ -128,6 +136,7 @@ describe("ProviderCenter (Surface 05)", () => {
           created = true;
           return profile();
         },
+        provider_get_active_selection: () => ({ primary: null, parallel: [], fallback: null }),
       };
       const fn = map[cmd];
       if (!fn) throw new Error(`unexpected ${cmd}`);
@@ -146,6 +155,7 @@ describe("ProviderCenter (Surface 05)", () => {
 
   it("list: renders rows in sort_order with name", async () => {
     routeInvoke({
+      ...DEFAULT_ROUTES,
       provider_list: () => TWO_PROFILES,
       key_status: () => ({ "provider/u1": true, "provider/u2": false }),
     });
@@ -159,6 +169,7 @@ describe("ProviderCenter (Surface 05)", () => {
   it("toggle: calls provider_toggle, optimistically flips, rolls back on error", async () => {
     let toggleShouldFail = false;
     routeInvoke({
+      ...DEFAULT_ROUTES,
       provider_list: () => TWO_PROFILES,
       key_status: () => ({ "provider/u1": true, "provider/u2": true }),
       provider_toggle: () => {
@@ -191,6 +202,7 @@ describe("ProviderCenter (Surface 05)", () => {
 
   it("edit: selecting a row opens detail with endpoint + model fields", async () => {
     routeInvoke({
+      ...DEFAULT_ROUTES,
       provider_list: () => TWO_PROFILES,
       key_status: () => ({ "provider/u1": true, "provider/u2": true }),
     });
@@ -206,6 +218,7 @@ describe("ProviderCenter (Surface 05)", () => {
 
   it("endpoint invalid: shows error, Save disabled", async () => {
     routeInvoke({
+      ...DEFAULT_ROUTES,
       provider_list: () => [profile({ uuid: "u1", name: "TestProvider", secret_ref: "provider/u1" })],
       key_status: () => ({ "provider/u1": true }),
     });
@@ -228,6 +241,7 @@ describe("ProviderCenter (Surface 05)", () => {
   it("save profile: calls provider_update with patch", async () => {
     const updates: unknown[] = [];
     routeInvoke({
+      ...DEFAULT_ROUTES,
       provider_list: () => [profile({ uuid: "u1", name: "TestProvider", secret_ref: "provider/u1" })],
       key_status: () => ({ "provider/u1": true }),
       provider_update: (args) => {
@@ -252,6 +266,7 @@ describe("ProviderCenter (Surface 05)", () => {
   it("key missing: shows key input + Save key; saving calls provider_set_key", async () => {
     const keyCalls: unknown[] = [];
     routeInvoke({
+      ...DEFAULT_ROUTES,
       provider_list: () => [profile({ uuid: "u1", name: "TestProvider", secret_ref: "provider/u1" })],
       key_status: () => ({}), // no key
       provider_set_key: (args) => {
@@ -274,6 +289,7 @@ describe("ProviderCenter (Surface 05)", () => {
 
   it("key input cleared on submit start, even on failure", async () => {
     routeInvoke({
+      ...DEFAULT_ROUTES,
       provider_list: () => [profile({ uuid: "u1", name: "TestProvider", secret_ref: "provider/u1" })],
       key_status: () => ({}),
       provider_set_key: () => {
@@ -296,6 +312,7 @@ describe("ProviderCenter (Surface 05)", () => {
   it("delete: opens Confirm; confirm calls provider_delete", async () => {
     const deletes: unknown[] = [];
     routeInvoke({
+      ...DEFAULT_ROUTES,
       provider_list: () => [profile({ uuid: "u1", name: "TestProvider", secret_ref: "provider/u1" })],
       key_status: () => ({ "provider/u1": true }),
       provider_delete: (args) => {
@@ -317,6 +334,7 @@ describe("ProviderCenter (Surface 05)", () => {
   it("set primary: calls provider_set_active with { primary, parallel: [], fallback }", async () => {
     const setActiveCalls: unknown[] = [];
     routeInvoke({
+      ...DEFAULT_ROUTES,
       provider_list: () => TWO_PROFILES,
       key_status: () => ({ "provider/u1": true, "provider/u2": true }),
       provider_set_active: (args) => {
@@ -342,6 +360,7 @@ describe("ProviderCenter (Surface 05)", () => {
     const actualScope = "v1:{u1|https://api.openai.com|false,u2|https://api.deepseek.com|false}";
     const confirmCalls: unknown[] = [];
     routeInvoke({
+      ...DEFAULT_ROUTES,
       provider_list: () => TWO_PROFILES,
       key_status: () => ({ "provider/u1": true, "provider/u2": true }),
       provider_set_active: (args) => {
@@ -379,6 +398,7 @@ describe("ProviderCenter (Surface 05)", () => {
   it("add parallel → stale_scope on confirm → toast, selection reverted", async () => {
     const actualScope = "v1:{changed}";
     routeInvoke({
+      ...DEFAULT_ROUTES,
       provider_list: () => TWO_PROFILES,
       key_status: () => ({ "provider/u1": true, "provider/u2": true }),
       provider_set_active: (args) => {
@@ -413,6 +433,7 @@ describe("ProviderCenter (Surface 05)", () => {
   it("reorder: move up calls provider_reorder with swapped uuids", async () => {
     const reorderCalls: unknown[] = [];
     routeInvoke({
+      ...DEFAULT_ROUTES,
       provider_list: () => TWO_PROFILES,
       key_status: () => ({ "provider/u1": true, "provider/u2": true }),
       provider_reorder: (args) => {
@@ -432,6 +453,7 @@ describe("ProviderCenter (Surface 05)", () => {
 
   it("connection test: calls provider_test_connection; ok → connected indicator", async () => {
     routeInvoke({
+      ...DEFAULT_ROUTES,
       provider_list: () => [profile({ uuid: "u1", name: "TestProvider", secret_ref: "provider/u1" })],
       key_status: () => ({ "provider/u1": true }),
       provider_test_connection: () => ({ ok: true, message: "reachable" }),
@@ -447,6 +469,7 @@ describe("ProviderCenter (Surface 05)", () => {
 
   it("balance section: renders TODO note, no fetch button", async () => {
     routeInvoke({
+      ...DEFAULT_ROUTES,
       provider_list: () => [profile({ uuid: "u1", name: "TestProvider", secret_ref: "provider/u1" })],
       key_status: () => ({ "provider/u1": true }),
     });
@@ -461,18 +484,16 @@ describe("ProviderCenter (Surface 05)", () => {
 
   it("uses zh copy when locale zh", async () => {
     localeMock.current = "zh";
-    routeInvoke({
-      provider_list: () => [],
-      key_status: () => ({}),
-    });
+    routeInvoke({ ...DEFAULT_ROUTES });
     render(() => <ProviderCenter />);
     await waitFor(() =>
       expect(screen.getByText("添加你的第一个服务商")).toBeTruthy(),
     );
   });
 
-  it("no role badges on cold load (session-only roles)", async () => {
+  it("no role badges on cold load when stored selection is empty", async () => {
     routeInvoke({
+      ...DEFAULT_ROUTES,
       provider_list: () => TWO_PROFILES,
       key_status: () => ({ "provider/u1": true, "provider/u2": true }),
     });
@@ -482,5 +503,52 @@ describe("ProviderCenter (Surface 05)", () => {
     expect(screen.queryAllByText("Primary").length).toBe(0);
     expect(screen.queryAllByText("Parallel").length).toBe(0);
     expect(screen.queryAllByText("Fallback").length).toBe(0);
+  });
+
+  it("cold-loads the stored active selection into role badges", async () => {
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => [
+        profile({ uuid: "u1", name: "MyOpenAI", sort_order: 0, secret_ref: "provider/u1" }),
+        profile({ uuid: "u2", name: "MyDeepSeek", template_id: "deepseek", sort_order: 1, secret_ref: "provider/u2", needs_key: true }),
+      ],
+      key_status: () => ({ "provider/u1": true, "provider/u2": true }),
+      provider_get_active_selection: () => ({ primary: "u1", parallel: ["u2"], fallback: null }),
+    });
+    const { findAllByText } = render(() => <ProviderCenter />);
+    // Primary badge ("Primary" / "主引擎") + Parallel badge ("Parallel" / "并行") render.
+    expect((await findAllByText(/Primary|主引擎/)).length).toBeGreaterThan(0);
+    expect((await findAllByText(/Parallel|并[行联]/)).length).toBeGreaterThan(0);
+    // No fallback badge.
+    expect(screen.queryAllByText(/Fallback|回退/).length).toBe(0);
+  });
+
+  it("fail-closed: shows load-failed banner + Retry and does NOT call providerSetActive when reads fail", async () => {
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => {
+        throw new Error("db locked");
+      },
+      provider_get_active_selection: () => {
+        throw new Error("db locked");
+      },
+    });
+    const { findByText } = render(() => <ProviderCenter />);
+    // Cold-load failure surfaced via the localized loadFailed banner.
+    expect(await findByText(/加载失败|load failed/i)).toBeTruthy();
+    // Fail-closed: no provider_set_active should have been attempted.
+    expect(invokeMock.mock.calls.some((c) => c[0] === "provider_set_active")).toBe(false);
+  });
+
+  it("preset grid contains only the 4 supported AI presets (no Google/DeepL)", async () => {
+    routeInvoke({ ...DEFAULT_ROUTES });
+    const { findByText } = render(() => <ProviderCenter />);
+    expect(await findByText("OpenAI")).toBeTruthy();
+    expect(await findByText("Anthropic")).toBeTruthy();
+    expect(await findByText("Gemini")).toBeTruthy();
+    expect(await findByText("Ollama")).toBeTruthy();
+    // Google Translate + DeepL presets are gone.
+    expect(screen.queryByText(/Google Translate/)).toBeNull();
+    expect(screen.queryByText(/^DeepL$/)).toBeNull();
   });
 });
