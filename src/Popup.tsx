@@ -1,5 +1,7 @@
-import { For, Show, createMemo, type Component } from "solid-js";
+import { For, Show, createMemo, createSignal, onCleanup, type Component } from "solid-js";
 import { Copy, Volume2, Pin, PinOff, Star, AlertTriangle } from "lucide-solid";
+import { invoke } from "@tauri-apps/api/core";
+import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import {
   Button,
   EmptyState,
@@ -35,12 +37,28 @@ function headlineKey(s: TranslationState): string {
   }
 }
 
+/** How long the Copy button shows its "Copied" feedback (ms). */
+const COPIED_FEEDBACK_MS = 1200;
+
 const Popup: Component = () => {
   detectLocale(); // resolve locale once on mount (t() reads it lazily)
   const ctrl = createPopupController();
   const state = ctrl.state;
 
   const isCompact = createMemo(() => state().kind === "loading");
+
+  // P1-3 + B4: Copy feedback. copiedUuid is "__single__" for the single card,
+  // or the engine uuid for a multi card. While set, that card's Copy button
+  // shows the "Copied" label.
+  const [copiedUuid, setCopiedUuid] = createSignal<string | null>(null);
+  let copiedTimer: ReturnType<typeof setTimeout> | undefined;
+  onCleanup(() => {
+    if (copiedTimer) clearTimeout(copiedTimer);
+  });
+
+  /** B4/P1-5: open the settings window to a named section. */
+  const openSettings = (section?: string) =>
+    invoke("open_settings_window", section ? { section } : {});
 
   // Narrowed snapshots for the single-success card. Solid re-runs these memos
   // reactively; capturing `s` locally lets TS narrow within each branch (two
@@ -59,10 +77,12 @@ const Popup: Component = () => {
     const s = state();
     return s.kind === "error" ? s : null;
   });
+  // B4: keystore-corrupt gets its OWN dedicated Show with a recovery CTA, so it
+  // is excluded from the generic error shell.
   const isErrorShell = createMemo(() => {
     const k = state().kind;
     return k === "error" || k === "offline" || k === "no-selection" ||
-      k === "no-permission" || k === "keystore-corrupt";
+      k === "no-permission";
   });
 
   function textFor(uuid: string): string | undefined {
@@ -74,21 +94,36 @@ const Popup: Component = () => {
     return undefined;
   }
 
-  // Per-card action builders (copy/speak/pin/favorite). Stale-safe via the
-  // controller's reaction: state changes re-run this component, so the
-  // actions captured here always reflect the current state/pin.
+  // B4: Copy via the Tauri clipboard plugin (no navigator.clipboard fallback —
+  // the webview may not expose it, and the plugin is the supported path).
+  // Writes the TRANSLATION text, never the source. TTS/Favorite are
+  // aria-disabled (focusable for discovery, not natively disabled) because they
+  // are not yet implemented.
   const buildActions = (uuid: string): ResultAction[] => {
     const isPinned = ctrl.pinned();
+    const isCopied = copiedUuid() === uuid;
     return [
       {
-        label: t("selection.action.copy"),
-        icon: <Copy size={14} />,
-        onClick: () => { void navigator.clipboard?.writeText(textFor(uuid) ?? ""); },
+        label: isCopied ? t("selection.action.copied") : t("selection.action.copy"),
+        // When copied, surface the label as visible text (the IconButton is
+        // icon-only, so the aria-label alone is not queryable by findByText).
+        icon: isCopied
+          ? <span class="popup-copy-copied">{t("selection.action.copied")}</span>
+          : <Copy size={14} />,
+        onClick: () => {
+          const translationText = textFor(uuid) ?? "";
+          void writeText(translationText).then(() => {
+            setCopiedUuid(uuid);
+            if (copiedTimer) clearTimeout(copiedTimer);
+            copiedTimer = setTimeout(() => setCopiedUuid(null), COPIED_FEEDBACK_MS);
+          });
+        },
       },
       {
-        label: t("selection.action.speak"),
+        label: t("selection.action.comingTts"),
         icon: <Volume2 size={14} />,
-        onClick: () => { /* TTS hook: window.speechSynthesis if available */ },
+        ariaDisabled: true,
+        onClick: () => { /* TTS: not yet shipped */ },
       },
       {
         label: isPinned ? t("selection.action.unpin") : t("selection.action.pin"),
@@ -97,9 +132,10 @@ const Popup: Component = () => {
         onClick: () => (isPinned ? ctrl.unpin() : ctrl.pin()),
       },
       {
-        label: t("selection.action.favorite"),
+        label: t("selection.action.comingFavorite"),
         icon: <Star size={14} />,
-        onClick: () => { /* vocabulary IPC hook */ },
+        ariaDisabled: true,
+        onClick: () => { /* vocabulary IPC: not yet shipped */ },
       },
     ];
   };
@@ -155,6 +191,25 @@ const Popup: Component = () => {
         )}
       </Show>
 
+      {/* P1-3: Retry re-translates the saved SOURCE text via
+          translate_selection_ipc (never translate_clipboard, never the result).
+          Shown whenever the controller has a source: in the success shell and
+          (for network errors) in the error shell below. */}
+      <Show when={
+        (single() || multi()) && ctrl.hasSource()
+      }>
+        <div class="popup-retry">
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-label={t("selection.action.retry")}
+            onClick={() => void ctrl.retrySelection()}
+          >
+            {t("selection.action.retry")}
+          </Button>
+        </div>
+      </Show>
+
       {/* Single-card error / special states (no ResultCard grid). */}
       <Show when={isErrorShell()}>
         <div class="popup-error" role="alert">
@@ -166,15 +221,46 @@ const Popup: Component = () => {
                 <Show when={
                   errorState()?.sub === "config-key" || errorState()?.sub === "config-401"
                 }>
-                  <Button variant="ghost" size="sm" onClick={() => { /* open settings window */ }}>
-                    {t("selection.action.retry")}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => void openSettings("provider-center")}
+                  >
+                    {t("selection.action.openSettings")}
                   </Button>
                 </Show>
               }>
-                <Button variant="secondary" size="sm" onClick={() => void ctrl.retry()}>
-                  {t("selection.action.retry")}
-                </Button>
+                <Show when={ctrl.hasSource()} fallback={<span />}>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    aria-label={t("selection.action.retry")}
+                    onClick={() => void ctrl.retrySelection()}
+                  >
+                    {t("selection.action.retry")}
+                  </Button>
+                </Show>
               </Show>
+            }
+          />
+        </div>
+      </Show>
+
+      {/* B4: keystore-corrupt gets its OWN dedicated recovery CTA (distinct from
+          the generic error shell so the wording targets keystore recovery). */}
+      <Show when={state().kind === "keystore-corrupt"}>
+        <div class="popup-error" role="alert">
+          <EmptyState
+            icon={<AlertTriangle size={32} />}
+            title={t("selection.error.keystore")}
+            action={
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => void openSettings("keystore-recovery")}
+              >
+                {t("selection.action.recovery")}
+              </Button>
             }
           />
         </div>

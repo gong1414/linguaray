@@ -349,7 +349,17 @@ async fn translate_clipboard(
         return Err("clipboard empty".into());
     }
     let (x, y) = cursor::position();
-    let _ = popup::show_at(&app, x, y);
+    // B4: switch to the source-aware emitters so clipboard-origin results carry
+    // `source_text` (P1-3: Retry needs the original text). Mirrors
+    // capture_and_translate: build_popup_anchor + gen check + loading_with_source.
+    let anchor = match build_popup_anchor(&app, x as f64, y as f64) {
+        Some(a) => a,
+        None => return Ok(()),
+    };
+    if !state.gen.is_latest(gen) {
+        return Ok(());
+    }
+    let _ = popup::loading_with_source(&app, &anchor, Some(&text));
     let s = settings::load(&app);
 
     // Task A5: the tray Active-pulse begins here (after the clipboard preflight).
@@ -364,7 +374,8 @@ async fn translate_clipboard(
         Err(msg) => {
             if state.gen.is_latest(gen) {
                 app_state.tray.lock().record_translation_error(gen);
-                let _ = popup::error(&app, &msg);
+                let _ = popup::set_popup_mode(&app, popup::PopupMode::Error, &anchor);
+                let _ = popup::error_with_source(&app, &msg, &text);
             }
             return Ok(());
         }
@@ -374,7 +385,8 @@ async fn translate_clipboard(
         Err(msg) => {
             if state.gen.is_latest(gen) {
                 app_state.tray.lock().record_translation_error(gen);
-                let _ = popup::error(&app, &msg);
+                let _ = popup::set_popup_mode(&app, popup::PopupMode::Error, &anchor);
+                let _ = popup::error_with_source(&app, &msg, &text);
             }
             return Ok(());
         }
@@ -392,14 +404,16 @@ async fn translate_clipboard(
         Ok(Err(msg)) => {
             if state.gen.is_latest(gen) {
                 app_state.tray.lock().record_translation_error(gen);
-                let _ = popup::error(&app, &msg);
+                let _ = popup::set_popup_mode(&app, popup::PopupMode::Error, &anchor);
+                let _ = popup::error_with_source(&app, &msg, &text);
             }
             return Ok(());
         }
         Err(e) => {
             if state.gen.is_latest(gen) {
                 app_state.tray.lock().record_translation_error(gen);
-                let _ = popup::error(&app, &format!("join error: {e}"));
+                let _ = popup::set_popup_mode(&app, popup::PopupMode::Error, &anchor);
+                let _ = popup::error_with_source(&app, &format!("join error: {e}"), &text);
             }
             return Ok(());
         }
@@ -417,22 +431,26 @@ async fn translate_clipboard(
     }
     match session_result {
         Ok(r) => match decide_clipboard_popup(&r) {
-            ClipboardPopupDecision::SingleSuccess { text, engine } => {
+            ClipboardPopupDecision::SingleSuccess { text: t, engine } => {
                 _tray_guard.mark_success();
-                let _ = popup::result(&app, &text, &engine);
+                let _ = popup::set_popup_mode(&app, popup::PopupMode::Single, &anchor);
+                let _ = popup::result_with_source(&app, &t, &engine, &text);
             }
             ClipboardPopupDecision::Multi => {
                 _tray_guard.mark_success();
-                let _ = popup::multi_result(&app, &r.outcomes);
+                let _ = popup::set_popup_mode(&app, popup::PopupMode::Multi, &anchor);
+                let _ = popup::multi_result_with_source(&app, &r.outcomes, &text);
             }
             ClipboardPopupDecision::Error(msg) => {
                 app_state.tray.lock().record_translation_error(gen);
-                let _ = popup::error(&app, &msg);
+                let _ = popup::set_popup_mode(&app, popup::PopupMode::Error, &anchor);
+                let _ = popup::error_with_source(&app, &msg, &text);
             }
         },
         Err(msg) => {
             app_state.tray.lock().record_translation_error(gen);
-            let _ = popup::error(&app, &msg);
+            let _ = popup::set_popup_mode(&app, popup::PopupMode::Error, &anchor);
+            let _ = popup::error_with_source(&app, &msg, &text);
         }
     }
     Ok(())

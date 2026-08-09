@@ -3,6 +3,7 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
 import { decodePopupMultiResult, decodePopupState } from "./decode";
+import { translateSelection } from "./selection-ipc";
 import type { PopupMultiPayload, PopupStatePayload, TranslationState } from "./types";
 
 /**
@@ -11,9 +12,10 @@ import type { PopupMultiPayload, PopupStatePayload, TranslationState } from "./t
  *  - the `pinned` signal (Surface 01: pinned popups ignore blur-hide)
  *  - Tauri event subscriptions (popup-state + popup-multi-result)
  *  - blur-hide gating on pin state
- *  - retry (re-emits the last selection translation via translate_clipboard —
- *    delegated to the backend which re-reads the active selection and emits
- *    popup-state / popup-multi-result, which re-decode here)
+ *  - lastSource: the ORIGINAL selected text (P1-3), saved from the backend
+ *    payload's `source_text` on every loading/result/error/multi event so Retry
+ *    can re-translate the SAME source via translate_selection_ipc (never
+ *    translate_clipboard, never the translation result).
  *
  * Returns a plain object of accessors/actions; the component binds them.
  */
@@ -22,6 +24,8 @@ export function createPopupController() {
   const [pinned, setPinned] = createSignal(false);
   /** uuid → friendly provider name. Loaded once on mount from provider_list. */
   const nameMap = new Map<string, string>();
+  /** P1-3: last saved SOURCE text (original selection), for Retry. */
+  let lastSource = "";
   const unlisteners: UnlistenFn[] = [];
 
   onMount(async () => {
@@ -34,12 +38,22 @@ export function createPopupController() {
     }
     unlisteners.push(
       await listen<PopupStatePayload>("popup-state", (e) => {
-        setState(decodePopupState(e.payload));
+        const payload = e.payload;
+        // P1-3: loading opens a new translation session — clear the prior
+        // source, then adopt this session's source if the backend carried it.
+        if (payload.status === "loading") {
+          lastSource = payload.source_text ?? "";
+        } else if (payload.source_text) {
+          lastSource = payload.source_text;
+        }
+        setState(decodePopupState(payload));
       }),
     );
     unlisteners.push(
       await listen<PopupMultiPayload>("popup-multi-result", (e) => {
-        setState(decodePopupMultiResult(e.payload));
+        const payload = e.payload;
+        if (payload.source_text) lastSource = payload.source_text;
+        setState(decodePopupMultiResult(payload));
       }),
     );
 
@@ -84,16 +98,24 @@ export function createPopupController() {
     await getCurrentWindow().hide();
   };
 
-  // Retry: ask the backend to re-run the current-selection translation. The
-  // backend re-emits popup-state / popup-multi-result, which re-decode here.
-  const retry = async () => {
+  /**
+   * P1-3: Retry re-translates the SAVED SOURCE text via translate_selection_ipc
+   * (translateSelection). Never translate_clipboard, never the translation
+   * result. No-op when there is no saved source. The backend re-emits
+   * popup-state / popup-multi-result, which re-decode here.
+   */
+  const retrySelection = async () => {
+    if (!lastSource) return;
     setState({ kind: "loading" });
     try {
-      await invoke("translate_clipboard");
+      await translateSelection(lastSource);
     } catch (e) {
       setState({ kind: "error", sub: "generic", message: String(e) });
     }
   };
 
-  return { state, pinned, pin, unpin, dismiss, retry, engineLabel };
+  /** Whether a saved SOURCE text is available for Retry (P1-3). */
+  const hasSource = () => lastSource.length > 0;
+
+  return { state, pinned, pin, unpin, dismiss, retrySelection, hasSource, engineLabel };
 }
