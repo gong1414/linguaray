@@ -12,7 +12,7 @@ fn window(app: &tauri::AppHandle) -> Result<WebviewWindow, String> {
 pub fn show_at(app: &tauri::AppHandle, x: i32, y: i32) -> Result<(), String> {
     let win = window(app)?;
     win.set_position(tauri::PhysicalPosition { x, y }).map_err(|e| e.to_string())?;
-    win.emit("popup-state", Payload { status: "loading", text: "", engine: "" }).map_err(|e| e.to_string())?;
+    win.emit("popup-state", Payload { status: "loading", text: "", engine: "", source_text: None }).map_err(|e| e.to_string())?;
     win.show().map_err(|e| e.to_string())?;
     win.set_focus().map_err(|e| e.to_string())?;
     Ok(())
@@ -20,13 +20,13 @@ pub fn show_at(app: &tauri::AppHandle, x: i32, y: i32) -> Result<(), String> {
 
 pub fn result(app: &tauri::AppHandle, text: &str, engine: &str) -> Result<(), String> {
     let win = window(app)?;
-    win.emit("popup-state", Payload { status: "result", text, engine }).map_err(|e| e.to_string())?;
+    win.emit("popup-state", Payload { status: "result", text, engine, source_text: None }).map_err(|e| e.to_string())?;
     Ok(())
 }
 
 pub fn error(app: &tauri::AppHandle, msg: &str) -> Result<(), String> {
     let win = window(app)?;
-    win.emit("popup-state", Payload { status: "error", text: msg, engine: "" }).map_err(|e| e.to_string())?;
+    win.emit("popup-state", Payload { status: "error", text: msg, engine: "", source_text: None }).map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -37,7 +37,13 @@ pub fn hide(app: &tauri::AppHandle) -> Result<(), String> {
 }
 
 #[derive(Clone, serde::Serialize)]
-struct Payload<'a> { status: &'a str, text: &'a str, engine: &'a str }
+struct Payload<'a> {
+    status: &'a str,
+    text: &'a str,
+    engine: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    source_text: Option<&'a str>,
+}
 
 // ─── R2a: 多结果事件 ──────────────────────────────────────────────────────
 
@@ -92,6 +98,157 @@ pub fn multi_result(
         outcomes: outcomes.iter().map(TranslationOutcomeSerialized::from).collect(),
     };
     win.emit(POPUP_MULTI_EVENT, payload).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+// ─── A3: native sizing + work-area clamping (P1-2 unified units) ─────────
+
+/// A monitor work area in LOGICAL (CSS) pixels. Callers fill this from
+/// `Monitor::work_area()` (rev-6-1: the REAL `PhysicalRect<i32, u32>` returned
+/// by Tauri 2.11.5) divided by scale_factor.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct LogicalWorkArea {
+    pub left: f64,
+    pub top: f64,
+    pub right: f64,
+    pub bottom: f64,
+}
+
+impl LogicalWorkArea {
+    pub fn width(&self) -> f64 {
+        self.right - self.left
+    }
+    pub fn height(&self) -> f64 {
+        self.bottom - self.top
+    }
+}
+
+/// P1-2: the single source of popup geometry. `cursor_logical` and `work_area`
+/// are BOTH logical (CSS) px; `scale_factor` converts to physical. Every mode
+/// change recomputes size AND position from this anchor.
+#[derive(Debug, Clone, Copy)]
+pub struct PopupAnchor {
+    pub cursor_logical: (f64, f64),
+    pub work_area: LogicalWorkArea,
+    pub scale_factor: f64,
+}
+
+/// The four popup sizes the UI requests. Matched 1:1 to the loading /
+/// single-success / multi-result / error UI states. Dimensions are LOGICAL.
+pub enum PopupMode {
+    Loading,
+    Single,
+    Multi,
+    Error,
+}
+
+impl PopupMode {
+    /// Logical (CSS) (width, height). Callers convert to physical via scale_factor.
+    pub fn size_logical(&self) -> (u32, u32) {
+        match self {
+            PopupMode::Loading => (200, 40),
+            PopupMode::Single => (400, 300),
+            PopupMode::Multi => (600, 400),
+            PopupMode::Error => (400, 300),
+        }
+    }
+}
+
+/// Margin between the popup and any work-area edge (logical px).
+const CLAMP_MARGIN: f64 = 8.0;
+
+/// Pure geometry: pick the popup's (x, y, width, height) PHYSICAL pixels for a
+/// given mode + anchor. Clamps in LOGICAL space, then multiplies by scale_factor.
+/// Pure on purpose — fully testable without a Tauri runtime. (P1-2)
+pub fn compute_popup_geometry_logical(
+    mode: PopupMode,
+    anchor: &PopupAnchor,
+) -> (i32, i32, u32, u32) {
+    let (lw, lh) = mode.size_logical();
+    let (lwf, lhf) = (lw as f64, lh as f64);
+    let (cx, cy) = anchor.cursor_logical;
+
+    let right_limit = anchor.work_area.right - CLAMP_MARGIN - lwf;
+    let left_limit = anchor.work_area.left + CLAMP_MARGIN;
+    let x_logical = cx.clamp(left_limit, right_limit.max(left_limit));
+
+    let bottom_limit = anchor.work_area.bottom - CLAMP_MARGIN - lhf;
+    let top_limit = anchor.work_area.top + CLAMP_MARGIN;
+    let y_logical = cy.clamp(top_limit, bottom_limit.max(top_limit));
+
+    let sf = anchor.scale_factor;
+    let phys = |v: f64| -> i32 { (v * sf).round() as i32 };
+    let phys_u = |v: f64| -> u32 {
+        let p = phys(v);
+        if p < 0 { 0 } else { p as u32 }
+    };
+    (phys(x_logical), phys(y_logical), phys_u(lwf), phys_u(lhf))
+}
+
+/// Show the popup at an explicit PHYSICAL (x, y, width, height). Order is
+/// load-bearing (P1-2): set_max_size FIRST, then set_size, then set_position.
+pub fn show_at_sized(
+    app: &tauri::AppHandle,
+    x: i32,
+    y: i32,
+    width: u32,
+    height: u32,
+) -> Result<(), String> {
+    let win = window(app)?;
+    let size = tauri::PhysicalSize { width, height };
+    win.set_max_size(Some(size)).map_err(|e| e.to_string())?;
+    win.set_size(size).map_err(|e| e.to_string())?;
+    win.set_position(tauri::PhysicalPosition { x, y })
+        .map_err(|e| e.to_string())?;
+    win.emit(
+        "popup-state",
+        Payload { status: "loading", text: "", engine: "", source_text: None },
+    )
+    .map_err(|e| e.to_string())?;
+    win.show().map_err(|e| e.to_string())?;
+    win.set_focus().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Show loading popup sized for the given anchor, carrying the source text so
+/// the frontend can save it for Retry (P1-3). A3 ships this so A2 can depend on
+/// A3 without waiting on B4.
+pub fn loading_with_source(
+    app: &tauri::AppHandle,
+    anchor: &PopupAnchor,
+    source_text: Option<&str>,
+) -> Result<(), String> {
+    let (x, y, w, h) = compute_popup_geometry_logical(PopupMode::Loading, anchor);
+    let win = window(app)?;
+    let size = tauri::PhysicalSize { width: w, height: h };
+    win.set_max_size(Some(size)).map_err(|e| e.to_string())?;
+    win.set_size(size).map_err(|e| e.to_string())?;
+    win.set_position(tauri::PhysicalPosition { x, y })
+        .map_err(|e| e.to_string())?;
+    win.emit(
+        "popup-state",
+        Payload { status: "loading", text: "", engine: "", source_text },
+    )
+    .map_err(|e| e.to_string())?;
+    win.show().map_err(|e| e.to_string())?;
+    win.set_focus().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Resize + reposition the popup for a UI mode. Recomputes BOTH size AND
+/// position from the anchor (P1-2: a mode change is a geometry change).
+pub fn set_popup_mode(
+    app: &tauri::AppHandle,
+    mode: PopupMode,
+    anchor: &PopupAnchor,
+) -> Result<(), String> {
+    let (x, y, w, h) = compute_popup_geometry_logical(mode, anchor);
+    let win = window(app)?;
+    let size = tauri::PhysicalSize { width: w, height: h };
+    win.set_max_size(Some(size)).map_err(|e| e.to_string())?;
+    win.set_size(size).map_err(|e| e.to_string())?;
+    win.set_position(tauri::PhysicalPosition { x, y })
+        .map_err(|e| e.to_string())?;
     Ok(())
 }
 
