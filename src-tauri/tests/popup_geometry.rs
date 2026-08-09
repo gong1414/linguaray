@@ -84,8 +84,34 @@ fn clamps_top_edge_to_work_area_plus_margin() {
 fn retina_clamps_in_logical_then_scales_position() {
     // 2x display, cursor at logical (990,100) inside a 1000x800 logical work area.
     // Clamp in logical, then physical position is 2x. Physical width is 800.
+    // right_limit = 1000 - 8 - 400 = 592; clamp(990, 8, 592) = 592; physical = 592*2 = 1184.
     let a = anchor_at(990.0, 100.0, 1000.0, 800.0, 2.0);
     let (x, _, w, _) = compute_popup_geometry_logical(PopupMode::Single, &a);
     assert_eq!(w, 800);
-    assert!(x <= 1184, "x={x} overflowed physical right edge after logical clamp");
+    assert_eq!(x, 1184, "physical x must be exactly 1184 after logical clamp then 2x scale");
+}
+
+#[test]
+fn degenerate_tiny_work_area_clamps_to_left_plus_margin() {
+    // Popup (400x300) bigger than the work area (100x80). right_limit = 100-8-400
+    // = -308 < left_limit(8). The .max(left_limit) collapses the range to a single
+    // point at left_limit, so x = left_margin in logical, * scale in physical.
+    let a = anchor_at(50.0, 40.0, 100.0, 80.0, 1.0);
+    let (x, y, _, _) = compute_popup_geometry_logical(PopupMode::Single, &a);
+    assert_eq!(x, MARGIN);
+    assert_eq!(y, MARGIN);
+}
+
+#[test]
+fn negative_work_area_origin_keeps_negative_physical_position() {
+    // Multi-monitor setup: secondary monitor to the LEFT of primary, work_area
+    // starts at logical (-1920, 0). Cursor at (-1000, 400). x must be negative.
+    use linguaray_lib::popup::LogicalWorkArea;
+    let a = PopupAnchor {
+        cursor_logical: (-1000.0, 400.0),
+        work_area: LogicalWorkArea { left: -1920.0, top: 0.0, right: 0.0, bottom: 1080.0 },
+        scale_factor: 1.0,
+    };
+    let (x, _, _, _) = compute_popup_geometry_logical(PopupMode::Single, &a);
+    assert!(x < 0, "x={x} should be negative for left-offset monitor");
 }
