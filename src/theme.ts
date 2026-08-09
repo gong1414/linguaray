@@ -63,24 +63,40 @@ export function initTheme(): void {
 function syncThemeColorMetas(theme: "light" | "dark"): void {
   const metas = document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]');
   const currentColor = theme === "dark" ? DARK_THEME_COLOR : LIGHT_THEME_COLOR;
-  if (metas.length === 0) {
-    const m = document.createElement("meta");
-    m.setAttribute("name", "theme-color");
-    m.setAttribute("media", "all");
-    m.setAttribute("content", currentColor);
-    m.setAttribute("data-theme-scheme", theme);
-    document.head.appendChild(m);
-    return;
-  }
+
+  // Find the meta matching the current scheme.
+  let current: HTMLMetaElement | null = null;
   for (const m of Array.from(metas)) {
-    // Match by data-theme-scheme attribute (set in index.html), not by parsing
-    // the media string — robust against media format changes / HMR reordering.
     const scheme = m.getAttribute("data-theme-scheme");
-    const isCurrent = scheme === theme;
-    if (isCurrent) {
-      m.setAttribute("media", "all");
-      m.setAttribute("content", currentColor);
+    if (scheme === theme) {
+      current = m;
+      break;
+    }
+  }
+
+  if (!current) {
+    // No meta for the current scheme exists. If there is exactly one meta and it
+    // belongs to the OTHER scheme, UPDATE it in place (change scheme + content)
+    // instead of disabling it — otherwise zero metas would be active.
+    if (metas.length === 1) {
+      current = metas[0];
+      current.setAttribute("data-theme-scheme", theme);
+      current.setAttribute("content", currentColor);
     } else {
+      // Create a new one for this scheme.
+      current = document.createElement("meta");
+      current.setAttribute("name", "theme-color");
+      current.setAttribute("data-theme-scheme", theme);
+      current.setAttribute("content", currentColor);
+      document.head.appendChild(current);
+    }
+  }
+
+  // Activate the current meta; disable all others.
+  current.setAttribute("media", "all");
+  current.setAttribute("content", currentColor);
+  for (const m of Array.from(metas)) {
+    if (m !== current) {
       m.setAttribute("media", "disabled");
     }
   }

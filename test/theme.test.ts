@@ -13,6 +13,7 @@ describe("initTheme", () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     for (const k of Object.keys(document.documentElement.dataset)) {
       delete document.documentElement.dataset[k];
     }
@@ -41,7 +42,6 @@ describe("initTheme", () => {
     } as unknown as MediaQueryList));
     initTheme();
     expect(document.documentElement.dataset.theme).toBe("dark");
-    vi.restoreAllMocks();
   });
 
   it("sets data-motion=reduced when prefers-reduced-motion matches", () => {
@@ -57,7 +57,6 @@ describe("initTheme", () => {
     } as unknown as MediaQueryList));
     initTheme();
     expect(document.documentElement.dataset.motion).toBe("reduced");
-    vi.restoreAllMocks();
   });
 
   it("sets data-motion=full when reduced-motion does not match", () => {
@@ -73,7 +72,6 @@ describe("initTheme", () => {
     } as unknown as MediaQueryList));
     initTheme();
     expect(document.documentElement.dataset.motion).toBe("full");
-    vi.restoreAllMocks();
   });
 
   it("sets lang to the detected locale", () => {
@@ -82,7 +80,7 @@ describe("initTheme", () => {
     expect(document.documentElement.lang).toBe("zh");
   });
 
-  it("activates the resolved-scheme theme-color meta with media=all and disables the other (rev-5-6)", () => {
+  it("activates the resolved-scheme theme-color meta with media=all and disables the other", () => {
     const light = document.createElement("meta");
     light.setAttribute("name", "theme-color");
     light.setAttribute("media", "(prefers-color-scheme: light)");
@@ -104,10 +102,10 @@ describe("initTheme", () => {
     expect(activeDark, "dark theme-color meta must exist").toBeTruthy();
     expect(activeDark!.getAttribute("media")).toBe("all");
     const disabled = Array.from(metas).find((m) => m.getAttribute("media") === "disabled");
-    expect(disabled, "non-current scheme meta must be disabled (media=disabled)").toBeTruthy();
+    expect(disabled, "non-current scheme meta must be disabled").toBeTruthy();
   });
 
-  it("rev-5-6: a FORCED theme wins over the OS preference (user Dark while OS Light)", () => {
+  it("a FORCED theme wins over the OS preference (user Dark while OS Light)", () => {
     vi.spyOn(window, "matchMedia").mockImplementation((q) => ({
       matches: q.includes("light"),
       media: q,
@@ -140,6 +138,16 @@ describe("initTheme", () => {
     expect(activeDark!.getAttribute("media")).toBe("all");
     const activeLight = Array.from(metas).find((m) => m.getAttribute("content") === "#F8FAFC");
     expect(activeLight!.getAttribute("media")).toBe("disabled");
-    vi.restoreAllMocks();
+  });
+
+  it("remains valid when initialized without metas then theme changes (0-meta → dark → light)", () => {
+    localStorage.setItem("linguaray.theme", "dark");
+    initTheme();
+    localStorage.setItem("linguaray.theme", "light");
+    initTheme();
+    const metas = [...document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')];
+    expect(metas.filter((m) => m.getAttribute("media") === "all")).toHaveLength(1);
+    expect(metas.find((m) => m.getAttribute("media") === "all")?.getAttribute("data-theme-scheme")).toBe("light");
+    expect(metas.find((m) => m.getAttribute("media") === "all")?.getAttribute("content")).toBe("#F8FAFC");
   });
 });
