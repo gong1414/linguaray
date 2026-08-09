@@ -1690,10 +1690,24 @@ pub struct ModelInfo {
 /// Result of a connection probe (P1 #8). `ok` + a human-readable message; the
 /// full connection-test HTTP flow is S3 scope, so the current implementation is
 /// a best-effort "reachable" check.
+///
+/// `latency_ms` is `Some(ms)` only on the reachable arm (a real Instant probe
+/// of the HTTP round-trip); it is `None` on every early-exit failure arm
+/// (empty/invalid endpoint, transport error, missing HTTP client).
 #[derive(Debug, Clone, Serialize)]
 pub struct ConnectionResult {
     pub ok: bool,
     pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub latency_ms: Option<u32>,
+}
+
+/// Measure elapsed time since `start` as whole milliseconds, using a saturating
+/// conversion so a probe that somehow exceeds `u128` → `u32` range clamps to
+/// `u32::MAX` rather than truncating via `as u32` (which silently wraps).
+/// Used by `provider_test_connection` to populate `ConnectionResult::latency_ms`.
+pub fn measure_latency_ms(start: std::time::Instant) -> u32 {
+    u32::try_from(start.elapsed().as_millis()).unwrap_or(u32::MAX)
 }
 
 /// List the models a provider can use (P1 #8).
@@ -1771,6 +1785,7 @@ async fn provider_test_connection(
         return Ok(ConnectionResult {
             ok: false,
             message: "endpoint not configured".into(),
+            latency_ms: None,
         });
     }
     // Validate the endpoint shape before sending any bytes.
@@ -1778,6 +1793,7 @@ async fn provider_test_connection(
         return Ok(ConnectionResult {
             ok: false,
             message: format!("invalid endpoint: {e}"),
+            latency_ms: None,
         });
     }
     // Best-effort reachability probe. We don't care about the response body —
@@ -1789,18 +1805,24 @@ async fn provider_test_connection(
             return Ok(ConnectionResult {
                 ok: false,
                 message: "HTTP client unavailable: startup build failed".into(),
+                latency_ms: None,
             })
         }
     };
+    // Time only the actual HTTP round-trip (the reachable arm). Early-exit
+    // failure arms above carry `latency_ms: None`.
+    let probe_start = std::time::Instant::now();
     let req = client.get(&profile.endpoint).send().await;
     match req {
         Ok(resp) => Ok(ConnectionResult {
             ok: true,
             message: format!("reachable (HTTP {})", resp.status().as_u16()),
+            latency_ms: Some(measure_latency_ms(probe_start)),
         }),
         Err(e) => Ok(ConnectionResult {
             ok: false,
             message: format!("connection failed: {e}"),
+            latency_ms: None,
         }),
     }
 }

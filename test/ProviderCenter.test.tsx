@@ -467,6 +467,43 @@ describe("ProviderCenter (Surface 05)", () => {
     await waitFor(() => expect(screen.getByText("Connected")).toBeTruthy());
   });
 
+  it("connection test: renders message · latency_ms when latency present", async () => {
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => [profile({ uuid: "u1", name: "TestProvider", secret_ref: "provider/u1" })],
+      key_status: () => ({ "provider/u1": true }),
+      provider_test_connection: () => ({ ok: true, message: "reachable", latency_ms: 42 }),
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("TestProvider")).toBeTruthy());
+    fireEvent.click(screen.getByLabelText("Edit TestProvider"));
+    await flush();
+    fireEvent.click(screen.getByText("Test"));
+    await whenCalledWith("provider_test_connection");
+    // The "· 42ms" latency suffix renders alongside the message.
+    await waitFor(() => expect(screen.getByText("· 42ms")).toBeTruthy());
+    // The connected badge still renders.
+    expect(screen.getByText("Connected")).toBeTruthy();
+  });
+
+  it("connection test: no latency suffix when latency_ms absent", async () => {
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => [profile({ uuid: "u1", name: "TestProvider", secret_ref: "provider/u1" })],
+      key_status: () => ({ "provider/u1": true }),
+      provider_test_connection: () => ({ ok: true, message: "reachable" }),
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("TestProvider")).toBeTruthy());
+    fireEvent.click(screen.getByLabelText("Edit TestProvider"));
+    await flush();
+    fireEvent.click(screen.getByText("Test"));
+    await whenCalledWith("provider_test_connection");
+    await waitFor(() => expect(screen.getByText("Connected")).toBeTruthy());
+    // No "· Nms" suffix anywhere.
+    expect(screen.queryByText(/· \d+ms/)).toBeNull();
+  });
+
   it("balance section: renders TODO note, no fetch button", async () => {
     routeInvoke({
       ...DEFAULT_ROUTES,
