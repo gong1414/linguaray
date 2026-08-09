@@ -135,6 +135,7 @@ pub struct PopupAnchor {
 
 /// The four popup sizes the UI requests. Matched 1:1 to the loading /
 /// single-success / multi-result / error UI states. Dimensions are LOGICAL.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PopupMode {
     Loading,
     Single,
@@ -167,6 +168,11 @@ pub fn compute_popup_geometry_logical(
     let (lw, lh) = mode.size_logical();
     let (lwf, lhf) = (lw as f64, lh as f64);
     let (cx, cy) = anchor.cursor_logical;
+    debug_assert!(
+        anchor.scale_factor.is_finite() && anchor.scale_factor > 0.0,
+        "scale_factor must be finite and positive, got {}",
+        anchor.scale_factor
+    );
 
     let right_limit = anchor.work_area.right - CLAMP_MARGIN - lwf;
     let left_limit = anchor.work_area.left + CLAMP_MARGIN;
