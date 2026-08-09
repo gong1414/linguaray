@@ -587,6 +587,60 @@ describe("ProviderCenter (Surface 05)", () => {
     expect(screen.queryByText("Fetch balance")).toBeNull();
   });
 
+  it("balance capability true: shows 'not yet available' placeholder and never calls provider_get_balance", async () => {
+    const invokedCmds: string[] = [];
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => [
+        profile({
+          uuid: "u1",
+          name: "BalancedProv",
+          secret_ref: "provider/u1",
+          capabilities: { balance: true, quota: false, model_list: true },
+        }),
+      ],
+      key_status: () => ({ "provider/u1": true }),
+      // If the component ever tried to fetch balance, this route would record
+      // the call. It MUST never be invoked.
+      provider_get_balance: () => {
+        invokedCmds.push("provider_get_balance");
+        return { balance: 1.23 };
+      },
+    });
+    // Also record every invoke so we can assert no balance IPC at all.
+    invokeMock.mockImplementation(async (cmd: string, args?: unknown) => {
+      invokedCmds.push(cmd);
+      const map: Record<string, (a?: unknown) => unknown> = {
+        provider_list: () => [
+          profile({
+            uuid: "u1",
+            name: "BalancedProv",
+            secret_ref: "provider/u1",
+            capabilities: { balance: true, quota: false, model_list: true },
+          }),
+        ],
+        key_status: () => ({ "provider/u1": true }),
+        provider_get_active_selection: () => ({ primary: null, parallel: [], fallback: null }),
+        provider_get_balance: () => {
+          invokedCmds.push("provider_get_balance");
+          return { balance: 1.23 };
+        },
+      };
+      const fn = map[cmd];
+      if (!fn) throw new Error(`unexpected invoke ${cmd}`);
+      return fn(args);
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("BalancedProv")).toBeTruthy());
+    fireEvent.click(screen.getByLabelText("Edit BalancedProv"));
+    await flush();
+    // The static placeholder renders (NOT a balance value).
+    expect(screen.getByText("Balance and quota are not yet available.")).toBeTruthy();
+    expect(screen.queryByText(/1\.23/)).toBeNull();
+    // Hard assertion: NO balance IPC was ever invoked.
+    expect(invokedCmds.some((c) => c === "provider_get_balance")).toBe(false);
+  });
+
   it("uses zh copy when locale zh", async () => {
     localeMock.current = "zh";
     routeInvoke({ ...DEFAULT_ROUTES });
