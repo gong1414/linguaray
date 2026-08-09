@@ -26,9 +26,22 @@ describe("SidebarItem", () => {
     expect(onClick).toHaveBeenCalledOnce();
   });
 
-  it("disabled sets native disabled attribute", () => {
+  it("disabled sets aria-disabled and stays focusable (NOT native disabled)", () => {
+    // rev-9: disabled items announce via aria-disabled but remain focusable so
+    // keyboard + SR users can discover the placeholder hint. Native disabled
+    // would drop them from the tab order.
     const { getByRole } = render(() => <SidebarItem label="Home" icon={<i />} disabled />);
-    expect((getByRole("button") as HTMLButtonElement).disabled).toBe(true);
+    const btn = getByRole("button") as HTMLButtonElement;
+    expect(btn.getAttribute("aria-disabled")).toBe("true");
+    expect(btn.hasAttribute("disabled")).toBe(false);
+    expect(btn.getAttribute("tabindex")).not.toBe("-1");
+  });
+
+  it("disabled item does NOT fire onClick", () => {
+    const onClick = vi.fn();
+    const { getByRole } = render(() => <SidebarItem label="Home" icon={<i />} disabled onClick={onClick} />);
+    fireEvent.click(getByRole("button"));
+    expect(onClick).not.toHaveBeenCalled();
   });
 
   it("active applies selected token class (accent bar styling)", () => {
