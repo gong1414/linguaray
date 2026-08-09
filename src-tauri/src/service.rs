@@ -177,7 +177,9 @@ pub struct TranslationOutcome {
 ///   [`translate_with_fallback_ref`]（带各自的 fallback 机会）。
 /// - `fallback` 是 `Option<Arc<dyn TraditionalEngine>>`，所有引擎共享同一个
 ///   （传统引擎 `translate` 是 `&self`，Arc 允许并发只读共享）。
-/// - 返回顺序不保证与输入顺序一致（并发完成顺序不定）；调用方按 `uuid` 关联。
+/// - 返回顺序严格等于输入顺序（B5）：每个 outcome 携带其输入 index，最终 vec
+///   按 index 排序产出——包括 pre-failed 条目也留在原位。`join_all` 的完成顺序
+///   不再影响输出顺序；调用方仍可按 `uuid` 关联，但不应再假设顺序无序。
 ///
 /// §G 不变量：每个引擎独立分类错误。`Config`/`Keystore` 错误绝不因另一个引擎
 /// 成功而被"覆盖"——它们作为各自 outcome 的 Err 保留，前端按 Surface 03 的
@@ -197,49 +199,59 @@ pub async fn translate_parallel(
     options: AppOptions,
     fallback: Option<Arc<dyn TraditionalEngine>>,
 ) -> Vec<TranslationOutcome> {
-    // 先把 profile→preset 的同步转换做完（不放进 async block，避免借用混乱）。
-    // 转换失败的先记成 outcome，成功的进入并发池。
-    let mut ready: Vec<(String, ProviderPreset)> = Vec::with_capacity(profiles.len());
-    let mut outcomes: Vec<TranslationOutcome> = Vec::new();
-    for p in profiles {
-        let uuid = p.uuid.clone();
+    // Collect (input_index, Option<uuid+preset>, Option<pre-failed outcome>).
+    // B5: tag each entry with its input index so the final vec can be rebuilt in
+    // STRICT input order. Pre-failed profiles (profile_to_preset rejects) must
+    // stay at their input position — NOT float before the ready outcomes, which
+    // happened in the old "push pre-failed then append ready" code path.
+    type Entry = (usize, Option<(String, ProviderPreset)>, Option<TranslationOutcome>);
+    let mut entries: Vec<Entry> = Vec::with_capacity(profiles.len());
+    for (idx, p) in profiles.into_iter().enumerate() {
         match profile_to_preset(&p) {
-            Ok(preset) => ready.push((uuid, preset)),
-            Err(reason) => outcomes.push(TranslationOutcome {
-                uuid,
-                result: Err(Error::Config(ConfigKind::Unsupported {
-                    provider: p.uuid.clone(),
-                    reason,
-                })),
-            }),
+            Ok(preset) => entries.push((idx, Some((p.uuid.clone(), preset)), None)),
+            Err(reason) => entries.push((
+                idx,
+                None,
+                Some(TranslationOutcome {
+                    uuid: p.uuid.clone(),
+                    result: Err(Error::Config(ConfigKind::Unsupported {
+                        provider: p.uuid.clone(),
+                        reason,
+                    })),
+                }),
+            )),
         }
     }
-
-    // 并发驱动所有 ready 引擎。每个 async block 按引用捕获 client/keystore/text
-    // /from/to/fallback，按值捕获自己的 (uuid, preset)。
-    let futs: Vec<_> = ready
-        .into_iter()
-        .map(|(uuid, preset)| {
-            // `.map` 的闭包是 `FnMut`，会被调用多次，不能把外层按引用捕获的
-            // `options` 直接 move 进 `async move`。每个 future 各 clone 一份。
-            // `text`/`from`/`to`/`fb_ref` 是 `&str`/`Option<&dyn>`（Copy），无此问题。
+    // Drive all ready entries concurrently, tagging each result with its index.
+    // (B5 only fixes ORDERING. B6 will change the fallback arg to None and add
+    // the session-level fallback policy. For now, pass fallback.as_deref() to
+    // preserve per-engine behavior until B6 lands.)
+    let futs: Vec<_> = entries
+        .iter()
+        .filter_map(|(idx, ready, _)| ready.as_ref().map(|(uuid, preset)| (*idx, uuid.clone(), preset)))
+        .map(|(idx, uuid, preset)| {
             let options = options.clone();
             let fb_ref: Option<&dyn TraditionalEngine> = fallback.as_deref();
             async move {
-                let input = TranslateInput {
-                    text,
-                    from,
-                    to,
-                    options,
-                };
+                let input = TranslateInput { text, from, to, options };
                 let result =
-                    translate_with_fallback_ref(client, keystore, &preset, input, fb_ref).await;
-                TranslationOutcome { uuid, result }
+                    translate_with_fallback_ref(client, keystore, preset, input, fb_ref).await;
+                (idx, TranslationOutcome { uuid, result })
             }
         })
         .collect();
-    let mut all = futures::future::join_all(futs).await;
-    outcomes.append(&mut all);
+    let mut ready_results = futures::future::join_all(futs).await;
+    // Build the final vec in strict input order: walk entries by index.
+    ready_results.sort_by_key(|(idx, _)| *idx);
+    let mut ready_iter = ready_results.into_iter();
+    let mut outcomes: Vec<TranslationOutcome> = Vec::with_capacity(entries.len());
+    for (_idx, _ready, pre_failed) in entries {
+        if let Some(o) = pre_failed {
+            outcomes.push(o);
+        } else if let Some((_idx, o)) = ready_iter.next() {
+            outcomes.push(o);
+        }
+    }
     outcomes
 }
 

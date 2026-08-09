@@ -15,6 +15,7 @@ use linguaray_lib::error::Error;
 use linguaray_lib::service::{translate_parallel, TranslationOutcome};
 use linguaray_lib::wire::AppOptions;
 use serde_json::json;
+use wiremock::matchers::any;
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 fn direct_client() -> reqwest::Client {
@@ -43,6 +44,16 @@ fn profile(uuid: &str, endpoint: &str) -> ProviderProfile {
         capabilities: ProviderCapabilities::default(),
         status: "active".into(),
     }
+}
+
+/// 构造一个 `profile_to_preset` 会拒绝的 profile（google_translate 协议→None）。
+/// 用于 B5 顺序测试：pre-failed entry 必须留在原输入位置，不能浮到 ready 之前。
+fn profile_unsupported(uuid: &str) -> ProviderProfile {
+    let mut p = profile(uuid, "https://translate.google.com");
+    p.protocol = Protocol::GoogleTranslate;
+    // 自洽性：确认 adapter 确实拒绝它。
+    assert!(profile_to_preset(&p).is_err());
+    p
 }
 
 async fn mount_ok(server: &MockServer, body: &str) {
@@ -208,4 +219,60 @@ async fn empty_profiles_yields_empty_outcomes() {
     )
     .await;
     assert!(outcomes.is_empty());
+}
+
+#[tokio::test]
+async fn outcomes_preserve_input_order_with_pre_failed_middle() {
+    let s1 = MockServer::start().await;
+    let s3 = MockServer::start().await;
+    let port1: u16 = s1.uri().rsplit(':').next().unwrap().parse().unwrap();
+    let port3: u16 = s3.uri().rsplit(':').next().unwrap().parse().unwrap();
+    mount_ok(&s1, "first").await;
+    mount_ok(&s3, "third").await;
+    let profiles = vec![
+        profile("u1", &format!("http://lvh.me:{port1}/v1/chat/completions")),
+        profile_unsupported("u2"),
+        profile("u3", &format!("http://lvh.me:{port3}/v1/chat/completions")),
+    ];
+    let client = direct_client();
+    let keystore = empty_keystore();
+    let outcomes = translate_parallel(
+        &client, &keystore, profiles, "x", "auto", "zh",
+        AppOptions::default(), None,
+    ).await;
+    let got: Vec<&str> = outcomes.iter().map(|o| o.uuid.as_str()).collect();
+    assert_eq!(got, vec!["u1", "u2", "u3"],
+        "outcomes must preserve STRICT input order including the pre-failed middle entry");
+    assert!(outcomes[1].result.is_err(), "u2 must be the pre-failed entry");
+}
+
+#[tokio::test]
+async fn ready_outcomes_preserve_input_order_under_completion_jitter() {
+    use std::time::Duration;
+    let s1 = MockServer::start().await;
+    let s2 = MockServer::start().await;
+    let s3 = MockServer::start().await;
+    let port1: u16 = s1.uri().rsplit(':').next().unwrap().parse().unwrap();
+    let port2: u16 = s2.uri().rsplit(':').next().unwrap().parse().unwrap();
+    let port3: u16 = s3.uri().rsplit(':').next().unwrap().parse().unwrap();
+    Mock::given(any()).respond_with(ResponseTemplate::new(200).set_body_json(json!({
+        "choices": [{"message": {"content": "slow"}}]
+    })).set_delay(Duration::from_millis(150))).mount(&s1).await;
+    mount_ok(&s2, "fast").await;
+    Mock::given(any()).respond_with(ResponseTemplate::new(200).set_body_json(json!({
+        "choices": [{"message": {"content": "medium"}}]
+    })).set_delay(Duration::from_millis(50))).mount(&s3).await;
+    let profiles = vec![
+        profile("u1", &format!("http://lvh.me:{port1}/v1/chat/completions")),
+        profile("u2", &format!("http://lvh.me:{port2}/v1/chat/completions")),
+        profile("u3", &format!("http://lvh.me:{port3}/v1/chat/completions")),
+    ];
+    let client = direct_client();
+    let keystore = empty_keystore();
+    let outcomes = translate_parallel(
+        &client, &keystore, profiles, "x", "auto", "zh",
+        AppOptions::default(), None,
+    ).await;
+    let got: Vec<&str> = outcomes.iter().map(|o| o.uuid.as_str()).collect();
+    assert_eq!(got, vec!["u1", "u2", "u3"]);
 }
