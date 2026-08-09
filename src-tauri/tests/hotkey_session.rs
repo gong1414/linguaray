@@ -93,3 +93,54 @@ fn on_hotkey_does_not_call_translate_with_fallback() {
         on_hotkey_body,
     );
 }
+
+#[test]
+fn on_hotkey_does_not_hold_selection_lock_and_helper_reads_cursor_under_lock() {
+    let src = include_str!("../src/lib.rs");
+
+    // (a) on_hotkey must NOT acquire selection_lock — the lock + cursor read +
+    //     capture_selection all live inside capture_and_translate now, under ONE
+    //     guard, so two rapid presses cannot interleave clipboard save/restore.
+    let on_start = src.find("fn on_hotkey").expect("on_hotkey fn not found");
+    let on_body = &src[on_start..];
+    let on_end = on_body[1..]
+        .find("\nfn ")
+        .or_else(|| on_body[1..].find("\nasync fn "))
+        .or_else(|| on_body[1..].find("\npub fn "))
+        .or_else(|| on_body[1..].find("\npub async fn "))
+        .map(|i| i + 1)
+        .unwrap_or(on_body.len());
+    let on_hotkey_body = &on_body[..on_end];
+    assert!(
+        !on_hotkey_body.contains("selection_lock"),
+        "on_hotkey must NOT acquire selection_lock itself; the lock moved into capture_and_translate so cursor+capture are atomic.\n--- on_hotkey body ---\n{}",
+        on_hotkey_body,
+    );
+
+    // (b) capture_and_translate must read cursor::position() INSIDE its
+    //     selection_lock block. Find the fn, then within it find the locked
+    //     region (from `selection_lock()` to the matching drop at the `};` that
+    //     closes the `let captured` block) and assert `cursor::position()` is
+    //     textually within that region.
+    let cap_start = src.find("async fn capture_and_translate").expect("capture_and_translate fn not found");
+    let cap_body = &src[cap_start..];
+    let cap_end = cap_body[1..]
+        .find("\nfn ")
+        .or_else(|| cap_body[1..].find("\nasync fn "))
+        .map(|i| i + 1)
+        .unwrap_or(cap_body.len());
+    let helper_body = &cap_body[..cap_end];
+    assert!(
+        helper_body.contains("selection_lock"),
+        "capture_and_translate must acquire selection_lock",
+    );
+    // The locked block runs cursor::position() and capture_selection under one guard.
+    // Assert the cursor read appears AFTER the selection_lock() call within the helper.
+    let lock_idx = helper_body.find("selection_lock").expect("selection_lock in helper");
+    let after_lock = &helper_body[lock_idx..];
+    assert!(
+        after_lock.contains("cursor::position()"),
+        "cursor::position() must be read INSIDE the selection_lock block in capture_and_translate, not before it.\n--- helper body after lock ---\n{}",
+        after_lock,
+    );
+}
