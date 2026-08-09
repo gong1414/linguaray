@@ -142,7 +142,14 @@ const App: Component = () => {
   const [theme, setTheme] = createSignal<Theme>(initialTheme);
   const [motion, setMotion] = createSignal<Motion>("full");
   const [nav, setNav] = createSignal<NavKey>(initialNav);
-  const [selState, setSelState] = createSignal<SelectionState>("success-single");
+  // C1: seed selState from ?state= so the surfaces visual spec can deep-link
+  // each popup state (loading/success-single/success-multi/partial/error-network).
+  // Previously hardcoded to "success-single", which made 4 of 5 popup baselines
+  // duplicates of the single-success shot. Mirrors the initialNav param-read.
+  const initialSel = SELECTION_STATES.includes(params.get("state") as SelectionState)
+    ? (params.get("state") as SelectionState)
+    : "success-single";
+  const [selState, setSelState] = createSignal<SelectionState>(initialSel);
   const [provState, setProvState] = createSignal<ProviderState>(
     // rev-6-8: ProviderState has NO "configured" value. The populated variant
     // seeds "key-saved" (a real ProviderState); the empty variant seeds "empty".
