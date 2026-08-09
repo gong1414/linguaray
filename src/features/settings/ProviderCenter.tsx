@@ -893,6 +893,14 @@ const ProviderCenter: Component = () => {
                           ? t.connectionOk
                           : t.connectionFailed}
                       </StatusBadge>
+                      <span class="pc__conn-message">
+                        {(conn() as ConnectionResult).message}
+                        <Show when={typeof (conn() as ConnectionResult).latency_ms === "number"}>
+                          <span class="pc__conn-latency">
+                            {" · "}{(conn() as ConnectionResult).latency_ms}ms
+                          </span>
+                        </Show>
+                      </span>
                     </Show>
                   </div>
 

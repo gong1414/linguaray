@@ -98,6 +98,10 @@ export type ModelInfo = {
 export type ConnectionResult = {
   ok: boolean;
   message: string;
+  /** Round-trip latency of a reachable probe (C3c). `null`/absent on failure
+   *  arms (no probe ran). `Option<u32>` on the Rust side; serialized only when
+   *  `Some` via `#[serde(skip_serializing_if = "Option::is_none")]`. */
+  latency_ms?: number | null;
 };
 
 // --- set_active result + error -----------------------------------------
