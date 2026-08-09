@@ -1990,9 +1990,14 @@ impl EngineInfo {
 /// - `supplied_text = Some(t)` (Retry): skip capture, use the saved SOURCE text.
 /// - `supplied_text = None` (hotkey/tray): run the selection_lock +
 ///   capture_selection block on_hotkey used.
-/// - `x`, `y`: the PHYSICAL cursor coords (from cursor::position() at the call
-///   site). The helper resolves the cursor's monitor via `monitor_from_point` and
-///   converts to logical via THAT monitor's scale_factor (rev-7-1).
+/// - `x`, `y`: `Option<f64>` — `Some` = caller-supplied PHYSICAL cursor coords
+///   (Retry, tray: the caller captured coordinates itself); `None` = the helper
+///   reads `cursor::position()` itself, INSIDE the single `selection_lock()`
+///   guard that ALSO runs `capture_selection`, so the cursor read and the
+///   clipboard-touching capture are atomic — a second rapid press cannot
+///   interleave clipboard save/restore between them (P1-1). The helper resolves
+///   the cursor's monitor via `monitor_from_point` and converts to logical via
+///   THAT monitor's scale_factor (rev-7-1).
 /// - `gen`: the generation token. Checked at every await boundary so a stale
 ///   run never overwrites a fresher popup (P1-1).
 ///
@@ -2003,14 +2008,16 @@ async fn capture_and_translate(
     state: &Arc<Session>,
     app_state: &Arc<AppState>,
     supplied_text: Option<String>,
-    x: f64,
-    y: f64,
+    x: Option<f64>,
+    y: Option<f64>,
     gen: u64,
 ) {
     // 1. Acquire text (capture or supplied).
     let (text, anchor) = match supplied_text {
         Some(t) if !t.is_empty() => {
-            let anchor = match build_popup_anchor(app, x, y) {
+            let cx = x.unwrap_or(0.0);
+            let cy = y.unwrap_or(0.0);
+            let anchor = match build_popup_anchor(app, cx, cy) {
                 Some(a) => a,
                 None => return,
             };
@@ -2019,8 +2026,19 @@ async fn capture_and_translate(
         _ => {
             // The SAME selection_lock + capture_selection(800, owner) block
             // on_hotkey uses.
-            let captured: Result<String, ()> = {
+            let captured: Result<(String, f64, f64), ()> = {
                 let _g = state.gen.selection_lock();
+                // Read the cursor under the SAME guard as capture_selection so two
+                // rapid presses cannot interleave clipboard save/restore between the
+                // cursor read and the capture (the capture touches the clipboard).
+                let (cx, cy) = match (x, y) {
+                    (Some(cx), Some(cy)) => (cx, cy),
+                    // hotkey/tray path: no pre-captured coords; read live now.
+                    _ => {
+                        let pos = cursor::position();
+                        (pos.0 as f64, pos.1 as f64)
+                    }
+                };
                 #[cfg(target_os = "windows")]
                 let owner = match app
                     .get_webview_window("main")
@@ -2036,9 +2054,9 @@ async fn capture_and_translate(
                 #[cfg(not(target_os = "windows"))]
                 let owner = ();
                 match selection::capture_selection(800, owner) {
-                    Ok(selection_engine::Capture::Selected(t)) => Ok(t),
+                    Ok(selection_engine::Capture::Selected(t)) => Ok((t, cx, cy)),
                     Ok(selection_engine::Capture::NoSelection) => {
-                        let anchor = match build_popup_anchor(app, x, y) {
+                        let anchor = match build_popup_anchor(app, cx, cy) {
                             Some(a) => a,
                             None => return,
                         };
@@ -2056,7 +2074,7 @@ async fn capture_and_translate(
                         Err(())
                     }
                     Err(e) => {
-                        let anchor = match build_popup_anchor(app, x, y) {
+                        let anchor = match build_popup_anchor(app, cx, cy) {
                             Some(a) => a,
                             None => return,
                         };
@@ -2071,11 +2089,11 @@ async fn capture_and_translate(
             if !state.gen.is_latest(gen) {
                 return;
             }
-            let text = match captured {
-                Ok(t) => t,
+            let (text, cx, cy) = match captured {
+                Ok(v) => v,
                 Err(_) => return,
             };
-            let anchor = match build_popup_anchor(app, x, y) {
+            let anchor = match build_popup_anchor(app, cx, cy) {
                 Some(a) => a,
                 None => return,
             };
@@ -2255,17 +2273,11 @@ fn on_hotkey(app: &tauri::AppHandle, _shortcut: &tauri_plugin_global_shortcut::S
         let state = app2.state::<Arc<Session>>().inner().clone();
         let app_state = app2.state::<Arc<AppState>>().inner().clone();
 
-        // (2) Capture cursor position under the selection lock BEFORE the popup
-        // steals focus. The capture_selection itself happens inside
-        // capture_and_translate so hotkey/tray share it; but the cursor read
-        // must precede any popup show.
-        let (x, y) = {
-            let _g = state.gen.selection_lock();
-            let pos = cursor::position();
-            (pos.0 as f64, pos.1 as f64)
-        };
-
-        capture_and_translate(&app2, &state, &app_state, None, x, y, gen).await;
+        // The cursor read + capture_selection happen together under ONE lock
+        // inside capture_and_translate (so two rapid presses cannot interleave
+        // clipboard save/restore between them). on_hotkey no longer takes the
+        // lock itself.
+        capture_and_translate(&app2, &state, &app_state, None, None, None, gen).await;
     });
 }
 
