@@ -179,4 +179,67 @@ describe("InputPanel (Surface 02)", () => {
     expect(await findByText("config-401")).toBeTruthy();
     cleanup();
   });
+
+  // ── B2: autosave / restore / clear-purge / focus ──────────────────────────
+
+  it("restores a saved draft on mount", () => {
+    localStorage.setItem("linguaray.input-draft", "saved draft");
+    routeInputInvoke({
+      provider_list: () => [],
+      translate_session: () => ({ outcomes: [] }),
+    });
+    render(() => <InputPanel />);
+    const textarea = document.querySelector("textarea") as HTMLTextAreaElement;
+    expect(textarea.value).toBe("saved draft");
+    localStorage.removeItem("linguaray.input-draft");
+    cleanup();
+  });
+
+  it("persists the draft after 300ms debounce", () => {
+    vi.useFakeTimers();
+    routeInputInvoke({
+      provider_list: () => [],
+      translate_session: () => ({ outcomes: [] }),
+    });
+    render(() => <InputPanel />);
+    const textarea = document.querySelector("textarea")!;
+    fireEvent.input(textarea, { target: { value: "typing" } });
+    expect(localStorage.getItem("linguaray.input-draft")).toBeNull();
+    vi.advanceTimersByTime(350);
+    expect(localStorage.getItem("linguaray.input-draft")).toBe("typing");
+    localStorage.removeItem("linguaray.input-draft");
+    vi.useRealTimers();
+    cleanup();
+  });
+
+  it("Clear purges the persisted draft", async () => {
+    routeInputInvoke({
+      provider_list: () => [],
+      translate_session: () => ({
+        outcomes: [{ uuid: "u1", ok: true, text: "你好", engine: "openai" }],
+        actual_engine: "openai",
+      }),
+    });
+    localStorage.setItem("linguaray.input-draft", "leftover");
+    const { getByRole, findByText } = render(() => <InputPanel />);
+    const textarea = document.querySelector("textarea")!;
+    fireEvent.input(textarea, { target: { value: "hello" } });
+    fireEvent.keyDown(textarea, { key: "Enter" });
+    // Wait for the translation to resolve (hasResult=true → Clear enabled).
+    await findByText("你好");
+    fireEvent.click(getByRole("button", { name: /清空|Clear/ }));
+    expect(localStorage.getItem("linguaray.input-draft")).toBeNull();
+    cleanup();
+  });
+
+  it("focuses the textarea on mount", () => {
+    routeInputInvoke({
+      provider_list: () => [],
+      translate_session: () => ({ outcomes: [] }),
+    });
+    render(() => <InputPanel />);
+    const textarea = document.querySelector("textarea")!;
+    expect(document.activeElement).toBe(textarea);
+    cleanup();
+  });
 });

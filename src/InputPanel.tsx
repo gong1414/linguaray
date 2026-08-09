@@ -1,4 +1,4 @@
-import { createSignal, createMemo, Show, For, type Component, type JSX } from "solid-js";
+import { createSignal, createMemo, createEffect, Show, For, onMount, onCleanup, type Component, type JSX } from "solid-js";
 import { invoke } from "@tauri-apps/api/core";
 import { AlertTriangle } from "lucide-solid";
 import { Button, InlineError, ResultCard, type ResultOutcome } from "@linguaray/ui";
@@ -17,6 +17,8 @@ export type InputPanelViewProps = {
   idle: boolean;
   hasResult?: boolean;
   engineLabel?: (raw: string) => string;
+  /** B2: ref forwarded to the textarea so the controller can focus it. */
+  textareaRef?: (el: HTMLTextAreaElement) => void;
   onText: (v: string) => void;
   onTranslate: () => void;
   onClear: () => void;
@@ -58,9 +60,10 @@ export function InputPanelView(props: InputPanelViewProps): JSX.Element {
   };
 
   return (
-    <main class="container" style={{ padding: "var(--space-3, 12px)" }}>
+    <main class="container" style={{ padding: "var(--space-lg)" }}>
       <h2 class="input-title">{t("input.title")}</h2>
       <textarea
+        ref={props.textareaRef}
         rows={4}
         placeholder={t("input.placeholder")}
         value={props.text}
@@ -125,12 +128,43 @@ export function InputPanelView(props: InputPanelViewProps): JSX.Element {
   );
 }
 
+const DRAFT_KEY = "linguaray.input-draft";
+const DEBOUNCE_MS = 300;
+
 const InputPanel: Component = () => {
   detectLocale();
   const [text, setText] = createSignal("");
   const [state, setState] = createSignal<TranslationState>({ kind: "loading" });
   const [idle, setIdle] = createSignal(true);
   const [hasResult, setHasResult] = createSignal(false);
+
+  let textareaRef: HTMLTextAreaElement | undefined;
+  let debounceTimer: ReturnType<typeof setTimeout> | undefined;
+
+  onMount(() => {
+    // B2: restore the saved draft + focus the textarea (cursor at end).
+    const saved = localStorage.getItem(DRAFT_KEY);
+    if (saved) setText(saved);
+    if (textareaRef) {
+      textareaRef.focus();
+      const end = saved?.length ?? 0;
+      textareaRef.setSelectionRange(end, end);
+    }
+  });
+
+  createEffect(() => {
+    // B2: debounced autosave on text change.
+    const value = text();
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      if (value) localStorage.setItem(DRAFT_KEY, value);
+      else localStorage.removeItem(DRAFT_KEY);
+    }, DEBOUNCE_MS);
+  });
+
+  onCleanup(() => {
+    if (debounceTimer) clearTimeout(debounceTimer);
+  });
 
   async function translate() {
     const value = text().trim();
@@ -158,6 +192,9 @@ const InputPanel: Component = () => {
     setText("");
     setState({ kind: "loading" });
     setHasResult(false);
+    // B2: purge the persisted draft immediately (not debounced).
+    if (debounceTimer) clearTimeout(debounceTimer);
+    localStorage.removeItem(DRAFT_KEY);
   };
 
   return (
@@ -167,6 +204,7 @@ const InputPanel: Component = () => {
       idle={idle()}
       hasResult={hasResult()}
       engineLabel={engineLabel}
+      textareaRef={(el) => (textareaRef = el)}
       onText={setText}
       onTranslate={translate}
       onClear={clear}
