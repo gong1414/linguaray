@@ -33,6 +33,7 @@ import {
   Star,
   Layers,
   CornerDownLeft,
+  Copy,
 } from "lucide-solid";
 import {
   ProviderRow,
@@ -59,6 +60,7 @@ import {
   loadProviders,
   providerCreate,
   providerUpdate,
+  providerDuplicate,
   providerDelete,
   providerReorder,
   providerToggle,
@@ -368,6 +370,18 @@ const ProviderCenter: Component = () => {
     }
   };
 
+  /** Duplicate a provider: new UUID, new secret_ref, keyless. Re-fetches the
+   *  list so the clone appears. */
+  const handleDuplicate = async (uuid: string) => {
+    try {
+      await providerDuplicate(uuid);
+      await refresh();
+      pushToast("success", t.profileSaved);
+    } catch (e) {
+      pushToast("destructive", t.saveFailed);
+    }
+  };
+
   /** Save profile: validate endpoint locally (reactive epError already shown),
    *  then IPC. Aborts on invalid endpoint. */
   const handleSaveProfile = async (uuid: string) => {
@@ -617,6 +631,16 @@ const ProviderCenter: Component = () => {
                               <CornerDownLeft size={14} />
                             </button>
                           </Show>
+                          {/* Duplicate */}
+                          <button
+                            type="button"
+                            class="pc__icon-btn"
+                            aria-label={t.duplicate}
+                            title={t.duplicate}
+                            onClick={() => void handleDuplicate(p.uuid)}
+                          >
+                            <Copy size={14} />
+                          </button>
                           {/* Reorder */}
                           <button
                             type="button"

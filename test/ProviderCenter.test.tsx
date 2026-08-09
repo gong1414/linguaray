@@ -540,6 +540,26 @@ describe("ProviderCenter (Surface 05)", () => {
     expect(invokeMock.mock.calls.some((c) => c[0] === "provider_set_active")).toBe(false);
   });
 
+  it("duplicate: clicking Duplicate calls provider_duplicate", async () => {
+    const dupCalls: unknown[] = [];
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => TWO_PROFILES,
+      key_status: () => ({ "provider/u1": true, "provider/u2": true }),
+      provider_duplicate: (args) => {
+        dupCalls.push(args);
+        return profile({ uuid: "u3", name: "MyOpenAI (copy)" });
+      },
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("MyOpenAI")).toBeTruthy());
+
+    fireEvent.click(screen.getAllByLabelText("Duplicate")[0]);
+    await whenCalledWith("provider_duplicate");
+    expect(dupCalls.length).toBeGreaterThanOrEqual(1);
+    expect(dupCalls[0]).toMatchObject({ uuid: "u1" });
+  });
+
   it("preset grid contains only the 4 supported AI presets (no Google/DeepL)", async () => {
     routeInvoke({ ...DEFAULT_ROUTES });
     const { findByText } = render(() => <ProviderCenter />);
