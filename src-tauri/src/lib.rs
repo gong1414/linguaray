@@ -33,8 +33,7 @@ pub mod uuid_util;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use tauri::menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem};
-use tauri::tray::{MouseButton, TrayIconBuilder, TrayIconEvent};
+use tauri::menu::MenuEvent;
 use tauri::Emitter;
 use tauri::Manager;
 use tauri_plugin_global_shortcut::{Builder as GlobalShortcutBuilder, GlobalShortcutExt, ShortcutState};
@@ -656,6 +655,62 @@ async fn translate_session(
     run_translate_session(&db, &client, keystore, &app, &req.text, &req.from, &req.to).await
 }
 
+/// A4 (P1-5): translate the live OS selection (fresh capture) OR a
+/// caller-supplied SOURCE text (Retry). Distinct from `translate_clipboard`
+/// which reads the clipboard — this NEVER reads the clipboard. The tray
+/// `translate-selection` action and the popup Retry both route here.
+///
+/// `text = Some(t)` (Retry): skip capture, use the saved SOURCE text.
+/// `text = None` (tray): capture the selection fresh under the selection lock.
+///
+/// Returns `Result<(), ()>` because the popup state is emitted via events —
+/// there is no useful payload to return to the caller. Allocation of the
+/// generation token + the capture+translate pipeline run on the async runtime
+/// so the IPC call does not block on capture_selection (which simulates Cmd+C).
+#[tauri::command]
+async fn translate_selection_ipc(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, Arc<Session>>,
+    app_state: tauri::State<'_, Arc<AppState>>,
+    text: Option<String>,
+) -> Result<(), ()> {
+    let state = state.inner().clone();
+    let app_state = app_state.inner().clone();
+    let gen = state.gen.next();
+    tauri::async_runtime::spawn(async move {
+        // The cursor read + capture_selection happen together under ONE lock
+        // inside capture_and_translate (None coords → helper reads cursor under
+        // the lock). For the Retry path (supplied text), the popup is re-shown
+        // at the current cursor, so None coords are correct there too.
+        capture_and_translate(&app, &state, &app_state, text, None, None, gen).await;
+    });
+    Ok(())
+}
+
+/// A4 (P1-5): show the main (settings) window and emit a `navigate` event so
+/// the App mount sets the shell's active page. The popup/input CTAs and the
+/// tray `settings` action both route here so the main window surfaces + jumps
+/// to the right section in one call. `section = None` defaults to the provider
+/// center.
+#[tauri::command]
+async fn open_settings_window(
+    app: tauri::AppHandle,
+    section: Option<String>,
+) -> Result<(), String> {
+    let page = section.unwrap_or_else(|| "provider-center".to_string());
+    let app2 = app.clone();
+    tauri::async_runtime::spawn(async move {
+        if let Some(w) = app2.get_webview_window("main") {
+            let _ = w.show();
+            let _ = w.set_focus();
+            let _ = w.emit("navigate", page);
+        }
+    })
+    .await
+    .map_err(|e| format!("join error: {e}"))?;
+    Ok(())
+}
+
 #[tauri::command]
 fn list_engines() -> Vec<EngineInfo> {
     let mut out: Vec<EngineInfo> = providers::presets()
@@ -1110,23 +1165,27 @@ async fn provider_list(
 #[tauri::command]
 async fn provider_create(
     state: tauri::State<'_, Arc<AppState>>,
+    app_handle: tauri::AppHandle,
     template_id: String,
     name: String,
     endpoint: String,
     model: Option<String>,
 ) -> Result<ProviderProfile, String> {
-    let app = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || {
+    let app_state = state.inner().clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
         // Acquire the gate FIRST (see provider_list).
-        let _gate = app.data_gate.read();
-        let db = require_ready_gated(&app, &_gate)?;
+        let _gate = app_state.data_gate.read();
+        let db = require_ready_gated(&app_state, &_gate)?;
         db.with_conn(|conn| {
             db_providers::create(conn, &template_id, &name, &endpoint, model.as_deref())
         })
         .map_err(|e| e.to_string())
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())??;
+    // rev-8-8: refresh the tray AFTER the write commits. Best-effort.
+    refresh_tray_if_available(&app_handle);
+    Ok(result)
 }
 
 /// Apply a partial patch to a provider. An endpoint change is validated and may
@@ -1134,18 +1193,21 @@ async fn provider_create(
 #[tauri::command]
 async fn provider_update(
     state: tauri::State<'_, Arc<AppState>>,
+    app_handle: tauri::AppHandle,
     uuid: String,
     patch: ProviderPatch,
 ) -> Result<ProviderProfile, String> {
-    let app = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || {
+    let app_state = state.inner().clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
         // Acquire the gate FIRST (see provider_list).
-        let _gate = app.data_gate.read();
-        let db = require_ready_gated(&app, &_gate)?;
+        let _gate = app_state.data_gate.read();
+        let db = require_ready_gated(&app_state, &_gate)?;
         db.with_conn(|conn| db_providers::update(conn, &uuid, &patch)).map_err(|e| e.to_string())
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())??;
+    refresh_tray_if_available(&app_handle);
+    Ok(result)
 }
 
 /// Duplicate a provider. New UUID, new `secret_ref`, keyless (the original key
@@ -1153,17 +1215,20 @@ async fn provider_update(
 #[tauri::command]
 async fn provider_duplicate(
     state: tauri::State<'_, Arc<AppState>>,
+    app_handle: tauri::AppHandle,
     uuid: String,
 ) -> Result<ProviderProfile, String> {
-    let app = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || {
+    let app_state = state.inner().clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
         // Acquire the gate FIRST (see provider_list).
-        let _gate = app.data_gate.read();
-        let db = require_ready_gated(&app, &_gate)?;
+        let _gate = app_state.data_gate.read();
+        let db = require_ready_gated(&app_state, &_gate)?;
         db.with_conn(|conn| db_providers::duplicate(conn, &uuid)).map_err(|e| e.to_string())
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())??;
+    refresh_tray_if_available(&app_handle);
+    Ok(result)
 }
 
 /// Begin the 3-step delete (mark `deleting`, evict from slots), purge the key
@@ -1174,18 +1239,19 @@ async fn provider_duplicate(
 #[tauri::command]
 async fn provider_delete(
     state: tauri::State<'_, Arc<AppState>>,
+    app_handle: tauri::AppHandle,
     uuid: String,
 ) -> Result<(), String> {
-    let app = state.inner().clone();
-    let keystore_dir = app.keystore_dir.clone();
+    let app_state = state.inner().clone();
+    let keystore_dir = app_state.keystore_dir.clone();
     tauri::async_runtime::spawn_blocking(move || -> Result<(), String> {
         // Write guard: a delete mutates selection slots + status; no reader/other
         // writer may interleave. Held for all 3 steps (the DB Mutex + keystore
         // flock are still released between steps inside their own calls).
         // Acquire the gate FIRST (see provider_list) so the readiness check +
         // Arc clone are atomic w.r.t. the DB swap.
-        let _gate = app.data_gate.write();
-        let db = require_ready_gated_write(&app, &_gate)?;
+        let _gate = app_state.data_gate.write();
+        let db = require_ready_gated_write(&app_state, &_gate)?;
 
         // Step 1: begin_delete under the DB Mutex → returns the secret_ref. The
         // DB guard (with_conn closure) is released before the keystore step.
@@ -1205,7 +1271,9 @@ async fn provider_delete(
         Ok(())
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())??;
+    refresh_tray_if_available(&app_handle);
+    Ok(())
 }
 
 /// Re-assign `sort_order` to the given UUID order. The list MUST be exactly the
@@ -1213,17 +1281,20 @@ async fn provider_delete(
 #[tauri::command]
 async fn provider_reorder(
     state: tauri::State<'_, Arc<AppState>>,
+    app_handle: tauri::AppHandle,
     uuids: Vec<String>,
 ) -> Result<(), String> {
-    let app = state.inner().clone();
+    let app_state = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         // Acquire the gate FIRST (see provider_list).
-        let _gate = app.data_gate.write();
-        let db = require_ready_gated_write(&app, &_gate)?;
+        let _gate = app_state.data_gate.write();
+        let db = require_ready_gated_write(&app_state, &_gate)?;
         db.with_conn(|conn| db_providers::reorder(conn, &uuids)).map_err(|e| e.to_string())
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())??;
+    refresh_tray_if_available(&app_handle);
+    Ok(())
 }
 
 /// Flip `enabled`. Disabling also evicts the row from selection slots and
@@ -1231,19 +1302,21 @@ async fn provider_reorder(
 #[tauri::command]
 async fn provider_toggle(
     state: tauri::State<'_, Arc<AppState>>,
+    app_handle: tauri::AppHandle,
     uuid: String,
     enabled: bool,
 ) -> Result<(), String> {
-    let app = state.inner().clone();
+    let app_state = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         // Acquire the gate FIRST (see provider_list).
-        let _gate = app.data_gate.write();
-        let db = require_ready_gated_write(&app, &_gate)?;
+        let _gate = app_state.data_gate.write();
+        let db = require_ready_gated_write(&app_state, &_gate)?;
         db.with_conn(|conn| db_providers::toggle(conn, &uuid, enabled)).map_err(|e| e.to_string())
     })
     .await
-    .map_err(|e| e.to_string())?
-    .map(|_| ())
+    .map_err(|e| e.to_string())??;
+    refresh_tray_if_available(&app_handle);
+    Ok(())
 }
 
 /// Set/clear a provider's API key in the keystore. The provider row's
@@ -1306,15 +1379,16 @@ async fn provider_set_key(
 #[tauri::command]
 async fn provider_set_active(
     state: tauri::State<'_, Arc<AppState>>,
+    app_handle: tauri::AppHandle,
     primary: String,
     parallel: Vec<String>,
     fallback: Option<String>,
 ) -> Result<SetActiveResult, String> {
-    let app = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || -> Result<SetActiveResult, String> {
+    let app_state = state.inner().clone();
+    let outcome = tauri::async_runtime::spawn_blocking(move || -> Result<SetActiveResult, String> {
         // Acquire the gate FIRST (see provider_list).
-        let _gate = app.data_gate.write();
-        let db = require_ready_gated_write(&app, &_gate)?;
+        let _gate = app_state.data_gate.write();
+        let db = require_ready_gated_write(&app_state, &_gate)?;
         // The `with_conn` closure must return Result<_, DbError> (Database's
         // contract). We carry the consent-required signal out via a SetActiveOutcome
         // so the outer closure can map it to the frontend-facing SetActiveResult
@@ -1378,7 +1452,97 @@ async fn provider_set_active(
         })
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())??;
+    // rev-7-8: refresh so the status item + submenu reflect the new primary.
+    refresh_tray_if_available(&app_handle);
+    Ok(outcome)
+}
+/// popup/popup CTAs (Surface 02/03) so they can show a friendly engine label.
+/// Returns the default (all-empty) selection if the DB is not ready yet.
+#[tauri::command]
+fn provider_get_active_selection(
+    app_state: tauri::State<'_, Arc<AppState>>,
+) -> Result<ActiveSelection, String> {
+    let app = app_state.inner().clone();
+    let _gate = app.data_gate.read();
+    let db = require_ready_gated(&app, &_gate)?;
+    db.with_conn(|conn| db_providers::read_active_selection(conn))
+        .map_err(|e| e.to_string())
+}
+
+/// A4 + rev-5-4: the sync core of `provider_set_active`, callable from the
+/// tray (which cannot resolve `tauri::State`). Sets `uuid` as the sole primary,
+/// no parallel, no fallback. This is the BODY the tray handler runs inside a
+/// `spawn_blocking` — do NOT wrap it in another `block_on(spawn_blocking(...))`.
+/// Uses the real write helper `set_active_slots`; because `parallel` is empty,
+/// the consent gate is never entered and the NeedsConsent branch is unreachable
+/// (kept in the match for exhaustiveness; if it ever fires it maps through).
+fn set_active_primary_core(
+    app_state: Arc<AppState>,
+    uuid: String,
+) -> Result<SetActiveResult, String> {
+    let app = app_state.clone();
+    let outcome = db_set_active_primary(&app, &uuid)?;
+    Ok(match outcome {
+        SetActiveOutcome::Written => SetActiveResult::Written,
+        SetActiveOutcome::NeedsConsent { actual_scope } => {
+            SetActiveResult::NeedsConsent { actual_scope }
+        }
+    })
+}
+
+/// rev-5-4: the gate + transaction that `set_active_primary_core` and the tray
+/// share. Acquires the write gate, runs `validate_active_selection` + the
+/// `set_active_slots` write inside ONE transaction. Returns the internal
+/// `SetActiveOutcome` so the caller can map it to the serialized result.
+fn db_set_active_primary(
+    app: &Arc<AppState>,
+    uuid: &str,
+) -> Result<SetActiveOutcome, String> {
+    let _gate = app.data_gate.write();
+    let db = require_ready_gated_write(app, &_gate)?;
+    let outcome = db
+        .with_conn(|conn| -> Result<SetActiveOutcome, DbErr> {
+            let tx = conn.transaction()?;
+            let active = db_providers::list(&tx)?;
+            db_providers::validate_active_selection(uuid, &[], None, &active)?;
+            // parallel is empty → set_active_slots (clears prior consent).
+            set_active_slots(&tx, uuid, &[], None)?;
+            tx.commit()?;
+            Ok(SetActiveOutcome::Written)
+        })
+        .map_err(|e| e.to_string())?;
+    Ok(outcome)
+}
+
+/// A4 minimal `handle_switch_provider` (A5 Step 10 will enhance this with the
+/// tray-state controller wiring — begin_switch/finish_switch + the red-dot on
+/// failure). This A4 version: set the provider as sole primary (SYNC, inside
+/// the caller's `spawn_blocking`), refresh the tray, and on failure set a
+/// `"Switch failed: <msg>"` tooltip AFTER the refresh (rev-19-5) so the
+/// refresh's own tooltip is not clobbered. Returns Ok/Err so the caller can
+/// decide logging.
+fn handle_switch_provider(
+    app: &tauri::AppHandle,
+    app_state: &Arc<AppState>,
+    uuid: &str,
+) -> Result<(), String> {
+    match set_active_primary_core(app_state.clone(), uuid.to_string()) {
+        Ok(_) => {
+            // Success: refresh so the status item + submenu reflect the new primary.
+            refresh_tray_if_available(app);
+            Ok(())
+        }
+        Err(msg) => {
+            // rev-19-5: refresh FIRST (restores the pre-switch tooltip), THEN
+            // override with the failure tooltip (rev-21-2: prefixed).
+            refresh_tray_if_available(app);
+            if let Some(tray) = app.tray_by_id("main-tray") {
+                let _ = tray.set_tooltip(Some(&format!("Switch failed: {msg}")));
+            }
+            Err(msg)
+        }
+    }
 }
 
 /// Confirm the user's explicit consent for a parallel selection and write it
@@ -1395,16 +1559,17 @@ async fn provider_set_active(
 #[tauri::command]
 async fn provider_confirm_and_set_active(
     state: tauri::State<'_, Arc<AppState>>,
+    app_handle: tauri::AppHandle,
     primary: String,
     parallel: Vec<String>,
     fallback: Option<String>,
     expected_scope: String,
 ) -> Result<i64, ProviderCommandError> {
-    let app = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || -> Result<i64, ProviderCommandError> {
+    let app_state = state.inner().clone();
+    let version = tauri::async_runtime::spawn_blocking(move || -> Result<i64, ProviderCommandError> {
         // Acquire the gate FIRST (see provider_list).
-        let _gate = app.data_gate.write();
-        let db = require_ready_gated_write(&app, &_gate).map_err(ProviderCommandError::from)?;
+        let _gate = app_state.data_gate.write();
+        let db = require_ready_gated_write(&app_state, &_gate).map_err(ProviderCommandError::from)?;
         let outcome = db.with_conn(|conn| -> Result<ConfirmActiveOutcome, DbErr> {
             let tx = conn.transaction()?;
             let active = db_providers::list(&tx)?;
@@ -1447,10 +1612,11 @@ async fn provider_confirm_and_set_active(
     .await
     .map_err(|e| ProviderCommandError::Db {
         message: format!("{e:?}"),
-    })?
+    })??;
+    // rev-8-8: refresh so the status item + submenu reflect the new primary.
+    refresh_tray_if_available(&app_handle);
+    Ok(version)
 }
-
-// ─── P1 #8: missing commands (provider diagnostics + DB recovery) ─────────
 
 /// One selectable model for a provider. The full HTTP model-list fetch is S3
 /// scope; for now [`provider_get_models`] returns a preset-derived list so the
@@ -2306,40 +2472,18 @@ fn on_input_hotkey(
 
 // ─── R2b Surface 04: system tray menu ──────────────────────────────────────
 
-/// Build the Surface 04 system tray menu and register it on the app.
-///
-/// Called once from `setup()`. Menu item IDs are stable strings so the
-/// [`handle_tray_menu_event`] handler can match them. IDs MUST stay in sync with
-/// the match arms there. Built last in setup so a tray-init failure does not
+/// rev-5-4: build the tray for the FIRST time (registers `"main-tray"`).
+/// Subsequent updates go through `refresh_tray` → `build_tray_menu` +
+/// `tray.set_menu(...)` so we never register a duplicate tray id.
+/// Called once from `setup()`. Built last so a tray-init failure does not
 /// block DB/keystore/window setup; the caller logs and continues on `Err`.
 fn build_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
-    // Quick actions group.
-    let sel = MenuItem::with_id(app, "tray.translate-selection", "Translate Selection", true, None::<&str>)?;
-    let inp = MenuItem::with_id(app, "tray.translate-input", "Translate Input", true, None::<&str>)?;
-    let clip = MenuItem::with_id(app, "tray.translate-clipboard", "Translate Clipboard", true, None::<&str>)?;
-    let ocr = MenuItem::with_id(app, "tray.ocr-capture", "OCR Translate", true, None::<&str>)?;
-    let sep1 = PredefinedMenuItem::separator(app)?;
-    // Active provider group (a live submenu populated from list_engines at click
-    // time is a follow-up; R2b ships a static status + switch affordance).
-    let provider_ready = MenuItem::with_id(app, "tray.provider-status", "Ready", false, None::<&str>)?;
-    let switch = MenuItem::with_id(app, "tray.switch-provider", "Switch Provider", true, None::<&str>)?;
-    let sep2 = PredefinedMenuItem::separator(app)?;
-    // Navigation + system group.
-    let history = MenuItem::with_id(app, "tray.history", "History", true, None::<&str>)?;
-    let settings = MenuItem::with_id(app, "tray.settings", "Settings", true, None::<&str>)?;
-    let sep3 = PredefinedMenuItem::separator(app)?;
-    let quit = MenuItem::with_id(app, "tray.quit", "Quit", true, None::<&str>)?;
-
-    let menu = Menu::with_items(app, &[
-        &sel, &inp, &clip, &ocr, &sep1,
-        &provider_ready, &switch, &sep2,
-        &history, &settings, &sep3,
-        &quit,
-    ])?;
-
+    use tauri::tray::{MouseButton, TrayIconBuilder, TrayIconEvent};
+    let menu = build_tray_menu(app)?;
     TrayIconBuilder::with_id("main-tray")
         .icon(app.default_window_icon().cloned().expect("default window icon"))
         .menu(&menu)
+        .tooltip(read_primary_status(app))
         .show_menu_on_left_click(false)
         .on_menu_event(handle_tray_menu_event)
         .on_tray_icon_event(|tray, event| {
@@ -2362,46 +2506,172 @@ fn build_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
-/// Menu item handler. Each arm matches a `with_id` string from [`build_tray`].
+/// rev-5-4: build ONLY the menu (reusable by build_tray + refresh_tray). Returns
+/// the full menu with the fresh provider list + status item text.
+fn build_tray_menu(app: &tauri::AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> {
+    use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
+
+    // Quick actions group.
+    let sel = MenuItem::with_id(app, "tray.translate-selection", "Translate Selection", true, None::<&str>)?;
+    let clip = MenuItem::with_id(app, "tray.translate-clipboard", "Translate Clipboard", true, None::<&str>)?;
+    let sep1 = PredefinedMenuItem::separator(app)?;
+
+    // Switch Provider submenu: built from the db at menu-build time;
+    // refresh_tray() rebuilds it after provider mutations.
+    let switch_sub = build_switch_provider_submenu(app)?;
+    let provider_status = MenuItem::with_id(app, "tray.provider-status", read_primary_status(app), false, None::<&str>)?;
+    let sep2 = PredefinedMenuItem::separator(app)?;
+
+    // Disabled "Coming later" items (P1-D).
+    let ocr = MenuItem::with_id(app, "tray.ocr-capture", "OCR Translate (Coming later)", false, None::<&str>)?;
+    let history = MenuItem::with_id(app, "tray.history", "History (Coming later)", false, None::<&str>)?;
+    let sep3 = PredefinedMenuItem::separator(app)?;
+
+    // Navigation + system group.
+    let settings = MenuItem::with_id(app, "tray.settings", "Settings", true, None::<&str>)?;
+    let sep4 = PredefinedMenuItem::separator(app)?;
+    let quit = MenuItem::with_id(app, "tray.quit", "Quit", true, None::<&str>)?;
+
+    let menu = Menu::with_items(app, &[
+        &sel, &clip, &sep1,
+        &switch_sub, &provider_status, &sep2,
+        &ocr, &history, &sep3,
+        &settings, &sep4,
+        &quit,
+    ])?;
+    Ok(menu)
+}
+
+/// Build the Switch Provider submenu from the enabled providers in the db. Each
+/// item id encodes the uuid: `tray.switch-<uuid>`. Returns a Submenu.
+fn build_switch_provider_submenu(app: &tauri::AppHandle) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>> {
+    use tauri::menu::{MenuItem, SubmenuBuilder};
+    let mut sub = SubmenuBuilder::new(app, "Switch Provider");
+    // Read enabled providers from the db (best-effort; empty submenu on error).
+    let enabled: Vec<(String, String)> = read_enabled_providers(app).unwrap_or_default();
+    for (uuid, name) in &enabled {
+        let item = MenuItem::with_id(app, format!("tray.switch-{uuid}"), name, true, None::<&str>)?;
+        sub = sub.item(&item);
+    }
+    sub.build()
+}
+
+/// Read (uuid, name) for enabled providers. Best-effort: returns empty on db error.
+fn read_enabled_providers(app: &tauri::AppHandle) -> Result<Vec<(String, String)>, String> {
+    use tauri::Manager;
+    let app_state = app.state::<Arc<AppState>>().inner().clone();
+    let result = tauri::async_runtime::block_on(tauri::async_runtime::spawn_blocking(move || {
+        let _gate = app_state.data_gate.read();
+        let db = require_ready_gated(&app_state, &_gate)?;
+        db.with_conn(|conn| {
+            let list = db_providers::list(conn)?;
+            Ok(list.into_iter().filter(|p| p.enabled).map(|p| (p.uuid, p.name)).collect::<Vec<_>>())
+        })
+        .map_err(|e: DbErr| e.to_string())
+    }));
+    match result {
+        Ok(Ok(v)) => Ok(v),
+        Ok(Err(_)) => Ok(Vec::new()),
+        Err(_) => Ok(Vec::new()),
+    }
+}
+
+/// Read the primary provider name for the status item. Falls back to "No provider".
+fn read_primary_status(app: &tauri::AppHandle) -> String {
+    use tauri::Manager;
+    let app_state = match app.try_state::<Arc<AppState>>() {
+        Some(s) => s.inner().clone(),
+        None => return "No provider".into(),
+    };
+    let result = tauri::async_runtime::block_on(tauri::async_runtime::spawn_blocking(move || {
+        let _gate = app_state.data_gate.read();
+        let db = match require_ready_gated(&app_state, &_gate) {
+            Ok(d) => d,
+            Err(_) => return "No provider".to_string(),
+        };
+        let selection = db.with_conn(|conn| db_providers::read_active_selection(conn));
+        match selection {
+            Ok(sel) => match sel.primary {
+                Some(uuid) => {
+                    let name = db.with_conn(|conn| db_providers::get(conn, &uuid)).ok().map(|p| p.name);
+                    name.unwrap_or_else(|| "Unknown provider".into())
+                }
+                None => "No provider".into(),
+            },
+            Err(_) => "No provider".into(),
+        }
+    }));
+    result.unwrap_or_else(|_| "No provider".into())
+}
+
+/// Refresh the tray menu + status after a provider mutation. Called from the
+/// eight provider mutation command handlers (P1-5) via `refresh_tray_if_available`.
+///
+/// rev-5-4: refresh the EXISTING `"main-tray"` in place — rebuild the menu +
+/// re-set the status tooltip via `app.tray_by_id("main-tray")`. Rebuilding from
+/// scratch via `build_tray` would register a DUPLICATE tray icon (Tauri panics
+/// on duplicate id). Instead, fetch the existing tray and update its menu +
+/// tooltip. If the tray does not exist yet (first build), fall back to
+/// `build_tray`. Errors are PROPAGATED so the wrapper can log them.
+pub fn refresh_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
+    if let Some(tray) = app.tray_by_id("main-tray") {
+        let menu = build_tray_menu(app)?;
+        tray.set_menu(Some(menu))?;
+        tray.set_tooltip(Some(&read_primary_status(app)))?;
+        Ok(())
+    } else {
+        build_tray(app)
+    }
+}
+
+/// rev-9-3: best-effort tray refresh after a provider mutation. Wraps
+/// `refresh_tray` (which returns `tauri::Result<()>`) so a tray rebuild failure
+/// (e.g. tray not yet built during startup) NEVER turns a successful provider
+/// write into an error.
+pub fn refresh_tray_if_available(app: &tauri::AppHandle) {
+    if let Err(e) = refresh_tray(app) {
+        log::warn!("tray refresh failed: {e}");
+    }
+}
+
+/// Menu item handler. Each arm matches a `with_id` string from [`build_tray_menu`].
 ///
 /// The translation entry points emit a `tray-action` event that the main window
-/// forwards to the existing commands (those commands depend on `tauri::State`
-/// handles only resolvable through the invoke handler, so we do not call them as
-/// plain functions here). Window-showing actions (`input`/`history`/`settings`)
-/// go through the manager directly.
+/// forwards (its listener invokes the matching backend command). The
+/// `tray.switch-<uuid>` arm runs the SYNC `handle_switch_provider` wrapper inside
+/// a `spawn_blocking` (rev-18-1/rev-20-4: offload the SYNC SQLite I/O). Settings
+/// shows the main window + emits a real `SettingsSection` value (rev-6-3).
 fn handle_tray_menu_event(app: &tauri::AppHandle, event: MenuEvent) {
-    match event.id().as_ref() {
+    let id = event.id().as_ref();
+    if let Some(uuid) = id.strip_prefix("tray.switch-") {
+        // P1-5 + rev-5-4: set this provider as the sole primary, then refresh
+        // the tray. On failure the write tx rolled back (old primary preserved);
+        // handle_switch_provider surfaces the error in the tray tooltip.
+        let app_state = app.state::<Arc<AppState>>().inner().clone();
+        let app_clone = app.clone();
+        let uuid_owned = uuid.to_string();
+        tauri::async_runtime::spawn_blocking(move || {
+            let _ = handle_switch_provider(&app_clone, &app_state, &uuid_owned);
+        });
+        return;
+    }
+    match id {
         "tray.translate-selection" => {
-            // Forward to the main window; its listener reuses the selection
-            // trigger path that emits popup-state / popup-multi-result.
             let _ = app.emit("tray-action", "translate-selection");
         }
-        "tray.translate-input" => {
-            if let Some(w) = app.get_webview_window("input") {
-                let _ = w.show();
-                let _ = w.set_focus();
-            }
-        }
         "tray.translate-clipboard" => {
-            // Forward to the main window, which can invoke the clipboard command
-            // (its State dependencies are not callable as a plain function).
             let _ = app.emit("tray-action", "translate-clipboard");
         }
         "tray.ocr-capture" => {
             let _ = app.emit("tray-action", "ocr-capture");
         }
-        "tray.history" => {
-            if let Some(w) = app.get_webview_window("main") {
-                let _ = w.show();
-                let _ = w.set_focus();
-                let _ = w.emit("navigate", "history");
-            }
-        }
         "tray.settings" => {
             if let Some(w) = app.get_webview_window("main") {
                 let _ = w.show();
                 let _ = w.set_focus();
-                let _ = w.emit("navigate", "settings");
+                // rev-6-3: navigate value is a real SettingsSection union member,
+                // NOT the generic "settings" string the type rejects.
+                let _ = w.emit("navigate", "provider-center");
             }
         }
         "tray.quit" => {
@@ -2438,6 +2708,7 @@ pub fn run() {
         .plugin(shortcut_plugin)
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::new().build())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .setup(|app| {
             // Resolve the app-local data dir. Review P1 #2: this MUST NOT crash
             // setup — if the platform path is unavailable, fall back to a temp
@@ -2707,6 +2978,7 @@ pub fn run() {
             translate_default,
             translate_clipboard,
             translate_session,
+            translate_selection_ipc,
             list_engines,
             set_key,
             delete_key,
@@ -2728,12 +3000,14 @@ pub fn run() {
             provider_toggle,
             provider_set_key,
             provider_set_active,
+            provider_get_active_selection,
             // P1 #3: multi-engine consent.
             provider_confirm_and_set_active,
             // P1 #8: provider diagnostics + DB recovery.
             provider_get_models,
             provider_test_connection,
-            archive_database
+            archive_database,
+            open_settings_window
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

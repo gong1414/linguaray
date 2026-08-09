@@ -20,6 +20,9 @@ export type SettingsSection =
 export type SettingsShellProps = {
   /** Initial active section (default: "provider-center"). */
   initialSection?: SettingsSection;
+  /** Controlled active section. When supplied, the parent owns the active
+   *  state; the shell reads `props.activePage` instead of its own signal. */
+  activePage?: SettingsSection;
   /** Called when the user clicks an enabled nav item. */
   onNavigate?: (section: SettingsSection) => void;
   /** Content for the currently-active section. */
@@ -47,9 +50,15 @@ type NavDef = {
 const SettingsShell: Component<SettingsShellProps> = (props) => {
   const locale = detectLocale();
   const t = SETTINGS_COPY[locale];
-  const [active, setActive] = createSignal<SettingsSection>(
+  // rev-9-2: controlled-uncontrolled dual mode. `active` is a DERIVATION of
+  // props.activePage (when the parent supplies it, the parent owns the state)
+  // falling back to the internal signal (uncontrolled mode). A plain
+  // createSignal(props.activePage ?? ...) initializer would read props.activePage
+  // ONCE at first render and then go stale when the parent passes a new value.
+  const [internalActive, setInternalActive] = createSignal<SettingsSection>(
     props.initialSection ?? "provider-center",
   );
+  const active = (): SettingsSection => props.activePage ?? internalActive();
   const [wide, setWide] = createSignal(
     typeof window !== "undefined" && window.matchMedia
       ? window.matchMedia(WIDE_QUERY).matches
@@ -73,14 +82,23 @@ const SettingsShell: Component<SettingsShellProps> = (props) => {
   ];
 
   const handleClick = (id: SettingsSection) => {
-    setActive(id);
+    // rev-9-2: only mutate the internal signal in UNCONTROLLED mode
+    // (props.activePage === undefined). In controlled mode the parent is the
+    // source of truth and updates `activePage` via the onNavigate callback.
+    if (props.activePage === undefined) {
+      setInternalActive(id);
+    }
     props.onNavigate?.(id);
   };
 
   const renderItem = (item: NavDef) => {
+    const ariaLabel = item.disabled
+      ? `${item.label} — ${t.nav.placeholderHint}`
+      : item.label;
     const node = (
       <SidebarItem
         label={item.label}
+        ariaLabel={ariaLabel}
         icon={item.icon}
         active={active() === item.id}
         disabled={item.disabled}
@@ -114,7 +132,12 @@ const SettingsShell: Component<SettingsShellProps> = (props) => {
   };
 
   return (
-    <div class="settings-shell" data-layout={wide() ? "full" : "rail"}>
+    <div
+      class="settings-shell"
+      data-layout={wide() ? "full" : "rail"}
+      data-testid="shell"
+      data-page={active()}
+    >
       <WindowChrome
         title={t.window.title}
         labels={{ minimize: t.window.minimize, close: t.window.close }}

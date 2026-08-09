@@ -8,6 +8,10 @@ export type SidebarItemProps = {
   badge?: string;
   onClick?: () => void;
   disabled?: boolean;
+  /** Accessible label. Defaults to `label`; pass a combined string for disabled
+   *  items so a screen reader announces BOTH the label and the placeholder hint
+   *  (e.g. "Shortcuts — Coming in R3b"). */
+  ariaLabel?: string;
 };
 
 const SidebarItem: Component<SidebarItemProps> = (props) => {
@@ -17,6 +21,8 @@ const SidebarItem: Component<SidebarItemProps> = (props) => {
       class="sidebar-item"
       classList={{ "sidebar-item--active": !!props.active }}
       aria-current={props.active ? "page" : undefined}
+      aria-label={props.ariaLabel ?? props.label}
+      aria-disabled={props.disabled || undefined}
       disabled={props.disabled}
       onClick={() => props.onClick?.()}
     >
