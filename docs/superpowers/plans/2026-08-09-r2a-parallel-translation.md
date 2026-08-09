@@ -1960,3 +1960,21 @@ cargo build
 - `run_translate_session(db, client, keystore, app, text, from, to)` — Task 4 定义，Task 6 一致调用。
 - `popup::multi_result(app, &[TranslationOutcome])` — Task 5 定义，Task 6 一致调用。
 - `preset.id = profile.secret_ref`（非 uuid）— Task 1 文档化，Task 3 测试断言（`engine == "provider/u1"`）。
+
+---
+
+## Rev-4 Retroactive Status (2026-08-09)
+
+Appended by the R2/R3a contract audit (docs/superpowers/plans/2026-08-09-r2-r3-contract-audit-fixes.md).
+Historical RED states are preserved as-written; this table records the actual
+shipped state and where gaps are closed. Each "Shipped?" claim was verified
+against the current source tree (file/function grep) at append time.
+
+| Original task | Shipped? | Gap closed in (audit task) |
+|---|---|---|
+| Task 1: Protocol→ApiKind + ProviderProfile→ProviderPreset adapter (`adapter.rs`, `protocol_to_api_kind`) | yes — `src-tauri/src/adapter.rs` defines `protocol_to_api_kind` + `ApiKind::{OpenAIChat,Anthropic}`; `providers.rs` defines `ProviderPreset` presets | — |
+| Task 2: `read_active_selection` reader (`db/providers.rs`) | yes — `read_active_selection` called from `lib.rs` (`provider_get_active_selection`, `run_translate_session`, cold-start) | — |
+| Task 3: `translate_parallel` orchestrator (`service.rs`) | yes — `pub async fn translate_parallel` in `service.rs:273`; stable input order + bounded fallback | B5 (stable order), B6 (bounded fallback) |
+| Task 4: `translate_session` IPC command | yes — `run_translate_session` in `lib.rs` + registered in `invoke_handler`; generation-token staleness guard wired | A2 (gen-token via `capture_and_translate`), D4 Step 4 (capability auth) |
+| Task 5: popup event refactor (`popup-multi-result`) | yes — `POPUP_MULTI_EVENT = "popup-multi-result"` in `popup.rs`; frontend decoder `decodePopupMultiResult` in `decode.ts` | B3 (friendly engine labels / no `secret_ref`) |
+| Task 6: `translate_clipboard` routes through `translate_session` core | yes — `translate_clipboard` in `lib.rs:337` calls `run_translate_session`; `decide_popup_event` pure helper tested | A4 (tray Active/Error pulse on this path), A2 (gen-token) |
