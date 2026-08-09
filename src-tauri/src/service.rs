@@ -169,21 +169,102 @@ pub struct TranslationOutcome {
     pub result: Result<Translation, Error>,
 }
 
-/// 并行调用多个 AI 引擎，每个独立走 §G fallback 分类。
+/// Run ONLY the primary attempt — no §G fallback conversion. B6 (P1-4):
+/// `translate_with_fallback_ref(..., None)` converts a non-local
+/// `FallbackEligible` into `LocalNoFallback`, so a session-level eligibility
+/// check can NEVER see the original `FallbackEligible`. This fn preserves the
+/// RAW `Error` so [`eligible_for_session_fallback`] can detect it. Used by
+/// [`translate_parallel`] to drive each primary in parallel, then decide the
+/// (single) session-level fallback once all primaries have settled.
+///
+/// `Config`/`Keystore` errors propagate unchanged; on success the `Translation`
+/// is tagged with the primary preset id (engine == preset.id).
+pub async fn translate_primary_only(
+    client: &reqwest::Client,
+    keystore: &Keystore,
+    primary_preset: &ProviderPreset,
+    input: TranslateInput<'_>,
+) -> Result<Translation, Error> {
+    translate(
+        client,
+        keystore,
+        primary_preset,
+        TranslateInput {
+            text: input.text,
+            from: input.from,
+            to: input.to,
+            options: input.options,
+        },
+    )
+    .await
+}
+
+/// B6 (P1-4, rev-6-4): PURE eligibility decision for the bounded session-level
+/// fallback. Returns `true` iff the session qualifies for EXACTLY ONE fallback
+/// call. Rules:
+///
+/// - `local_primary_failed` → `false` (local-primary sacred: a LOCAL primary
+///   that failed blocks any remote fallback for this session).
+/// - ANY success → `false` (partial success: surface what we have, don't
+///   silently inject a fallback card).
+/// - At least one NON-LOCAL engine failed with `FallbackEligible` → `true`
+///   (all-remote-transient session: one fallback over the whole text).
+/// - Anything else (Config/Keystore errors, only-local failures) → `false`.
+///
+/// `locality[i]` mirrors `outcomes[i]`: `true` if engine `i` was LOCAL. A
+/// missing locality entry (pre-failed profiles that never produced a preset) is
+/// treated as `false` (non-local) — a pre-failed primary contributes
+/// `local_primary_failed=false` and only blocks via its Config error.
+pub fn eligible_for_session_fallback(
+    outcomes: &[TranslationOutcome],
+    locality: &[bool],
+    local_primary_failed: bool,
+) -> bool {
+    if local_primary_failed {
+        return false;
+    }
+    let any_success = outcomes.iter().any(|o| o.result.is_ok());
+    if any_success {
+        return false;
+    }
+    // Any Config/Keystore error blocks the session fallback: these are "user
+    // must fix Settings" problems and silently running a fallback would mask
+    // them. (Plan deviation: the verbatim plan body only checked `.any()` for a
+    // non-local FallbackEligible, which would wrongly return true for a session
+    // like [FallbackEligible, Config]. Added this guard so test 5 holds.)
+    let any_config_or_keystore = outcomes.iter().any(|o| {
+        matches!(o.result, Err(Error::Config(_)) | Err(Error::Keystore(_)))
+    });
+    if any_config_or_keystore {
+        return false;
+    }
+    outcomes
+        .iter()
+        .enumerate()
+        .any(|(i, o)| {
+            let was_local = locality.get(i).copied().unwrap_or(false);
+            !was_local && matches!(o.result, Err(Error::FallbackEligible(_)))
+        })
+}
+
+/// 并行调用多个 AI 引擎，再用 B6 bounded session-level fallback（P1-4, rev-6-4）。
 ///
 /// - 每个 profile 经 [`profile_to_preset`] 转 preset；转换失败（如 google_translate
 ///   协议）→ 该引擎产出 `Err(Config::Unsupported)` outcome，**不** panic、**不**丢弃。
-/// - 所有引擎用 `futures::future::join_all` 并发驱动，各自跑
-///   [`translate_with_fallback_ref`]（带各自的 fallback 机会）。
-/// - `fallback` 是 `Option<Arc<dyn TraditionalEngine>>`，所有引擎共享同一个
-///   （传统引擎 `translate` 是 `&self`，Arc 允许并发只读共享）。
-/// - 返回顺序严格等于输入顺序（B5）：每个 outcome 携带其输入 index，最终 vec
-///   按 index 排序产出——包括 pre-failed 条目也留在原位。`join_all` 的完成顺序
-///   不再影响输出顺序；调用方仍可按 `uuid` 关联，但不应再假设顺序无序。
+/// - 所有 ready 引擎用 `futures::future::join_all` 并发驱动，各自跑
+///   [`translate_primary_only`]（**不**走 per-engine fallback；保留 RAW `Error`，
+///   这样 [`eligible_for_session_fallback`] 才能看到 `FallbackEligible`）。
+/// - `fallback` 是 `Option<Arc<dyn TraditionalEngine>>`，当整个 session 满足
+///   eligibility 时被调用 **至多一次**：所有非 local primary 全部 transient 失败、
+///   无任何成功、无 Config/Keystore 错误、且 primary 不是 local 失败（local-sacred）。
+///   fallback 结果作为 **新 outcome 卡片** 追加（uuid = fallback engine id）。
+/// - 返回顺序：N 个 primary outcome 严格按输入顺序（B5），随后至多 1 个 fallback
+///   outcome（仅在 eligible 且 fallback Some 时）。pre-failed 条目留在原输入位置。
 ///
-/// §G 不变量：每个引擎独立分类错误。`Config`/`Keystore` 错误绝不因另一个引擎
-/// 成功而被"覆盖"——它们作为各自 outcome 的 Err 保留，前端按 Surface 03 的
-/// "partial success" 渲染。
+/// §G 不变量：`Config`/`Keystore` 错误绝不因另一个引擎成功而被"覆盖"——它们作为
+/// 各自 outcome 的 Err 保留，前端按 Surface 03 的 "partial success" 渲染。Local
+/// primary 的 `FallbackEligible` **不计入** session eligibility（local-sacred），且
+/// local primary 失败会 **完全阻断** session fallback（rev-6-4）。
 //
 // 8 个参数是计划的既定签名（R2a 测试直接位置调用），收敛成一个 ctx struct
 // 会让所有调用点更绕；与 `translate`/`translate_with_fallback` 的扁平签名保持
@@ -222,34 +303,82 @@ pub async fn translate_parallel(
             )),
         }
     }
-    // Drive all ready entries concurrently, tagging each result with its index.
-    // (B5 only fixes ORDERING. B6 will change the fallback arg to None and add
-    // the session-level fallback policy. For now, pass fallback.as_deref() to
-    // preserve per-engine behavior until B6 lands.)
+    // Drive all ready entries concurrently via translate_primary_only (B6,
+    // P1-4). Unlike translate_with_fallback_ref(..., None) — which converts a
+    // non-local FallbackEligible into LocalNoFallback and so hides it from the
+    // session-level check — translate_primary_only preserves the RAW Error so
+    // eligible_for_session_fallback can detect it.
+    //
+    // Capture was_local = is_local(&preset) HERE (before the await) so the
+    // locality classification is stable and not affected by the future's move.
+    // text/from/to are &str (borrowed fn params) — the futures borrow them and
+    // they remain in scope for the session-fallback call after join_all.
     let futs: Vec<_> = entries
         .iter()
-        .filter_map(|(idx, ready, _)| ready.as_ref().map(|(uuid, preset)| (*idx, uuid.clone(), preset)))
-        .map(|(idx, uuid, preset)| {
+        .filter_map(|(idx, ready, _)| {
+            ready.as_ref().map(|(uuid, preset)| {
+                (*idx, uuid.clone(), preset, is_local(preset))
+            })
+        })
+        .map(|(idx, uuid, preset, was_local)| {
             let options = options.clone();
-            let fb_ref: Option<&dyn TraditionalEngine> = fallback.as_deref();
             async move {
                 let input = TranslateInput { text, from, to, options };
                 let result =
-                    translate_with_fallback_ref(client, keystore, preset, input, fb_ref).await;
-                (idx, TranslationOutcome { uuid, result })
+                    translate_primary_only(client, keystore, preset, input).await;
+                (idx, was_local, TranslationOutcome { uuid, result })
             }
         })
         .collect();
-    let mut ready_results = futures::future::join_all(futs).await;
-    // Build the final vec in strict input order: walk entries by index.
-    ready_results.sort_by_key(|(idx, _)| *idx);
-    let mut ready_iter = ready_results.into_iter();
+    let ready_results = futures::future::join_all(futs).await;
+    // Index the ready results by input index so we can rebuild strict input
+    // order AND carry each outcome's locality in parallel. The (was_local,
+    // outcome) pair is consumed by the ordered walk below.
+    let mut by_idx: std::collections::HashMap<usize, (bool, TranslationOutcome)> =
+        std::collections::HashMap::with_capacity(ready_results.len());
+    for (idx, was_local, o) in ready_results {
+        by_idx.insert(idx, (was_local, o));
+    }
+    // Read the PRIMARY's locality BEFORE the consuming walk. The primary is the
+    // entry at input index 0 (a pre-failed primary contributes locality=false —
+    // it never produced a preset, so it can't be local). This drives the
+    // local_primary_failed rule (rev-6-4): a LOCAL primary that failed blocks
+    // the session fallback entirely.
+    let primary_was_local = by_idx.get(&0).map(|(wl, _)| *wl).unwrap_or(false);
+    // Build outcomes + a parallel locality Vec in STRICT input order. Pre-failed
+    // entries (no preset → no is_local call) are inserted in place with
+    // locality=false. This preserves B5's ordering invariant while giving the
+    // eligibility check a locality entry for every outcome.
     let mut outcomes: Vec<TranslationOutcome> = Vec::with_capacity(entries.len());
-    for (_idx, _ready, pre_failed) in entries {
+    let mut locality: Vec<bool> = Vec::with_capacity(entries.len());
+    for (idx, _ready, pre_failed) in entries {
         if let Some(o) = pre_failed {
+            outcomes.push(o); // pre-failed → locality false (never had a preset)
+            locality.push(false);
+        } else if let Some((was_local, o)) = by_idx.remove(&idx) {
             outcomes.push(o);
-        } else if let Some((_idx, o)) = ready_iter.next() {
-            outcomes.push(o);
+            locality.push(was_local);
+        }
+    }
+    // B6 bounded session-level fallback decision (P1-4, rev-6-4). A LOCAL
+    // primary that failed blocks the session fallback; otherwise the pure
+    // eligibility fn decides (all-remote-transient → one fallback).
+    let local_primary_failed =
+        primary_was_local && outcomes.first().map(|o| o.result.is_err()).unwrap_or(false);
+    let eligible = eligible_for_session_fallback(&outcomes, &locality, local_primary_failed);
+    // Fire the fallback AT MOST ONCE per session. The fallback translates the
+    // WHOLE text once and is appended as a NEW outcome card (uuid = fallback
+    // engine id), so callers see N primary cards + at most 1 fallback card.
+    // text/from/to are still borrowed here (they're &str fn params), and
+    // options was cloned into the futures — re-clone once for this call.
+    if eligible {
+        if let Some(eng) = fallback.as_deref() {
+            let fb_id = eng.id().to_string();
+            let fb_result = eng
+                .translate(client, text, from, to)
+                .await
+                .map(|text| Translation { text, engine: fb_id.clone() });
+            outcomes.push(TranslationOutcome { uuid: fb_id, result: fb_result });
         }
     }
     outcomes
