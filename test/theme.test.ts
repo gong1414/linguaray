@@ -87,10 +87,12 @@ describe("initTheme", () => {
     light.setAttribute("name", "theme-color");
     light.setAttribute("media", "(prefers-color-scheme: light)");
     light.setAttribute("content", "#F8FAFC");
+    light.setAttribute("data-theme-scheme", "light");
     const dark = document.createElement("meta");
     dark.setAttribute("name", "theme-color");
     dark.setAttribute("media", "(prefers-color-scheme: dark)");
     dark.setAttribute("content", "#020617");
+    dark.setAttribute("data-theme-scheme", "dark");
     document.head.append(light, dark);
 
     localStorage.setItem("linguaray.theme", "dark");
@@ -100,19 +102,14 @@ describe("initTheme", () => {
     expect(metas.length).toBe(2);
     const activeDark = Array.from(metas).find((m) => m.getAttribute("content") === "#020617");
     expect(activeDark, "dark theme-color meta must exist").toBeTruthy();
-    // rev-5-6: the current meta gets media="all" (always wins), NOT
-    // prefers-color-scheme:dark (which would lose when OS prefers light).
     expect(activeDark!.getAttribute("media")).toBe("all");
     const disabled = Array.from(metas).find((m) => m.getAttribute("media") === "disabled");
     expect(disabled, "non-current scheme meta must be disabled (media=disabled)").toBeTruthy();
   });
 
   it("rev-5-6: a FORCED theme wins over the OS preference (user Dark while OS Light)", () => {
-    // OS prefers light; user forced dark. The rev-4 form left the dark meta at
-    // media="(prefers-color-scheme: dark)" (no match) + light meta disabled → no
-    // meta applied. rev-5-6 sets the current (dark) meta to media="all".
     vi.spyOn(window, "matchMedia").mockImplementation((q) => ({
-      matches: q.includes("light"), // OS prefers light
+      matches: q.includes("light"),
       media: q,
       addEventListener: () => {},
       removeEventListener: () => {},
@@ -126,13 +123,15 @@ describe("initTheme", () => {
     light.setAttribute("name", "theme-color");
     light.setAttribute("media", "(prefers-color-scheme: light)");
     light.setAttribute("content", "#F8FAFC");
+    light.setAttribute("data-theme-scheme", "light");
     const dark = document.createElement("meta");
     dark.setAttribute("name", "theme-color");
     dark.setAttribute("media", "(prefers-color-scheme: dark)");
     dark.setAttribute("content", "#020617");
+    dark.setAttribute("data-theme-scheme", "dark");
     document.head.append(light, dark);
 
-    localStorage.setItem("linguaray.theme", "dark"); // forced dark
+    localStorage.setItem("linguaray.theme", "dark");
     initTheme();
 
     const metas = document.querySelectorAll<HTMLMetaElement>("meta[name=theme-color]");
