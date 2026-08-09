@@ -641,6 +641,93 @@ describe("ProviderCenter (Surface 05)", () => {
     expect(invokedCmds.some((c) => c === "provider_get_balance")).toBe(false);
   });
 
+  it("model fetch error: provider_get_models throws → falls back to manual input", async () => {
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => [profile({ uuid: "u1", name: "TestProvider", secret_ref: "provider/u1" })],
+      key_status: () => ({ "provider/u1": true }),
+      provider_get_models: () => {
+        throw new Error("net");
+      },
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("TestProvider")).toBeTruthy());
+    fireEvent.click(screen.getByLabelText("Edit TestProvider"));
+    await flush();
+
+    // Click Fetch models → it throws → UI falls back to a manual <input>.
+    fireEvent.click(screen.getByText("Fetch models"));
+    await whenCalledWith("provider_get_models");
+    await flush();
+    // The manual-entry fallback is an INPUT tagged with the "Model" label.
+    const manualInput = screen.getByLabelText("Model") as HTMLInputElement;
+    expect(manualInput.tagName).toBe("INPUT");
+    // The dropdown (native select) is gone — manual entry only.
+    expect(screen.queryByRole("listbox")).toBeNull();
+  });
+
+  it("model fetch pending: provider_get_models pending → spinner (role=status) + aria-busy visible", async () => {    let resolveFetch: (models: { id: string; label: string }[]) => void = () => {};
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => [profile({ uuid: "u1", name: "TestProvider", secret_ref: "provider/u1" })],
+      key_status: () => ({ "provider/u1": true }),
+      provider_get_models: () =>
+        new Promise((res) => {
+          resolveFetch = res as (m: { id: string; label: string }[]) => void;
+        }),
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("TestProvider")).toBeTruthy());
+    fireEvent.click(screen.getByLabelText("Edit TestProvider"));
+    await flush();
+
+    fireEvent.click(screen.getByText("Fetch models"));
+    await whenCalledWith("provider_get_models");
+    // While pending: the Select trigger is aria-busy and a status region
+    // (spinner) is present.
+    await waitFor(() =>
+      expect(screen.getByLabelText("Model").closest("[aria-busy='true']")).toBeTruthy(),
+    );
+    expect(screen.getByRole("status")).toBeTruthy();
+    // Resolve to let the component settle (avoids dangling-promise warnings).
+    resolveFetch([{ id: "gpt-4o-mini", label: "gpt-4o-mini" }]);
+    await flush();
+  });
+
+  it("model_list capability false: no Fetch models button, no provider_get_models call", async () => {
+    const invokedCmds: string[] = [];
+    invokeMock.mockImplementation(async (cmd: string, args?: unknown) => {
+      invokedCmds.push(cmd);
+      const map: Record<string, (a?: unknown) => unknown> = {
+        provider_list: () => [
+          profile({
+            uuid: "u1",
+            name: "NoListModel",
+            secret_ref: "provider/u1",
+            capabilities: { balance: false, quota: false, model_list: false },
+          }),
+        ],
+        key_status: () => ({ "provider/u1": true }),
+        provider_get_active_selection: () => ({ primary: null, parallel: [], fallback: null }),
+        provider_get_models: () => {
+          invokedCmds.push("provider_get_models");
+          return [];
+        },
+      };
+      const fn = map[cmd];
+      if (!fn) throw new Error(`unexpected invoke ${cmd}`);
+      return fn(args);
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("NoListModel")).toBeTruthy());
+    fireEvent.click(screen.getByLabelText("Edit NoListModel"));
+    await flush();
+    // No Fetch models button (capability disabled).
+    expect(screen.queryByText("Fetch models")).toBeNull();
+    // Hard assertion: provider_get_models was never invoked.
+    expect(invokedCmds.some((c) => c === "provider_get_models")).toBe(false);
+  });
+
   it("uses zh copy when locale zh", async () => {
     localeMock.current = "zh";
     routeInvoke({ ...DEFAULT_ROUTES });

@@ -813,6 +813,9 @@ const ProviderCenter: Component = () => {
               const keyError = createMemo(() => keyErrorByUuid()[uuid]);
               const options = createMemo(() => modelOptionsByUuid()[uuid]);
               const modelFetch = createMemo(() => modelFetchByUuid()[uuid] ?? "idle");
+              // Only providers that advertise model_list can fetch a dropdown;
+              // others get the manual-entry input directly.
+              const canListModels = createMemo(() => p().capabilities.model_list);
               const selectOptions = createMemo<SelectOption[]>(() => {
                 const opts = options();
                 if (opts && opts.length > 0) {
@@ -839,9 +842,11 @@ const ProviderCenter: Component = () => {
                     }
                   />
 
-                  {/* Model */}
+                  {/* Model: dropdown + Fetch models only when the provider
+                      advertises model_list; otherwise a manual-entry input.
+                      A fetch error also falls back to the manual input. */}
                   <Show
-                    when={modelFetch() !== "error"}
+                    when={modelFetch() !== "error" && canListModels()}
                     fallback={
                       <TextField
                         label={t.models}
