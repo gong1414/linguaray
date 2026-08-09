@@ -18,6 +18,7 @@ import type {
   ModelInfo,
   ConnectionResult,
   SetActiveResult,
+  ActiveSelectionFE,
 } from "./provider-types";
 
 // Re-export so components import the error type from one place.
@@ -132,3 +133,7 @@ export const resetKeystore = (): Promise<string | null> =>
 /** Key presence map keyed by `secret_ref`. */
 export const keyStatus = (): Promise<Record<string, boolean>> =>
   invoke<Record<string, boolean>>("key_status");
+
+/** B3: read the active (primary/parallel/fallback) selection. */
+export const providerGetActiveSelection = (): Promise<ActiveSelectionFE> =>
+  invoke<ActiveSelectionFE>("provider_get_active_selection");

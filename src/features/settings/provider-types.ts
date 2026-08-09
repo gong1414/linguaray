@@ -123,3 +123,10 @@ export type ProviderCommandError =
   | { error: "stale_scope"; actual_scope: string }
   | { error: "db"; message: string }
   | { error: "validation"; message: string };
+
+/** Mirror of `db::providers::ActiveSelection` (B3). */
+export type ActiveSelectionFE = {
+  primary: string | null;
+  parallel: string[];
+  fallback: string | null;
+};
