@@ -68,22 +68,19 @@ function syncThemeColorMetas(theme: "light" | "dark"): void {
     m.setAttribute("name", "theme-color");
     m.setAttribute("media", "all");
     m.setAttribute("content", currentColor);
+    m.setAttribute("data-theme-scheme", theme);
     document.head.appendChild(m);
     return;
   }
-  const currentKeyword = theme; // "light" | "dark"
   for (const m of Array.from(metas)) {
-    const media = m.getAttribute("media") ?? "";
-    // The meta that SHIPS with the resolved scheme's keyword is the current one.
-    // (index.html ships media="(prefers-color-scheme: light)" and "...dark".)
-    const isCurrent = media.includes(currentKeyword);
+    // Match by data-theme-scheme attribute (set in index.html), not by parsing
+    // the media string — robust against media format changes / HMR reordering.
+    const scheme = m.getAttribute("data-theme-scheme");
+    const isCurrent = scheme === theme;
     if (isCurrent) {
-      // rev-5-6: force the current meta to ALWAYS apply (media="all"), so a
-      // forced theme wins over the OS preference. Re-assert the resolved color.
       m.setAttribute("media", "all");
       m.setAttribute("content", currentColor);
     } else {
-      // Disable the non-current scheme meta so the OS chrome uses only the current.
       m.setAttribute("media", "disabled");
     }
   }
