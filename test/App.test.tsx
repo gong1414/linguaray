@@ -6,11 +6,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, fireEvent, cleanup, screen, waitFor } from "@solidjs/testing-library";
 
-const { invokeMock } = vi.hoisted(() => ({
+const { invokeMock, listenMock } = vi.hoisted(() => ({
   invokeMock: vi.fn(async (_cmd: string, _args?: unknown): Promise<unknown> => undefined),
+  // A4: App.onMount registers tray-action + navigate listeners. Mock the event
+  // API so the real Tauri bridge is never touched in jsdom (would throw).
+  listenMock: vi.fn(async (_event: string, _cb: (e: { payload: unknown }) => void) => () => {}),
 }));
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: invokeMock }));
+vi.mock("@tauri-apps/api/event", () => ({ listen: listenMock }));
 
 import App from "../src/App";
 

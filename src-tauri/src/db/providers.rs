@@ -645,7 +645,7 @@ pub fn finalize_delete(conn: &mut Connection, uuid: &str) -> Result<(), DbError>
 
 /// 当前 (primary, parallel, fallback) 选择快照，从 `preferences` singleton 读出。
 /// 用于 `translate_session` 决定要并行调用哪些引擎。
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize)]
 pub struct ActiveSelection {
     /// primary_uuid；NULL/空 → None。
     pub primary: Option<String>,

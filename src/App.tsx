@@ -1,35 +1,73 @@
 /**
- * R3a App mount — a thin wrapper that mounts SettingsShell hosting the
- * Provider Center (Surface 05) by default, with Keystore Recovery (Surface 06)
- * reachable via nav. Shortcuts and Privacy are R3b placeholders.
+ * R3a App mount + R2/R3a audit Task A4: hosts the tray-action + navigate
+ * listeners. The tray (Surface 04) emits `tray-action`; `open_settings_window`
+ * emits `navigate`. The shell's activePage is a CONTROLLED signal (P1-5) so the
+ * tray / popup CTAs can drive navigation.
  *
- * The legacy monolithic settings/translate window (translate_clipboard, the
- * <select>/<textarea> key input, inline confirm()) is fully removed. Live
- * translation now lives in the Popup/InputPanel surfaces (R2b).
+ * Surface 04 scope (rev-10): normal icon, provider name status,
+ * translate-selection/clipboard/switch-provider/settings/quit are live. OCR +
+ * History are disabled with "Coming later". Update badge, active-translation
+ * pulse, and Balance are not implemented (see Surface status table).
  */
-import { createSignal, type Component } from "solid-js";
+import { createSignal, onCleanup, onMount, type Component } from "solid-js";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import SettingsShell, { type SettingsSection } from "./features/settings/SettingsShell";
 import ProviderCenter from "./features/settings/ProviderCenter";
 import KeystoreRecovery from "./features/settings/KeystoreRecovery";
 import { SETTINGS_COPY } from "./features/settings/copy";
+import { translateSelection, translateClipboard } from "./features/translation/selection-ipc";
 import { detectLocale } from "./i18n";
 
 const App: Component = () => {
   const locale = detectLocale();
   const t = SETTINGS_COPY[locale];
-  const [section, setSection] = createSignal<SettingsSection>("provider-center");
+  // rev-7-2: activePage uses the EXISTING SettingsSection union (no new type).
+  // It is passed as the `activePage` prop so the parent controls the shell.
+  const [activePage, setActivePage] = createSignal<SettingsSection>("provider-center");
+  const unlisteners: UnlistenFn[] = [];
+
+  onMount(async () => {
+    unlisteners.push(
+      await listen<string>("tray-action", (e) => {
+        const action = e.payload;
+        if (action === "translate-clipboard") {
+          void translateClipboard();
+        } else if (action === "translate-selection") {
+          void translateSelection();
+        } else if (action === "ocr-capture") {
+          // Disabled in the menu (Coming later); no-op here.
+        } else if (action === "switch-provider" || action === "settings") {
+          setActivePage("provider-center");
+        }
+      }),
+    );
+    unlisteners.push(
+      await listen<string>("navigate", (e) => {
+        const page = e.payload as SettingsSection;
+        if (
+          page === "provider-center" ||
+          page === "keystore-recovery" ||
+          page === "shortcuts" ||
+          page === "privacy"
+        ) {
+          setActivePage(page);
+        }
+      }),
+    );
+  });
+
+  onCleanup(() => {
+    for (const u of unlisteners) u();
+  });
 
   return (
-    <SettingsShell initialSection="provider-center" onNavigate={setSection}>
-      {section() === "provider-center" ? (
+    <SettingsShell activePage={activePage()} onNavigate={setActivePage}>
+      {activePage() === "provider-center" ? (
         <ProviderCenter />
-      ) : section() === "keystore-recovery" ? (
+      ) : activePage() === "keystore-recovery" ? (
         <KeystoreRecovery />
       ) : (
-        <section
-          class="app__placeholder"
-          aria-label={t.nav.placeholderHint}
-        >
+        <section class="app__placeholder" aria-label={t.nav.placeholderHint}>
           <p>{t.nav.placeholderHint}</p>
         </section>
       )}

@@ -8,6 +8,8 @@
     "allow-translate",
     "allow-translate-default",
     "allow-translate-clipboard",
+    "allow-translate-session",
+    "allow-translate-selection-ipc",
     "allow-list-engines",
     "allow-set-key",
     "allow-delete-key",
@@ -29,8 +31,10 @@
     "allow-provider-set-key",
     "allow-provider-set-active",
     "allow-provider-confirm-and-set-active",
+    "allow-provider-get-active-selection",
     "allow-provider-get-models",
     "allow-provider-test-connection",
-    "allow-archive-database"
+    "allow-archive-database",
+    "allow-open-settings-window"
   ]
 }

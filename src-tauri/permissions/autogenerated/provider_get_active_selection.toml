@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-provider-get-active-selection"
+description = "Enables the provider_get_active_selection command without any pre-configured scope."
+commands.allow = ["provider_get_active_selection"]
+
+[[permission]]
+identifier = "deny-provider-get-active-selection"
+description = "Denies the provider_get_active_selection command without any pre-configured scope."
+commands.deny = ["provider_get_active_selection"]
