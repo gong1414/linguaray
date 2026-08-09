@@ -655,56 +655,62 @@ const ProviderCenter: Component = () => {
                             setDeleteConfirmUuid(p.uuid);
                           }}
                         />
-                        {/* Role-action icon buttons (ProviderRow has no slot). */}
+                        {/* Role-action icon buttons (ProviderRow has no slot).
+                            Role-assign buttons (set-primary / add-parallel /
+                            set-fallback / remove-parallel) are hidden for
+                            disabled providers — a disabled provider cannot hold
+                            a role. Reorder + duplicate remain available. */}
                         <div class="pc__role-actions">
-                          <Show when={role().kind !== "primary"}>
-                            <button
-                              type="button"
-                              class="pc__icon-btn"
-                              aria-label={t.setPrimary}
-                              title={t.setPrimary}
-                              onClick={() => void handleSetPrimary(p.uuid)}
-                            >
-                              <Star size={14} />
-                            </button>
-                          </Show>
-                          <Show when={role().kind === "parallel"}>
-                            <button
-                              type="button"
-                              class="pc__icon-btn"
-                              aria-label={t.removeParallel}
-                              title={t.removeParallel}
-                              onClick={() => void handleRemoveParallel(p.uuid)}
-                            >
-                              <Layers size={14} />
-                            </button>
-                          </Show>
-                          <Show when={role().kind !== "parallel" && role().kind !== "primary"}>
-                            <button
-                              type="button"
-                              class="pc__icon-btn"
-                              aria-label={t.addParallel}
-                              title={t.addParallel}
-                              onClick={(e) =>
-                                handleAddParallel(
-                                  p.uuid,
-                                  e.currentTarget as unknown as HTMLElement,
-                                )
-                              }
-                            >
-                              <Layers size={14} />
-                            </button>
-                          </Show>
-                          <Show when={role().kind !== "fallback" && role().kind !== "primary"}>
-                            <button
-                              type="button"
-                              class="pc__icon-btn"
-                              aria-label={t.setFallback}
-                              title={t.setFallback}
-                              onClick={() => void handleSetFallback(p.uuid)}
-                            >
-                              <CornerDownLeft size={14} />
-                            </button>
+                          <Show when={p.enabled}>
+                            <Show when={role().kind !== "primary"}>
+                              <button
+                                type="button"
+                                class="pc__icon-btn"
+                                aria-label={t.setPrimary}
+                                title={t.setPrimary}
+                                onClick={() => void handleSetPrimary(p.uuid)}
+                              >
+                                <Star size={14} />
+                              </button>
+                            </Show>
+                            <Show when={role().kind === "parallel"}>
+                              <button
+                                type="button"
+                                class="pc__icon-btn"
+                                aria-label={t.removeParallel}
+                                title={t.removeParallel}
+                                onClick={() => void handleRemoveParallel(p.uuid)}
+                              >
+                                <Layers size={14} />
+                              </button>
+                            </Show>
+                            <Show when={role().kind !== "parallel" && role().kind !== "primary"}>
+                              <button
+                                type="button"
+                                class="pc__icon-btn"
+                                aria-label={t.addParallel}
+                                title={t.addParallel}
+                                onClick={(e) =>
+                                  handleAddParallel(
+                                    p.uuid,
+                                    e.currentTarget as unknown as HTMLElement,
+                                  )
+                                }
+                              >
+                                <Layers size={14} />
+                              </button>
+                            </Show>
+                            <Show when={role().kind !== "fallback" && role().kind !== "primary"}>
+                              <button
+                                type="button"
+                                class="pc__icon-btn"
+                                aria-label={t.setFallback}
+                                title={t.setFallback}
+                                onClick={() => void handleSetFallback(p.uuid)}
+                              >
+                                <CornerDownLeft size={14} />
+                              </button>
+                            </Show>
                           </Show>
                           {/* Duplicate */}
                           <button
