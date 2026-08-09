@@ -34,6 +34,11 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
+# rev-11/rev-12 / Task A5: generate the tray PNGs at build time. Build-only,
+# NOT a runtime dep — the bytes are embedded via include_bytes!(env!("OUT_DIR").
+# rev-12: produces TWO icons — tray-error-32.png (red-dot overlay on the base
+# icon) + tray-active-32.png (dimmed variant for the pulse frame-swap).
+image = { version = "0.25", default-features = false, features = ["png"] }
 
 [dependencies]
 tauri = { version = "2", features = ["macos-private-api", "tray-icon", "image-png"] }
@@ -63,6 +68,10 @@ mouse_position = "0.1"
 arboard = "3"
 enigo = "0.2"
 futures = "0.3"
+# rev-14 / Task A5: cross-platform system locale detection (macOS CFLocale,
+# Windows GetUserDefaultLocaleName, Unix LANG/LC_*). rev-13's std::env::var("LANG")
+# was Unix-only; sys-locale works on all three platforms.
+sys-locale = "0.3"
 windows-sys = { version = "0.59", features = [
   "Win32_Foundation",
   "Win32_Graphics_Gdi",
@@ -100,6 +109,14 @@ objc2-app-kit = { version = "0.3", features = [
 
 [dev-dependencies]
 wiremock = "0.6"
-tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+# rev-14 / Task A5: add `test-util` so #[tokio::test(start_paused = true)] resolves
+# if a test wants it (rev-14's tray_state tests are sync and do not strictly need it,
+# but the feature must resolve to avoid a compile error from the attribute).
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "test-util"] }
 tempfile = "3"
 crossbeam-channel = "0.5"
+# rev-13/rev-14 / Task A5: the red-dot pixel-diff test (Step 2) loads the generated
+# tray-error-32.png and the base icon to assert the overlay is localized to the
+# dot circle. Build-dep `image` is NOT visible to integration tests, so this is
+# a separate dev-dep entry (same version).
+image = { version = "0.25", default-features = false, features = ["png"] }
