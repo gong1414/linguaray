@@ -42,4 +42,65 @@
   padding: var(--space-md);
   box-sizing: border-box;
   overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+/* macOS Accessibility permission banner. Warning token surface; the banner
+ * stacks above the section content and stays reachable (role=alert + buttons
+ * in the tab order). */
+.settings-shell__a11y-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  background: var(--color-warning-fill);
+  color: var(--color-warning-fg);
+}
+
+.settings-shell__a11y-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  min-width: 0;
+  flex: 1 1 16rem;
+}
+
+.settings-shell__a11y-title {
+  font-weight: var(--text-md--weight);
+}
+
+.settings-shell__a11y-hint {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+.settings-shell__a11y-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  flex: 0 0 auto;
+}
+
+.settings-shell__a11y-action {
+  font: inherit;
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-md);
+  border: 1px solid currentColor;
+  background: transparent;
+  color: var(--color-warning-fg);
+  cursor: pointer;
+}
+
+.settings-shell__a11y-action:hover {
+  background: var(--color-surface-hover);
+}
+
+.settings-shell__a11y-action:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
 }
