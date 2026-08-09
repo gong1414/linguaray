@@ -381,6 +381,24 @@ describe("ProviderCenter (Surface 05)", () => {
     await waitFor(() => expect(screen.queryByText("Retry")).toBeNull());
   });
 
+  it("disabled provider: no Set-as-primary / Add-to-parallel role buttons", async () => {
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => [
+        profile({ uuid: "u1", name: "DisabledProv", enabled: false, secret_ref: "provider/u1" }),
+      ],
+      key_status: () => ({ "provider/u1": true }),
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("DisabledProv")).toBeTruthy());
+    // A disabled provider exposes no role-assign buttons.
+    expect(screen.queryAllByLabelText("Set as primary").length).toBe(0);
+    expect(screen.queryAllByLabelText("Add to parallel").length).toBe(0);
+    expect(screen.queryAllByLabelText("Set as fallback").length).toBe(0);
+    // Reorder + duplicate (non-role actions) remain available.
+    expect(screen.getAllByLabelText("Move up").length).toBeGreaterThanOrEqual(1);
+  });
+
   it("set primary: calls provider_set_active with { primary, parallel: [], fallback }", async () => {
     const setActiveCalls: unknown[] = [];
     routeInvoke({
