@@ -22,11 +22,13 @@ export type PopupStatePayload = {
   status: "loading" | "result" | "error";
   text: string;
   engine: string;
+  source_text?: string;
 };
 
 /** Backend `popup-multi-result` payload. */
 export type PopupMultiPayload = {
   outcomes: TranslationOutcomeFE[];
+  source_text?: string;
 };
 
 /** Backend `translate_session` return value. */
@@ -97,6 +99,10 @@ export type CopyKey =
   | "selection.action.favorite"
   | "selection.action.favorited"
   | "selection.action.retry"
+  | "selection.action.openSettings"
+  | "selection.action.recovery"
+  | "selection.action.comingTts"
+  | "selection.action.comingFavorite"
   | "selection.multi.title"
   // Surface 02
   | "input.title"

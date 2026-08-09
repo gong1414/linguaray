@@ -12,6 +12,12 @@ export type ResultAction = {
   /** Mark active (e.g. pinned/favorited). Visual only. */
   active?: boolean;
   disabled?: boolean;
+  /**
+   * Visually + semantically disabled (aria-disabled="true") while remaining
+   * focusable (NOT a native `disabled`). Used for not-yet-shipped actions
+   * (TTS, Favorite) so they stay keyboard-reachable for discovery.
+   */
+  ariaDisabled?: boolean;
 };
 
 export type ResultCardProps = {
@@ -67,7 +73,8 @@ const ResultCard: Component<ResultCardProps> = (props) => {
                 size="sm"
                 aria-label={a.label}
                 aria-pressed={a.active ? "true" : undefined}
-                disabled={a.disabled}
+                disabled={a.disabled && !a.ariaDisabled}
+                aria-disabled={a.ariaDisabled ? "true" : undefined}
                 onClick={() => a.onClick?.()}
               >
                 {a.icon}
