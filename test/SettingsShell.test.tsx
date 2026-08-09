@@ -1,7 +1,37 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, fireEvent, cleanup } from "@solidjs/testing-library";
+import { render, fireEvent, cleanup, waitFor } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import SettingsShell, { type SettingsSection } from "../src/features/settings/SettingsShell";
+
+// --- Tauri API mocks (C6: SettingsShell statically imports invoke +
+// getCurrentWindow + openUrl at module load, so the mocks must be hoisted
+// above the component import). ---
+const { invokeMock, onFocusChangedMock, unlistenMock, openUrlMock, focusSlot } = vi.hoisted(() => {
+  // focusSlot holds the focus handler the component registers so tests can
+  // fire it to simulate a window focus event without reaching into Tauri.
+  const focusSlot: { cb?: (e: { payload: boolean }) => void } = {};
+  const unlistenMock = vi.fn();
+  return {
+    invokeMock: vi.fn(async (_cmd: string, _args?: unknown): Promise<unknown> => true),
+    onFocusChangedMock: vi.fn(async (cb: (e: { payload: boolean }) => void) => {
+      focusSlot.cb = cb;
+      return unlistenMock;
+    }),
+    unlistenMock,
+    openUrlMock: vi.fn(async () => undefined),
+    focusSlot,
+  };
+});
+
+vi.mock("@tauri-apps/api/core", () => ({ invoke: invokeMock }));
+vi.mock("@tauri-apps/api/window", () => ({
+  getCurrentWindow: () => ({
+    onFocusChanged: onFocusChangedMock,
+    close: vi.fn(async () => {}),
+    minimize: vi.fn(async () => {}),
+  }),
+}));
+vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: openUrlMock }));
 
 // matchMedia is stubbed globally in test/setup.ts (matches:false). Per-test we
 // install a fresh implementation to simulate the two breakpoints.
@@ -19,7 +49,21 @@ function installMatchMedia(matchesWide: boolean) {
   (window.matchMedia as unknown) = vi.fn(impl);
 }
 
-beforeEach(() => installMatchMedia(true));
+beforeEach(() => {
+  installMatchMedia(true);
+  // Reset all Tauri mocks + default a11y_status to granted so the existing
+  // (pre-C6) tests do not render the permission banner. C6 tests override
+  // the a11y_status return per-test.
+  invokeMock.mockReset();
+  invokeMock.mockResolvedValue(true);
+  // mockClear (NOT mockReset) preserves the hoisted implementation that
+  // captures the focus callback into focusSlot; mockReset would wipe it.
+  onFocusChangedMock.mockClear();
+  unlistenMock.mockReset();
+  openUrlMock.mockReset();
+  openUrlMock.mockResolvedValue(undefined);
+  focusSlot.cb = undefined;
+});
 afterEach(() => {
   cleanup();
   // restore the setup.ts default stub
@@ -187,5 +231,55 @@ describe("SettingsShell", () => {
       return btn && (btn.getAttribute("aria-label") ?? "").length > 0;
     });
     expect(labeledTriggers.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe("SettingsShell — macOS Accessibility permission (C6)", () => {
+  it("shows the macOS Accessibility permission warning when not granted", async () => {
+    // a11y_status resolves false → banner renders with the localized title +
+    // hint + Re-check + Open System Settings actions. Default locale is en.
+    invokeMock.mockResolvedValue(false);
+    const { getByText, getByTestId } = render(() => <SettingsShell>body</SettingsShell>);
+    await waitFor(() => expect(getByTestId("a11y-banner")).toBeInTheDocument());
+    expect(getByText("Accessibility permission needed")).toBeInTheDocument();
+    expect(getByText("Re-check")).toBeInTheDocument();
+    expect(getByText("System Settings")).toBeInTheDocument();
+  });
+
+  it("Re-check re-invokes a11y_status", async () => {
+    invokeMock.mockResolvedValue(false);
+    const { getByTestId } = render(() => <SettingsShell>body</SettingsShell>);
+    await waitFor(() => expect(getByTestId("a11y-banner")).toBeInTheDocument());
+    // Clear the onMount call so the next a11y_status is attributable to the
+    // Re-check button click.
+    invokeMock.mockClear();
+    fireEvent.click(getByTestId("a11y-recheck"));
+    await waitFor(() =>
+      expect(invokeMock.mock.calls.some((c) => c[0] === "a11y_status")).toBe(true),
+    );
+  });
+
+  it("registers exactly one onFocusChanged listener and re-checks on focus (P1-9)", async () => {
+    invokeMock.mockResolvedValue(false);
+    render(() => <SettingsShell>body</SettingsShell>);
+    // P1-9: assert exactly ONE registration before testing behavior.
+    await waitFor(() => expect(onFocusChangedMock).toHaveBeenCalledTimes(1));
+    // Fire the captured focus callback → recheckA11y re-invokes a11y_status.
+    invokeMock.mockClear();
+    expect(focusSlot.cb).toBeDefined();
+    focusSlot.cb!({ payload: true });
+    await waitFor(() =>
+      expect(invokeMock.mock.calls.some((c) => c[0] === "a11y_status")).toBe(true),
+    );
+  });
+
+  it("onCleanup calls the unlisten returned by onFocusChanged (P1-9)", async () => {
+    invokeMock.mockResolvedValue(true);
+    render(() => <SettingsShell>body</SettingsShell>);
+    await waitFor(() => expect(onFocusChangedMock).toHaveBeenCalledTimes(1));
+    expect(unlistenMock).not.toHaveBeenCalled();
+    // Unmounting the shell runs the onCleanup that calls the focus unlisten.
+    cleanup();
+    expect(unlistenMock).toHaveBeenCalledTimes(1);
   });
 });

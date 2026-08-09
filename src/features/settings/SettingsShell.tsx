@@ -1,10 +1,12 @@
 import {
   createSignal,
   onCleanup,
+  onMount,
   Show,
   type Component,
   type JSX,
 } from "solid-js";
+import { invoke } from "@tauri-apps/api/core";
 import { Server, ShieldCheck, Keyboard, ShieldAlert } from "lucide-solid";
 import { WindowChrome, SidebarItem, Tooltip } from "@linguaray/ui";
 import { SETTINGS_COPY } from "./copy";
@@ -81,6 +83,41 @@ const SettingsShell: Component<SettingsShellProps> = (props) => {
     { id: "privacy", label: t.nav.privacy, icon: <ShieldAlert size={16} />, disabled: true },
   ];
 
+  // macOS Accessibility permission. null = unknown (pre-first-resolve), true =
+  // granted, false = not granted → render the recovery banner. Selection
+  // capture needs the AX permission for both the direct-read and the simulated
+  // Cmd+C fallback, so a missing grant is surfaced here, not silently ignored.
+  const [a11yGranted, setA11yGranted] = createSignal<boolean | null>(null);
+  const recheckA11y = async () => {
+    try {
+      const granted = await invoke<boolean>("a11y_status");
+      setA11yGranted(granted);
+    } catch {
+      // Swallow: a non-Tauri context (or a backend that lacks the command)
+      // leaves the banner hidden rather than blocking the whole shell.
+      setA11yGranted(true);
+    }
+  };
+  onMount(() => {
+    void recheckA11y();
+    // Re-check when the window regains focus: the user likely just toggled the
+    // grant in System Settings, so refresh the banner without a manual Re-check.
+    // Lazy-import the Tauri window API so jsdom tests that don't mock it (and
+    // non-Tauri contexts) never touch the bridge at import time.
+    let unlisten: (() => void) | undefined;
+    import("@tauri-apps/api/window")
+      .then(({ getCurrentWindow }) =>
+        getCurrentWindow().onFocusChanged(({ payload: focused }) => {
+          if (focused) void recheckA11y();
+        }),
+      )
+      .then((u) => {
+        unlisten = u;
+      })
+      .catch(() => {});
+    onCleanup(() => unlisten?.());
+  });
+
   const handleClick = (id: SettingsSection) => {
     // rev-9-2: only mutate the internal signal in UNCONTROLLED mode
     // (props.activePage === undefined). In controlled mode the parent is the
@@ -145,7 +182,49 @@ const SettingsShell: Component<SettingsShellProps> = (props) => {
         onMinimize={handleMinimize}
         sidebar={<nav class="settings-shell__nav" aria-label={t.window.title}>{navItems.map(renderItem)}</nav>}
       >
-        <div class="settings-shell__content">{props.children}</div>
+        <div class="settings-shell__content">
+          <Show when={a11yGranted() === false}>
+            <div
+              class="settings-shell__a11y-banner"
+              role="alert"
+              data-testid="a11y-banner"
+            >
+              <div class="settings-shell__a11y-body">
+                <strong class="settings-shell__a11y-title">{t.a11y.title}</strong>
+                <p class="settings-shell__a11y-hint">{t.a11y.hint}</p>
+              </div>
+              <div class="settings-shell__a11y-actions">
+                <button
+                  type="button"
+                  class="settings-shell__a11y-action"
+                  data-testid="a11y-recheck"
+                  onClick={() => void recheckA11y()}
+                >
+                  {t.a11y.recheck}
+                </button>
+                <button
+                  type="button"
+                  class="settings-shell__a11y-action"
+                  data-testid="a11y-open-settings"
+                  onClick={() =>
+                    // Lazy-import so a non-Tauri context (or a test that doesn't
+                    // mock the plugin) never touches the opener bridge.
+                    import("@tauri-apps/plugin-opener")
+                      .then(({ openUrl }) =>
+                        openUrl(
+                          "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
+                        ),
+                      )
+                      .catch(() => {})
+                  }
+                >
+                  {t.a11y.openSettings}
+                </button>
+              </div>
+            </div>
+          </Show>
+          {props.children}
+        </div>
       </WindowChrome>
     </div>
   );

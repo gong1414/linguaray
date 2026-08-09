@@ -33,6 +33,20 @@ type NavCopy = {
   placeholderHint: string;
 };
 
+/** macOS Accessibility permission banner. Shown when `a11y_status` is false;
+ *  selection capture needs the AX permission for both the direct-read and the
+ *  simulated Cmd+C fallback. */
+type A11yCopy = {
+  /** Banner title. */
+  title: string;
+  /** Why LinguaRay needs the permission + how to grant it. */
+  hint: string;
+  /** Re-check button (re-invokes `a11y_status`). */
+  recheck: string;
+  /** Open System Settings button (deep-link to Privacy_Accessibility). */
+  openSettings: string;
+};
+
 /** Keystore Recovery (Surface 06) labels.
  *  `description` carries the `{reason}` placeholder. */
 type KeystoreCopy = {
@@ -193,6 +207,7 @@ type ProviderCopy = {
 export type SettingsCopy = {
   window: WindowCopy;
   nav: NavCopy;
+  a11y: A11yCopy;
   keystore: KeystoreCopy;
   provider: ProviderCopy;
 };
@@ -211,6 +226,12 @@ const EN: SettingsCopy = {
     shortcuts: "Shortcuts",
     privacy: "Privacy",
     placeholderHint: "Coming in R3b",
+  },
+  a11y: {
+    title: "Accessibility permission needed",
+    hint: "LinguaRay needs the macOS Accessibility permission to capture selected text. Grant it in System Settings, then re-check.",
+    recheck: "Re-check",
+    openSettings: "System Settings",
   },
   keystore: {
     healthy: "Keystore healthy",
@@ -333,6 +354,12 @@ const ZH: SettingsCopy = {
     shortcuts: "Shortcuts",
     privacy: "Privacy",
     placeholderHint: "将在 R3b 中提供",
+  },
+  a11y: {
+    title: "需要辅助功能权限",
+    hint: "LinguaRay 需要辅助功能权限才能捕获选中文本。请在系统设置中授权，然后重新检查。",
+    recheck: "重新检查",
+    openSettings: "系统设置",
   },
   keystore: {
     healthy: "密钥库正常",
