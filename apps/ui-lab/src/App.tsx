@@ -11,6 +11,8 @@ import {
 import { strings, galleryStrings, type Locale, type SelectionState, type ProviderState } from "./i18n";
 import SelectionPopup from "./pages/SelectionPopup";
 import ProviderCenter from "./pages/ProviderCenter";
+import InputPanel from "./pages/InputPanel";
+import KeystoreRecovery from "./pages/KeystoreRecovery";
 import { ComponentGallery } from "./pages/ComponentGallery";
 import { SidebarItem, Confirm } from "@linguaray/ui";
 import { Settings } from "lucide-solid";
@@ -93,7 +95,7 @@ const NAV_ITEMS: {
 ];
 
 // Implemented surfaces.
-const IMPLEMENTED: NavKey[] = ["selection-popup", "provider-center", "component-gallery", "sidebar-isolated"];
+const IMPLEMENTED: NavKey[] = ["selection-popup", "input-window", "provider-center", "keystore", "component-gallery", "sidebar-isolated", "confirm-isolated"];
 
 const PROVIDER_STATES: ProviderState[] = [
   "empty",
@@ -141,7 +143,23 @@ const App: Component = () => {
   const [motion, setMotion] = createSignal<Motion>("full");
   const [nav, setNav] = createSignal<NavKey>(initialNav);
   const [selState, setSelState] = createSignal<SelectionState>("success-single");
-  const [provState, setProvState] = createSignal<ProviderState>("empty");
+  const [provState, setProvState] = createSignal<ProviderState>(
+    // rev-6-8: ProviderState has NO "configured" value. The populated variant
+    // seeds "key-saved" (a real ProviderState); the empty variant seeds "empty".
+    params.get("fixture") === "populated" ? "key-saved" : "empty",
+  );
+  const [keystoreState, setKeystoreState] = createSignal<"healthy" | "corrupt">(
+    params.get("fixture") === "corrupt" ? "corrupt" : "healthy",
+  );
+  const [inputState, setInputState] = createSignal<"idle" | "multi" | "partial" | "error">(
+    params.get("state") === "multi"
+      ? "multi"
+      : params.get("state") === "partial"
+        ? "partial"
+        : params.get("state") === "error"
+          ? "error"
+          : "idle",
+  );
   const [settingsSize, setSettingsSize] = createSignal<"min" | "default" | "narrow-699" | "boundary-700">("default");
 
   const t = createMemo(() => strings[locale()]);
@@ -376,6 +394,14 @@ const App: Component = () => {
               <ComponentGallery locale={locale()} theme={theme()} />
             </Match>
 
+            <Match when={nav() === "input-window"}>
+              <InputPanel state={inputState()} />
+            </Match>
+
+            <Match when={nav() === "keystore"}>
+              <KeystoreRecovery state={keystoreState()} />
+            </Match>
+
             <Match when={!IMPLEMENTED.includes(nav())}>
               <div class="lab__frame-placeholder">
                 <p>
@@ -435,6 +461,42 @@ const App: Component = () => {
                 : settingsSize() === "boundary-700" ? t().provider.frameBoundary700
                 : t().provider.frameDefault}
             </button>
+          </div>
+        </Show>
+
+        <Show when={nav() === "input-window"}>
+          <div class="lab__state-bar" role="group" aria-label={t().controls.state}>
+            <span class="lab__state-label">{t().controls.state}</span>
+            <For each={["idle", "multi", "partial", "error"] as const}>
+              {(s) => (
+                <button
+                  type="button"
+                  class="lab__state-chip lr-focusable"
+                  aria-pressed={inputState() === s ? "true" : "false"}
+                  onClick={() => setInputState(s)}
+                >
+                  {s}
+                </button>
+              )}
+            </For>
+          </div>
+        </Show>
+
+        <Show when={nav() === "keystore"}>
+          <div class="lab__state-bar" role="group" aria-label={t().controls.state}>
+            <span class="lab__state-label">{t().controls.state}</span>
+            <For each={["healthy", "corrupt"] as const}>
+              {(s) => (
+                <button
+                  type="button"
+                  class="lab__state-chip lr-focusable"
+                  aria-pressed={keystoreState() === s ? "true" : "false"}
+                  onClick={() => setKeystoreState(s)}
+                >
+                  {s}
+                </button>
+              )}
+            </For>
           </div>
         </Show>
       </main>
