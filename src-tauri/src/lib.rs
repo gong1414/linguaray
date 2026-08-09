@@ -46,6 +46,10 @@ use crate::db::readiness::DataReadiness;
 use crate::db::Database;
 use crate::service::{translate_parallel, translate_with_fallback_ref, TranslationOutcome};
 
+// Re-export so integration tests can reference the error enum as
+// `linguaray_lib::Error` (mirrors `service::TranslationOutcome` usage).
+pub use crate::error::Error;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TranslateRequest {
     pub text: String,
@@ -437,7 +441,7 @@ pub struct TranslateSessionResult {
 /// translate_clipboard 根据翻译结果决定发哪种 popup 事件的纯函数决策。
 /// 抽出来便于测试（translate_clipboard 本身依赖 Tauri runtime 不可单测）。
 #[derive(Debug)]
-enum ClipboardPopupDecision {
+pub enum ClipboardPopupDecision {
     /// 单引擎成功 → 走老 popup-state 事件（向后兼容）。
     SingleSuccess { text: String, engine: String },
     /// 并行（含部分成功）→ 走 popup-multi-result 事件。
@@ -446,7 +450,7 @@ enum ClipboardPopupDecision {
     Error(String),
 }
 
-fn decide_clipboard_popup(result: &TranslateSessionResult) -> ClipboardPopupDecision {
+pub fn decide_clipboard_popup(result: &TranslateSessionResult) -> ClipboardPopupDecision {
     if result.outcomes.is_empty() {
         return ClipboardPopupDecision::Error("translation produced no outcomes".into());
     }
@@ -480,6 +484,17 @@ fn decide_clipboard_popup(result: &TranslateSessionResult) -> ClipboardPopupDeci
     ClipboardPopupDecision::Multi
 }
 
+/// Central sentinel resolver: the frontend passes `to: ""` to mean "use the
+/// stored target language". Exposed so the hotkey contract is locked by an
+/// integration test.
+pub fn resolve_target_language(to: &str, settings_target: &str) -> String {
+    if to.is_empty() {
+        settings_target.to_string()
+    } else {
+        to.to_string()
+    }
+}
+
 /// 翻译会话核心逻辑（纯函数，无 Tauri State 依赖）。
 ///
 /// 被两个入口共享：
@@ -498,11 +513,15 @@ async fn run_translate_session(
     from: &str,
     to: &str,
 ) -> Result<TranslateSessionResult, String> {
+    // P1-C: resolve the "" sentinel CENTRALLY so on_hotkey, translate_session,
+    // translate_selection_ipc, and the tray all agree.
+    let settings_target = settings::load(app).target_language;
+    let to = resolve_target_language(to, &settings_target);
     // 读 fallback_engine（§G opt-in，默认 None）。
     let fallback_box = settings::load(app).fallback_engine.as_deref().and_then(engines::find);
     let fallback: Option<Arc<dyn engines::TraditionalEngine>> =
         fallback_box.map(Arc::<dyn engines::TraditionalEngine>::from);
-    run_translate_session_with_fallback(db, client, keystore, text, from, to, fallback).await
+    run_translate_session_with_fallback(db, client, keystore, text, from, &to, fallback).await
 }
 
 /// 测试入口：不读 settings，fallback 直接传 None（聚焦核心路径）。
@@ -1965,6 +1984,248 @@ impl EngineInfo {
     }
 }
 
+/// Shared selection-capture + translate-session pipeline. Used by on_hotkey,
+/// translate_selection_ipc (tray + Retry). Emits the popup state per outcome.
+///
+/// - `supplied_text = Some(t)` (Retry): skip capture, use the saved SOURCE text.
+/// - `supplied_text = None` (hotkey/tray): run the selection_lock +
+///   capture_selection block on_hotkey used.
+/// - `x`, `y`: the PHYSICAL cursor coords (from cursor::position() at the call
+///   site). The helper resolves the cursor's monitor via `monitor_from_point` and
+///   converts to logical via THAT monitor's scale_factor (rev-7-1).
+/// - `gen`: the generation token. Checked at every await boundary so a stale
+///   run never overwrites a fresher popup (P1-1).
+///
+/// `to` is passed as `""` so run_translate_session's central resolver handles it.
+#[allow(clippy::too_many_arguments)]
+async fn capture_and_translate(
+    app: &tauri::AppHandle,
+    state: &Arc<Session>,
+    app_state: &Arc<AppState>,
+    supplied_text: Option<String>,
+    x: f64,
+    y: f64,
+    gen: u64,
+) {
+    // 1. Acquire text (capture or supplied).
+    let (text, anchor) = match supplied_text {
+        Some(t) if !t.is_empty() => {
+            let anchor = match build_popup_anchor(app, x, y) {
+                Some(a) => a,
+                None => return,
+            };
+            (t, anchor)
+        }
+        _ => {
+            // The SAME selection_lock + capture_selection(800, owner) block
+            // on_hotkey uses.
+            let captured: Result<String, ()> = {
+                let _g = state.gen.selection_lock();
+                #[cfg(target_os = "windows")]
+                let owner = match app
+                    .get_webview_window("main")
+                    .ok_or_else(|| "main window unavailable".to_string())
+                    .and_then(|w| w.hwnd().map(|h| h.0).map_err(|e| e.to_string()))
+                {
+                    Ok(h) => h,
+                    Err(e) => {
+                        log::warn!("clipboard restore skipped: no owner HWND ({e})");
+                        return;
+                    }
+                };
+                #[cfg(not(target_os = "windows"))]
+                let owner = ();
+                match selection::capture_selection(800, owner) {
+                    Ok(selection_engine::Capture::Selected(t)) => Ok(t),
+                    Ok(selection_engine::Capture::NoSelection) => {
+                        let anchor = match build_popup_anchor(app, x, y) {
+                            Some(a) => a,
+                            None => return,
+                        };
+                        let (px, py, pw, ph) =
+                            popup::compute_popup_geometry_logical(popup::PopupMode::Error, &anchor);
+                        let _ = popup::show_at_sized(app, px, py, pw, ph);
+                        let _ = popup::error(
+                            app,
+                            if !a11y::enabled() {
+                                "No selection captured. Grant Accessibility in System Settings → Privacy → Accessibility."
+                            } else {
+                                "No text selected."
+                            },
+                        );
+                        Err(())
+                    }
+                    Err(e) => {
+                        let anchor = match build_popup_anchor(app, x, y) {
+                            Some(a) => a,
+                            None => return,
+                        };
+                        let (px, py, pw, ph) =
+                            popup::compute_popup_geometry_logical(popup::PopupMode::Error, &anchor);
+                        let _ = popup::show_at_sized(app, px, py, pw, ph);
+                        let _ = popup::error(app, &e);
+                        Err(())
+                    }
+                }
+            };
+            if !state.gen.is_latest(gen) {
+                return;
+            }
+            let text = match captured {
+                Ok(t) => t,
+                Err(_) => return,
+            };
+            let anchor = match build_popup_anchor(app, x, y) {
+                Some(a) => a,
+                None => return,
+            };
+            (text, anchor)
+        }
+    };
+
+    // 2. Show loading popup sized + clamped, carrying the source (P1-3).
+    if !state.gen.is_latest(gen) {
+        return;
+    }
+    let _ = popup::loading_with_source(app, &anchor, Some(&text));
+
+    // 3. client/keystore guards acquired from Session FIRST.
+    let client = match state.client.as_ref() {
+        Some(c) => c.clone(),
+        None => {
+            if state.gen.is_latest(gen) {
+                let _ = popup::set_popup_mode(app, popup::PopupMode::Error, &anchor);
+                let _ = popup::error_with_source(
+                    app,
+                    "HTTP client unavailable: startup build failed (recovery required)",
+                    &text,
+                );
+            }
+            return;
+        }
+    };
+    let keystore = match state.keystore.as_ref() {
+        Some(k) => k,
+        None => {
+            if state.gen.is_latest(gen) {
+                let _ = popup::set_popup_mode(app, popup::PopupMode::Error, &anchor);
+                let _ = popup::error_with_source(
+                    app,
+                    "keystore unavailable: startup init failed (recovery required)",
+                    &text,
+                );
+            }
+            return;
+        }
+    };
+
+    // rev-9-1: acquire the db Arc via spawn_blocking (gate guard INSIDE the closure).
+    let app_arc = app_state.clone();
+    let db = match tauri::async_runtime::spawn_blocking(move || -> Result<Arc<Database>, String> {
+        let _gate = app_arc.data_gate.read();
+        require_ready_gated(&app_arc, &_gate)
+    })
+    .await
+    {
+        Ok(Ok(db)) => db,
+        Ok(Err(msg)) => {
+            if state.gen.is_latest(gen) {
+                let _ = popup::set_popup_mode(app, popup::PopupMode::Error, &anchor);
+                let _ = popup::error_with_source(app, &msg, &text);
+            }
+            return;
+        }
+        Err(e) => {
+            if state.gen.is_latest(gen) {
+                let _ = popup::set_popup_mode(app, popup::PopupMode::Error, &anchor);
+                let _ = popup::error_with_source(app, &format!("join error: {e}"), &text);
+            }
+            return;
+        }
+    };
+
+    if !state.gen.is_latest(gen) {
+        return;
+    }
+
+    // 4. run_translate_session — to:"" is resolved centrally inside it.
+    let session_result = match run_translate_session(
+        &db, &client, keystore, app, &text, "auto", "",
+    )
+    .await
+    {
+        Ok(r) => r,
+        Err(msg) => {
+            if state.gen.is_latest(gen) {
+                let _ = popup::set_popup_mode(app, popup::PopupMode::Error, &anchor);
+                let _ = popup::error_with_source(app, &msg, &text);
+            }
+            return;
+        }
+    };
+    if !state.gen.is_latest(gen) {
+        return;
+    }
+
+    // 5. Route per decision + size per state.
+    match decide_clipboard_popup(&session_result) {
+        ClipboardPopupDecision::SingleSuccess { text: t, engine } => {
+            let _ = popup::set_popup_mode(app, popup::PopupMode::Single, &anchor);
+            let _ = popup::result_with_source(app, &t, &engine, &text);
+        }
+        ClipboardPopupDecision::Multi => {
+            let _ = popup::set_popup_mode(app, popup::PopupMode::Multi, &anchor);
+            let _ = popup::multi_result_with_source(app, &session_result.outcomes, &text);
+        }
+        ClipboardPopupDecision::Error(msg) => {
+            let _ = popup::set_popup_mode(app, popup::PopupMode::Error, &anchor);
+            let _ = popup::error_with_source(app, &msg, &text);
+        }
+    }
+}
+
+/// Build a PopupAnchor from the physical cursor coords. The scale factor used
+/// to convert the work area AND the cursor is the TARGET MONITOR's
+/// `scale_factor()` — NOT the popup window's.
+fn build_popup_anchor(app: &tauri::AppHandle, x_phys: f64, y_phys: f64) -> Option<popup::PopupAnchor> {
+    let win = app.get_webview_window("popup")?;
+
+    let monitor = app
+        .monitor_from_point(x_phys, y_phys)
+        .ok()
+        .flatten()
+        .or_else(|| app.primary_monitor().ok().flatten());
+
+    let mut sf = match &monitor {
+        Some(m) => m.scale_factor(),
+        None => win.scale_factor().unwrap_or(1.0),
+    };
+    if !(sf > 0.0 && sf.is_finite()) {
+        sf = 1.0;
+    }
+    let cursor_logical = (x_phys / sf, y_phys / sf);
+
+    let work_area_logical = if let Some(m) = &monitor {
+        let wa = m.work_area();
+        let pos = &wa.position;
+        let sz = &wa.size;
+        let left = pos.x as f64 / sf;
+        let top = pos.y as f64 / sf;
+        let right = left + sz.width as f64 / sf;
+        let bottom = top + sz.height as f64 / sf;
+        popup::LogicalWorkArea { left, top, right, bottom }
+    } else {
+        let (cx, cy) = cursor_logical;
+        popup::LogicalWorkArea { left: cx, top: cy, right: cx + 1.0, bottom: cy + 1.0 }
+    };
+
+    Some(popup::PopupAnchor {
+        cursor_logical,
+        work_area: work_area_logical,
+        scale_factor: sf,
+    })
+}
+
 /// Selection-translate loop bound to the `Alt+Space` global shortcut (§B/§C/§D).
 ///
 /// The handler runs on the global-shortcut event thread, so all real work is
@@ -1986,140 +2247,25 @@ fn on_hotkey(app: &tauri::AppHandle, _shortcut: &tauri_plugin_global_shortcut::S
     }
 
     // (1) latest-wins token — allocate SYNCHRONOUSLY in the handler, BEFORE spawn.
-    // Doing this inside spawn let two presses' futures start out of order so the
-    // older press could grab the newer token (rev-3 race). Allocating here, in the
-    // handler thread (which is serialized per-press), guarantees strict press order.
     let state = app.state::<Arc<Session>>().inner().clone();
     let gen = state.gen.next();
 
     let app2 = app.clone();
     tauri::async_runtime::spawn(async move {
         let state = app2.state::<Arc<Session>>().inner().clone();
+        let app_state = app2.state::<Arc<AppState>>().inner().clone();
 
-        // (2) capture cursor position + selection under ONE selection-mutex hold,
-        // BEFORE the popup steals focus. The lock must span BOTH reads in a single
-        // guard — splitting it into two lock acquisitions lets a second hotkey
-        // trigger run its own capture_selection in between, whose clipboard writes
-        // (sentinel/copy) would interleave with this run's restore window and
-        // reopen the clipboard-corruption race the mutex exists to close (spec §concurrency).
-        let (x, y, captured) = {
+        // (2) Capture cursor position under the selection lock BEFORE the popup
+        // steals focus. The capture_selection itself happens inside
+        // capture_and_translate so hotkey/tray share it; but the cursor read
+        // must precede any popup show.
+        let (x, y) = {
             let _g = state.gen.selection_lock();
             let pos = cursor::position();
-            // Windows: owner HWND from the main webview window (the event-loop thread that
-            // pumps messages + receives WM_DESTROYCLIPBOARD). `WebviewWindow::hwnd()` is
-            // #[cfg(windows)] and returns the windows-crate HWND (newtype HWND(*mut c_void));
-            // `.0` is the raw *mut c_void == windows-sys HWND. Non-Windows: pass ().
-            // The async block returns (), so resolve the HWND via a `match` (not `?`) and
-            // log+return on failure (best-effort: no valid owner → no compound restore).
-            #[cfg(target_os = "windows")]
-            let owner = match app2
-                .get_webview_window("main")
-                .ok_or_else(|| "main window unavailable".to_string())
-                .and_then(|w| w.hwnd().map(|h| h.0).map_err(|e| e.to_string()))
-            {
-                Ok(h) => h,
-                Err(e) => {
-                    log::warn!("clipboard restore skipped: no owner HWND ({e})");
-                    return;
-                }
-            };
-            #[cfg(not(target_os = "windows"))]
-            let owner = ();
-            let cap = selection::capture_selection(800, owner);
-            (pos.0, pos.1, cap)
+            (pos.0 as f64, pos.1 as f64)
         };
 
-        // (3) superseded by a newer trigger — drop this run silently.
-        if !state.gen.is_latest(gen) {
-            return;
-        }
-
-        let text = match captured {
-            Ok(selection_engine::Capture::Selected(t)) => t,
-            Ok(selection_engine::Capture::NoSelection) => {
-                // Surface it visibly (review P1 #5: errors must reach the user, not
-                // vanish into a popup that's never shown). show_at reveals the window
-                // (popup::error alone only emits to a hidden window — review catch).
-                let _ = popup::show_at(&app2, x, y);
-                let _ = popup::error(
-                    &app2,
-                    if !a11y::enabled() {
-                        "No selection captured. Grant Accessibility in System Settings → Privacy → Accessibility."
-                    } else {
-                        "No text selected."
-                    },
-                );
-                return;
-            }
-            Err(e) => {
-                let _ = popup::show_at(&app2, x, y);
-                let _ = popup::error(&app2, &e);
-                return;
-            }
-        };
-
-        // (4) show loading popup at the cursor.
-        let _ = popup::show_at(&app2, x, y);
-
-        // (5) translate via the §G fallback-aware service. Default provider and
-        //     target language come from settings (Phase 2b); fall back to a
-        //     provider-not-found error popup instead of panicking. The opt-in
-        //     `fallback_engine` (Phase 3 Task 3) is resolved here — None by
-        //     default, so behavior is unchanged unless the user opts in.
-        let s = settings::load(&app2);
-        let preset = match providers::presets().into_iter().find(|p| p.id == s.default_provider) {
-            Some(p) => p,
-            None => {
-                let _ = popup::error(
-                    &app2,
-                    &format!("default provider '{}' not found", s.default_provider),
-                );
-                return;
-            }
-        };
-        let fallback = s.fallback_engine.as_deref().and_then(engines::find);
-        let input = service::TranslateInput {
-            text: &text,
-            from: "auto",
-            to: &s.target_language,
-            options: wire::AppOptions::default(),
-        };
-        let client = match state.client.as_ref() {
-            Some(c) => c,
-            None => {
-                if state.gen.is_latest(gen) {
-                    let _ = popup::error(
-                        &app2,
-                        "HTTP client unavailable: startup build failed (recovery required)",
-                    );
-                }
-                return;
-            }
-        };
-        let keystore = match state.keystore.as_ref() {
-            Some(k) => k,
-            None => {
-                if state.gen.is_latest(gen) {
-                    let _ = popup::error(
-                        &app2,
-                        "keystore unavailable: startup init failed (recovery required)",
-                    );
-                }
-                return;
-            }
-        };
-        match service::translate_with_fallback(client, keystore, &preset, input, fallback).await {
-            Ok(out) => {
-                if state.gen.is_latest(gen) {
-                    let _ = popup::result(&app2, &out.text, &out.engine);
-                }
-            }
-            Err(e) => {
-                if state.gen.is_latest(gen) {
-                    let _ = popup::error(&app2, &e.to_string());
-                }
-            }
-        }
+        capture_and_translate(&app2, &state, &app_state, None, x, y, gen).await;
     });
 }
 

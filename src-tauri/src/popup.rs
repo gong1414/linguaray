@@ -84,6 +84,8 @@ impl From<&crate::service::TranslationOutcome> for TranslationOutcomeSerialized 
 #[derive(Clone, serde::Serialize)]
 struct PopupMultiPayload {
     outcomes: Vec<TranslationOutcomeSerialized>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    source_text: Option<String>,
 }
 
 /// 推送多引擎翻译结果（R2a）。emit `popup-multi-result` 事件，
@@ -96,9 +98,54 @@ pub fn multi_result(
     let win = window(app)?;
     let payload = PopupMultiPayload {
         outcomes: outcomes.iter().map(TranslationOutcomeSerialized::from).collect(),
+        source_text: None,
     };
     win.emit(POPUP_MULTI_EVENT, payload).map_err(|e| e.to_string())?;
     Ok(())
+}
+
+/// A2: emit result WITH source (B4 refines the serialization). Carries source_text
+/// so Retry always has the original text (P1-3).
+pub fn result_with_source(
+    app: &tauri::AppHandle,
+    text: &str,
+    engine: &str,
+    source_text: &str,
+) -> Result<(), String> {
+    let win = window(app)?;
+    win.emit(
+        "popup-state",
+        Payload { status: "result", text, engine, source_text: Some(source_text) },
+    )
+    .map_err(|e| e.to_string())
+}
+
+/// A2: emit multi-result WITH source.
+pub fn multi_result_with_source(
+    app: &tauri::AppHandle,
+    outcomes: &[crate::service::TranslationOutcome],
+    source_text: &str,
+) -> Result<(), String> {
+    let win = window(app)?;
+    let payload = PopupMultiPayload {
+        outcomes: outcomes.iter().map(TranslationOutcomeSerialized::from).collect(),
+        source_text: Some(source_text.to_owned()),
+    };
+    win.emit(POPUP_MULTI_EVENT, payload).map_err(|e| e.to_string())
+}
+
+/// A2: emit error WITH source so the popup can still offer Retry (P1-3).
+pub fn error_with_source(
+    app: &tauri::AppHandle,
+    msg: &str,
+    source_text: &str,
+) -> Result<(), String> {
+    let win = window(app)?;
+    win.emit(
+        "popup-state",
+        Payload { status: "error", text: msg, engine: "", source_text: Some(source_text) },
+    )
+    .map_err(|e| e.to_string())
 }
 
 // ─── A3: native sizing + work-area clamping (P1-2 unified units) ─────────
@@ -329,6 +376,7 @@ mod tests {
         ];
         let payload = PopupMultiPayload {
             outcomes: outcomes.iter().map(TranslationOutcomeSerialized::from).collect(),
+            source_text: None,
         };
         let json = serde_json::to_string(&payload).unwrap();
         assert!(json.contains("\"outcomes\""), "{json}");
