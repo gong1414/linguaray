@@ -80,6 +80,11 @@ import "./ProviderCenter.css";
 // R2/C2: only the 4 supported AI presets are exposed. Traditional MT engines
 // (google / deepl) are no longer offered as presets.
 type Preset = { templateId: string; name: string | null; endpoint: string; model: string | null };
+
+/** Escape a literal string for use inside a CSS attribute selector. Provider
+ *  names may contain characters that break `button[aria-label="..."]` otherwise. */
+const cssEscape = (s: string): string =>
+  s.replace(/["\\]/g, (c) => `\\${c}`);
 const PRESETS: Preset[] = [
   { templateId: "openai", name: "OpenAI", endpoint: "https://api.openai.com/v1/chat/completions", model: "gpt-4o-mini" },
   { templateId: "anthropic", name: "Anthropic", endpoint: "https://api.anthropic.com/v1/messages", model: "claude-sonnet-4-5" },
@@ -122,6 +127,13 @@ const ProviderCenter: Component = () => {
   // --- Dialogs + toasts ---
   const [deleteConfirmUuid, setDeleteConfirmUuid] = createSignal<string | null>(null);
   const deleteTriggerRef: { current?: HTMLElement } = {};
+  // Delete error/retry state machine. On a failed delete the Confirm closes and
+  // a Retry banner surfaces in the main area (Kobalte's Dialog sets body
+  // pointer-events:none during its close transition, which would swallow clicks
+  // on an in-dialog Retry button). `deleteFailedUuid` holds the provider that
+  // failed so Retry can re-attempt without re-opening the dialog.
+  const [deleteError, setDeleteError] = createSignal(false);
+  const [deleteFailedUuid, setDeleteFailedUuid] = createSignal<string | null>(null);
   const [consentOpen, setConsentOpen] = createSignal(false);
   const [pendingParallelUuid, setPendingParallelUuid] = createSignal<string | null>(null);
   const [consentActualScope, setConsentActualScope] = createSignal<string | null>(null);
@@ -477,15 +489,49 @@ const ProviderCenter: Component = () => {
   };
 
   const confirmDelete = async () => {
-    const uuid = deleteConfirmUuid();
+    const uuid = deleteConfirmUuid() ?? deleteFailedUuid();
     if (!uuid) return;
     try {
       await providerDelete(uuid);
+      setDeleteError(false);
+      setDeleteFailedUuid(null);
       setDeleteConfirmUuid(null);
       await refresh();
     } catch (e) {
+      // Close the dialog and surface a Retry banner in the main area. Kobalte's
+      // Dialog sets body pointer-events:none during its close transition, so an
+      // in-dialog Retry button would have its clicks swallowed.
+      setDeleteError(true);
+      setDeleteFailedUuid(uuid);
+      setDeleteConfirmUuid(null);
       pushToast("destructive", t.saveFailed);
     }
+  };
+
+  /** Retry a failed delete (re-attempts providerDelete for the failed uuid). */
+  const retryDelete = () => {
+    void confirmDelete();
+  };
+
+  /** Dismiss the delete-error banner (gives up on retry). */
+  const dismissDeleteError = () => {
+    setDeleteError(false);
+    setDeleteFailedUuid(null);
+  };
+
+  /** Cancel the delete dialog: clear error/attempts and restore focus to the
+   *  delete trigger button. We focus the trigger explicitly here (in addition
+   *  to the Confirm's onCloseAutoFocus) because Kobalte's auto-focus restore is
+   *  unreliable under jsdom's synthesized events. */
+  const cancelDelete = () => {
+    setDeleteConfirmUuid(null);
+    setDeleteError(false);
+    setDeleteFailedUuid(null);
+    // Restore focus on the next tick (after the dialog unmounts) so the trigger
+    // is the active element when the row re-renders.
+    queueMicrotask(() => {
+      deleteTriggerRef.current?.focus();
+    });
   };
 
   /** Reorder: optimistic local swap → IPC → revert + toast on error. */
@@ -591,7 +637,21 @@ const ProviderCenter: Component = () => {
                           onToggle={(enabled) => void handleToggle(p.uuid, enabled)}
                           onEdit={() => setSelectedUuid(p.uuid)}
                           onDelete={() => {
-                            deleteTriggerRef.current = undefined;
+                            // Capture the delete trigger button so the Confirm's
+                            // onCloseAutoFocus can restore focus to it on cancel.
+                            // ProviderRow.onDelete carries no event/element, so
+                            // resolve the button by its deterministic aria-label
+                            // ("Delete {name}"). document.activeElement is
+                            // unreliable here — fireEvent.click in jsdom does not
+                            // move focus to the button, and a real click may have
+                            // already blurred it by the time the handler runs.
+                            const label = t.cardDelete.replace("{name}", p.name);
+                            const btn = document.querySelector<HTMLButtonElement>(
+                              `button[aria-label="${cssEscape(label)}"]`,
+                            );
+                            deleteTriggerRef.current = btn ?? undefined;
+                            setDeleteError(false);
+                            setDeleteFailedUuid(null);
                             setDeleteConfirmUuid(p.uuid);
                           }}
                         />
@@ -922,16 +982,34 @@ const ProviderCenter: Component = () => {
       {/* Delete Confirm */}
       <Confirm
         open={!!deleteConfirmUuid()}
-        onOpenChange={(o) => !o && setDeleteConfirmUuid(null)}
+        onOpenChange={(o) => {
+          if (!o) cancelDelete();
+        }}
         title={t.deleteConfirmTitle}
         message={t.deleteConfirmMsg}
         confirmLabel={t.delete}
         cancelLabel={t.cancel}
         variant="destructive"
         onConfirm={() => void confirmDelete()}
-        onCancel={() => setDeleteConfirmUuid(null)}
+        onCancel={() => cancelDelete()}
         triggerRef={deleteTriggerRef}
       />
+
+      {/* Delete-error Retry banner: surfaced after a failed delete. Lives in the
+          main layout (NOT inside the Kobalte Dialog) because the Dialog sets
+          body pointer-events:none during its close transition, which would
+          swallow clicks on an in-dialog Retry button. */}
+      <Show when={deleteError()}>
+        <div class="pc__delete-error-banner" role="alert">
+          <span class="pc__delete-error-msg">{t.saveFailed}</span>
+          <Button variant="secondary" size="sm" onClick={retryDelete}>
+            {t.retry}
+          </Button>
+          <Button variant="ghost" size="sm" onClick={dismissDeleteError}>
+            {t.cancel}
+          </Button>
+        </div>
+      </Show>
 
       {/* Consent Confirm */}
       <Confirm

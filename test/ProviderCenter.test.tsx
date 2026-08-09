@@ -331,6 +331,56 @@ describe("ProviderCenter (Surface 05)", () => {
     expect(deletes.length).toBeGreaterThanOrEqual(1);
   });
 
+  it("delete → cancel: focus returns to the delete trigger button", async () => {
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => [profile({ uuid: "u1", name: "TestProvider", secret_ref: "provider/u1" })],
+      key_status: () => ({ "provider/u1": true }),
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("TestProvider")).toBeTruthy());
+
+    const deleteBtn = screen.getByLabelText("Delete TestProvider") as HTMLButtonElement;
+    fireEvent.click(deleteBtn);
+    await waitFor(() => expect(screen.getByText("Delete provider?")).toBeTruthy());
+
+    // Cancel the dialog.
+    fireEvent.click(screen.getByText("Cancel"));
+    await flush();
+    // Focus is restored to the delete trigger button.
+    await waitFor(() => expect(document.activeElement).toBe(deleteBtn));
+  });
+
+  it("delete fails then retry succeeds: deleteAttempts === 2", async () => {
+    let deleteAttempts = 0;
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => [profile({ uuid: "u1", name: "TestProvider", secret_ref: "provider/u1" })],
+      key_status: () => ({ "provider/u1": true }),
+      provider_delete: () => {
+        deleteAttempts += 1;
+        if (deleteAttempts === 1) throw new Error("db locked");
+      },
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("TestProvider")).toBeTruthy());
+
+    fireEvent.click(screen.getByLabelText("Delete TestProvider"));
+    await waitFor(() => expect(screen.getByText("Delete provider?")).toBeTruthy());
+    // First attempt fails.
+    fireEvent.click(screen.getByText("Delete"));
+    await whenCalledWith("provider_delete");
+    await waitFor(() => expect(deleteAttempts).toBe(1));
+    // A Retry banner surfaces after the failure (the Confirm closes; the Retry
+    // affordance lives in the main area — see component note on Kobalte's
+    // body pointer-events:none during Dialog close transitions).
+    await waitFor(() => expect(screen.getByText("Retry")).toBeTruthy());
+    fireEvent.click(screen.getByText("Retry").closest("button")!);
+    await waitFor(() => expect(deleteAttempts).toBe(2));
+    // After the successful retry the Retry banner is gone.
+    await waitFor(() => expect(screen.queryByText("Retry")).toBeNull());
+  });
+
   it("set primary: calls provider_set_active with { primary, parallel: [], fallback }", async () => {
     const setActiveCalls: unknown[] = [];
     routeInvoke({
