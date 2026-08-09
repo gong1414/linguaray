@@ -282,4 +282,39 @@ describe("SettingsShell — macOS Accessibility permission (C6)", () => {
     cleanup();
     expect(unlistenMock).toHaveBeenCalledTimes(1);
   });
+
+  it("hardens onCleanup against the async-resolution race: unlisten IS called when onFocusChanged resolves AFTER unmount", async () => {
+    // Regression for the C6 race: if the component unmounts BEFORE the
+    // dynamic import + onFocusChanged() promise resolves, the old onCleanup
+    // captured an undefined `unlisten` and silently leaked the listener.
+    // The fix sets a `cancelled` flag so the resolve path tears down a
+    // listener that arrived late. Here we keep onFocusChanged pending across
+    // the unmount, then resolve it and assert unlisten IS invoked.
+    invokeMock.mockResolvedValue(false);
+    // Swap the hoisted mock for THIS test only: return a controllable promise
+    // that stays pending until we resolve it manually. The resolved value is
+    // the unlisten function (mirrors the real Tauri onFocusChanged contract).
+    let resolveFocus!: (u: () => void) => void;
+    const pendingFocus = new Promise<() => void>((res) => {
+      resolveFocus = res;
+    });
+    onFocusChangedMock.mockImplementationOnce((cb: (e: { payload: boolean }) => void) => {
+      focusSlot.cb = cb;
+      return pendingFocus as unknown as ReturnType<typeof onFocusChangedMock>;
+    });
+    render(() => <SettingsShell>body</SettingsShell>);
+    // onFocusChanged was called (registration happened) but its promise is
+    // still pending — do NOT await it.
+    await waitFor(() => expect(onFocusChangedMock).toHaveBeenCalledTimes(1));
+    expect(unlistenMock).not.toHaveBeenCalled();
+    // Unmount BEFORE the focus promise resolves. The old code would leave
+    // `unlisten` undefined here and leak the listener.
+    cleanup();
+    expect(unlistenMock).not.toHaveBeenCalled();
+    // Now resolve the pending onFocusChanged promise. The cancelled-flag path
+    // must immediately invoke unlisten so the late-arriving listener is torn
+    // down instead of leaked.
+    resolveFocus(unlistenMock);
+    await waitFor(() => expect(unlistenMock).toHaveBeenCalledTimes(1));
+  });
 });

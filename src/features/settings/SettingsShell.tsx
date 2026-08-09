@@ -105,6 +105,12 @@ const SettingsShell: Component<SettingsShellProps> = (props) => {
     // Lazy-import the Tauri window API so jsdom tests that don't mock it (and
     // non-Tauri contexts) never touch the bridge at import time.
     let unlisten: (() => void) | undefined;
+    // Race guard: if the component unmounts BEFORE the dynamic import +
+    // onFocusChanged() promise resolves, `unlisten` is still undefined and
+    // onCleanup would be a no-op, leaking the listener (whose closure captures
+    // this component's recheckA11y). `cancelled` lets the resolve path tear
+    // down a listener that arrived after teardown.
+    let cancelled = false;
     import("@tauri-apps/api/window")
       .then(({ getCurrentWindow }) =>
         getCurrentWindow().onFocusChanged(({ payload: focused }) => {
@@ -112,10 +118,14 @@ const SettingsShell: Component<SettingsShellProps> = (props) => {
         }),
       )
       .then((u) => {
-        unlisten = u;
+        if (cancelled) u();
+        else unlisten = u;
       })
       .catch(() => {});
-    onCleanup(() => unlisten?.());
+    onCleanup(() => {
+      cancelled = true;
+      unlisten?.();
+    });
   });
 
   const handleClick = (id: SettingsSection) => {
