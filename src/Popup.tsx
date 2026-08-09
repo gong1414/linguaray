@@ -128,7 +128,7 @@ const Popup: Component = () => {
         {(s) => (
           <ResultCard
             engineId={s.engine}
-            engineLabel={s.engine}
+            engineLabel={ctrl.engineLabel(s.engine)}
             text={s.text}
             outcome={"success" as ResultOutcome}
             actions={buildActions("__single__")}
@@ -143,7 +143,7 @@ const Popup: Component = () => {
               {(r) => (
                 <ResultCard
                   engineId={r.uuid}
-                  engineLabel={r.engine}
+                  engineLabel={ctrl.engineLabel(r.engine)}
                   text={r.text}
                   outcome={(r.ok ? "success" : "failure") as ResultOutcome}
                   errorText={r.errorText}

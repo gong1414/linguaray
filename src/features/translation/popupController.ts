@@ -20,9 +20,18 @@ import type { PopupMultiPayload, PopupStatePayload, TranslationState } from "./t
 export function createPopupController() {
   const [state, setState] = createSignal<TranslationState>({ kind: "loading" });
   const [pinned, setPinned] = createSignal(false);
+  /** uuid → friendly provider name. Loaded once on mount from provider_list. */
+  const nameMap = new Map<string, string>();
   const unlisteners: UnlistenFn[] = [];
 
   onMount(async () => {
+    // B3: load the provider name map so engine labels resolve to friendly names.
+    try {
+      const profiles = await invoke<{ uuid: string; name: string }[]>("provider_list");
+      for (const p of profiles) nameMap.set(p.uuid, p.name);
+    } catch {
+      // Best-effort: leave the map empty; labels fall back below.
+    }
     unlisteners.push(
       await listen<PopupStatePayload>("popup-state", (e) => {
         setState(decodePopupState(e.payload));
@@ -47,6 +56,26 @@ export function createPopupController() {
     for (const u of unlisteners) u();
   });
 
+  /** B3: resolve a raw engine id (uuid or `provider/<uuid>`) to a friendly name. */
+  const engineLabel = (raw: string): string => {
+    if (nameMap.has(raw)) return nameMap.get(raw)!;
+    if (raw.startsWith("provider/")) {
+      const uuid = raw.slice("provider/".length);
+      if (nameMap.has(uuid)) return nameMap.get(uuid)!;
+    }
+    const presetLabels: Record<string, string> = {
+      openai: "OpenAI",
+      anthropic: "Anthropic",
+      gemini: "Gemini",
+      ollama: "Ollama",
+    };
+    if (presetLabels[raw]) return presetLabels[raw];
+    if (["google", "deepl", "microsoft", "baidu", "youdao", "tencent"].includes(raw)) {
+      return "Fallback";
+    }
+    return "Unknown";
+  };
+
   const pin = () => setPinned(true);
   const unpin = () => setPinned(false);
 
@@ -66,5 +95,5 @@ export function createPopupController() {
     }
   };
 
-  return { state, pinned, pin, unpin, dismiss, retry };
+  return { state, pinned, pin, unpin, dismiss, retry, engineLabel };
 }

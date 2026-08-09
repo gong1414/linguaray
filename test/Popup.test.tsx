@@ -87,4 +87,26 @@ describe("Popup (Surface 01)", () => {
     expect(vi.mocked(getCurrentWindow().hide)).toHaveBeenCalled();
     cleanup();
   });
+
+  it("renders friendly engine label, not secret_ref/uuid", async () => {
+    const { invoke } = await import("@tauri-apps/api/core");
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "provider_list") {
+        return [
+          { uuid: "u1", name: "My OpenAI", secret_ref: "provider/u1", template_id: "openai", protocol: "openai_chat", endpoint: "", model: null, enabled: true, sort_order: 0, is_local: false, needs_key: true, status: "active", capabilities: { balance: false, quota: false, model_list: false } },
+        ];
+      }
+      return { outcomes: [], actual_engine: undefined };
+    });
+
+    const { findByText } = render(() => <Popup />);
+    // Flush the mount-time provider_list so the name map resolves before the
+    // popup-state event fires.
+    await Promise.resolve();
+    await Promise.resolve();
+    await emitEvent("popup-state", { status: "result", text: "你好", engine: "provider/u1", source_text: "hello" });
+    expect(await findByText("My OpenAI")).toBeTruthy();
+    expect(document.body.textContent).not.toContain("provider/u1");
+    cleanup();
+  });
 });
