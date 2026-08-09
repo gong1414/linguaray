@@ -28,6 +28,7 @@ pub mod settings;
 pub mod wire;
 pub mod db;
 pub mod fs_acl;
+pub mod tray_state;
 pub mod uuid_util;
 
 use serde::{Deserialize, Serialize};
@@ -106,6 +107,10 @@ pub struct AppState {
     pub db_path: PathBuf,
     pub keystore_dir: PathBuf,
     pub settings_path: Option<PathBuf>,
+    /// rev-13/rev-14 (Task A5): the tray visual-state controller. SYNC
+    /// `parking_lot::Mutex` (NOT `tokio::sync::Mutex`) so `TranslationGuard::drop`
+    /// runs `finish_translation` synchronously on the calling thread.
+    pub tray: Arc<parking_lot::Mutex<tray_state::TrayStateController>>,
 }
 
 /// Gating check for provider commands that ALREADY hold the `data_gate` guard.
@@ -347,10 +352,18 @@ async fn translate_clipboard(
     let _ = popup::show_at(&app, x, y);
     let s = settings::load(&app);
 
+    // Task A5: the tray Active-pulse begins here (after the clipboard preflight).
+    // TranslationGuard::new calls begin_translation(gen); its Drop calls
+    // finish_translation(gen, succeeded) on every return path. On a success branch
+    // we call guard.mark_success(); on an error branch we call
+    // record_translation_error(gen) before the guard drops.
+    let mut _tray_guard = tray_state::TranslationGuard::new(&app_state.tray, gen);
+
     let client = match session_client(&state) {
         Ok(c) => c.clone(),
         Err(msg) => {
             if state.gen.is_latest(gen) {
+                app_state.tray.lock().record_translation_error(gen);
                 let _ = popup::error(&app, &msg);
             }
             return Ok(());
@@ -360,6 +373,7 @@ async fn translate_clipboard(
         Ok(k) => k,
         Err(msg) => {
             if state.gen.is_latest(gen) {
+                app_state.tray.lock().record_translation_error(gen);
                 let _ = popup::error(&app, &msg);
             }
             return Ok(());
@@ -377,12 +391,14 @@ async fn translate_clipboard(
         Ok(Ok(db)) => db,
         Ok(Err(msg)) => {
             if state.gen.is_latest(gen) {
+                app_state.tray.lock().record_translation_error(gen);
                 let _ = popup::error(&app, &msg);
             }
             return Ok(());
         }
         Err(e) => {
             if state.gen.is_latest(gen) {
+                app_state.tray.lock().record_translation_error(gen);
                 let _ = popup::error(&app, &format!("join error: {e}"));
             }
             return Ok(());
@@ -402,16 +418,20 @@ async fn translate_clipboard(
     match session_result {
         Ok(r) => match decide_clipboard_popup(&r) {
             ClipboardPopupDecision::SingleSuccess { text, engine } => {
+                _tray_guard.mark_success();
                 let _ = popup::result(&app, &text, &engine);
             }
             ClipboardPopupDecision::Multi => {
+                _tray_guard.mark_success();
                 let _ = popup::multi_result(&app, &r.outcomes);
             }
             ClipboardPopupDecision::Error(msg) => {
+                app_state.tray.lock().record_translation_error(gen);
                 let _ = popup::error(&app, &msg);
             }
         },
         Err(msg) => {
+            app_state.tray.lock().record_translation_error(gen);
             let _ = popup::error(&app, &msg);
         }
     }
@@ -1522,16 +1542,38 @@ fn db_set_active_primary(
 /// `"Switch failed: <msg>"` tooltip AFTER the refresh (rev-19-5) so the
 /// refresh's own tooltip is not clobbered. Returns Ok/Err so the caller can
 /// decide logging.
-fn handle_switch_provider(
+/// A5 Step 10 (rev-18-1): the SYNC core of the switch-provider flow.
+///
+/// DB write and tray controller, NO AppHandle (the testable entry). Calls
+/// `set_active_primary_core(...)` directly (SYNC), then
+/// `tray.lock().finish_switch(rev, success)` (rev-16-3 revision-tagged; a stale
+/// `rev != switch_revision` is ignored). The `rev` is captured via
+/// `begin_switch()` BEFORE the DB call so a concurrent switch's late result
+/// cannot clobber this one. Does NOT touch the translation `GenerationToken`
+/// (rev-15 P1-3) and does NOT `.await` anything (SYNC).
+pub fn handle_switch_provider_core(
+    app_state: &Arc<AppState>,
+    uuid: &str,
+) -> Result<(), String> {
+    let rev = app_state.tray.lock().begin_switch();
+    let result = set_active_primary_core(app_state.clone(), uuid.to_string());
+    let success = result.is_ok();
+    app_state.tray.lock().finish_switch(rev, success);
+    result.map(|_| ())
+}
+
+/// A5 Step 10 (rev-18-1): the SYNC wrapper — calls the core + best-effort tray
+/// refresh + failure tooltip. The tray.switch arm runs this via
+/// `tauri::async_runtime::spawn_blocking` (offloads the SYNC SQLite I/O).
+pub fn handle_switch_provider(
     app: &tauri::AppHandle,
     app_state: &Arc<AppState>,
     uuid: &str,
 ) -> Result<(), String> {
-    match set_active_primary_core(app_state.clone(), uuid.to_string()) {
+    let result = handle_switch_provider_core(app_state, uuid);
+    match &result {
         Ok(_) => {
-            // Success: refresh so the status item + submenu reflect the new primary.
             refresh_tray_if_available(app);
-            Ok(())
         }
         Err(msg) => {
             // rev-19-5: refresh FIRST (restores the pre-switch tooltip), THEN
@@ -1540,9 +1582,9 @@ fn handle_switch_provider(
             if let Some(tray) = app.tray_by_id("main-tray") {
                 let _ = tray.set_tooltip(Some(&format!("Switch failed: {msg}")));
             }
-            Err(msg)
         }
     }
+    result
 }
 
 /// Confirm the user's explicit consent for a parallel selection and write it
@@ -2273,11 +2315,20 @@ async fn capture_and_translate(
     }
     let _ = popup::loading_with_source(app, &anchor, Some(&text));
 
+    // Task A5: the tray Active-pulse begins here. TranslationGuard::new calls
+    // begin_translation(gen); its Drop calls finish_translation(gen, succeeded)
+    // on EVERY return path below (early returns, error branches, success). On a
+    // success branch we call guard.mark_success() so Drop clears any prior-gen
+    // error; on an error branch we call record_translation_error(gen) BEFORE the
+    // guard drops (Drop then only decrements + recomputes, leaving the error).
+    let mut _tray_guard = tray_state::TranslationGuard::new(&app_state.tray, gen);
+
     // 3. client/keystore guards acquired from Session FIRST.
     let client = match state.client.as_ref() {
         Some(c) => c.clone(),
         None => {
             if state.gen.is_latest(gen) {
+                app_state.tray.lock().record_translation_error(gen);
                 let _ = popup::set_popup_mode(app, popup::PopupMode::Error, &anchor);
                 let _ = popup::error_with_source(
                     app,
@@ -2292,6 +2343,7 @@ async fn capture_and_translate(
         Some(k) => k,
         None => {
             if state.gen.is_latest(gen) {
+                app_state.tray.lock().record_translation_error(gen);
                 let _ = popup::set_popup_mode(app, popup::PopupMode::Error, &anchor);
                 let _ = popup::error_with_source(
                     app,
@@ -2314,6 +2366,7 @@ async fn capture_and_translate(
         Ok(Ok(db)) => db,
         Ok(Err(msg)) => {
             if state.gen.is_latest(gen) {
+                app_state.tray.lock().record_translation_error(gen);
                 let _ = popup::set_popup_mode(app, popup::PopupMode::Error, &anchor);
                 let _ = popup::error_with_source(app, &msg, &text);
             }
@@ -2321,6 +2374,7 @@ async fn capture_and_translate(
         }
         Err(e) => {
             if state.gen.is_latest(gen) {
+                app_state.tray.lock().record_translation_error(gen);
                 let _ = popup::set_popup_mode(app, popup::PopupMode::Error, &anchor);
                 let _ = popup::error_with_source(app, &format!("join error: {e}"), &text);
             }
@@ -2341,6 +2395,7 @@ async fn capture_and_translate(
         Ok(r) => r,
         Err(msg) => {
             if state.gen.is_latest(gen) {
+                app_state.tray.lock().record_translation_error(gen);
                 let _ = popup::set_popup_mode(app, popup::PopupMode::Error, &anchor);
                 let _ = popup::error_with_source(app, &msg, &text);
             }
@@ -2354,14 +2409,17 @@ async fn capture_and_translate(
     // 5. Route per decision + size per state.
     match decide_clipboard_popup(&session_result) {
         ClipboardPopupDecision::SingleSuccess { text: t, engine } => {
+            _tray_guard.mark_success();
             let _ = popup::set_popup_mode(app, popup::PopupMode::Single, &anchor);
             let _ = popup::result_with_source(app, &t, &engine, &text);
         }
         ClipboardPopupDecision::Multi => {
+            _tray_guard.mark_success();
             let _ = popup::set_popup_mode(app, popup::PopupMode::Multi, &anchor);
             let _ = popup::multi_result_with_source(app, &session_result.outcomes, &text);
         }
         ClipboardPopupDecision::Error(msg) => {
+            app_state.tray.lock().record_translation_error(gen);
             let _ = popup::set_popup_mode(app, popup::PopupMode::Error, &anchor);
             let _ = popup::error_with_source(app, &msg, &text);
         }
@@ -2946,6 +3004,9 @@ pub fn run() {
                 db_path,
                 keystore_dir,
                 settings_path,
+                tray: Arc::new(parking_lot::Mutex::new(
+                    tray_state::TrayStateController::new(app.handle().clone()),
+                )),
             }));
             // Round-2 review P1 #2: register hotkeys at RUNTIME (per-shortcut,
             // catching each Result) so a conflict skips just that shortcut, not the
@@ -3017,6 +3078,16 @@ pub fn run() {
 mod tests {
     use super::*;
 
+    /// Build a `TrayStateController` backed by a `RecordingRenderer` for unit
+    /// tests that construct an `AppState` (the `tray` field is required by the
+    /// struct but these tests only inspect `readiness`).
+    fn test_tray_controller() -> tray_state::TrayStateController {
+        tray_state::TrayStateController::with_renderer(
+            Arc::new(tray_state::RecordingRenderer::default()),
+            tray_state::Locale::En,
+        )
+    }
+
     /// Task 5a: `get_data_readiness` returns a `DataReadiness` (not a hand-rolled
     /// JSON `String`) so the frontend gets a properly serialized tagged union via
     /// Tauri's auto-serialization. This IS a wire-contract change from the
@@ -3033,6 +3104,7 @@ mod tests {
             db_path: dir.path().join("linguaray.db"),
             keystore_dir: dir.path().join("keystore"),
             settings_path: Some(dir.path().join("settings.json")),
+            tray: Arc::new(parking_lot::Mutex::new(test_tray_controller())),
         };
         let got = state.readiness.read().clone();
         assert_eq!(got, DataReadiness::Ready);
@@ -3058,6 +3130,7 @@ mod tests {
             db_path: dir.path().join("linguaray.db"),
             keystore_dir: dir.path().join("keystore"),
             settings_path: Some(dir.path().join("settings.json")),
+            tray: Arc::new(parking_lot::Mutex::new(test_tray_controller())),
         };
         let got = state.readiness.read().clone();
         let json = serde_json::to_string(&got).unwrap();

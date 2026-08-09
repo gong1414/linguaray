@@ -17,7 +17,17 @@
 use linguaray_lib::db::readiness::DataReadiness;
 use linguaray_lib::db::recovery::{archive_database_core, ArchiveFailpoint};
 use linguaray_lib::db::Database;
+use linguaray_lib::tray_state::{Locale, RecordingRenderer, TrayStateController};
 use std::sync::Arc;
+
+/// Build a `TrayStateController` backed by a `RecordingRenderer` for the test
+/// `AppState` construction sites (the `tray` field is required by the struct).
+fn test_tray() -> TrayStateController {
+    TrayStateController::with_renderer(
+        Arc::new(RecordingRenderer::default()),
+        Locale::En,
+    )
+}
 use tempfile::TempDir;
 
 /// The app state used by these tests. Mirrors the production `AppState` shape
@@ -46,6 +56,7 @@ impl Harness {
             db_path: db_path.clone(),
             keystore_dir: dir.path().join("keystore"),
             settings_path: Some(dir.path().join("settings.json")),
+            tray: Arc::new(parking_lot::Mutex::new(test_tray())),
         });
         Self {
             _dir: dir,
@@ -252,6 +263,7 @@ fn r7_unresolved_settings_path_refuses_before_destructive_ops() {
         db_path: db_path.clone(),
         keystore_dir: dir.path().join("keystore"),
         settings_path: None, // unresolved — preflight must refuse.
+        tray: Arc::new(parking_lot::Mutex::new(test_tray())),
     });
 
     let err = archive_database_core(&app, ArchiveFailpoint::None).unwrap_err();
