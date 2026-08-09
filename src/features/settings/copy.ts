@@ -141,6 +141,10 @@ type ProviderCopy = {
   saveProfile: string;
   saving: string;
   saveFailed: string;
+  /** Cold-load failure banner title (provider list OR active selection read failed). */
+  loadFailed: string;
+  /** Retry button on the cold-load failure banner. */
+  retry: string;
   reload: string;
   cancel: string;
   deleteConfirmTitle: string;
@@ -245,6 +249,8 @@ const EN: SettingsCopy = {
     saveProfile: "Save profile",
     saving: "Saving…",
     saveFailed: "Failed to save: network error",
+    loadFailed: "Provider load failed",
+    retry: "Retry",
     reload: "Reload",
     cancel: "Cancel",
     deleteConfirmTitle: "Delete provider?",
@@ -364,6 +370,8 @@ const ZH: SettingsCopy = {
     saveProfile: "保存配置",
     saving: "保存中…",
     saveFailed: "保存失败：网络错误",
+    loadFailed: "加载失败",
+    retry: "重试",
     reload: "重新加载",
     cancel: "取消",
     deleteConfirmTitle: "删除服务商？",

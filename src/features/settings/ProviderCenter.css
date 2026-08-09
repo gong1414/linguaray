@@ -18,8 +18,15 @@
 
 .pc__retry {
   display: flex;
+  align-items: center;
   justify-content: center;
+  gap: var(--space-sm, 8px);
   padding: var(--space-md, 12px);
+}
+
+.pc__load-failed {
+  font-size: var(--text-sm, 0.85rem);
+  color: var(--color-danger-fg, #dc2626);
 }
 
 /* Two-pane layout: provider sidebar + detail panel. */
