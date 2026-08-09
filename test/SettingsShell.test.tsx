@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, fireEvent, cleanup } from "@solidjs/testing-library";
-import SettingsShell from "../src/features/settings/SettingsShell";
+import { createSignal } from "solid-js";
+import SettingsShell, { type SettingsSection } from "../src/features/settings/SettingsShell";
 
 // matchMedia is stubbed globally in test/setup.ts (matches:false). Per-test we
 // install a fresh implementation to simulate the two breakpoints.
@@ -49,12 +50,69 @@ describe("SettingsShell", () => {
     }
   });
 
-  it("Shortcuts and Privacy are disabled (placeholder)", () => {
+  it("Shortcuts and Privacy are aria-disabled placeholders (NOT native disabled)", () => {
+    // rev-9: disabled nav items announce via aria-disabled but MUST stay
+    // focusable (in the tab order) so keyboard + SR users can discover them.
     const { getByText } = render(() => <SettingsShell>body</SettingsShell>);
     const shortcuts = getByText("Shortcuts").closest("button") as HTMLButtonElement;
     const privacy = getByText("Privacy").closest("button") as HTMLButtonElement;
-    expect(shortcuts.disabled).toBe(true);
-    expect(privacy.disabled).toBe(true);
+    expect(shortcuts.getAttribute("aria-disabled")).toBe("true");
+    expect(privacy.getAttribute("aria-disabled")).toBe("true");
+    // Native disabled would drop them from the tab order — forbidden.
+    expect(shortcuts.hasAttribute("disabled")).toBe(false);
+    expect(privacy.hasAttribute("disabled")).toBe(false);
+  });
+
+  it("rail mode (matchMedia wide=false) keeps an accessible name on every nav item", () => {
+    installMatchMedia(false);
+    const { container } = render(() => <SettingsShell>body</SettingsShell>);
+    const buttons = container.querySelectorAll("nav button");
+    expect(buttons.length).toBe(4);
+    for (const btn of Array.from(buttons)) {
+      const label = (btn.getAttribute("aria-label") ?? "").trim();
+      const text = (btn.textContent ?? "").trim();
+      expect(label.length + text.length, "rail nav item needs a non-empty accessible name").toBeGreaterThan(0);
+    }
+  });
+
+  it("disabled nav items are aria-disabled AND focusable (NOT native disabled)", () => {
+    installMatchMedia(true);
+    const { container } = render(() => <SettingsShell>body</SettingsShell>);
+    const disabledBtns = container.querySelectorAll('button[aria-disabled="true"]');
+    expect(disabledBtns.length).toBe(2); // Shortcuts + Privacy
+    for (const btn of Array.from(disabledBtns)) {
+      expect(btn.hasAttribute("disabled"), "aria-disabled items must not be native-disabled").toBe(false);
+      // tabindex defaults to 0 for buttons; an explicit "-1" would remove focus.
+      expect(btn.getAttribute("tabindex"), "aria-disabled items must remain in tab order").not.toBe("-1");
+    }
+  });
+
+  it("disabled placeholder nav item announces the real placeholderHint copy (Coming in R3b)", () => {
+    const { container } = render(() => <SettingsShell>body</SettingsShell>);
+    const disabledBtns = container.querySelectorAll('button[aria-disabled="true"]');
+    const labels = Array.from(disabledBtns).map((b) => b.getAttribute("aria-label") ?? "");
+    // Every disabled item's aria-label appends the placeholder hint.
+    for (const label of labels) {
+      expect(label).toContain("Coming in R3b");
+    }
+  });
+
+  it("controlled activePage prop reactively updates data-page + sidebar highlight (rev-9-2)", () => {
+    // Parent-owned signal drives `activePage`; switching it re-derives both the
+    // shell's data-page and which SidebarItem carries aria-current="page".
+    const [page, setPage] = createSignal<SettingsSection>("provider-center");
+    const { container, getByText } = render(() => (
+      <SettingsShell activePage={page()} onNavigate={setPage}>body</SettingsShell>
+    ));
+    const shell = container.querySelector("[data-page]") as HTMLElement;
+    expect(shell.getAttribute("data-page")).toBe("provider-center");
+    const providerBtn = getByText("Provider Center").closest("button")!;
+    expect(providerBtn.getAttribute("aria-current")).toBe("page");
+    // Parent flips the signal — the controlled prop re-flows WITHOUT a click.
+    setPage("keystore-recovery");
+    expect(shell.getAttribute("data-page")).toBe("keystore-recovery");
+    expect(getByText("Keystore Recovery").closest("button")!.getAttribute("aria-current")).toBe("page");
+    expect(providerBtn.getAttribute("aria-current")).toBeNull();
   });
 
   it("clicking Provider Center calls onNavigate with provider-center", () => {
