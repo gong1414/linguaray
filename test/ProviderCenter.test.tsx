@@ -854,6 +854,39 @@ describe("ProviderCenter (Surface 05)", () => {
     expect(dupCalls[0]).toMatchObject({ uuid: "u1" });
   });
 
+  it("toast: after provider create, toast has role=status + non-empty aria-label", async () => {
+    let created = false;
+    invokeMock.mockImplementation(async (cmd: string) => {
+      const map: Record<string, () => unknown> = {
+        provider_list: () => (created ? [profile()] : []),
+        key_status: () => ({}),
+        provider_create: () => {
+          created = true;
+          return profile();
+        },
+        provider_get_active_selection: () => ({ primary: null, parallel: [], fallback: null }),
+      };
+      const fn = map[cmd];
+      if (!fn) throw new Error(`unexpected invoke ${cmd}`);
+      return fn();
+    });
+    render(() => <ProviderCenter />);
+    await flush();
+
+    fireEvent.click(screen.getByText("OpenAI"));
+    await flush();
+    // A toast surfaces after the create + refresh.
+    await waitFor(() => {
+      const statuses = screen.getAllByRole("status");
+      expect(statuses.length).toBeGreaterThanOrEqual(1);
+    });
+    // The toast region has a non-empty aria-label (announces its content).
+    const statuses = screen.getAllByRole("status");
+    const labeled = statuses.find((s) => (s.getAttribute("aria-label") ?? "").length > 0);
+    expect(labeled).toBeTruthy();
+    expect((labeled!.getAttribute("aria-label") ?? "").length).toBeGreaterThan(0);
+  });
+
   it("preset grid contains only the 4 supported AI presets (no Google/DeepL)", async () => {
     routeInvoke({ ...DEFAULT_ROUTES });
     const { findByText } = render(() => <ProviderCenter />);

@@ -379,6 +379,7 @@ const ProviderCenter: Component = () => {
     try {
       await providerCreate(preset.templateId, name, preset.endpoint, preset.model ?? undefined);
       await refresh();
+      pushToast("success", t.profileSaved);
     } catch (e) {
       pushToast("destructive", t.saveFailed);
     }

@@ -114,4 +114,20 @@ describe("SettingsShell", () => {
     expect(keystoreBtn.getAttribute("aria-current")).toBe("page");
     expect(providerBtn.getAttribute("aria-current")).toBeNull();
   });
+
+  it("tooltip trigger carries an accessible label (aria-label)", () => {
+    // Rail mode wraps every nav item in a Tooltip. The underlying SidebarItem
+    // button carries a non-empty aria-label so the trigger is reachable +
+    // announced even when the visible label is hidden.
+    installMatchMedia(false);
+    const { container } = render(() => <SettingsShell>body</SettingsShell>);
+    const triggers = container.querySelectorAll(".lr-tooltip__trigger");
+    expect(triggers.length).toBeGreaterThanOrEqual(1);
+    // The trigger wraps a button with an aria-label.
+    const labeledTriggers = Array.from(triggers).filter((tr) => {
+      const btn = tr.querySelector("button[aria-label]");
+      return btn && (btn.getAttribute("aria-label") ?? "").length > 0;
+    });
+    expect(labeledTriggers.length).toBeGreaterThanOrEqual(1);
+  });
 });

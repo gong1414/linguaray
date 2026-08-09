@@ -12,6 +12,10 @@ export type ToastProps = {
   onDismiss: () => void;
   /** Accessible label for the dismiss button (i18n). Default: "Dismiss". */
   dismissLabel?: string;
+  /** Accessible name for the toast region (i18n). Defaults to `message` so a
+   *  screen reader announces the toast content as a single labeled region
+   *  (the inner message text is kept for sighted users). */
+  ariaLabel?: string;
   class?: string;
 };
 
@@ -48,6 +52,7 @@ const Toast: Component<ToastProps> = (props) => {
         props.class ? ` ${props.class}` : ""
       }`}
       role={props.variant === "warning" || props.variant === "destructive" ? "alert" : "status"}
+      aria-label={props.ariaLabel ?? props.message}
     >
       <span class="lr-toast__message">{props.message}</span>
       <button
