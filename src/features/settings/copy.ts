@@ -141,6 +141,9 @@ type ProviderCopy = {
   saveProfile: string;
   saving: string;
   saveFailed: string;
+  /** Surfaced when a save rejects with a UNIQUE constraint violation
+   *  (duplicate name / secret_ref). Carries no placeholder. */
+  keyAlreadyExists: string;
   /** Cold-load failure banner title (provider list OR active selection read failed). */
   loadFailed: string;
   /** Retry button on the cold-load failure banner. */
@@ -249,6 +252,7 @@ const EN: SettingsCopy = {
     saveProfile: "Save profile",
     saving: "Saving…",
     saveFailed: "Failed to save: network error",
+    keyAlreadyExists: "A provider with this name already exists",
     loadFailed: "Provider load failed",
     retry: "Retry",
     reload: "Reload",
@@ -370,6 +374,7 @@ const ZH: SettingsCopy = {
     saveProfile: "保存配置",
     saving: "保存中…",
     saveFailed: "保存失败：网络错误",
+    keyAlreadyExists: "该名称的服务商已存在",
     loadFailed: "加载失败",
     retry: "重试",
     reload: "重新加载",

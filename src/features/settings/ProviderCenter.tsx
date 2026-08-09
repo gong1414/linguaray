@@ -113,6 +113,8 @@ const ProviderCenter: Component = () => {
   const [endpointDraft, setEndpointDraft] = createSignal<Record<string, string>>({});
   const [modelDraftByUuid, setModelDraftByUuid] = createSignal<Record<string, string>>({});
   const [saveByUuid, setSaveByUuid] = createSignal<Record<string, "idle" | "saving" | "saved" | "failed">>({});
+  // Per-UUID key-save error message (localized). Cleared on the next key edit.
+  const [keyErrorByUuid, setKeyErrorByUuid] = createSignal<Record<string, string>>({});
   const [connByUuid, setConnByUuid] = createSignal<Record<string, ConnectionResult | "testing">>({});
   const [modelOptionsByUuid, setModelOptionsByUuid] = createSignal<Record<string, ModelInfo[]>>({});
   const [modelFetchByUuid, setModelFetchByUuid] = createSignal<Record<string, "idle" | "loading" | "error">>({});
@@ -424,6 +426,11 @@ const ProviderCenter: Component = () => {
       return n;
     });
     setSaveByUuid((prev) => ({ ...prev, [uuid]: "saving" }));
+    setKeyErrorByUuid((prev) => {
+      const n = { ...prev };
+      delete n[uuid];
+      return n;
+    });
     try {
       await providerSetKey(uuid, key);
       setSaveByUuid((prev) => ({ ...prev, [uuid]: "saved" }));
@@ -433,7 +440,15 @@ const ProviderCenter: Component = () => {
       pushToast("success", t.keySaved);
     } catch (e) {
       setSaveByUuid((prev) => ({ ...prev, [uuid]: "failed" }));
-      pushToast("destructive", t.saveFailed);
+      // Detect UNIQUE constraint violations and surface a localized "already
+      // exists" message; everything else is a generic save-failed.
+      const msg = (e as { message?: string })?.message ?? "";
+      if (/UNIQUE constraint/i.test(String(msg))) {
+        setKeyErrorByUuid((prev) => ({ ...prev, [uuid]: t.keyAlreadyExists }));
+        pushToast("destructive", t.keyAlreadyExists);
+      } else {
+        pushToast("destructive", t.saveFailed);
+      }
     }
   };
 
@@ -728,6 +743,8 @@ const ProviderCenter: Component = () => {
               });
               const conn = createMemo(() => connByUuid()[uuid]);
               const saveState = createMemo(() => saveByUuid()[uuid] ?? "idle");
+              const keyText = createMemo(() => keyInputByUuid()[uuid] ?? "");
+              const keyError = createMemo(() => keyErrorByUuid()[uuid]);
               const options = createMemo(() => modelOptionsByUuid()[uuid]);
               const modelFetch = createMemo(() => modelFetchByUuid()[uuid] ?? "idle");
               const selectOptions = createMemo<SelectOption[]>(() => {
@@ -817,18 +834,29 @@ const ProviderCenter: Component = () => {
                           <TextField
                             label={t.apiKey}
                             type="password"
-                            value={keyInputByUuid()[uuid] ?? ""}
+                            value={keyText()}
                             placeholder={t.apiKeyPlaceholder}
-                            onInput={(e) =>
+                            errorText={keyError() ?? undefined}
+                            onInput={(e) => {
                               setKeyInputByUuid((prev) => ({
                                 ...prev,
                                 [uuid]: e.currentTarget.value,
-                              }))
-                            }
+                              }));
+                              // Clear any stale inline error as soon as the
+                              // user edits the key again.
+                              if (keyError()) {
+                                setKeyErrorByUuid((prev) => {
+                                  const n = { ...prev };
+                                  delete n[uuid];
+                                  return n;
+                                });
+                              }
+                            }}
                           />
                           <Button
                             variant="primary"
                             size="sm"
+                            disabled={p().needs_key && keyText().length === 0}
                             loading={saveState() === "saving"}
                             onClick={() => void handleSaveKey(uuid)}
                           >
