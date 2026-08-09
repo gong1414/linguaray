@@ -19,23 +19,23 @@ body { overflow: hidden; }
 
 .container {
   background: transparent;
-  padding: var(--space-2, 8px);
+  padding: var(--space-md);
   display: flex;
   flex-direction: column;
-  gap: var(--space-2, 8px);
+  gap: var(--space-md);
   outline: none;
 }
 
 .container--compact {
   min-height: 40px;
-  padding: var(--space-1, 4px);
+  padding: var(--space-sm);
 }
 
 .popup-results {
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: minmax(200px, 1fr);
-  gap: var(--space-2, 8px);
+  gap: var(--space-md);
 }
 
 .popup-results[data-multi="true"] {
@@ -47,7 +47,7 @@ body { overflow: hidden; }
   background: var(--color-bg-elevated, #fff);
   border-radius: var(--radius-lg, 12px);
   box-shadow: var(--shadow-lg, 0 4px 16px rgba(0, 0, 0, 0.12));
-  padding: var(--space-3, 12px);
+  padding: var(--space-lg);
 }
 
 .popup-retry {
