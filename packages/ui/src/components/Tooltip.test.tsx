@@ -107,6 +107,27 @@ describe("Tooltip", () => {
     expect(document.body.querySelector(".lr-tooltip__content")).toBeNull();
   });
 
+  it("blur closes an open tooltip", async () => {
+    const { container } = render(() => (
+      <Tooltip content="Tip" as={IconButton} triggerProps={{ "aria-label": "Copy" }}>
+        <Copy size={16} />
+      </Tooltip>
+    ));
+    const trigger = container.querySelector(".lr-tooltip__trigger") as HTMLElement;
+    // Focus opens the tooltip (Kobante opens on focus OR hover by default).
+    trigger.focus();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(document.body.querySelector(".lr-tooltip__content")).toBeTruthy();
+
+    // Blurring the trigger dismisses the tooltip (Kobante default). The tooltip
+    // is NOT a menu — focus leaving the trigger must close it. We assert the
+    // programmatic contract (the content leaves the portal), not a visual
+    // pseudo-class like :focus-visible (unreliable under jsdom).
+    trigger.dispatchEvent(new FocusEvent("blur", { bubbles: false }));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(document.body.querySelector(".lr-tooltip__content")).toBeNull();
+  });
+
   it("as={IconButton}: ref passed via triggerProps lands on the native button", () => {
     // The rail uses this to confirm the trigger is the real focusable element.
     const ref: { current?: HTMLElement } = {};

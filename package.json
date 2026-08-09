@@ -13,9 +13,10 @@
     "typecheck": "tsc --noEmit && pnpm -r typecheck",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:src": "vitest run --root test",
+    "test:src": "vitest run",
     "test:ui": "pnpm --filter @linguaray/ui test",
-    "test:ui-lab": "pnpm --filter @linguaray/ui-lab test"
+    "test:ui-lab": "pnpm --filter @linguaray/ui-lab test",
+    "test:all": "pnpm test && pnpm test:ui && pnpm test:ui-lab"
   },
   "license": "MIT",
   "dependencies": {
