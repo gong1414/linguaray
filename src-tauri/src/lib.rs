@@ -1222,7 +1222,7 @@ async fn provider_create(
     .await
     .map_err(|e| e.to_string())??;
     // rev-8-8: refresh the tray AFTER the write commits. Best-effort.
-    refresh_tray_if_available(&app_handle);
+    refresh_tray_if_available(&app_handle).await;
     Ok(result)
 }
 
@@ -1244,7 +1244,7 @@ async fn provider_update(
     })
     .await
     .map_err(|e| e.to_string())??;
-    refresh_tray_if_available(&app_handle);
+    refresh_tray_if_available(&app_handle).await;
     Ok(result)
 }
 
@@ -1265,7 +1265,7 @@ async fn provider_duplicate(
     })
     .await
     .map_err(|e| e.to_string())??;
-    refresh_tray_if_available(&app_handle);
+    refresh_tray_if_available(&app_handle).await;
     Ok(result)
 }
 
@@ -1310,7 +1310,7 @@ async fn provider_delete(
     })
     .await
     .map_err(|e| e.to_string())??;
-    refresh_tray_if_available(&app_handle);
+    refresh_tray_if_available(&app_handle).await;
     Ok(())
 }
 
@@ -1331,7 +1331,7 @@ async fn provider_reorder(
     })
     .await
     .map_err(|e| e.to_string())??;
-    refresh_tray_if_available(&app_handle);
+    refresh_tray_if_available(&app_handle).await;
     Ok(())
 }
 
@@ -1353,7 +1353,7 @@ async fn provider_toggle(
     })
     .await
     .map_err(|e| e.to_string())??;
-    refresh_tray_if_available(&app_handle);
+    refresh_tray_if_available(&app_handle).await;
     Ok(())
 }
 
@@ -1492,7 +1492,7 @@ async fn provider_set_active(
     .await
     .map_err(|e| e.to_string())??;
     // rev-7-8: refresh so the status item + submenu reflect the new primary.
-    refresh_tray_if_available(&app_handle);
+    refresh_tray_if_available(&app_handle).await;
     Ok(outcome)
 }
 /// popup/popup CTAs (Surface 02/03) so they can show a friendly engine label.
@@ -1583,25 +1583,38 @@ pub fn handle_switch_provider_core(
 /// A5 Step 10 (rev-18-1): the SYNC wrapper — calls the core + best-effort tray
 /// refresh + failure tooltip. The tray.switch arm runs this via
 /// `tauri::async_runtime::spawn_blocking` (offloads the SYNC SQLite I/O).
+///
+/// P1-2: this wrapper stays SYNC (it runs inside `spawn_blocking` and CANNOT
+/// `.await`). The tray refresh is now async ([`refresh_tray_if_available`]), so
+/// it is detached via `tauri::async_runtime::spawn` — the DB write commits
+/// synchronously and is returned immediately; the best-effort tray refresh runs
+/// as a fire-and-forget task on the runtime. The rev-19-5 ordering (refresh
+/// FIRST, THEN override the tooltip on failure) is preserved inside the spawned
+/// task. `result` is cloned into the task so the synchronous `Ok`/`Err` can be
+/// returned to the caller.
 pub fn handle_switch_provider(
     app: &tauri::AppHandle,
     app_state: &Arc<AppState>,
     uuid: &str,
 ) -> Result<(), String> {
     let result = handle_switch_provider_core(app_state, uuid);
-    match &result {
-        Ok(_) => {
-            refresh_tray_if_available(app);
-        }
-        Err(msg) => {
-            // rev-19-5: refresh FIRST (restores the pre-switch tooltip), THEN
-            // override with the failure tooltip (rev-21-2: prefixed).
-            refresh_tray_if_available(app);
-            if let Some(tray) = app.tray_by_id("main-tray") {
-                let _ = tray.set_tooltip(Some(&format!("Switch failed: {msg}")));
+    let app_clone = app.clone();
+    let result_for_refresh = result.clone();
+    tauri::async_runtime::spawn(async move {
+        match &result_for_refresh {
+            Ok(_) => {
+                refresh_tray_if_available(&app_clone).await;
+            }
+            Err(msg) => {
+                // rev-19-5: refresh FIRST (restores the pre-switch tooltip), THEN
+                // override with the failure tooltip (rev-21-2: prefixed).
+                refresh_tray_if_available(&app_clone).await;
+                if let Some(tray) = app_clone.tray_by_id("main-tray") {
+                    let _ = tray.set_tooltip(Some(&format!("Switch failed: {msg}")));
+                }
             }
         }
-    }
+    });
     result
 }
 
@@ -1674,7 +1687,7 @@ async fn provider_confirm_and_set_active(
         message: format!("{e:?}"),
     })??;
     // rev-8-8: refresh so the status item + submenu reflect the new primary.
-    refresh_tray_if_available(&app_handle);
+    refresh_tray_if_available(&app_handle).await;
     Ok(version)
 }
 
@@ -2597,11 +2610,20 @@ fn on_input_hotkey(
 /// block DB/keystore/window setup; the caller logs and continues on `Err`.
 fn build_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
     use tauri::tray::{MouseButton, TrayIconBuilder, TrayIconEvent};
-    let menu = build_tray_menu(app)?;
+    // P1-2: the tray data readers + menu builder are `async`. `build_tray` runs
+    // exactly once from `setup()` (sync, on the main thread, before the runtime
+    // serves commands), so a SINGLE `block_on` driving both awaits is safe here
+    // — it cannot nest inside an async worker thread the way the tray refresh
+    // path can. This is the ONLY legitimate `block_on` in the tray path.
+    let (menu, status) = tauri::async_runtime::block_on(async {
+        let menu = build_tray_menu(app).await?;
+        let status = read_primary_status(app).await;
+        Ok::<_, tauri::Error>((menu, status))
+    })?;
     TrayIconBuilder::with_id("main-tray")
         .icon(app.default_window_icon().cloned().expect("default window icon"))
         .menu(&menu)
-        .tooltip(read_primary_status(app))
+        .tooltip(status)
         .show_menu_on_left_click(false)
         .on_menu_event(handle_tray_menu_event)
         .on_tray_icon_event(|tray, event| {
@@ -2626,7 +2648,9 @@ fn build_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
 
 /// rev-5-4: build ONLY the menu (reusable by build_tray + refresh_tray). Returns
 /// the full menu with the fresh provider list + status item text.
-fn build_tray_menu(app: &tauri::AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> {
+///
+/// P1-2: `async fn` — awaits the async DB readers instead of nesting `block_on`.
+async fn build_tray_menu(app: &tauri::AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> {
     use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 
     // Quick actions group.
@@ -2636,8 +2660,9 @@ fn build_tray_menu(app: &tauri::AppHandle) -> tauri::Result<tauri::menu::Menu<ta
 
     // Switch Provider submenu: built from the db at menu-build time;
     // refresh_tray() rebuilds it after provider mutations.
-    let switch_sub = build_switch_provider_submenu(app)?;
-    let provider_status = MenuItem::with_id(app, "tray.provider-status", read_primary_status(app), false, None::<&str>)?;
+    let enabled = read_enabled_providers(app).await;
+    let switch_sub = build_switch_provider_submenu(app, &enabled)?;
+    let provider_status = MenuItem::with_id(app, "tray.provider-status", read_primary_status(app).await, false, None::<&str>)?;
     let sep2 = PredefinedMenuItem::separator(app)?;
 
     // Disabled "Coming later" items (P1-D).
@@ -2660,25 +2685,38 @@ fn build_tray_menu(app: &tauri::AppHandle) -> tauri::Result<tauri::menu::Menu<ta
     Ok(menu)
 }
 
-/// Build the Switch Provider submenu from the enabled providers in the db. Each
+/// Build the Switch Provider submenu from the given `(uuid, name)` pairs. Each
 /// item id encodes the uuid: `tray.switch-<uuid>`. Returns a Submenu.
-fn build_switch_provider_submenu(app: &tauri::AppHandle) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>> {
+///
+/// P1-2: the DB read is no longer performed here — the caller (an async fn)
+/// reads the providers via [`read_enabled_providers`] and passes the slice in,
+/// so this builder stays sync and `block_on`-free.
+fn build_switch_provider_submenu(
+    app: &tauri::AppHandle,
+    enabled: &[(String, String)],
+) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>> {
     use tauri::menu::{MenuItem, SubmenuBuilder};
     let mut sub = SubmenuBuilder::new(app, "Switch Provider");
-    // Read enabled providers from the db (best-effort; empty submenu on error).
-    let enabled: Vec<(String, String)> = read_enabled_providers(app).unwrap_or_default();
-    for (uuid, name) in &enabled {
+    for (uuid, name) in enabled {
         let item = MenuItem::with_id(app, format!("tray.switch-{uuid}"), name, true, None::<&str>)?;
         sub = sub.item(&item);
     }
     sub.build()
 }
 
-/// Read (uuid, name) for enabled providers. Best-effort: returns empty on db error.
-fn read_enabled_providers(app: &tauri::AppHandle) -> Result<Vec<(String, String)>, String> {
+/// Read (uuid, name) for enabled providers. Best-effort: returns empty on db
+/// error.
+///
+/// P1-2: this is an `async fn` that drives the blocking DB read via
+/// `spawn_blocking().await`. It MUST NOT use `block_on(spawn_blocking(...))`
+/// because it is awaited from async command handlers — nesting `block_on`
+/// inside the async runtime risks a runtime panic ("Cannot start a runtime from
+/// within a runtime"). The single legitimate `block_on` caller is `build_tray`,
+/// which runs once in `setup()` (sync, before the runtime serves commands).
+async fn read_enabled_providers(app: &tauri::AppHandle) -> Vec<(String, String)> {
     use tauri::Manager;
     let app_state = app.state::<Arc<AppState>>().inner().clone();
-    let result = tauri::async_runtime::block_on(tauri::async_runtime::spawn_blocking(move || {
+    match tauri::async_runtime::spawn_blocking(move || {
         let _gate = app_state.data_gate.read();
         let db = require_ready_gated(&app_state, &_gate)?;
         db.with_conn(|conn| {
@@ -2686,22 +2724,26 @@ fn read_enabled_providers(app: &tauri::AppHandle) -> Result<Vec<(String, String)
             Ok(list.into_iter().filter(|p| p.enabled).map(|p| (p.uuid, p.name)).collect::<Vec<_>>())
         })
         .map_err(|e: DbErr| e.to_string())
-    }));
-    match result {
-        Ok(Ok(v)) => Ok(v),
-        Ok(Err(_)) => Ok(Vec::new()),
-        Err(_) => Ok(Vec::new()),
+    })
+    .await
+    {
+        Ok(Ok(v)) => v,
+        _ => Vec::new(),
     }
 }
 
-/// Read the primary provider name for the status item. Falls back to "No provider".
-fn read_primary_status(app: &tauri::AppHandle) -> String {
+/// Read the primary provider name for the status item. Falls back to
+/// "No provider".
+///
+/// P1-2: `async fn` driving the blocking DB read via `spawn_blocking().await`
+/// (see [`read_enabled_providers`]). No `block_on`.
+async fn read_primary_status(app: &tauri::AppHandle) -> String {
     use tauri::Manager;
     let app_state = match app.try_state::<Arc<AppState>>() {
         Some(s) => s.inner().clone(),
         None => return "No provider".into(),
     };
-    let result = tauri::async_runtime::block_on(tauri::async_runtime::spawn_blocking(move || {
+    match tauri::async_runtime::spawn_blocking(move || {
         let _gate = app_state.data_gate.read();
         let db = match require_ready_gated(&app_state, &_gate) {
             Ok(d) => d,
@@ -2718,8 +2760,12 @@ fn read_primary_status(app: &tauri::AppHandle) -> String {
             },
             Err(_) => "No provider".into(),
         }
-    }));
-    result.unwrap_or_else(|_| "No provider".into())
+    })
+    .await
+    {
+        Ok(s) => s,
+        Err(_) => "No provider".into(),
+    }
 }
 
 /// Refresh the tray menu + status after a provider mutation. Called from the
@@ -2731,11 +2777,11 @@ fn read_primary_status(app: &tauri::AppHandle) -> String {
 /// on duplicate id). Instead, fetch the existing tray and update its menu +
 /// tooltip. If the tray does not exist yet (first build), fall back to
 /// `build_tray`. Errors are PROPAGATED so the wrapper can log them.
-pub fn refresh_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
+pub async fn refresh_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
     if let Some(tray) = app.tray_by_id("main-tray") {
-        let menu = build_tray_menu(app)?;
+        let menu = build_tray_menu(app).await?;
         tray.set_menu(Some(menu))?;
-        tray.set_tooltip(Some(&read_primary_status(app)))?;
+        tray.set_tooltip(Some(&read_primary_status(app).await))?;
         Ok(())
     } else {
         build_tray(app)
@@ -2746,8 +2792,12 @@ pub fn refresh_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
 /// `refresh_tray` (which returns `tauri::Result<()>`) so a tray rebuild failure
 /// (e.g. tray not yet built during startup) NEVER turns a successful provider
 /// write into an error.
-pub fn refresh_tray_if_available(app: &tauri::AppHandle) {
-    if let Err(e) = refresh_tray(app) {
+///
+/// P1-2: `async fn` — awaits [`refresh_tray`]. Callers in async command
+/// handlers `.await` this directly; the SYNC `handle_switch_provider` (runs in
+/// `spawn_blocking`) detaches it via `tauri::async_runtime::spawn`.
+pub async fn refresh_tray_if_available(app: &tauri::AppHandle) {
+    if let Err(e) = refresh_tray(app).await {
         log::warn!("tray refresh failed: {e}");
     }
 }
