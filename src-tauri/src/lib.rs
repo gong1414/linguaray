@@ -2232,6 +2232,16 @@ impl EngineInfo {
     }
 }
 
+/// Outcome of the capture step. The popup UI for the non-`Selected` variants is
+/// rendered AFTER the `selection_lock` guard drops and AFTER the `is_latest(gen)`
+/// check, so the lock covers capture-only (P1-1). The physical cursor coords are
+/// carried alongside each variant so the post-lock UI code can place the popup.
+enum CaptureOutcome {
+    Selected(String, f64, f64),
+    NoSelection(f64, f64),
+    CaptureError(String, f64, f64),
+}
+
 /// Shared selection-capture + translate-session pipeline. Used by on_hotkey,
 /// translate_selection_ipc (tray + Retry). Emits the popup state per outcome.
 ///
@@ -2272,9 +2282,12 @@ async fn capture_and_translate(
             (t, anchor)
         }
         _ => {
-            // The SAME selection_lock + capture_selection(800, owner) block
-            // on_hotkey uses.
-            let captured: Result<(String, f64, f64), ()> = {
+            // The selection_lock covers capture-only: the cursor read and
+            // capture_selection run under ONE guard so two rapid presses cannot
+            // interleave clipboard save/restore between them. The popup UI for
+            // the NoSelection / CaptureError branches is rendered AFTER the guard
+            // drops and AFTER the is_latest(gen) check (P1-1).
+            let captured: CaptureOutcome = {
                 let _g = state.gen.selection_lock();
                 // Read the cursor under the SAME guard as capture_selection so two
                 // rapid presses cannot interleave clipboard save/restore between the
@@ -2302,44 +2315,51 @@ async fn capture_and_translate(
                 #[cfg(not(target_os = "windows"))]
                 let owner = ();
                 match selection::capture_selection(800, owner) {
-                    Ok(selection_engine::Capture::Selected(t)) => Ok((t, cx, cy)),
+                    Ok(selection_engine::Capture::Selected(t)) => {
+                        CaptureOutcome::Selected(t, cx, cy)
+                    }
                     Ok(selection_engine::Capture::NoSelection) => {
-                        let anchor = match build_popup_anchor(app, cx, cy) {
-                            Some(a) => a,
-                            None => return,
-                        };
-                        let (px, py, pw, ph) =
-                            popup::compute_popup_geometry_logical(popup::PopupMode::Error, &anchor);
-                        let _ = popup::show_at_sized(app, px, py, pw, ph);
-                        let _ = popup::error(
-                            app,
-                            if !a11y::enabled() {
-                                "No selection captured. Grant Accessibility in System Settings → Privacy → Accessibility."
-                            } else {
-                                "No text selected."
-                            },
-                        );
-                        Err(())
+                        CaptureOutcome::NoSelection(cx, cy)
                     }
-                    Err(e) => {
-                        let anchor = match build_popup_anchor(app, cx, cy) {
-                            Some(a) => a,
-                            None => return,
-                        };
-                        let (px, py, pw, ph) =
-                            popup::compute_popup_geometry_logical(popup::PopupMode::Error, &anchor);
-                        let _ = popup::show_at_sized(app, px, py, pw, ph);
-                        let _ = popup::error(app, &e);
-                        Err(())
-                    }
+                    Err(e) => CaptureOutcome::CaptureError(e, cx, cy),
                 }
             };
+            // Stale-run guard BEFORE any popup UI: a superseded capture must never
+            // paint the popup (P1-1).
             if !state.gen.is_latest(gen) {
                 return;
             }
             let (text, cx, cy) = match captured {
-                Ok(v) => v,
-                Err(_) => return,
+                CaptureOutcome::Selected(t, cx, cy) => (t, cx, cy),
+                CaptureOutcome::NoSelection(cx, cy) => {
+                    let anchor = match build_popup_anchor(app, cx, cy) {
+                        Some(a) => a,
+                        None => return,
+                    };
+                    let (px, py, pw, ph) =
+                        popup::compute_popup_geometry_logical(popup::PopupMode::Error, &anchor);
+                    let _ = popup::show_at_sized(app, px, py, pw, ph);
+                    let _ = popup::error(
+                        app,
+                        if !a11y::enabled() {
+                            "No selection captured. Grant Accessibility in System Settings → Privacy → Accessibility."
+                        } else {
+                            "No text selected."
+                        },
+                    );
+                    return;
+                }
+                CaptureOutcome::CaptureError(e, cx, cy) => {
+                    let anchor = match build_popup_anchor(app, cx, cy) {
+                        Some(a) => a,
+                        None => return,
+                    };
+                    let (px, py, pw, ph) =
+                        popup::compute_popup_geometry_logical(popup::PopupMode::Error, &anchor);
+                    let _ = popup::show_at_sized(app, px, py, pw, ph);
+                    let _ = popup::error(app, &e);
+                    return;
+                }
             };
             let anchor = match build_popup_anchor(app, cx, cy) {
                 Some(a) => a,
