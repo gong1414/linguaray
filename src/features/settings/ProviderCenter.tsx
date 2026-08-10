@@ -502,6 +502,8 @@ const ProviderCenter: Component = () => {
       setModelFetchByUuid((prev) => ({ ...prev, [uuid]: "idle" }));
     } catch (e) {
       setModelFetchByUuid((prev) => ({ ...prev, [uuid]: "error" }));
+      // Surface the failure so the user knows why no dropdown appeared.
+      pushToast("warning", t.modelFetchError);
     }
   };
 
@@ -875,6 +877,7 @@ const ProviderCenter: Component = () => {
                     label={t.name}
                     value={draftName()}
                     errorText={nameError() ?? undefined}
+                    disabled={saveState() === "saving"}
                     onInput={(e) => {
                       setNameDraftByUuid((prev) => ({
                         ...prev,
@@ -898,6 +901,7 @@ const ProviderCenter: Component = () => {
                     value={draftEndpoint()}
                     placeholder={t.endpoint.placeholder}
                     errorText={epError() ?? undefined}
+                    disabled={saveState() === "saving"}
                     onInput={(e) =>
                       setEndpointDraft((prev) => ({
                         ...prev,
@@ -916,6 +920,7 @@ const ProviderCenter: Component = () => {
                         label={t.models}
                         value={draftModel()}
                         placeholder={t.manualModelPlaceholder}
+                        disabled={saveState() === "saving"}
                         onInput={(e) =>
                           setModelDraftByUuid((prev) => ({
                             ...prev,
@@ -932,6 +937,7 @@ const ProviderCenter: Component = () => {
                         options={selectOptions()}
                         loading={modelFetch() === "loading"}
                         loadingLabel={t.loadingModels}
+                        disabled={saveState() === "saving"}
                         onChange={(v) =>
                           setModelDraftByUuid((prev) => ({ ...prev, [uuid]: v }))
                         }
@@ -972,6 +978,7 @@ const ProviderCenter: Component = () => {
                             value={keyText()}
                             placeholder={t.apiKeyPlaceholder}
                             errorText={keyError() ?? undefined}
+                            disabled={saveState() === "saving"}
                             onInput={(e) => {
                               setKeyInputByUuid((prev) => ({
                                 ...prev,
