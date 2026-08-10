@@ -637,7 +637,8 @@ impl PulseWorker {
         // rev-19-3: move (not clone) — the struct no longer holds a notify field.
         let notify_for_thread = notify;
         let handle = std::thread::spawn(move || {
-            let mut dimmed = false;
+            // P2-2: render() already set Dimmed; first tick toggles to Normal.
+            let mut dimmed = true;
             loop {
                 match stop_rx.recv_timeout(interval) {
                     Ok(()) | Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
