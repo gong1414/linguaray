@@ -21,6 +21,9 @@ export type ProviderRowProps = {
   role: ProviderRole;
   enabled: boolean;
   active?: boolean;
+  /** When true, all row actions (toggle / edit / delete) are disabled. Used to
+   *  lock the row while a delete is in-flight (prevents double-delete + races). */
+  disabled?: boolean;
   labels: ProviderRowLabels;
   onToggle: (enabled: boolean) => void;
   onEdit: () => void;
@@ -39,11 +42,11 @@ const ProviderRow: Component<ProviderRowProps> = (props) => {
         <span class="provider-row__template">{props.template}</span>
       </div>
       <StatusBadge variant={status().variant} dot>{props.labels.statusText[status().code]}</StatusBadge>
-      <Switch checked={props.enabled} onChange={props.onToggle} label={props.labels.enabled} />
-      <button type="button" class="provider-row__btn" aria-label={props.labels.edit} onClick={props.onEdit}>
+      <Switch checked={props.enabled} onChange={props.onToggle} label={props.labels.enabled} disabled={props.disabled} />
+      <button type="button" class="provider-row__btn" aria-label={props.labels.edit} onClick={props.onEdit} disabled={props.disabled}>
         <Pencil size={16} />
       </button>
-      <button type="button" class="provider-row__btn" aria-label={props.labels.delete} onClick={props.onDelete}>
+      <button type="button" class="provider-row__btn" aria-label={props.labels.delete} onClick={props.onDelete} disabled={props.disabled}>
         <Trash2 size={16} />
       </button>
     </div>

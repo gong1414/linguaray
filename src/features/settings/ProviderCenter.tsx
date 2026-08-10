@@ -140,6 +140,9 @@ const ProviderCenter: Component = () => {
   // failed so Retry can re-attempt without re-opening the dialog.
   const [deleteError, setDeleteError] = createSignal(false);
   const [deleteFailedUuid, setDeleteFailedUuid] = createSignal<string | null>(null);
+  // Per-provider deleting busy state. Set while `provider_delete` is in-flight
+  // so the row's action buttons are locked (prevents double-delete / races).
+  const [deletingUuid, setDeletingUuid] = createSignal<string | null>(null);
   const [consentOpen, setConsentOpen] = createSignal(false);
   const [pendingParallelUuid, setPendingParallelUuid] = createSignal<string | null>(null);
   const [consentActualScope, setConsentActualScope] = createSignal<string | null>(null);
@@ -518,6 +521,7 @@ const ProviderCenter: Component = () => {
   const confirmDelete = async () => {
     const uuid = deleteConfirmUuid() ?? deleteFailedUuid();
     if (!uuid) return;
+    setDeletingUuid(uuid);
     try {
       await providerDelete(uuid);
       setDeleteError(false);
@@ -532,6 +536,8 @@ const ProviderCenter: Component = () => {
       setDeleteFailedUuid(uuid);
       setDeleteConfirmUuid(null);
       pushToast("destructive", t.saveFailed);
+    } finally {
+      setDeletingUuid(null);
     }
   };
 
@@ -650,8 +656,9 @@ const ProviderCenter: Component = () => {
                   // role is a reactive accessor: re-evaluated when selection()
                   // changes, so role-action visibility + badges update in place.
                   const role = () => roleFor(p.uuid);
+                  const isDeleting = () => deletingUuid() === p.uuid;
                   return (
-                    <li class="pc__provider-row-wrapper" data-status={p.status}>
+                    <li class="pc__provider-row-wrapper" data-status={isDeleting() ? "deleting" : p.status}>
                       <div class="pc__provider-row-main">
                         <ProviderRow
                           name={p.name}
@@ -660,6 +667,7 @@ const ProviderCenter: Component = () => {
                           role={role()}
                           enabled={p.enabled}
                           active={selectedUuid() === p.uuid}
+                          disabled={isDeleting()}
                           labels={rowLabelsFor(p.name)}
                           onToggle={(enabled) => void handleToggle(p.uuid, enabled)}
                           onEdit={() => setSelectedUuid(p.uuid)}
@@ -695,6 +703,7 @@ const ProviderCenter: Component = () => {
                                 class="pc__icon-btn"
                                 aria-label={t.setPrimary}
                                 title={t.setPrimary}
+                                disabled={isDeleting()}
                                 onClick={() => void handleSetPrimary(p.uuid)}
                               >
                                 <Star size={14} />
@@ -706,6 +715,7 @@ const ProviderCenter: Component = () => {
                                 class="pc__icon-btn"
                                 aria-label={t.removeParallel}
                                 title={t.removeParallel}
+                                disabled={isDeleting()}
                                 onClick={() => void handleRemoveParallel(p.uuid)}
                               >
                                 <Layers size={14} />
@@ -717,6 +727,7 @@ const ProviderCenter: Component = () => {
                                 class="pc__icon-btn"
                                 aria-label={t.addParallel}
                                 title={t.addParallel}
+                                disabled={isDeleting()}
                                 onClick={(e) =>
                                   handleAddParallel(
                                     p.uuid,
@@ -733,6 +744,7 @@ const ProviderCenter: Component = () => {
                                 class="pc__icon-btn"
                                 aria-label={t.setFallback}
                                 title={t.setFallback}
+                                disabled={isDeleting()}
                                 onClick={() => void handleSetFallback(p.uuid)}
                               >
                                 <CornerDownLeft size={14} />
@@ -745,6 +757,7 @@ const ProviderCenter: Component = () => {
                             class="pc__icon-btn"
                             aria-label={t.duplicate}
                             title={t.duplicate}
+                            disabled={isDeleting()}
                             onClick={() => void handleDuplicate(p.uuid)}
                           >
                             <Copy size={14} />
@@ -755,6 +768,7 @@ const ProviderCenter: Component = () => {
                             class="pc__icon-btn"
                             aria-label={t.moveUp}
                             title={t.moveUp}
+                            disabled={isDeleting()}
                             onClick={() => void moveProvider(p.uuid, "up")}
                           >
                             <ArrowUp size={14} />
@@ -764,6 +778,7 @@ const ProviderCenter: Component = () => {
                             class="pc__icon-btn"
                             aria-label={t.moveDown}
                             title={t.moveDown}
+                            disabled={isDeleting()}
                             onClick={() => void moveProvider(p.uuid, "down")}
                           >
                             <ArrowDown size={14} />
