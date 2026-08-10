@@ -276,4 +276,25 @@ describe("Popup (Surface 01)", () => {
     expect(await findByText("你好")).toBeTruthy();
     cleanup();
   });
+
+  it("B3/P1-8: loading state shows Retry when source_text is saved", async () => {
+    const { findByLabelText, container } = render(() => <Popup />);
+    // A loading event carrying source_text keeps the loading shell but saves
+    // the source so Retry becomes available (re-translate saved source).
+    await emitEvent("popup-state", { status: "loading", source_text: "hello" });
+    // Still in the loading shell (spinner present).
+    expect(container.querySelector(".lr-spinner__icon")).toBeTruthy();
+    const retryBtn = await findByLabelText(/重试|Retry/);
+    expect(retryBtn).toBeTruthy();
+    cleanup();
+  });
+
+  it("B3/P1-8: loading state hides Retry when there is no source_text", async () => {
+    const { queryByLabelText, container } = render(() => <Popup />);
+    // Loading with no source: Retry must NOT appear.
+    await emitEvent("popup-state", { status: "loading" });
+    expect(container.querySelector(".lr-spinner__icon")).toBeTruthy();
+    expect(queryByLabelText(/重试|Retry/)).toBeNull();
+    cleanup();
+  });
 });

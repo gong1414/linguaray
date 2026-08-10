@@ -157,6 +157,19 @@ const Popup: Component = () => {
       <Show when={state().kind === "loading"}>
         <div class="popup-loading">
           <Spinner size={12} label={t("selection.loading")} />
+          {/* B3/P1-8: Retry available whenever a SOURCE text is saved, including
+              the loading state (re-translate the saved source via
+              translate_selection_ipc — never the clipboard or the result). */}
+          <Show when={ctrl.hasSource()}>
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label={t("selection.action.retry")}
+              onClick={() => void ctrl.retrySelection()}
+            >
+              {t("selection.action.retry")}
+            </Button>
+          </Show>
         </div>
       </Show>
 

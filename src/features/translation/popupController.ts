@@ -24,8 +24,13 @@ export function createPopupController() {
   const [pinned, setPinned] = createSignal(false);
   /** uuid → friendly provider name. Loaded once on mount from provider_list. */
   const nameMap = new Map<string, string>();
-  /** P1-3: last saved SOURCE text (original selection), for Retry. */
-  let lastSource = "";
+  /**
+   * P1-3: last saved SOURCE text (original selection), for Retry. A signal (not
+   * a plain `let`) so `hasSource()` is reactive — the loading shell mounts once
+   * on popup open (initial loading state), so a later loading event that carries
+   * source_text would never re-render a plain-let-derived Retry (P1-8).
+   */
+  const [lastSource, setLastSource] = createSignal("");
   const unlisteners: UnlistenFn[] = [];
   /**
    * B2/P1-9: guards the unmount-during-await race. onCleanup flips this to
@@ -46,9 +51,9 @@ export function createPopupController() {
       // P1-3: loading opens a new translation session — clear the prior
       // source, then adopt this session's source if the backend carried it.
       if (payload.status === "loading") {
-        lastSource = payload.source_text ?? "";
+        setLastSource(payload.source_text ?? "");
       } else if (payload.source_text) {
-        lastSource = payload.source_text;
+        setLastSource(payload.source_text);
       }
       setState(decodePopupState(payload));
     });
@@ -60,7 +65,7 @@ export function createPopupController() {
     const unMulti = await listen<PopupMultiPayload>("popup-multi-result", (e) => {
       if (cancelled) return;
       const payload = e.payload;
-      if (payload.source_text) lastSource = payload.source_text;
+      if (payload.source_text) setLastSource(payload.source_text);
       setState(decodePopupMultiResult(payload));
     });
     if (cancelled) { unMulti(); return; }
@@ -127,17 +132,17 @@ export function createPopupController() {
    * popup-state / popup-multi-result, which re-decode here.
    */
   const retrySelection = async () => {
-    if (!lastSource) return;
+    if (!lastSource()) return;
     setState({ kind: "loading" });
     try {
-      await translateSelection(lastSource);
+      await translateSelection(lastSource());
     } catch (e) {
       setState({ kind: "error", sub: "generic", message: String(e) });
     }
   };
 
-  /** Whether a saved SOURCE text is available for Retry (P1-3). */
-  const hasSource = () => lastSource.length > 0;
+  /** Whether a saved SOURCE text is available for Retry (P1-3). Reactive (P1-8). */
+  const hasSource = () => lastSource().length > 0;
 
   return { state, pinned, pin, unpin, dismiss, retrySelection, hasSource, engineLabel };
 }
