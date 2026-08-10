@@ -752,3 +752,51 @@ fn stale_switch_result_ignored() {
     );
     assert_eq!(recompute_pure(&c), TrayVisualState::Normal);
 }
+
+// ─── 12. rev-A4 (P2-2): pulse first frame Dimmed → Normal (not Dimmed → Dimmed) ─
+// NOTE: the assertions snapshot the call count BEFORE each tick and assert on the
+// frame at that exact index, so the test pins the SPECIFIC frame each tick
+// produced (rather than `.any()` over the full history, which is satisfied by the
+// constructor's idle-state Normal frame and could not catch the P2-2 bug).
+
+#[test]
+fn pulse_sequence_is_dimmed_then_normal_then_dimmed() {
+    let (mut c, renderer, notify_rx) = controller_with_notify();
+    c.begin_translation(1);
+    // Initial render (the begin_translation frame) must be Dimmed — it is the
+    // last frame in the history at this point.
+    let n0 = renderer.calls().len();
+    assert!(
+        renderer
+            .calls()
+            .last()
+            .map(|(icon, _)| icon.is_dimmed())
+            .unwrap_or(false),
+        "initial render must be Dimmed, got {:?}",
+        renderer.calls()
+    );
+    // Tick 1: must render Normal (not repeat Dimmed). The frame at index n0 is
+    // the first frame the worker pushed (deterministic: the worker's first
+    // recv_timeout(2ms) cannot have elapsed before this <1µs snapshot).
+    match notify_rx.recv_timeout(std::time::Duration::from_millis(50)) {
+        Ok(PulseEvent::Tick) => {}
+        other => panic!("expected Tick, got {other:?}"),
+    }
+    let calls1 = renderer.calls();
+    assert!(
+        calls1.get(n0).map(|(icon, _)| icon.is_normal()).unwrap_or(false),
+        "tick 1 must render Normal (P2-2), got {calls1:?}"
+    );
+    // Tick 2: Dimmed.
+    let n1 = renderer.calls().len();
+    match notify_rx.recv_timeout(std::time::Duration::from_millis(50)) {
+        Ok(PulseEvent::Tick) => {}
+        other => panic!("expected Tick, got {other:?}"),
+    }
+    let calls2 = renderer.calls();
+    assert!(
+        calls2.get(n1).map(|(icon, _)| icon.is_dimmed()).unwrap_or(false),
+        "tick 2 must render Dimmed, got {calls2:?}"
+    );
+    c.finish_translation(1, true);
+}
