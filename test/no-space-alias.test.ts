@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
-const ALIAS = /--space-[0-9]/;
+const ALIAS = /--space-[0-9](?![a-z])/;
 
 function walk(dir: string): string[] {
   const out: string[] = [];
@@ -28,5 +28,12 @@ describe("no --space-N legacy aliases in src/", () => {
       if (ALIAS.test(stripped)) offenders.push(f);
     }
     expect(offenders, `legacy --space-N alias found in: ${offenders.join(", ")}`).toEqual([]);
+  });
+
+  it("does NOT flag legitimate --space-2xl / --space-3xl tokens", () => {
+    expect(ALIAS.test("--space-2xl")).toBe(false);
+    expect(ALIAS.test("--space-3xl")).toBe(false);
+    expect(ALIAS.test("--space-1")).toBe(true);
+    expect(ALIAS.test("--space-2")).toBe(true);
   });
 });
