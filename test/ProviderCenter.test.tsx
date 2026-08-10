@@ -263,6 +263,65 @@ describe("ProviderCenter (Surface 05)", () => {
     expect(updates.length).toBeGreaterThanOrEqual(1);
   });
 
+  it("edits the provider name and saves", async () => {
+    const updates: unknown[] = [];
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => [profile({ uuid: "u1", name: "TestProvider", secret_ref: "provider/u1" })],
+      key_status: () => ({ "provider/u1": true }),
+      provider_update: (args) => {
+        updates.push(args);
+        return profile({ uuid: "u1", name: "RenamedProvider" });
+      },
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("TestProvider")).toBeTruthy());
+    fireEvent.click(screen.getByLabelText("Edit TestProvider"));
+    await flush();
+
+    const nameInput = screen.getByLabelText("Name") as HTMLInputElement;
+    fireEvent.input(nameInput, { target: { value: "RenamedProvider" } });
+    await flush();
+
+    fireEvent.click(screen.getByText("Save profile"));
+    await waitFor(() => expect(updates.length).toBeGreaterThanOrEqual(1));
+    expect((updates[0] as { patch: { name?: string } }).patch.name).toBe("RenamedProvider");
+  });
+
+  it("blocks save when another provider has the same name", async () => {
+    const updates: unknown[] = [];
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => [
+        profile({ uuid: "u1", name: "ProvA", secret_ref: "provider/u1" }),
+        profile({ uuid: "u2", name: "ProvB", sort_order: 1, secret_ref: "provider/u2" }),
+      ],
+      key_status: () => ({ "provider/u1": true, "provider/u2": true }),
+      provider_update: (args) => {
+        updates.push(args);
+        return profile({ uuid: "u1", name: "ProvB" });
+      },
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("ProvA")).toBeTruthy());
+
+    fireEvent.click(screen.getByLabelText("Edit ProvA"));
+    await flush();
+
+    const nameInput = screen.getByLabelText("Name") as HTMLInputElement;
+    fireEvent.input(nameInput, { target: { value: "ProvB" } });
+    await flush();
+
+    fireEvent.click(screen.getByText("Save profile"));
+    await flush();
+    // Conflict error surfaces (inline in the Name field's error slot).
+    await waitFor(() =>
+      expect(screen.getAllByText("Another provider already uses this name").length).toBeGreaterThanOrEqual(1),
+    );
+    // provider_update was NOT called (aborted before the IPC round-trip).
+    expect(updates.length).toBe(0);
+  });
+
   it("key missing: shows key input + Save key; saving calls provider_set_key", async () => {
     const keyCalls: unknown[] = [];
     routeInvoke({
