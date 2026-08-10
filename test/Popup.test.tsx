@@ -252,4 +252,28 @@ describe("Popup (Surface 01)", () => {
     expect(vi.mocked(invoke)).not.toHaveBeenCalledWith("translate_clipboard");
     cleanup();
   });
+
+  it("B2/P1-9: popup-state emitted BEFORE provider_list resolves is still received", async () => {
+    const { invoke } = await import("@tauri-apps/api/core");
+    // provider_list hangs forever: listeners MUST be registered before it so an
+    // event arriving during the load is not lost (the pre-fix order awaited
+    // provider_list first and dropped any event fired before it resolved).
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "provider_list") return new Promise(() => {});
+      return { outcomes: [], actual_engine: undefined };
+    });
+
+    const { findByText } = render(() => <Popup />);
+    // Let the async onMount register its listeners (now BEFORE provider_list).
+    await Promise.resolve();
+    await Promise.resolve();
+    await emitEvent("popup-state", {
+      status: "result",
+      text: "你好",
+      engine: "deepseek/u1",
+      source_text: "hi",
+    });
+    expect(await findByText("你好")).toBeTruthy();
+    cleanup();
+  });
 });

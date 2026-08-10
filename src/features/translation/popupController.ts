@@ -27,46 +27,68 @@ export function createPopupController() {
   /** P1-3: last saved SOURCE text (original selection), for Retry. */
   let lastSource = "";
   const unlisteners: UnlistenFn[] = [];
+  /**
+   * B2/P1-9: guards the unmount-during-await race. onCleanup flips this to
+   * `true` and runs the already-pushed unlisteners BEFORE any pending await in
+   * onMount resolves. Listener callbacks check it (no setState after unmount),
+   * and each `await listen(...)` result is dropped immediately if cleanup
+   * already ran (no leaked listener registered after unmount).
+   */
+  let cancelled = false;
 
   onMount(async () => {
-    // B3: load the provider name map so engine labels resolve to friendly names.
+    // B2/P1-9: register event listeners BEFORE loading provider_list. Events
+    // arriving during the provider_list load must still be captured (the prior
+    // order awaited provider_list first and lost any event fired during load).
+    const unState = await listen<PopupStatePayload>("popup-state", (e) => {
+      if (cancelled) return;
+      const payload = e.payload;
+      // P1-3: loading opens a new translation session — clear the prior
+      // source, then adopt this session's source if the backend carried it.
+      if (payload.status === "loading") {
+        lastSource = payload.source_text ?? "";
+      } else if (payload.source_text) {
+        lastSource = payload.source_text;
+      }
+      setState(decodePopupState(payload));
+    });
+    // Component unmounted while this await was pending: drop the listener
+    // immediately so it is never leaked (onCleanup already ran).
+    if (cancelled) { unState(); return; }
+    unlisteners.push(unState);
+
+    const unMulti = await listen<PopupMultiPayload>("popup-multi-result", (e) => {
+      if (cancelled) return;
+      const payload = e.payload;
+      if (payload.source_text) lastSource = payload.source_text;
+      setState(decodePopupMultiResult(payload));
+    });
+    if (cancelled) { unMulti(); return; }
+    unlisteners.push(unMulti);
+
+    // Blur-hide, gated by pin: a pinned popup stays visible on blur (S0 §4.1).
+    const win = getCurrentWindow();
+    const unFocus = await win.onFocusChanged(({ payload: focused }) => {
+      if (cancelled) return;
+      if (!focused && !pinned()) win.hide();
+    });
+    if (cancelled) { unFocus(); return; }
+    unlisteners.push(unFocus);
+
+    // Load the provider name map LAST (best-effort: labels fall back below).
     try {
       const profiles = await invoke<{ uuid: string; name: string }[]>("provider_list");
+      if (cancelled) return;
       for (const p of profiles) nameMap.set(p.uuid, p.name);
     } catch {
       // Best-effort: leave the map empty; labels fall back below.
     }
-    unlisteners.push(
-      await listen<PopupStatePayload>("popup-state", (e) => {
-        const payload = e.payload;
-        // P1-3: loading opens a new translation session — clear the prior
-        // source, then adopt this session's source if the backend carried it.
-        if (payload.status === "loading") {
-          lastSource = payload.source_text ?? "";
-        } else if (payload.source_text) {
-          lastSource = payload.source_text;
-        }
-        setState(decodePopupState(payload));
-      }),
-    );
-    unlisteners.push(
-      await listen<PopupMultiPayload>("popup-multi-result", (e) => {
-        const payload = e.payload;
-        if (payload.source_text) lastSource = payload.source_text;
-        setState(decodePopupMultiResult(payload));
-      }),
-    );
-
-    // Blur-hide, gated by pin: a pinned popup stays visible on blur (S0 §4.1).
-    const win = getCurrentWindow();
-    unlisteners.push(
-      await win.onFocusChanged(({ payload: focused }) => {
-        if (!focused && !pinned()) win.hide();
-      }),
-    );
   });
 
   onCleanup(() => {
+    // B2/P1-9: flip the flag first so callbacks pending on an in-flight event
+    // become no-ops, then release the already-registered listeners.
+    cancelled = true;
     for (const u of unlisteners) u();
   });
 
