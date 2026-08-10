@@ -158,6 +158,10 @@ type ProviderCopy = {
   /** Surfaced when a save rejects with a UNIQUE constraint violation
    *  (duplicate name / secret_ref). Carries no placeholder. */
   keyAlreadyExists: string;
+  /** Surfaced when the user edits a provider name to one another provider
+   *  already uses (structured duplicate-name conflict, checked client-side
+   *  before save). Carries no placeholder. */
+  nameExists: string;
   /** Cold-load failure banner title (provider list OR active selection read failed). */
   loadFailed: string;
   /** Retry button on the cold-load failure banner. */
@@ -274,6 +278,7 @@ const EN: SettingsCopy = {
     saving: "Saving…",
     saveFailed: "Failed to save: network error",
     keyAlreadyExists: "A provider with this name already exists",
+    nameExists: "Another provider already uses this name",
     loadFailed: "Provider load failed",
     retry: "Retry",
     reload: "Reload",
@@ -402,6 +407,7 @@ const ZH: SettingsCopy = {
     saving: "保存中…",
     saveFailed: "保存失败：网络错误",
     keyAlreadyExists: "该名称的服务商已存在",
+    nameExists: "该名称已被其他提供商使用",
     loadFailed: "加载失败",
     retry: "重试",
     reload: "重新加载",

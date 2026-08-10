@@ -117,9 +117,15 @@ const ProviderCenter: Component = () => {
   const [keyInputByUuid, setKeyInputByUuid] = createSignal<Record<string, string>>({});
   const [endpointDraft, setEndpointDraft] = createSignal<Record<string, string>>({});
   const [modelDraftByUuid, setModelDraftByUuid] = createSignal<Record<string, string>>({});
+  // Per-UUID name draft for the editable name field (mirrors endpoint/model
+  // drafts). Undefined → fall back to the stored provider name.
+  const [nameDraftByUuid, setNameDraftByUuid] = createSignal<Record<string, string>>({});
   const [saveByUuid, setSaveByUuid] = createSignal<Record<string, "idle" | "saving" | "saved" | "failed">>({});
   // Per-UUID key-save error message (localized). Cleared on the next key edit.
   const [keyErrorByUuid, setKeyErrorByUuid] = createSignal<Record<string, string>>({});
+  // Per-UUID name conflict error (structured duplicate-name check). Cleared on
+  // the next name edit.
+  const [nameErrorByUuid, setNameErrorByUuid] = createSignal<Record<string, string>>({});
   const [connByUuid, setConnByUuid] = createSignal<Record<string, ConnectionResult | "testing">>({});
   const [modelOptionsByUuid, setModelOptionsByUuid] = createSignal<Record<string, ModelInfo[]>>({});
   const [modelFetchByUuid, setModelFetchByUuid] = createSignal<Record<string, "idle" | "loading" | "error">>({});
@@ -398,10 +404,11 @@ const ProviderCenter: Component = () => {
   };
 
   /** Save profile: validate endpoint locally (reactive epError already shown),
-   *  then IPC. Aborts on invalid endpoint. */
+   *  then IPC. Aborts on invalid endpoint or a duplicate-name conflict. */
   const handleSaveProfile = async (uuid: string) => {
     const draft = endpointDraft()[uuid];
     const modelDraft = modelDraftByUuid()[uuid];
+    const nameDraft = nameDraftByUuid()[uuid];
     const provider = providers().find((p) => p.uuid === uuid);
     if (!provider) return;
     const effectiveEndpoint = draft ?? provider.endpoint;
@@ -410,9 +417,28 @@ const ProviderCenter: Component = () => {
       // The reactive epError memo will surface the message; abort the save.
       return;
     }
+    const effectiveName = (nameDraft ?? provider.name).trim();
+    // Structured duplicate-name conflict: the DB has no UNIQUE constraint on
+    // name, so enforce uniqueness client-side before the IPC round-trip.
+    if (effectiveName !== provider.name) {
+      const conflict = providers().some(
+        (other) => other.uuid !== uuid && other.name === effectiveName,
+      );
+      if (conflict) {
+        setNameErrorByUuid((prev) => ({ ...prev, [uuid]: t.nameExists }));
+        return;
+      }
+    }
+    // Clear any stale name conflict error now that the name is valid.
+    setNameErrorByUuid((prev) => {
+      const n = { ...prev };
+      delete n[uuid];
+      return n;
+    });
     setSaveByUuid((prev) => ({ ...prev, [uuid]: "saving" }));
     try {
       const updated = await providerUpdate(uuid, {
+        name: effectiveName,
         endpoint: effectiveEndpoint,
         model: modelDraft ?? provider.model,
       });
@@ -797,6 +823,8 @@ const ProviderCenter: Component = () => {
               const uuid = p().uuid;
               const draftEndpoint = createMemo(() => endpointDraft()[uuid] ?? p().endpoint);
               const draftModel = createMemo(() => modelDraftByUuid()[uuid] ?? p().model ?? "");
+              const draftName = createMemo(() => nameDraftByUuid()[uuid] ?? p().name);
+              const nameError = createMemo(() => nameErrorByUuid()[uuid]);
               const epError = createMemo(() => {
                 // Reactive: validate the draft as it changes (not just on save).
                 const draft = draftEndpoint();
@@ -827,7 +855,27 @@ const ProviderCenter: Component = () => {
               });
               return (
                 <div class="pc__detail-content">
-                  <h3 class="pc__detail-name">{p().name}</h3>
+                  {/* Name (editable — backend supports `name` patches). */}
+                  <TextField
+                    label={t.name}
+                    value={draftName()}
+                    errorText={nameError() ?? undefined}
+                    onInput={(e) => {
+                      setNameDraftByUuid((prev) => ({
+                        ...prev,
+                        [uuid]: e.currentTarget.value,
+                      }));
+                      // Clear any stale conflict error as soon as the user
+                      // edits the name again.
+                      if (nameError()) {
+                        setNameErrorByUuid((prev) => {
+                          const n = { ...prev };
+                          delete n[uuid];
+                          return n;
+                        });
+                      }
+                    }}
+                  />
 
                   {/* Endpoint */}
                   <TextField
