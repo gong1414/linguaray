@@ -1518,9 +1518,10 @@ fn provider_get_active_selection(
 fn set_active_primary_core(
     app_state: Arc<AppState>,
     uuid: String,
+    rev: u64,
 ) -> Result<SetActiveResult, String> {
     let app = app_state.clone();
-    let outcome = db_set_active_primary(&app, &uuid)?;
+    let outcome = db_set_active_primary(&app, &uuid, rev)?;
     Ok(match outcome {
         SetActiveOutcome::Written => SetActiveResult::Written,
         SetActiveOutcome::NeedsConsent { actual_scope } => {
@@ -1533,11 +1534,41 @@ fn set_active_primary_core(
 /// share. Acquires the write gate, runs `validate_active_selection` + the
 /// `set_active_slots` write inside ONE transaction. Returns the internal
 /// `SetActiveOutcome` so the caller can map it to the serialized result.
-fn db_set_active_primary(
+///
+/// P1-3 (Task A3): `pub` + revision-guarded. The caller passes the `rev`
+/// captured via `tray.lock().begin_switch()`. This function checks `rev`
+/// against `tray.switch_revision()` BEFORE acquiring the write gate AND
+/// re-checks AFTER acquiring it, so a stale/late switch request (an older
+/// click whose DB write lands after a newer click already committed) is
+/// rejected at the DB level — guaranteeing last-click-wins.
+pub fn db_set_active_primary(
     app: &Arc<AppState>,
     uuid: &str,
+    rev: u64,
 ) -> Result<SetActiveOutcome, String> {
+    // P1-3: check revision BEFORE acquiring the write gate. If a newer switch
+    // already bumped the revision, this stale request must NOT write.
+    {
+        let controller = app.tray.lock();
+        if controller.switch_revision() != rev {
+            return Err(format!(
+                "stale switch revision {rev} (current {})",
+                controller.switch_revision()
+            ));
+        }
+    }
     let _gate = app.data_gate.write();
+    // Re-check after acquiring the gate: another switch may have bumped the
+    // revision between the first check and the gate acquisition.
+    {
+        let controller = app.tray.lock();
+        if controller.switch_revision() != rev {
+            return Err(format!(
+                "stale switch revision {rev} (current {})",
+                controller.switch_revision()
+            ));
+        }
+    }
     let db = require_ready_gated_write(app, &_gate)?;
     let outcome = db
         .with_conn(|conn| -> Result<SetActiveOutcome, DbErr> {
@@ -1574,9 +1605,18 @@ pub fn handle_switch_provider_core(
     uuid: &str,
 ) -> Result<(), String> {
     let rev = app_state.tray.lock().begin_switch();
-    let result = set_active_primary_core(app_state.clone(), uuid.to_string());
+    let result = set_active_primary_core(app_state.clone(), uuid.to_string(), rev);
     let success = result.is_ok();
     app_state.tray.lock().finish_switch(rev, success);
+    // P1-3 (Task A3): if the DB write failed because a newer switch already
+    // bumped the revision, the newer click has already won — this is expected,
+    // not an error. Swallow the stale-revision error so the caller sees Ok
+    // (the DB already reflects the last click).
+    if let Err(ref e) = result {
+        if e.contains("stale switch revision") {
+            return Ok(());
+        }
+    }
     result.map(|_| ())
 }
 
@@ -1949,7 +1989,11 @@ impl From<String> for ProviderCommandError {
 /// Outcome of a `provider_set_active` DB transaction (P1 #3). Carries the
 /// consent-required signal out of the `with_conn` closure (whose error type is
 /// fixed to `DbError`) so the command can surface it to the frontend.
-enum SetActiveOutcome {
+///
+/// `pub` + `Debug` (Task A3 / P1-3): exposed so the integration test for the
+/// revision-guarded `db_set_active_primary` can name and inspect the return.
+#[derive(Debug)]
+pub enum SetActiveOutcome {
     /// Selection written (no consent needed, or scope already matched).
     Written,
     /// A non-empty parallel selection needs explicit consent; carries the
