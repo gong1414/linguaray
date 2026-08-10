@@ -146,8 +146,8 @@ const Popup: Component = () => {
 
   return (
     <main
-      class="container"
-      classList={{ "container--compact": isCompact() }}
+      class="popup-shell"
+      classList={{ "popup-shell--compact": isCompact() }}
       role="region"
       aria-label={headlineKey(state())}
       aria-busy={state().kind === "loading" ? "true" : undefined}
