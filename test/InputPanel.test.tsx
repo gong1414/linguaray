@@ -242,4 +242,23 @@ describe("InputPanel (Surface 02)", () => {
     expect(document.activeElement).toBe(textarea);
     cleanup();
   });
+
+  // ── B4 / P1-5: Clear gating fix ───────────────────────────────────────────
+
+  it("Clear is enabled when text is typed but no result yet", () => {
+    routeInputInvoke({
+      provider_list: () => [],
+      translate_session: () => ({
+        outcomes: [{ uuid: "u1", ok: true, text: "hello", engine: "deepseek/u1" }],
+      }),
+    });
+    const { getByRole } = render(() => <InputPanel />);
+    const ta = getByRole("textbox") as HTMLTextAreaElement;
+    fireEvent.input(ta, { target: { value: "你好" } });
+    // Text is present but no translation has run (hasResult is false) — the
+    // Clear button must be enabled so the user can discard the typed text.
+    const clearBtn = getByRole("button", { name: /清空|Clear/ }) as HTMLButtonElement;
+    expect(clearBtn.disabled).toBe(false);
+    cleanup();
+  });
 });

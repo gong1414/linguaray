@@ -1,7 +1,7 @@
 import { createSignal, createMemo, createEffect, Show, For, onMount, onCleanup, type Component, type JSX } from "solid-js";
 import { invoke } from "@tauri-apps/api/core";
 import { AlertTriangle } from "lucide-solid";
-import { Button, InlineError, ResultCard, type ResultOutcome } from "@linguaray/ui";
+import { Button, InlineError, ResultCard, TextArea, type ResultOutcome } from "@linguaray/ui";
 import { decodeSessionResult } from "./features/translation/decode";
 import { ensureProviderNameMap, engineLabel } from "./features/translation/inputController";
 import { detectLocale, t } from "./i18n";
@@ -28,7 +28,10 @@ export function InputPanelView(props: InputPanelViewProps): JSX.Element {
   const labelOf = (raw: string) => (props.engineLabel ?? ((r: string) => r))(raw);
   // rev-8-6: showClear is a DERIVATION (a function of props), not a value read
   // once at mount — keeps it reactive in Solid's fine-grained model.
-  const showClear = () => props.hasResult ?? false;
+  // P1-5: Clear is also enabled when the user has typed text but never
+  // translated (hasResult is false yet text is present).
+  const showClear = () =>
+    (props.hasResult ?? false) || props.text.trim().length > 0;
 
   const single = createMemo(() => {
     const s = props.state;
@@ -62,7 +65,7 @@ export function InputPanelView(props: InputPanelViewProps): JSX.Element {
   return (
     <main class="container" style={{ padding: "var(--space-lg)" }}>
       <h2 class="input-title">{t("input.title")}</h2>
-      <textarea
+      <TextArea
         ref={props.textareaRef}
         rows={4}
         placeholder={t("input.placeholder")}
@@ -70,7 +73,7 @@ export function InputPanelView(props: InputPanelViewProps): JSX.Element {
         disabled={!props.idle}
         onInput={(e) => props.onText(e.currentTarget.value)}
         onKeyDown={onKeyDown}
-        aria-label={t("input.title")}
+        ariaLabel={t("input.title")}
       />
       <div class="input-actions">
         <Button variant="secondary" size="md" onClick={props.onClear} disabled={!showClear()}>
