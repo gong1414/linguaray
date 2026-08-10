@@ -694,8 +694,8 @@ fn switch_arm_source_has_no_gen_next_call() {
         "rev-22-3: handle_switch_provider must be `pub fn` (SYNC), not `pub async fn` (rev-18-1) (first 500 chars of wrapper body: {wrapper_preview})"
     );
     assert!(
-        !wrapper_body.contains(".await") && !wrapper_body.contains("spawn(async move"),
-        "rev-22-3: handle_switch_provider wrapper must NOT `.await` or spawn an async task (rev-18-1 SYNC model) (first 500 chars of wrapper body: {wrapper_preview})"
+        wrapper_body.contains("spawn(async move"),
+        "Task A2 (P1-2): handle_switch_provider must detach the now-async tray refresh via `spawn(async move {{ ... refresh_tray_if_available(...).await; }})`. The wrapper itself stays SYNC (`pub fn`, runs inside spawn_blocking, does the DB write synchronously — rev-18-1 SYNC model) and therefore cannot `.await` directly; spawning the async refresh is the only legitimate way to drive it from this sync context. (first 500 chars of wrapper body: {wrapper_preview})"
     );
 
     assert!(
