@@ -764,6 +764,69 @@ describe("ProviderCenter (Surface 05)", () => {
     expect(manualInput.tagName).toBe("INPUT");
     // The dropdown (native select) is gone — manual entry only.
     expect(screen.queryByRole("listbox")).toBeNull();
+    // A warning toast (role=alert) surfaces so the user knows the fetch failed.
+    await waitFor(() => {
+      const alert = screen.getByRole("alert");
+      expect((alert.getAttribute("aria-label") ?? "")).toMatch(/fetch models/i);
+    });
+  });
+
+  it("saving disables detail inputs while provider_update is in-flight", async () => {
+    let resolveUpdate: () => void = () => {};
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => [
+        profile({
+          uuid: "u1",
+          name: "TestProvider",
+          secret_ref: "provider/u1",
+          capabilities: { balance: false, quota: false, model_list: false },
+        }),
+      ],
+      key_status: () => ({}), // no key → Key TextField renders
+      provider_update: () =>
+        new Promise<ProviderProfile>((res) => {
+          // Preserve model_list:false so the Model field stays a manual
+          // TextField across the save (keeps the captured element stable).
+          resolveUpdate = () =>
+            res(
+              profile({
+                uuid: "u1",
+                capabilities: { balance: false, quota: false, model_list: false },
+              }),
+            );
+        }),
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("TestProvider")).toBeTruthy());
+    fireEvent.click(screen.getByLabelText("Edit TestProvider"));
+    await flush();
+
+    const nameInput = screen.getByLabelText("Name") as HTMLInputElement;
+    const endpointInput = screen.getByLabelText("Endpoint") as HTMLInputElement;
+    const modelInput = screen.getByLabelText("Model") as HTMLInputElement;
+    const keyInput = screen.getByLabelText("API key") as HTMLInputElement;
+
+    // Before save: all detail inputs are editable.
+    expect(nameInput.disabled).toBe(false);
+    expect(endpointInput.disabled).toBe(false);
+    expect(modelInput.disabled).toBe(false);
+    expect(keyInput.disabled).toBe(false);
+
+    fireEvent.click(screen.getByText("Save profile"));
+    // While provider_update is pending, every editable input is locked.
+    await waitFor(() => expect(nameInput.disabled).toBe(true));
+    expect(endpointInput.disabled).toBe(true);
+    expect(modelInput.disabled).toBe(true);
+    expect(keyInput.disabled).toBe(true);
+
+    // Resolve the save → inputs re-enable.
+    resolveUpdate();
+    await flush();
+    await waitFor(() => expect(nameInput.disabled).toBe(false));
+    expect(endpointInput.disabled).toBe(false);
+    expect(modelInput.disabled).toBe(false);
+    expect(keyInput.disabled).toBe(false);
   });
 
   it("model fetch pending: provider_get_models pending → spinner (role=status) + aria-busy visible", async () => {    let resolveFetch: (models: { id: string; label: string }[]) => void = () => {};

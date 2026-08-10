@@ -12,8 +12,8 @@
   height: 100%;
   min-height: 0;
   overflow: hidden;
-  background: var(--color-bg, #ffffff);
-  color: var(--color-fg, #0f172a);
+  background: var(--color-canvas, #ffffff);
+  color: var(--color-text-primary, #0f172a);
 }
 
 .pc__retry {
@@ -61,7 +61,7 @@
 .pc__sidebar-title {
   font-size: var(--text-md, 0.95rem);
   font-weight: 600;
-  color: var(--color-fg, #0f172a);
+  color: var(--color-text-primary, #0f172a);
   margin: 0;
 }
 
@@ -108,7 +108,7 @@
   height: 28px;
   border: 1px solid var(--color-border, #e2e8f0);
   border-radius: var(--radius-sm, 6px);
-  background: var(--color-bg-elevated, #ffffff);
+  background: var(--color-surface-default, #ffffff);
   color: var(--color-fg-muted, #64748b);
   cursor: pointer;
   transition: border-color var(--duration-fast, 120ms) var(--ease-standard, ease),
@@ -149,8 +149,8 @@
   height: var(--height-md, 36px);
   border: 1px solid var(--color-border, #e2e8f0);
   border-radius: var(--radius-md, 8px);
-  background: var(--color-bg-elevated, #ffffff);
-  color: var(--color-fg, #0f172a);
+  background: var(--color-surface-default, #ffffff);
+  color: var(--color-text-primary, #0f172a);
   font-size: var(--text-sm, 0.85rem);
   cursor: pointer;
   transition: border-color var(--duration-fast, 120ms) var(--ease-standard, ease);
@@ -173,7 +173,7 @@
   min-height: 0;
   overflow-y: auto;
   padding: var(--space-md, 16px);
-  background: var(--color-bg-elevated, #ffffff);
+  background: var(--color-surface-default, #ffffff);
   border: 1px solid var(--color-border, #e2e8f0);
   border-radius: var(--radius-md, 8px);
 }
@@ -187,7 +187,7 @@
 .pc__detail-name {
   font-size: var(--text-lg, 1.1rem);
   font-weight: 600;
-  color: var(--color-fg, #0f172a);
+  color: var(--color-text-primary, #0f172a);
   margin: 0;
 }
 
@@ -238,7 +238,7 @@
 
 .pc__balance-title {
   font-weight: 600;
-  color: var(--color-fg, #0f172a);
+  color: var(--color-text-primary, #0f172a);
 }
 
 .pc__balance-note {
@@ -260,7 +260,7 @@
   align-items: center;
   gap: var(--space-sm, 8px);
   font-size: var(--text-sm, 0.85rem);
-  color: var(--color-fg, #0f172a);
+  color: var(--color-text-primary, #0f172a);
 }
 
 .pc__consent-kind {
