@@ -144,3 +144,37 @@ fn on_hotkey_does_not_hold_selection_lock_and_helper_reads_cursor_under_lock() {
         after_lock,
     );
 }
+
+#[test]
+fn capture_lock_block_excludes_ui_operations() {
+    let src = include_str!("../src/lib.rs");
+    let cap_start = src.find("async fn capture_and_translate")
+        .expect("capture_and_translate fn not found");
+    let cap_body = &src[cap_start..];
+    let captured_var = cap_body.find("let captured")
+        .or_else(|| cap_body.find("let outcome"))
+        .expect("expected capture assignment");
+    let block_open = cap_body[captured_var..].find('{')
+        .expect("expected `{` after capture assignment");
+    let block_start = captured_var + block_open;
+    let mut depth = 0i32;
+    let mut block_end = block_start;
+    for (i, ch) in cap_body[block_start..].char_indices() {
+        match ch {
+            '{' => depth += 1,
+            '}' => { depth -= 1; if depth == 0 { block_end = block_start + i + 1; break; } }
+            _ => {}
+        }
+    }
+    let lock_block = &cap_body[block_start..block_end];
+    assert!(lock_block.contains("capture_selection"), "lock block must call capture_selection");
+    assert!(!lock_block.contains("build_popup_anchor"), "build_popup_anchor must NOT be inside the selection_lock block (P1-1)");
+    assert!(!lock_block.contains("show_at_sized"), "show_at_sized must NOT be inside the selection_lock block");
+    assert!(!lock_block.contains("popup::error"), "popup::error must NOT be inside the selection_lock block");
+    assert!(!lock_block.contains("compute_popup_geometry_logical"), "compute_popup_geometry_logical must NOT be inside the selection_lock block");
+    // Verify is_latest is checked BEFORE build_popup_anchor in the post-lock code.
+    let post_lock = &cap_body[block_end..];
+    let is_latest_pos = post_lock.find("is_latest(gen)").unwrap_or(usize::MAX);
+    let anchor_pos = post_lock.find("build_popup_anchor").unwrap_or(usize::MAX);
+    assert!(is_latest_pos < anchor_pos, "is_latest(gen) must be checked BEFORE build_popup_anchor in the post-lock code");
+}
