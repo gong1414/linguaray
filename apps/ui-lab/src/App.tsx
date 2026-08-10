@@ -16,6 +16,11 @@ import KeystoreRecovery from "./pages/KeystoreRecovery";
 import { ComponentGallery } from "./pages/ComponentGallery";
 import { SidebarItem, Confirm } from "@linguaray/ui";
 import { Settings } from "lucide-solid";
+// D1 (P1-4): import the REAL production SettingsShell so the keyboard e2e
+// exercises the actual shell + SidebarItem nav, not an isolated stand-in.
+import SettingsShell, {
+  type SettingsSection,
+} from "@app/features/settings/SettingsShell";
 import "./App.css";
 
 type Theme = "light" | "dark";
@@ -46,7 +51,8 @@ type NavKey =
   | "updater"
   | "component-gallery"
   | "sidebar-isolated"
-  | "confirm-isolated";
+  | "confirm-isolated"
+  | "settings-keyboard";
 
 // Complete S0 §4.1 state matrix.
 const SELECTION_STATES: SelectionState[] = [
@@ -95,7 +101,7 @@ const NAV_ITEMS: {
 ];
 
 // Implemented surfaces.
-const IMPLEMENTED: NavKey[] = ["selection-popup", "input-window", "provider-center", "keystore", "component-gallery", "sidebar-isolated", "confirm-isolated"];
+const IMPLEMENTED: NavKey[] = ["selection-popup", "input-window", "provider-center", "keystore", "component-gallery", "sidebar-isolated", "confirm-isolated", "settings-keyboard"];
 
 const PROVIDER_STATES: ProviderState[] = [
   "empty",
@@ -129,8 +135,15 @@ const App: Component = () => {
   const params = new URLSearchParams(
     typeof window !== "undefined" ? window.location.search : "",
   );
-  const validNav = (NAV_ITEMS.map((i) => i.key) as NavKey[]);
-  const initialNav = validNav.includes(params.get("nav") as NavKey)
+  // D1 (P1-4): validNav spans both NAV_ITEMS (visible nav) AND IMPLEMENTED,
+  // so the hidden `settings-keyboard` fixture route (in IMPLEMENTED but NOT in
+  // NAV_ITEMS) deep-links correctly. Without this, ?nav=settings-keyboard falls
+  // back to "selection-popup" and the fixture never renders.
+  const validNav = new Set<NavKey>([
+    ...(NAV_ITEMS.map((i) => i.key) as NavKey[]),
+    ...IMPLEMENTED,
+  ]);
+  const initialNav = validNav.has(params.get("nav") as NavKey)
     ? (params.get("nav") as NavKey)
     : "selection-popup";
   const initialTheme =
@@ -168,6 +181,11 @@ const App: Component = () => {
           : "idle",
   );
   const [settingsSize, setSettingsSize] = createSignal<"min" | "default" | "narrow-699" | "boundary-700">("default");
+  // D1 (P1-4): controlled active-section for the real SettingsShell fixture.
+  // The shell is rendered in controlled mode (activePage/onNavigate) so the
+  // keyboard e2e can assert data-page transitions driven by real Tab/Enter.
+  const [settingsKeyboardPage, setSettingsKeyboardPage] =
+    createSignal<SettingsSection>("provider-center");
 
   const t = createMemo(() => strings[locale()]);
   const selT = createMemo(() => t().selection);
@@ -237,6 +255,33 @@ const App: Component = () => {
           onCancel={() => {}}
         />
       </div>
+    );
+  }
+
+  // settings-keyboard: bare fixture for Playwright keyboard e2e (P1-4) —
+  // renders ONLY the REAL production SettingsShell (from @app), with no lab
+  // header/nav/state-bar, so the first Tab lands directly on the shell's own
+  // sidebar nav. The shell runs in controlled mode (activePage/onNavigate) so
+  // the test asserts data-page transitions from real Tab/Enter keypresses.
+  // A hidden fixture route: NOT in NAV_ITEMS (so it never appears in the lab
+  // nav list), but recognized via the IMPLEMENTED-aware validNav set above.
+  // Routed as an isolated early-return (matching sidebar-isolated /
+  // confirm-isolated) rather than a <Match> inside the lab shell, because the
+  // lab shell's header/nav inject ~16 focusable tab stops before the sidebar,
+  // which the spec's cap-12 Tab loop cannot traverse.
+  if (nav() === "settings-keyboard") {
+    return (
+      <SettingsShell
+        activePage={settingsKeyboardPage()}
+        onNavigate={setSettingsKeyboardPage}
+      >
+        <div
+          class="settings-shell__fixture-body"
+          data-testid="settings-fixture-body"
+        >
+          {t().nav.providerCenter}
+        </div>
+      </SettingsShell>
     );
   }
 
