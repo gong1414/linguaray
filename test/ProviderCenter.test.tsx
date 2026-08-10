@@ -440,6 +440,47 @@ describe("ProviderCenter (Surface 05)", () => {
     await waitFor(() => expect(screen.queryByText("Retry")).toBeNull());
   });
 
+  it("locks the provider row during delete (deferred promise)", async () => {
+    let resolveDelete: () => void = () => {};
+    let deleted = false;
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () =>
+        deleted ? [] : [profile({ uuid: "u1", name: "TestProvider", secret_ref: "provider/u1" })],
+      key_status: () => ({ "provider/u1": true }),
+      provider_delete: () =>
+        new Promise<void>((res) => {
+          resolveDelete = () => {
+            deleted = true;
+            res();
+          };
+        }),
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("TestProvider")).toBeTruthy());
+
+    // Open the delete Confirm.
+    fireEvent.click(screen.getByLabelText("Delete TestProvider"));
+    await waitFor(() => expect(screen.getByText("Delete provider?")).toBeTruthy());
+
+    // Confirm the delete — provider_delete is now a pending deferred promise.
+    fireEvent.click(screen.getByText("Delete"));
+    // While the promise is pending, the row is locked: Edit button is disabled.
+    await waitFor(() => {
+      const editBtn = screen.getByLabelText("Edit TestProvider") as HTMLButtonElement;
+      expect(editBtn.disabled).toBe(true);
+    });
+    // The row wrapper carries data-status="deleting".
+    const wrapper = document.querySelector('.pc__provider-row-wrapper[data-status="deleting"]');
+    expect(wrapper).toBeTruthy();
+
+    // Resolve the deferred promise — delete succeeds, list re-fetches.
+    resolveDelete();
+    await flush();
+    // The provider is gone from the list.
+    await waitFor(() => expect(screen.queryByText("TestProvider")).toBeNull());
+  });
+
   it("disabled provider: no Set-as-primary / Add-to-parallel role buttons", async () => {
     routeInvoke({
       ...DEFAULT_ROUTES,
