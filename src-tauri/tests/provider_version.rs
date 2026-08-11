@@ -10,9 +10,12 @@
 //! Plus the schema migration: a v1-shaped DB (no `version` column) is upgraded
 //! idempotently and every existing row lands at version 1.
 
+use linguaray_lib::db::migration::{
+    run_migration_with_identity, FailpointCell,
+};
 use linguaray_lib::db::providers::{self, ProviderPatch, UpdateOutcome};
 use linguaray_lib::db::schema;
-use linguaray_lib::db::Database;
+use linguaray_lib::db::{Database, DbError};
 use tempfile::tempdir;
 
 /// Open a fresh DB in a temp dir, create all tables + seed singletons. Mirrors
@@ -440,4 +443,256 @@ fn update_returns_outcome_not_dberror_on_not_found() {
         matches!(res, Ok(UpdateOutcome::NotFound)),
         "NotFound is an outcome, not an error: got {res:?}"
     );
+}
+
+// ─── P1-2: fail-closed version column structure validation ────────────────
+
+/// Build a v1-shaped DB whose `providers` table already carries a `version`
+/// column with a NON-v2 shape. `version_decl` is the column declaration text
+/// (e.g. `"version TEXT"`). The rest of the schema matches v1 so the table is
+/// realistic. Used by the negative tests below.
+fn fresh_v1_db_with_version_column(version_decl: &str) -> (tempfile::TempDir, Database) {
+    let dir = tempdir().unwrap();
+    let db_path = dir.path().join("v1_malformed.db");
+    let db = Database::open(&db_path).unwrap();
+    let create = format!(
+        "CREATE TABLE _schema_migrations (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            schema_version INTEGER NOT NULL,
+            migration_complete INTEGER NOT NULL DEFAULT 0,
+            migration_checkpoint TEXT,
+            migrated_at INTEGER
+         );
+         INSERT INTO _schema_migrations (id, schema_version, migration_complete)
+         VALUES (1, 1, 1);
+         CREATE TABLE providers (
+            uuid TEXT PRIMARY KEY,
+            template_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            protocol TEXT NOT NULL,
+            endpoint TEXT NOT NULL,
+            model TEXT,
+            enabled INTEGER NOT NULL DEFAULT 1,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            is_local INTEGER NOT NULL DEFAULT 0,
+            needs_key INTEGER NOT NULL DEFAULT 0,
+            secret_ref TEXT NOT NULL UNIQUE,
+            capabilities TEXT NOT NULL DEFAULT '{{}}',
+            status TEXT NOT NULL DEFAULT 'active',
+            {version_decl}
+         );"
+    );
+    db.with_conn(|conn| {
+        conn.execute_batch(&create)?;
+        conn.execute(
+            "INSERT INTO providers (uuid, template_id, name, protocol, endpoint, secret_ref) \
+             VALUES ('legacy-uuid', 'openai', 'Legacy OpenAI', 'openai_chat', \
+             'https://api.openai.com', 'openai')",
+            [],
+        )?;
+        Ok(())
+    })
+    .unwrap();
+    (dir, db)
+}
+
+/// A pre-existing `version TEXT` column must NOT be silently adopted — the
+/// migration fails closed with an Integrity error instead of trusting a column
+/// that would mis-serialize the optimistic-lock version.
+#[test]
+fn migrate_v1_to_v2_rejects_text_version_column() {
+    let (_dir, db) = fresh_v1_db_with_version_column("version TEXT");
+    let res = db.with_conn(|conn| {
+        let tx = conn.transaction()?;
+        schema::migrate_v1_to_v2(&tx)?;
+        tx.commit()?;
+        Ok(())
+    });
+    assert!(
+        matches!(res, Err(DbError::Integrity(_))),
+        "expected Integrity error for TEXT version column, got {res:?}"
+    );
+}
+
+/// A nullable `version INTEGER` column (no NOT NULL) must fail closed — a NULL
+/// version would break every CAS update (the WHERE version=? match misses NULL).
+#[test]
+fn migrate_v1_to_v2_rejects_nullable_version_column() {
+    let (_dir, db) = fresh_v1_db_with_version_column("version INTEGER");
+    let res = db.with_conn(|conn| {
+        let tx = conn.transaction()?;
+        schema::migrate_v1_to_v2(&tx)?;
+        tx.commit()?;
+        Ok(())
+    });
+    assert!(
+        matches!(res, Err(DbError::Integrity(_))),
+        "expected Integrity error for nullable version column, got {res:?}"
+    );
+}
+
+/// A `version` column with the wrong default (0 instead of 1) must fail closed
+/// — a default of 0 would let new rows start at a version that never matches a
+/// freshly-created row's expected_version=1.
+#[test]
+fn migrate_v1_to_v2_rejects_wrong_default_version_column() {
+    let (_dir, db) =
+        fresh_v1_db_with_version_column("version INTEGER NOT NULL DEFAULT 0");
+    let res = db.with_conn(|conn| {
+        let tx = conn.transaction()?;
+        schema::migrate_v1_to_v2(&tx)?;
+        tx.commit()?;
+        Ok(())
+    });
+    assert!(
+        matches!(res, Err(DbError::Integrity(_))),
+        "expected Integrity error for default-0 version column, got {res:?}"
+    );
+}
+
+// ─── P1-1: FULL-pipeline v1→v2 migration via run_migration ────────────────
+
+/// Injected keystore identity for the full-pipeline test (never the real
+/// machine identity — deterministic across hosts).
+const PIPE_ID: &str = "pipeline-test-identity";
+
+/// Drive the FULL migration coordinator (`run_migration_with_identity`) against
+/// a genuine v1 DB (old schema WITHOUT the version column, singleton seeded at
+/// schema_version=1, one pre-existing provider row). With an empty keystore +
+/// no settings, the coordinator must: Phase 2 create/seed (no-op on the
+/// existing tables), Phase 2c ALTER the version column + bump schema_version,
+/// Phase 5 mark complete. Then every existing row lands at version 1 and the
+/// optimistic lock is live (CAS works with expected_version=1).
+#[test]
+fn full_pipeline_v1_to_v2_migration_via_run_migration() {
+    let (dir, db) = fresh_v1_db();
+    let keystore_dir = dir.path().join("keystore");
+    // No settings.json + no keystore dir contents (fresh install keystore-wise);
+    // the existing v1 provider row stays (no candidates enumerated).
+    let settings_path = dir.path().join("settings.json");
+    let fp = FailpointCell::none();
+
+    run_migration_with_identity(&db, &keystore_dir, &settings_path, &fp, PIPE_ID)
+        .expect("full pipeline should complete on a v1 DB");
+
+    db.with_conn(|conn| {
+        // version column exists; the pre-existing v1 row defaulted to 1.
+        let (ver, name): (i64, String) = conn.query_row(
+            "SELECT version, name FROM providers WHERE uuid='legacy-uuid'",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )?;
+        assert_eq!(ver, 1, "existing v1 row seeds to version 1 after migration");
+        assert_eq!(name, "Legacy OpenAI");
+
+        // schema_version recorded as 2 + migration_complete=1.
+        let (sv, mc): (i64, i64) = conn.query_row(
+            "SELECT schema_version, migration_complete FROM _schema_migrations WHERE id=1",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )?;
+        assert_eq!(sv, 2, "schema_version bumped to 2");
+        assert_eq!(mc, 1, "migration marked complete");
+        Ok(())
+    })
+    .unwrap();
+
+    // End-to-end: the optimistic lock is live on the migrated row. A CAS update
+    // with expected_version=1 must succeed (bumps to 2); the provider read path
+    // works against the migrated column.
+    let row = db
+        .with_conn(|conn| providers::get(conn, "legacy-uuid"))
+        .unwrap();
+    assert_eq!(row.version, 1);
+
+    let patch = ProviderPatch {
+        name: Some("Pipeline Renamed".into()),
+        endpoint: None,
+        model: None,
+        enabled: None,
+        sort_order: None,
+        expected_version: 1,
+    };
+    let updated = match db
+        .with_conn(|conn| providers::update(conn, "legacy-uuid", &patch))
+        .unwrap()
+    {
+        UpdateOutcome::Written(p) => p,
+        other => panic!("expected Written after migration, got {other:?}"),
+    };
+    assert_eq!(updated.version, 2, "CAS bumps the migrated row 1 → 2");
+    assert_eq!(updated.name, "Pipeline Renamed");
+}
+
+/// Re-running the full pipeline after it completed is a no-op (the Complete
+/// preflight short-circuits before any phase). The version column + schema
+/// version are untouched.
+#[test]
+fn full_pipeline_is_idempotent_on_replay() {
+    let (dir, db) = fresh_v1_db();
+    let keystore_dir = dir.path().join("keystore");
+    let settings_path = dir.path().join("settings.json");
+    let fp = FailpointCell::none();
+
+    run_migration_with_identity(&db, &keystore_dir, &settings_path, &fp, PIPE_ID)
+        .expect("first run should complete");
+    // Second run: preflight sees Complete → no phases run → Ok.
+    run_migration_with_identity(&db, &keystore_dir, &settings_path, &fp, PIPE_ID)
+        .expect("second run should be a no-op Complete");
+
+    let count: i64 = db
+        .with_conn(|conn| {
+            let mut stmt = conn.prepare("PRAGMA table_info(providers)")?;
+            let mut count = 0i64;
+            let rows = stmt.query_map([], |r| r.get::<_, String>(1))?;
+            for name in rows {
+                if name? == "version" {
+                    count += 1;
+                }
+            }
+            Ok(count)
+        })
+        .unwrap();
+    assert_eq!(count, 1, "exactly one version column after double pipeline run");
+}
+
+/// If the `_schema_migrations` singleton ROW is missing on an otherwise-v2 DB
+/// (tables created by `create_all_tables`, so the version column already
+/// exists), `seed_singletons` recreates the row and the pipeline completes
+/// correctly. (On a fresh/v2-shaped DB the version column is inline, so the
+/// Phase 2c skip is safe.)
+#[test]
+fn full_pipeline_recreates_missing_schema_migrations_row() {
+    let dir = tempdir().unwrap();
+    let db_path = dir.path().join("missing_row.db");
+    let db = Database::open(&db_path).unwrap();
+    // Create the full v2 schema + seed, then DELETE the singleton row to
+    // simulate a corrupted-but-recoverable state.
+    db.with_conn(|conn| {
+        let tx = conn.transaction()?;
+        schema::create_all_tables(&tx)?;
+        schema::seed_singletons(&tx)?;
+        tx.commit()?;
+        conn.execute("DELETE FROM _schema_migrations WHERE id=1", [])?;
+        Ok(())
+    })
+    .unwrap();
+
+    let keystore_dir = dir.path().join("keystore");
+    let settings_path = dir.path().join("settings.json");
+    let fp = FailpointCell::none();
+    run_migration_with_identity(&db, &keystore_dir, &settings_path, &fp, PIPE_ID)
+        .expect("pipeline should complete after recreating the singleton row");
+
+    let (sv, mc): (i64, i64) = db
+        .with_conn(|conn| {
+            Ok(conn.query_row(
+                "SELECT schema_version, migration_complete FROM _schema_migrations WHERE id=1",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )?)
+        })
+        .unwrap();
+    assert_eq!(sv, schema::SCHEMA_VERSION as i64, "singleton row recreated at v2");
+    assert_eq!(mc, 1, "migration marked complete");
 }

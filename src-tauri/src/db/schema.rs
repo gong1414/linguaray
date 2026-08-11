@@ -258,36 +258,106 @@ pub fn set_migration_complete(conn: &Connection) -> Result<(), DbError> {
     Ok(())
 }
 
+/// Per-column metadata read from `PRAGMA table_info`. Used by
+/// [`migrate_v1_to_v2`] to validate a pre-existing `version` column's shape.
+#[derive(Debug)]
+struct ColumnInfo {
+    name: String,
+    /// Declared type, upper-cased for case-insensitive compare (e.g. "INTEGER").
+    col_type: String,
+    notnull: bool,
+    /// The declared DEFAULT, as SQLite reports it verbatim (e.g. Some("1")).
+    dflt: Option<String>,
+}
+
+/// Read every column descriptor for a table via `PRAGMA table_info`.
+///
+/// `PRAGMA table_info` columns: (cid, name, type, notnull, dflt_value, pk).
+/// `type` is the empty string for a column declared without a type; `dflt_value`
+/// is NULL when no DEFAULT was declared.
+fn table_columns(conn: &Connection, table: &str) -> Result<Vec<ColumnInfo>, DbError> {
+    // `table` is an internal literal ("providers"), not user input, so building
+    // the PRAGMA statement by formatting is safe (PRAGMA table_info does not
+    // accept a bound parameter in the supported SQLite versions).
+    let sql = format!("PRAGMA table_info({table})");
+    let mut stmt = conn.prepare(&sql)?;
+    let rows = stmt.query_map([], |r| {
+        Ok(ColumnInfo {
+            name: r.get::<_, String>(1)?,
+            col_type: r.get::<_, String>(2).unwrap_or_default().to_ascii_uppercase(),
+            notnull: r.get::<_, i64>(3)? != 0,
+            dflt: r.get::<_, Option<String>>(4)?,
+        })
+    })?;
+    let mut out = Vec::new();
+    for row in rows {
+        out.push(row?);
+    }
+    Ok(out)
+}
+
+/// Does a `version` column on `providers` have the exact shape the optimistic
+/// lock requires: `INTEGER NOT NULL DEFAULT 1`?
+fn version_column_is_correct(col: &ColumnInfo) -> bool {
+    col.col_type == "INTEGER" && col.notnull && col.dflt.as_deref() == Some("1")
+}
+
 /// v1 → v2 migration (R2-E): add the `providers.version` optimistic-lock column.
 ///
-/// Idempotent: probes `PRAGMA table_info(providers)` for a `version` column and
-/// only runs the `ALTER TABLE` when it's missing (so a crash-replay, a v2 DB,
-/// or a DB mid-migration all converge safely). After ensuring the column exists,
-/// bumps `_schema_migrations.schema_version` to 2.
+/// Idempotent: probes `PRAGMA table_info(providers)` for a `version` column.
+/// - **No `version` column** → `ALTER TABLE ADD COLUMN version INTEGER NOT NULL
+///   DEFAULT 1`, then re-reads PRAGMA to verify the column landed correctly.
+/// - **A `version` column with the correct shape** (INTEGER NOT NULL DEFAULT 1)
+///   → no-op (crash-replay / already-v2 DB / mid-migration all converge here).
+/// - **A `version` column with the WRONG shape** (TEXT, nullable, wrong default)
+///   → **fail-closed**: return `Err(DbError::Integrity(...))`. A pre-existing
+///   incompatible column must NOT be silently adopted — the optimistic lock
+///   assumes INTEGER NOT NULL DEFAULT 1, and a TEXT/nullable column would either
+///   mis-serialize the version or let a NULL slip in and break every CAS update.
+///
+/// After ensuring the column exists, bumps `_schema_migrations.schema_version`
+/// to 2.
 ///
 /// Caller MUST be inside a transaction (the ALTER + the version bump commit
 /// atomically — a crash between them would leave schema_version stale and force
 /// a harmless re-run on the next startup, but co-locating them in one tx is
 /// cleaner and matches the create_all_tables + seed_singletons pattern).
 pub fn migrate_v1_to_v2(conn: &Connection) -> Result<(), DbError> {
-    // Idempotent guard: only ALTER if the column is absent. PRAGMA table_info
-    // returns one row per column; index 1 is the column name.
-    let mut has_version = false;
-    {
-        let mut stmt = conn.prepare("PRAGMA table_info(providers)")?;
-        let names = stmt.query_map([], |r| r.get::<_, String>(1))?;
-        for name in names {
-            if name? == "version" {
-                has_version = true;
-                break;
+    let columns = table_columns(conn, "providers")?;
+    let existing = columns.iter().find(|c| c.name == "version");
+    match existing {
+        Some(col) => {
+            // A version column already exists. Fail-closed unless its shape
+            // matches exactly — never silently adopt an incompatible column.
+            if !version_column_is_correct(col) {
+                return Err(DbError::Integrity(format!(
+                    "providers.version has an incompatible shape: \
+                     type={}, notnull={}, default={:?}; \
+                     expected INTEGER NOT NULL DEFAULT 1",
+                    col.col_type, col.notnull, col.dflt
+                )));
+            }
+            // Correct shape — nothing to ALTER (idempotent re-run / already-v2).
+        }
+        None => {
+            conn.execute(
+                "ALTER TABLE providers ADD COLUMN version INTEGER NOT NULL DEFAULT 1",
+                [],
+            )?;
+            // Re-read PRAGMA and verify the ALTER landed the expected shape.
+            // SQLite honours the declared type/notnull/default for ADD COLUMN,
+            // but we re-check fail-closed so a future schema change or a SQLite
+            // quirk can't leave a subtly-wrong column undetected.
+            let after = table_columns(conn, "providers")?;
+            let landed = after.iter().find(|c| c.name == "version");
+            match landed {
+                Some(col) if version_column_is_correct(col) => { /* ok */ }
+                other => return Err(DbError::Integrity(format!(
+                    "ALTER TABLE providers ADD COLUMN version did not produce the \
+                     expected INTEGER NOT NULL DEFAULT 1 column; got: {other:?}"
+                ))),
             }
         }
-    }
-    if !has_version {
-        conn.execute(
-            "ALTER TABLE providers ADD COLUMN version INTEGER NOT NULL DEFAULT 1",
-            [],
-        )?;
     }
     // Bump the recorded schema version (idempotent: re-writing 2→2 is a no-op).
     conn.execute(
