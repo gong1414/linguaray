@@ -1123,3 +1123,181 @@ fn concurrent_same_version_only_one_wins_via_update() {
         .unwrap();
     assert_eq!(final_version, 2, "exactly one bump landed; got version {final_version}");
 }
+
+// ─── R6-P1-2: validate_v2_schema checks ALL columns in ALL tables ──────────
+//
+// The positive fixture is a fresh DB created via `create_all_tables` +
+// `seed_singletons` (see `fresh_db`, already exercised by
+// `validate_v2_schema_ok_on_fresh_db`). The 5 negative tests below each rebuild
+// one table WITHOUT a previously-unchecked column and assert `validate_v2_schema`
+// now fails closed — proving the validator catches every column declared in the
+// DDL, not just the small subset the earlier revision checked.
+//
+// We rebuild the table (DROP + CREATE) instead of ALTER TABLE DROP COLUMN
+// because several target columns carry constraints SQLite refuses to drop:
+// `providers.protocol` has a column-level CHECK, `providers.secret_ref` has a
+// UNIQUE constraint, and `history_results.outcome_tag` is referenced by the
+// table-level success/failure CHECK. A clean DROP+CREATE avoids all of these.
+
+/// Drop the named table and recreate it from `ddl`, preserving the other 7
+/// tables. All other tables remain as `create_all_tables` left them, so the
+/// validator failure is attributable ONLY to the rebuilt table's missing column.
+fn rebuild_table(db: &Database, table: &str, ddl: &str) {
+    db.with_conn(|conn| {
+        conn.execute_batch(&format!("DROP TABLE {table};"))?;
+        conn.execute_batch(ddl)?;
+        Ok(())
+    })
+    .unwrap();
+}
+
+/// `providers` missing the `protocol` column → `validate_v2_schema` fails closed.
+/// protocol is required for protocol-routing; a missing column would break every
+/// provider dispatch path.
+#[test]
+fn validate_v2_schema_fails_when_providers_protocol_missing() {
+    let (_dir, db) = fresh_db();
+    // Rebuild providers WITHOUT the protocol column (the CHECK that validated
+    // protocol's enum is dropped along with it).
+    rebuild_table(
+        &db,
+        "providers",
+        "CREATE TABLE providers (
+            uuid TEXT PRIMARY KEY,
+            template_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            endpoint TEXT NOT NULL,
+            model TEXT,
+            enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0,1)),
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            is_local INTEGER NOT NULL DEFAULT 0 CHECK (is_local IN (0,1)),
+            needs_key INTEGER NOT NULL CHECK (needs_key IN (0,1)),
+            secret_ref TEXT NOT NULL UNIQUE,
+            capabilities TEXT NOT NULL DEFAULT '{}',
+            status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','deleting','deleted')),
+            version INTEGER NOT NULL DEFAULT 1
+         );",
+    );
+    let res = db.with_conn(|conn| schema::validate_v2_schema(conn));
+    assert!(
+        matches!(res, Err(DbError::Integrity(_))),
+        "providers missing protocol column → Integrity; got {res:?}"
+    );
+}
+
+/// `providers` missing the `secret_ref` column → `validate_v2_schema` fails
+/// closed. secret_ref is the keystore handle; without it the key is unrecoverable.
+#[test]
+fn validate_v2_schema_fails_when_providers_secret_ref_missing() {
+    let (_dir, db) = fresh_db();
+    rebuild_table(
+        &db,
+        "providers",
+        "CREATE TABLE providers (
+            uuid TEXT PRIMARY KEY,
+            template_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            protocol TEXT NOT NULL CHECK (protocol IN ('openai_chat','anthropic','gemini','google_translate','custom_http')),
+            endpoint TEXT NOT NULL,
+            model TEXT,
+            enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0,1)),
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            is_local INTEGER NOT NULL DEFAULT 0 CHECK (is_local IN (0,1)),
+            needs_key INTEGER NOT NULL CHECK (needs_key IN (0,1)),
+            capabilities TEXT NOT NULL DEFAULT '{}',
+            status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','deleting','deleted')),
+            version INTEGER NOT NULL DEFAULT 1
+         );",
+    );
+    let res = db.with_conn(|conn| schema::validate_v2_schema(conn));
+    assert!(
+        matches!(res, Err(DbError::Integrity(_))),
+        "providers missing secret_ref column → Integrity; got {res:?}"
+    );
+}
+
+/// `preferences` missing the `target_language` column → `validate_v2_schema`
+/// fails closed. target_language drives every translation request.
+#[test]
+fn validate_v2_schema_fails_when_preferences_target_language_missing() {
+    let (_dir, db) = fresh_db();
+    // preferences has no column-level constraints that block DROP COLUMN, but we
+    // rebuild for consistency with the other negative tests.
+    rebuild_table(
+        &db,
+        "preferences",
+        "CREATE TABLE preferences (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            primary_uuid TEXT,
+            parallel_uuids TEXT NOT NULL DEFAULT '[]',
+            fallback_uuid TEXT,
+            parallel_consent_version INTEGER,
+            parallel_consent_scope TEXT,
+            history_enabled INTEGER NOT NULL DEFAULT 0 CHECK (history_enabled IN (0,1)),
+            history_retention_days INTEGER NOT NULL DEFAULT 30
+         );",
+    );
+    let res = db.with_conn(|conn| schema::validate_v2_schema(conn));
+    assert!(
+        matches!(res, Err(DbError::Integrity(_))),
+        "preferences missing target_language column → Integrity; got {res:?}"
+    );
+}
+
+/// `history_sessions` missing the `target_language` column → `validate_v2_schema`
+/// fails closed.
+#[test]
+fn validate_v2_schema_fails_when_history_sessions_target_language_missing() {
+    let (_dir, db) = fresh_db();
+    rebuild_table(
+        &db,
+        "history_sessions",
+        "CREATE TABLE history_sessions (
+            session_uuid TEXT PRIMARY KEY,
+            timestamp INTEGER NOT NULL,
+            trigger_source TEXT NOT NULL,
+            detected_language TEXT,
+            is_favorite INTEGER NOT NULL DEFAULT 0 CHECK (is_favorite IN (0,1)),
+            source_text_encrypted BLOB NOT NULL,
+            source_text_nonce BLOB NOT NULL,
+            crypto_version INTEGER NOT NULL
+         );",
+    );
+    let res = db.with_conn(|conn| schema::validate_v2_schema(conn));
+    assert!(
+        matches!(res, Err(DbError::Integrity(_))),
+        "history_sessions missing target_language column → Integrity; got {res:?}"
+    );
+}
+
+/// `history_results` missing the `outcome_tag` column → `validate_v2_schema`
+/// fails closed. outcome_tag (success/failure) gates the encrypted-blob checks.
+#[test]
+fn validate_v2_schema_fails_when_history_results_outcome_tag_missing() {
+    let (_dir, db) = fresh_db();
+    // Rebuild WITHOUT outcome_tag and WITHOUT the table-level CHECK that
+    // referenced it (the CHECK would be invalid without the column).
+    rebuild_table(
+        &db,
+        "history_results",
+        "CREATE TABLE history_results (
+            result_uuid TEXT PRIMARY KEY,
+            session_uuid TEXT NOT NULL REFERENCES history_sessions(session_uuid) ON DELETE CASCADE,
+            provider_uuid TEXT NOT NULL,
+            provider_name_snapshot TEXT NOT NULL,
+            engine_id TEXT NOT NULL,
+            elapsed_ms INTEGER NOT NULL,
+            result_text_encrypted BLOB,
+            result_text_nonce BLOB,
+            error_kind TEXT,
+            error_message_encrypted BLOB,
+            error_message_nonce BLOB,
+            crypto_version INTEGER NOT NULL
+         );",
+    );
+    let res = db.with_conn(|conn| schema::validate_v2_schema(conn));
+    assert!(
+        matches!(res, Err(DbError::Integrity(_))),
+        "history_results missing outcome_tag column → Integrity; got {res:?}"
+    );
+}
