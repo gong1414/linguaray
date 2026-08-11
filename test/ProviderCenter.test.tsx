@@ -1354,4 +1354,277 @@ describe("ProviderCenter (Surface 05)", () => {
     expect(screen.queryByText(/Google Translate/)).toBeNull();
     expect(screen.queryByText(/^DeepL$/)).toBeNull();
   });
+
+  // ─── R5-P1-1: Reload race condition (reloadingUuid lock) ─────────────────
+
+  it("Reload pending disables the form fields for that provider (R5-P1-1)", async () => {
+    // model_list:false so the Model field is a stable manual TextField (keeps the
+    // captured element reference stable across the reload re-render).
+    const prof = (over: Partial<ProviderProfile> = {}) =>
+      profile({
+        uuid: "u1",
+        name: "TestProvider",
+        secret_ref: "provider/u1",
+        capabilities: { balance: false, quota: false, model_list: false },
+        ...over,
+      });
+    let reloadPending = false;
+    let resolveReload: () => void = () => {};
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () =>
+        reloadPending ? [prof({ version: 2 })] : [prof({ version: 1 })],
+      key_status: () => ({ "provider/u1": true }),
+      provider_update: () => {
+        throw Object.assign(new Error("stale"), {
+          error: "stale_version",
+          actual_version: 2,
+        });
+      },
+      provider_get_active_selection: () =>
+        reloadPending
+          ? new Promise((res) => {
+              resolveReload = () =>
+                res({ primary: null, parallel: [], fallback: null });
+            })
+          : { primary: null, parallel: [], fallback: null },
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("TestProvider")).toBeTruthy());
+    fireEvent.click(screen.getByLabelText("Edit TestProvider"));
+    await flush();
+
+    // Trigger the save-conflict banner.
+    const endpointInput = screen.getByLabelText("Endpoint") as HTMLInputElement;
+    fireEvent.input(endpointInput, { target: { value: "https://new.example.com" } });
+    await flush();
+    fireEvent.click(screen.getByText("Save profile"));
+    await waitFor(() =>
+      expect(screen.getAllByText("This provider was modified elsewhere").length).toBeGreaterThanOrEqual(1),
+    );
+
+    // Click Reload — refresh hangs on the deferred provider_get_active_selection.
+    reloadPending = true;
+    fireEvent.click(screen.getByText("Reload"));
+    await flush();
+    // While the reload is pending, every editable field + Save is disabled.
+    await waitFor(() =>
+      expect((screen.getByLabelText("Name") as HTMLInputElement).disabled).toBe(true),
+    );
+    expect((screen.getByLabelText("Endpoint") as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getByLabelText("Model") as HTMLInputElement).disabled).toBe(true);
+    expect(
+      (screen.getByText("Save profile").closest("button") as HTMLButtonElement).disabled,
+    ).toBe(true);
+
+    // Resolve the reload → fields re-enable.
+    resolveReload();
+    await flush();
+    await waitFor(() =>
+      expect((screen.getByLabelText("Name") as HTMLInputElement).disabled).toBe(false),
+    );
+    expect((screen.getByLabelText("Endpoint") as HTMLInputElement).disabled).toBe(false);
+    expect((screen.getByLabelText("Model") as HTMLInputElement).disabled).toBe(false);
+  });
+
+  it("u1 Reload pending — u2 conflict appears — u1 completes; u2 conflict survives (R5-P1-1)", async () => {
+    let reloadPending = false;
+    let resolveReload: () => void = () => {};
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => [
+        profile({ uuid: "u1", name: "ProvA", sort_order: 0, secret_ref: "provider/u1" }),
+        profile({ uuid: "u2", name: "ProvB", sort_order: 1, secret_ref: "provider/u2" }),
+      ],
+      key_status: () => ({ "provider/u1": true, "provider/u2": true }),
+      provider_update: () => {
+        throw Object.assign(new Error("stale"), {
+          error: "stale_version",
+          actual_version: 2,
+        });
+      },
+      provider_get_active_selection: () =>
+        reloadPending
+          ? new Promise((res) => {
+              resolveReload = () =>
+                res({ primary: null, parallel: [], fallback: null });
+            })
+          : { primary: null, parallel: [], fallback: null },
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("ProvA")).toBeTruthy());
+
+    // Select u1, edit endpoint, save → stale → u1 conflict banner.
+    fireEvent.click(screen.getByLabelText("Edit ProvA"));
+    await flush();
+    const ep1 = screen.getByLabelText("Endpoint") as HTMLInputElement;
+    fireEvent.input(ep1, { target: { value: "https://new-a.example.com" } });
+    await flush();
+    fireEvent.click(screen.getByText("Save profile"));
+    await waitFor(() =>
+      expect(screen.getAllByText("This provider was modified elsewhere").length).toBeGreaterThanOrEqual(1),
+    );
+
+    // Click Reload on u1 — refresh hangs (deferred selection).
+    reloadPending = true;
+    fireEvent.click(screen.getByText("Reload"));
+    await flush();
+
+    // While u1's reload is pending, switch to u2 and trigger u2's own conflict.
+    // (u2's fields are NOT disabled — reloadingUuid is u1, not u2.)
+    fireEvent.click(screen.getByLabelText("Edit ProvB"));
+    await flush();
+    const ep2 = screen.getByLabelText("Endpoint") as HTMLInputElement;
+    fireEvent.input(ep2, { target: { value: "https://new-b.example.com" } });
+    await flush();
+    fireEvent.click(screen.getByText("Save profile"));
+    await waitFor(() =>
+      expect(screen.getAllByText("This provider was modified elsewhere").length).toBeGreaterThanOrEqual(1),
+    );
+
+    // Resolve u1's pending reload.
+    resolveReload();
+    await flush();
+
+    // u2's conflict banner SURVIVES — setSaveConflictUuid was conditional on
+    // uuid===u1, so u2's conflict (set during the reload) was not clobbered.
+    await waitFor(() =>
+      expect(screen.getAllByText("This provider was modified elsewhere").length).toBeGreaterThanOrEqual(1),
+    );
+  });
+
+  it("double-click Reload — only the first applies (re-entrancy guard) (R5-P1-1)", async () => {
+    let reloadStarted = false;
+    let resolveReload: () => void = () => {};
+    let reloadListCalls = 0;
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => {
+        if (reloadStarted) {
+          reloadListCalls += 1;
+          return new Promise((res) => {
+            resolveReload = () =>
+              res([profile({ uuid: "u1", name: "TestProvider", version: 2, secret_ref: "provider/u1" })]);
+          });
+        }
+        return [profile({ uuid: "u1", name: "TestProvider", version: 1, secret_ref: "provider/u1" })];
+      },
+      key_status: () => ({ "provider/u1": true }),
+      provider_update: () => {
+        throw Object.assign(new Error("stale"), {
+          error: "stale_version",
+          actual_version: 2,
+        });
+      },
+      provider_get_active_selection: () => ({ primary: null, parallel: [], fallback: null }),
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("TestProvider")).toBeTruthy());
+    fireEvent.click(screen.getByLabelText("Edit TestProvider"));
+    await flush();
+
+    // Trigger the conflict banner.
+    const endpointInput = screen.getByLabelText("Endpoint") as HTMLInputElement;
+    fireEvent.input(endpointInput, { target: { value: "https://new.example.com" } });
+    await flush();
+    fireEvent.click(screen.getByText("Save profile"));
+    await waitFor(() =>
+      expect(screen.getAllByText("This provider was modified elsewhere").length).toBeGreaterThanOrEqual(1),
+    );
+
+    // Click Reload twice rapidly.
+    reloadStarted = true;
+    const reloadBtn = screen.getByText("Reload").closest("button") as HTMLButtonElement;
+    fireEvent.click(reloadBtn);
+    fireEvent.click(reloadBtn);
+    await flush();
+
+    // Only ONE provider_list call landed — the second click was blocked by the
+    // reloadingUuid guard (and the disabled Reload button).
+    expect(reloadListCalls).toBe(1);
+
+    // Resolve to settle the pending promise (avoids dangling-promise warnings).
+    resolveReload();
+    await flush();
+    await waitFor(() =>
+      expect(screen.queryByText("This provider was modified elsewhere")).toBeNull(),
+    );
+  });
+
+  // ─── R5-P2-3: Reload clears both save-conflict + independent name-conflict ─
+
+  it("Reload clears both save-conflict banner and independent name-conflict error (R5-P2-3)", async () => {
+    let refreshed = false;
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => [
+        refreshed
+          ? profile({
+              uuid: "u1",
+              name: "TestProvider",
+              endpoint: "https://remote.example.com",
+              version: 2,
+              secret_ref: "provider/u1",
+            })
+          : profile({
+              uuid: "u1",
+              name: "TestProvider",
+              endpoint: "https://api.openai.com",
+              version: 1,
+              secret_ref: "provider/u1",
+            }),
+        // u2 holds the name we will collide u1 against (client-side only).
+        profile({ uuid: "u2", name: "TakenName", sort_order: 1, secret_ref: "provider/u2" }),
+      ],
+      key_status: () => ({ "provider/u1": true, "provider/u2": true }),
+      provider_update: () => {
+        throw Object.assign(new Error("stale"), {
+          error: "stale_version",
+          actual_version: 2,
+        });
+      },
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("TestProvider")).toBeTruthy());
+    fireEvent.click(screen.getByLabelText("Edit TestProvider"));
+    await flush();
+
+    // Step 1: trigger stale_version → conflict banner shows.
+    const endpointInput = screen.getByLabelText("Endpoint") as HTMLInputElement;
+    fireEvent.input(endpointInput, { target: { value: "https://new.example.com" } });
+    await flush();
+    fireEvent.click(screen.getByText("Save profile"));
+    await waitFor(() =>
+      expect(screen.getAllByText("This provider was modified elsewhere").length).toBeGreaterThanOrEqual(1),
+    );
+
+    // Step 2: edit u1's name to collide with u2 → Save → name-conflict error
+    // (client-side, no IPC round-trip). The conflict banner from step 1 stays.
+    const nameInput = screen.getByLabelText("Name") as HTMLInputElement;
+    fireEvent.input(nameInput, { target: { value: "TakenName" } });
+    await flush();
+    fireEvent.click(screen.getByText("Save profile"));
+    await flush();
+    await waitFor(() =>
+      expect(screen.getAllByText("Another provider already uses this name").length).toBeGreaterThanOrEqual(1),
+    );
+
+    // Step 3: Reload clears BOTH the save-conflict banner AND the name-conflict
+    // error; the name draft reverts to the remote value.
+    refreshed = true;
+    fireEvent.click(screen.getByText("Reload"));
+    await flush();
+    await waitFor(() =>
+      expect(screen.queryByText("This provider was modified elsewhere")).toBeNull(),
+    );
+    expect(screen.queryByText("Another provider already uses this name")).toBeNull();
+    // Name draft cleared → shows the remote name.
+    await waitFor(() =>
+      expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("TestProvider"),
+    );
+    // Endpoint draft cleared → shows the fresh remote endpoint.
+    await waitFor(() =>
+      expect((screen.getByLabelText("Endpoint") as HTMLInputElement).value).toBe("https://remote.example.com"),
+    );
+  });
 });
