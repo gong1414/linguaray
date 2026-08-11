@@ -690,7 +690,7 @@ Checkpoint goal: every entry bootstraps theme identically; the popup clamps to t
 **Interfaces:**
 - Produces: `export function initTheme(): void` — reads `localStorage.getItem("linguaray.theme")` (`"light"` | `"dark"` | null), falls back to `window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"`, then sets `document.documentElement.dataset.theme`, `document.documentElement.dataset.motion` (`"reduced"` when `window.matchMedia("(prefers-reduced-motion: reduce)").matches`, else `"full"`), and `document.documentElement.lang` (from `src/i18n.ts`'s `detectLocale()`). It ALSO manages the two `<meta name="theme-color">` elements (P2): the meta whose `media` matches the resolved scheme keeps its media and gets its `content` re-asserted to the resolved token; the other meta is disabled by setting `media="disabled"`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `test/theme.test.ts`:
 
@@ -843,12 +843,12 @@ describe("initTheme", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `pnpm vitest run test/theme.test.ts`
 Expected: FAIL — `Cannot find module '../src/theme'`.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `src/theme.ts`:
 
@@ -945,12 +945,12 @@ function syncThemeColorMetas(theme: "light" | "dark"): void {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `pnpm vitest run test/theme.test.ts`
 Expected: PASS (6 tests).
 
-- [ ] **Step 5: Wire initTheme into the three entries**
+- [x] **Step 5: Wire initTheme into the three entries**
 
 Edit `src/popup-entry.tsx`:
 
@@ -977,12 +977,12 @@ initTheme();
 render(() => <App />, document.getElementById("root") as HTMLElement);
 ```
 
-- [ ] **Step 6: Run full vitest to confirm no regression**
+- [x] **Step 6: Run full vitest to confirm no regression**
 
 Run: `pnpm test`
 Expected: PASS (the existing suites + the 6 new tests).
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git diff --check
@@ -1009,7 +1009,7 @@ git commit -m "feat(theme): add initTheme() bootstrap called from all three entr
   - `pub fn set_popup_mode(app, mode, anchor: &PopupAnchor) -> Result<(), String>` — recomputes BOTH size AND position via `compute_popup_geometry_logical(anchor)`, then `set_max_size` → `set_size` → `set_position`.
   - `pub fn loading_with_source(app, anchor: &PopupAnchor, source_text: Option<&str>) -> Result<(), String>` — shows the popup sized for Loading mode, emits a loading `Payload` carrying `source_text` (P1-3: the loading payload carries the source so Retry is available even before the result arrives).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `src-tauri/tests/popup_geometry.rs`:
 
@@ -1136,12 +1136,12 @@ describe("popup geometry contract (frontend mirror)", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cargo test --manifest-path src-tauri/Cargo.toml --features xproc-test-helper --test popup_geometry`
 Expected: FAIL — `cannot find type PopupMode / PopupAnchor in crate`.
 
-- [ ] **Step 3: Implement the geometry types + functions**
+- [x] **Step 3: Implement the geometry types + functions**
 
 Add to `src-tauri/src/popup.rs` (after the existing `POPUP_MULTI_EVENT` const, before the `#[cfg(test)]` block). This requires the `PhysicalRect` type — Tauri 2 exposes `tauri::PhysicalRect`; if the precise generic form differs in the installed patch, the struct below uses a plain local rect so the pure math is testable without the Tauri runtime. **The `PopupAnchor.work_area` field uses the local `LogicalWorkArea` (CSS px) so the pure function compiles in `tests/` without a Tauri link.** The conversion from `tauri::PhysicalRect` happens at the call site (A2).
 
@@ -1313,18 +1313,18 @@ struct Payload<'a> {
 
 Update the existing emit sites (`show_at`, `result`, `error`) to pass `source_text: None`. The inline `#[cfg(test)]` block in popup.rs that constructs `Payload` must also add `source_text: None`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cargo test --manifest-path src-tauri/Cargo.toml --features xproc-test-helper --test popup_geometry`
 Run: `pnpm vitest run test/popupGeometry.test.ts`
 Expected: PASS (10 Rust tests + 4 TS tests).
 
-- [ ] **Step 5: Verify the crate still compiles + existing popup tests pass**
+- [x] **Step 5: Verify the crate still compiles + existing popup tests pass**
 
 Run: `cargo test --manifest-path src-tauri/Cargo.toml --features xproc-test-helper --lib popup::`
 Expected: the existing `popup.rs` inline tests pass (they now pass `source_text: None`).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git diff --check
@@ -1355,7 +1355,7 @@ git commit -m "feat(popup): PopupAnchor + logical->physical geometry clamping + 
 
 > **P1-1 design note (verified):** the generation token MUST be allocated synchronously in `on_hotkey` (lib.rs:1998 today). The capture-under-lock block (lib.rs:2010-2030) ALSO stays in `on_hotkey` because it must read the cursor + selection atomically before the popup steals focus. `capture_and_translate` takes the ALREADY-captured `(x, y, captured)` is NOT possible because the tray/Retry paths need the helper to do their own capture. Resolution: `capture_and_translate` accepts a `supplied_text: Option<String>` (Retry: skip capture; tray/hotkey: capture inside the helper under the lock). For the hotkey path, `on_hotkey` passes `supplied_text = None` and lets the helper capture — BUT the synchronous `gen.next()` stays in `on_hotkey`. The capture-under-lock moves INTO the helper so hotkey/tray share it.
 
-- [ ] **Step 1: Write the failing test (central `to` resolver + decision routing + source-structure grep)**
+- [x] **Step 1: Write the failing test (central `to` resolver + decision routing + source-structure grep)**
 
 Create `src-tauri/tests/hotkey_session.rs`:
 
@@ -1457,12 +1457,12 @@ fn on_hotkey_does_not_call_translate_with_fallback() {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cargo test --manifest-path src-tauri/Cargo.toml --features xproc-test-helper --test hotkey_session`
 Expected: FAIL — `cannot find function resolve_target_language` / `decide_clipboard_popup` (private today); the grep assertion fails because `on_hotkey` still contains `translate_with_fallback(`.
 
-- [ ] **Step 3: Expose the decision fn + the central target resolver**
+- [x] **Step 3: Expose the decision fn + the central target resolver**
 
 In `src-tauri/src/lib.rs`, make `decide_clipboard_popup` (lib.rs:449) and `ClipboardPopupDecision` (lib.rs:440) `pub`, and re-export at the crate root. Add the central resolver near the decision fn:
 
@@ -1481,7 +1481,7 @@ pub fn resolve_target_language(to: &str, settings_target: &str) -> String {
 
 Change `enum ClipboardPopupDecision` → `pub enum ClipboardPopupDecision` and `fn decide_clipboard_popup` → `pub fn decide_clipboard_popup`. Add `pub use ...` re-exports at the crate root if the integration test path requires them (the test uses `linguaray_lib::decide_clipboard_popup` / `linguaray_lib::ClipboardPopupDecision` / `linguaray_lib::TranslateSessionResult`, so ensure all three are reachable from the crate root).
 
-- [ ] **Step 4: Resolve `to: ""` centrally inside run_translate_session**
+- [x] **Step 4: Resolve `to: ""` centrally inside run_translate_session**
 
 In `src-tauri/src/lib.rs`, `run_translate_session` (lib.rs:492). At the TOP of the fn body, before reading `fallback_engine`, add:
 
@@ -1507,7 +1507,7 @@ async fn run_translate_session(
 }
 ```
 
-- [ ] **Step 5: Extract `capture_and_translate` from on_hotkey (P1-1: full + generation-token-checked)**
+- [x] **Step 5: Extract `capture_and_translate` from on_hotkey (P1-1: full + generation-token-checked)**
 
 Add a new async helper near `on_hotkey`. This is the COMPLETE body (no placeholders), reusing the exact HWND resolution + capture_selection + client/keystore/db acquisition from on_hotkey (lib.rs:1999-2124), factored so the hotkey, tray `translate-selection`, and Retry share it. `gen` is checked at every await boundary.
 
@@ -1872,7 +1872,7 @@ struct PopupMultiPayload {
 
 The existing `multi_result` fn must be updated to pass `source_text: None`. The frontend `PopupMultiPayload.source_text?: string` (types.ts) is unchanged — `Option<String>` serializes to `string | undefined`.
 
-- [ ] **Step 6: Rewrite on_hotkey to call capture_and_translate**
+- [x] **Step 6: Rewrite on_hotkey to call capture_and_translate**
 
 In `src-tauri/src/lib.rs`, replace the spawn block body (lib.rs:2001-2124, i.e. everything inside `tauri::async_runtime::spawn(async move { ... })`) with:
 
@@ -1900,7 +1900,7 @@ In `src-tauri/src/lib.rs`, replace the spawn block body (lib.rs:2001-2124, i.e. 
 }
 ```
 
-- [ ] **Step 7: Build + run the full Rust suite**
+- [x] **Step 7: Build + run the full Rust suite**
 
 Run:
 - `cargo build --manifest-path src-tauri/Cargo.toml --features xproc-test-helper`
@@ -1908,7 +1908,7 @@ Run:
 
 Expected: clean build; the existing `translate_session.rs`, `fallback.rs`, `translate_parallel.rs`, and `popup_geometry` tests pass; the 5 new `hotkey_session` tests pass (including the grep assertion).
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git diff --check
@@ -1955,7 +1955,7 @@ git commit -m "fix(hotkey): route Alt+Space through capture_and_translate -> run
   - `provider_get_active_selection() -> ActiveSelection`.
 - Produces (frontend): App.tsx mounts `listen("tray-action", ...)` + `listen("navigate", ...)`; `SettingsShell` accepts `activePage` + `onNavigate` props (controlled).
 
-- [ ] **Step 1: Add the clipboard plugin to Cargo.toml (P1-6, before capabilities)**
+- [x] **Step 1: Add the clipboard plugin to Cargo.toml (P1-6, before capabilities)**
 
 Edit `src-tauri/Cargo.toml`, add to the `[dependencies]` table:
 
@@ -1969,7 +1969,7 @@ Register the plugin in `src-tauri/src/lib.rs` inside `tauri::Builder::default()`
         .plugin(tauri_plugin_clipboard_manager::init())
 ```
 
-- [ ] **Step 2: Add the missing backend commands to build.rs (permission manifest source)**
+- [x] **Step 2: Add the missing backend commands to build.rs (permission manifest source)**
 
 `src-tauri/build.rs` currently lacks `translate_session`, `translate_selection_ipc`, `provider_get_active_selection`, `open_settings_window`. Add all four to the `.commands(&[...])` list:
 
@@ -1995,7 +1995,7 @@ Register the plugin in `src-tauri/src/lib.rs` inside `tauri::Builder::default()`
 
 Run `cargo build --manifest-path src-tauri/Cargo.toml --features xproc-test-helper` and confirm the autogenerated permission TOMLs now include `translate_session.toml`, `translate_selection_ipc.toml`, `provider_get_active_selection.toml`, `open_settings_window.toml` under `src-tauri/permissions/autogenerated/`.
 
-- [ ] **Step 3: Authorize the commands in capabilities (P1-6)**
+- [x] **Step 3: Authorize the commands in capabilities (P1-6)**
 
 `src-tauri/capabilities/input.json` — add `allow-translate-session` AND `allow-provider-list`:
 
@@ -2073,7 +2073,7 @@ Run `cargo build --manifest-path src-tauri/Cargo.toml --features xproc-test-help
 }
 ```
 
-- [ ] **Step 4: Add the capability-set integration test (P1-6)**
+- [x] **Step 4: Add the capability-set integration test (P1-6)**
 
 Create `src-tauri/tests/capabilities.rs`:
 
@@ -2147,7 +2147,7 @@ fn main_window_authorizes_every_new_command() {
 
 `serde_json` is already a dependency of the crate (verified at `src-tauri/Cargo.toml:44` — `serde_json = "1"` under `[dependencies]`), so it is available to the integration test with no `Cargo.toml` edit.
 
-- [ ] **Step 5: Write the failing frontend test**
+- [x] **Step 5: Write the failing frontend test**
 
 Create `test/tray-action.test.tsx` (uses the verified `vi.hoisted + invokeMock` pattern):
 
@@ -2241,12 +2241,12 @@ describe("App tray-action + navigate listeners", () => {
 });
 ```
 
-- [ ] **Step 6: Run test to verify it fails**
+- [x] **Step 6: Run test to verify it fails**
 
 Run: `pnpm vitest run test/tray-action.test.tsx`
 Expected: FAIL — the listeners are not registered yet.
 
-- [ ] **Step 7: Add the selection-ipc module + the listeners to App.tsx**
+- [x] **Step 7: Add the selection-ipc module + the listeners to App.tsx**
 
 Create `src/features/translation/selection-ipc.ts`:
 
@@ -2443,12 +2443,12 @@ Everything else in the file — the `matchMedia` signal + `onCleanup` subscripti
 
 The shell's root now carries `data-testid="shell"` + `data-page={active()}` (rev-9-2: `active()` is the derivation, so `data-page` updates reactively when the parent changes `props.activePage`) so Playwright + real-DOM Vitest can read the active page WITHOUT mocking SettingsShell (rev-7-6 removes the mock dependency in the keyboard spec). The tray-action Vitest test still mocks SettingsShell (Step 5) because it is a unit test of the App listeners, not the shell DOM. The new controlled-component test in C5 Step 1 (`setPage("keystore-recovery")` → `data-page="keystore-recovery"`) uses the REAL (un-mocked) shell and verifies the reactivity.
 
-- [ ] **Step 8: Run test to verify it passes**
+- [x] **Step 8: Run test to verify it passes**
 
 Run: `pnpm vitest run test/tray-action.test.tsx`
 Expected: PASS (5 tests).
 
-- [ ] **Step 9: Extract set_active_primary_core + build the executable tray (P1-5)**
+- [x] **Step 9: Extract set_active_primary_core + build the executable tray (P1-5)**
 
 In `src-tauri/src/lib.rs`, extract the sync core of `provider_set_active` (lib.rs:1288) so the tray can call it without the `tauri::State` handle. Add near `provider_set_active`. **rev-5-4 (load-bearing):** uses the REAL write helpers `set_active_slots` (lib.rs:1711) — there is NO `db_providers::write_active_selection` — and matches the REAL `SetActiveOutcome { Written, NeedsConsent { actual_scope } }` variants (lib.rs:1672) with their `actual_scope` field. Because `parallel = []` + `fallback = None`, the consent gate (`if !parallel.is_empty()`) is never entered and the function always writes via `set_active_slots` (the no-parallel branch). No nested `spawn_blocking → block_on → spawn_blocking`: this fn is itself the body the caller runs inside a `spawn_blocking`.
 
@@ -2742,7 +2742,7 @@ fn handle_tray_menu_event(app: &tauri::AppHandle, event: MenuEvent) {
 
 > **rev-5-4 verified:** `SetActiveOutcome` (lib.rs:1672) is `enum { Written, NeedsConsent { actual_scope: String } }`; `SetActiveResult` (lib.rs:1620) mirrors it. The real write helper is `set_active_slots` (lib.rs:1711) — there is NO `write_active_selection` in `db_providers`. The tray calls `set_active_primary_core` inside ONE `spawn_blocking`; `set_active_primary_core` itself runs the gate + tx synchronously (no inner `block_on`).
 
-- [ ] **Step 9b: Refresh the tray after every provider mutation (rev-8-8: EIGHT commands)**
+- [x] **Step 9b: Refresh the tray after every provider mutation (rev-8-8: EIGHT commands)**
 
 The tray's Switch Provider submenu + status item are built from the db at menu-build time. If a provider is created/updated/deleted/toggled/reordered/set-active/duplicated/confirm-and-set-active and the tray is NOT refreshed, the submenu + status show stale data. **rev-8-8 (load-bearing, corrects rev-7-8's count):** each of the EIGHT provider mutation commands (`provider_create`/`provider_update`/`provider_delete`/`provider_toggle`/`provider_reorder`/`provider_set_active`/`provider_duplicate`/`provider_confirm_and_set_active`) currently takes `state: tauri::State<'_, Arc<AppState>>` and has NO `AppHandle` parameter — its closure-internal clone is `let app = state.inner().clone();` (an `Arc<AppState>`, NOT an `AppHandle`). So the rev-6-3 instruction "call `refresh_tray(&app)`" could not compile (`refresh_tray` takes `&tauri::AppHandle`, not `&Arc<AppState>`). rev-7-8 fixed six of them; rev-8-8 adds the remaining two (`provider_duplicate` + `provider_confirm_and_set_active`). Concretely:
 
@@ -3053,7 +3053,7 @@ async fn provider_confirm_and_set_active(
 
 > **rev-8-8 note (EIGHT commands, not six):** rev-7-8 enumerated only six provider mutation commands, but the verified source (`src-tauri/src/lib.rs`) has EIGHT: `provider_create`/`provider_update`/`provider_delete`/`provider_toggle`/`provider_reorder`/`provider_set_active`/`provider_duplicate`/`provider_confirm_and_set_active`. All eight now gain the `app_handle: tauri::AppHandle` parameter + call `refresh_tray_if_available(&app_handle)` on their success path. The tray's own `handle_tray_menu_event` Switch-Provider arm (Step 9) calls `refresh_tray_if_available(&app_for_refresh)` on success (rev-9-3: returns `()`, logs on failure) so the spawn stays unit-typed. The eight IPC commands above are the frontend-driven mutations (Create/Update/Delete/Toggle/Reorder/SetActive/Duplicate/ConfirmAndSetActive from the Settings UI) — those are the ones that need the new `app_handle` parameter + the `refresh_tray_if_available` call so the tray stays in sync when the user edits providers from the settings window.
 
-- [ ] **Step 10: Make the main window hidden by default**
+- [x] **Step 10: Make the main window hidden by default**
 
 In `src-tauri/tauri.conf.json`, the first window entry. Update it:
 
@@ -3069,7 +3069,7 @@ In `src-tauri/tauri.conf.json`, the first window entry. Update it:
       },
 ```
 
-- [ ] **Step 11: Build + run Rust tests + frontend tests**
+- [x] **Step 11: Build + run Rust tests + frontend tests**
 
 Run:
 - `cargo build --manifest-path src-tauri/Cargo.toml --features xproc-test-helper`
@@ -3078,7 +3078,7 @@ Run:
 
 Expected: clean build; all tests pass. Verify the four new permission TOMLs exist under `src-tauri/permissions/autogenerated/`.
 
-- [ ] **Step 12: Commit**
+- [x] **Step 12: Commit**
 
 ```bash
 git diff --check
@@ -3326,7 +3326,7 @@ git commit -m "feat(permissions+tray+clipboard): authorize new commands + clipbo
   ```
   Callers (translation flow): `let mut _tray_guard = tray_state::TranslationGuard::new(&app_state.tray, gen);` after the preflight (capture + anchor); on a success branch call `_tray_guard.mark_success();` BEFORE returning (the guard's Drop calls `finish_translation(gen, true)` → clears the prior-gen error IF `error_gen <= gen` (rev-16-2 guard) + decrements + recomputes); on an error branch call `app_state.tray.lock().record_translation_error(gen);` (**rev-16-1 renamed from `record_error(gen)`**, gen-guarded set per rev-16-2 + rev-17-3 `latest_translation_gen` guard; sync) — the guard's Drop calls `finish_translation(gen, false)` (decrement + recompute, does NOT clear `error_gen`). **Switch flow (rev-16-3 / rev-17-1: does NOT use the guard, is async)** — the switch handler calls `let rev = controller.lock().begin_switch();` BEFORE `spawn_blocking`/the async DB call, then after the switch resolves calls `controller.lock().finish_switch(rev, success)` (which records/clears `switch_error_rev` for that revision; a stale `rev != switch_revision` is ignored). **rev-17-4: `record_switch_error()`/`clear_switch_error()` are DELETED** — `finish_switch` is the sole switch mutator. `begin_translation` is called INSIDE `TranslationGuard::new` (so a guard either exists with a begun translation, or does not exist).
 
-- [ ] **Step 1: Add the `image` build-dependency + `image` dev-dependency + `sys-locale` runtime dep + `test-util` dev tokio feature (rev-14) in Cargo.toml** (rev-15 note: the `[features] xproc-test-helper = []` line ALREADY EXISTS — no feature addition needed; `src-tauri/Cargo.lock` is git-tracked and will be updated by adding `sys-locale`, so it is committed in Step 12)
+- [x] **Step 1: Add the `image` build-dependency + `image` dev-dependency + `sys-locale` runtime dep + `test-util` dev tokio feature (rev-14) in Cargo.toml** (rev-15 note: the `[features] xproc-test-helper = []` line ALREADY EXISTS — no feature addition needed; `src-tauri/Cargo.lock` is git-tracked and will be updated by adding `sys-locale`, so it is committed in Step 12)
 
 Edit `src-tauri/Cargo.toml`. Find the existing `[build-dependencies]` section (it already contains `tauri-build = { version = "2", features = [] }`) and add the `image` line (rev-12: this dep now generates BOTH the red-dot overlay PNG and the dimmed pulse PNG):
 
@@ -3379,7 +3379,7 @@ image = { version = "0.25", default-features = false, features = ["png"] }
 
 > **rev-14 vs rev-13 Cargo.toml summary:** rev-13 ADDED `time`+`sync` to the RUNTIME tokio (for `tokio::sync::Mutex` + `tokio::time`). rev-14 REVERTS that (the runtime tokio stays `["macros", "rt-multi-thread"]`) because the mutex is now `parking_lot` and the timer is `std::thread`. rev-14 ADDS `sys-locale = "0.3"` (runtime) + `test-util` (dev tokio) + `image` (dev). `parking_lot` was already present — no change there.
 
-- [ ] **Step 2: Write the failing test (priority ordering + rev-12 reducer concurrency + rev-15/rev-16/rev-17/rev-19 sync guard/generation/PulseWorker(channel-quit + PulseEvent)/renderer/worker-stop-barrier/switch-revision/gen-guards/latest_translation_gen/worker_start_count-no-churn/functional-switch(fresh_db fixture)/structural(dynamic-tray.switch-submenu)/pixel — 33 tests; rev-19: controller_with_notify passes `Some(notify_tx)` + fresh_db fixture + worker_start_count no-churn assertion)**
+- [x] **Step 2: Write the failing test (priority ordering + rev-12 reducer concurrency + rev-15/rev-16/rev-17/rev-19 sync guard/generation/PulseWorker(channel-quit + PulseEvent)/renderer/worker-stop-barrier/switch-revision/gen-guards/latest_translation_gen/worker_start_count-no-churn/functional-switch(fresh_db fixture)/structural(dynamic-tray.switch-submenu)/pixel — 33 tests; rev-19: controller_with_notify passes `Some(notify_tx)` + fresh_db fixture + worker_start_count no-churn assertion)**
 
 Create `src-tauri/tests/tray_state.rs`. The test has THIRTEEN sections (rev-18 enumeration = **33 tests** — unchanged from rev-17; rev-19 keeps 33 — the functional switch test FIXTURE is rewritten to the `fresh_db` pattern + the no-churn assertion to `worker_start_count`, NO test added/removed; ALL `#[test]` SYNC, 0 `#[tokio::test]`; verified by grepping `^#[test]$` + `^#[tokio::test]` in the code block below — 33 `#[test]`, 0 `#[tokio::test]`; rev-18-3 rewrites the functional switch test in-place from `#[tokio::test]`/async to `#[test]`/SYNC against a real DB, no count delta):
 1. **rev-11 priority ordering** (6 tests, unchanged pure functions).
@@ -4444,11 +4444,11 @@ fn stale_switch_result_ignored() {
 
 > **rev-15/rev-16/rev-17/rev-18/rev-19 test-design notes:** (a) **rev-16 P2-1 / rev-17-2:** the PulseWorker-lifecycle tests construct a controller via `controller_with_notify()` (which calls `with_renderer_interval_and_notify(renderer.clone(), locale, interval, Some(notify_tx))`); the worker emits `notify_tx.send(PulseEvent::Tick)` per tick (rev-17-2: was `send(())`), and the test `recv_timeout` on the receiver to deterministically wait for N frames — **NO `thread::sleep`** (CI-flake-free). The worker-stop tests (`last_finish_stops_the_worker`, `leaving_active_stops_the_worker_no_stale_frames`) assert `Ok(PulseEvent::Stopped)` on the notify channel (rev-17-2: the worker emits Stopped before its thread exits — was the `Disconnected` side-effect). The `controller_with_notify()` helper returns `(controller, Arc<RecordingRenderer>, Receiver<PulseEvent>)` (rev-17-2: `PulseEvent`, was `()`) — the test reads `renderer.calls()` on the SAME `Arc` it passed to the constructor (no downcast, no `renderer_snapshot()` accessor needed). (b) All reducer/guard/generation tests are plain `#[test]` with SYNC calls (`c.begin_translation(1);`, `_guard.mark_success();`, `c.finish_translation(1, true);`) — no `#[tokio::test]`, no `.await`. (c) The `leaving_active_stops_the_worker_no_stale_frames` test (renamed from rev-14's `stale_epoch_tick_does_not_clobber_error`) verifies the rev-15 worker-stop barrier: after `record_translation_error(1)` (rev-16-1 renamed) switches to `Error` + drops the worker (channel-quit: `send` + `join`), the notify channel returns `Ok(PulseEvent::Stopped)` (rev-17-2 — no `thread::sleep`). There is NO epoch check (rev-15 P1-4 removed `visual_epoch`) — the channel-quit is the barrier. (d) The pixel-diff test `panic!`s if the generated PNG is missing (rev-14 P2). (e) **rev-15 P1-2:** `RecordingRenderer` is `#[cfg(any(test, feature = "xproc-test-helper"))]`-gated in the module (NOT `#[cfg(test)]`); the integration test crate is compiled under `--features xproc-test-helper` (every verification command in this plan carries it), so the type resolves; `cargo build` (no feature) does NOT compile the mock. (f) **rev-17 P2-4 / rev-18-5:** the two `PulseWorker` channel-quit tests (`stop_signal_joins_the_worker`, `drop_stops_the_worker`) use NO `thread::sleep` — they pass a `notify` channel, call `PulseWorker::stop()` / drop, and `match` the `recv_timeout` result against `Ok(PulseEvent::Tick)` (confirming the worker ran) / `Ok(PulseEvent::Stopped)` (confirming the worker exited) — rev-18-5: explicit `match` (not `let _ =`); `drop_stops_the_worker` asserts `Stopped` (NOT `Disconnected` — the explicit signal is deterministic, the Disconnected side-effect is not). (g) **rev-16 P2-2 / rev-18-3:** `switch_handler_does_not_call_gen_next` (rev-18-3: `#[test]` — NOT `#[tokio::test]`; calls the REAL SYNC core `handle_switch_provider_core(&app_state, &uuid)` — NO AppHandle — against a REAL temp DB + an inserted provider — rev-17 P2-1 `.await`ed an async helper, rev-16 simulated the controller only) verifies rev-15 P1-3 / rev-16 P1-3 / rev-18-1 functionally (the core never touches a `GenerationToken`) AND asserts the DB `primary_uuid` was updated + the tray controller reflects success/failure, AND `switch_arm_source_has_no_gen_next_call` is a STRUCTURAL `include_str!` grep that asserts the switch handler source contains no `.gen.next()` / `session.gen` / `.await` / `spawn(async move` / `pub async fn handle_switch_provider` (rev-18 P2-4: the SYNC model is enforced structurally). (h) **rev-16-2 / rev-17-3 gen guards:** `older_success_does_not_clear_newer_error` + `older_error_does_not_replace_newer_error` (rev-16-2) + `stale_gen_error_ignored_after_newer_begin` (rev-17-3 NEW) verify the `finish_translation`/`record_translation_error` gen guards + the `latest_translation_gen` guard. (i) **rev-16-3 switch revision:** `two_concurrent_switches_second_wins` + `stale_switch_result_ignored` verify stale switch results are ignored and the latest revision wins. (j) **rev-16 P2-3:** the test imports do NOT name `RenderedIcon` or `TrayRenderer` directly — they are reached via `RecordingRenderer::calls()` element methods (`.is_dimmed()`, `.is_normal()`, `.is_error_dot()`), so there is no `unused_imports` clippy warning. (k) **rev-16 P2-5:** the file header says "6 tests" for the reducer concurrency section (rev-15 said "5" — undercount). (l) **rev-17-4:** the switch-flow tests use `finish_switch(rev, false)`/`finish_switch(rev, true)` — NOT the deleted `record_switch_error()`/`clear_switch_error()`. (m) **rev-18-1/3/5:** the functional switch test is SYNC (`#[test]`, no `.await`) and calls the SYNC core `handle_switch_provider_core(&app_state, &uuid)` (NO AppHandle — `tauri::test::mock_app` is unavailable without a tauri test feature the current `Cargo.toml` does not enable) against a REAL temp DB + inserted provider; all `recv_timeout` use explicit `match` (not `let _ =`); `drop_stops_the_worker` asserts `Stopped` (not `Disconnected`). (n) **rev-19-1/2/3/4:** `controller_with_notify()` passes `Some(notify_tx)` (not a bare `Sender`) — the 4th param of `with_renderer_interval_and_notify` is `Option<mpsc::Sender<PulseEvent>>`; the functional switch test fixture uses the `fresh_db` pattern (`Database::open` + `schema::create_all_tables` + `schema::seed_singletons` inside a transaction FIRST, THEN `db_providers::create`) — without this the test panics "no such table: providers" (`Database::open` does not create tables, db/mod.rs:93); the `PulseWorker` struct has NO `notify` field (the Sender is moved into the thread closure — rev-19-3, no `dead_code` warning); the `second_begin_does_not_churn_the_worker` test asserts `worker_start_count` stays at 1 across the second `begin_translation` (rev-19-4 — deterministic, replaces rev-18-5's timing-sensitive frame-count comparison). **Test count = 33** (rev-19: unchanged from rev-18's 33 — rev-19 rewrites the fixture + the no-churn assertion in-place, no test added/removed; rev-18: unchanged from rev-17's 33 — the functional switch test is REWRITTEN in-place from `#[tokio::test]`/async to `#[test]`/SYNC with a real DB, no count delta; verified by grepping `^#[test]$` + `^#[tokio::test]` in the Step 2 code block — after rev-18 ALL are `#[test]`, 0 `#[tokio::test]`). (o) **rev-22-1/2/3/4:** the `switch_arm_source_has_no_gen_next_call` STRUCTURAL grep test is REWRITTEN in place (no `#[test]` count delta): (1) the preview is `chars().take(500).collect::<String>()` (UTF-8-safe, 500 CHARS not bytes — no "byte index is not a char boundary" panic); (2) the grep window is narrowed to brace-matched `extract_function_body(src, signature)` of the THREE switch functions (`handle_tray_menu_event` / `handle_switch_provider_core` / `handle_switch_provider`) instead of `&src[switch_start..]` to EOF (avoids false-failing on an unrelated subsequent function); (3) each of `core_body` / `wrapper_body` / `handler_body` is asserted INDEPENDENTLY for `.await` / `pub async fn` / `spawn(async move` / `.gen.next()` / `session.gen` (a regression is pinpointed to the exact function); (4) `extract_function_body` is a LOCAL helper `fn` INSIDE the test (NOT a `#[test]`), so the test count stays 33.
 
-- [ ] **Step 3: Run test to verify it fails**
+- [x] **Step 3: Run test to verify it fails**
 
 Run: `cargo test --manifest-path src-tauri/Cargo.toml --features xproc-test-helper --test tray_state`
 Expected: FAIL — `cannot find module \`tray_state\` in crate \`linguaray_lib\`` (or `unresolved import` for `TrayStateController`/`recompute_pure`/`Locale`/`tray_tooltip_text`/`detect_system_locale`/`RecordingRenderer`/`TranslationGuard`/`with_renderer_and_interval`). The rev-11 priority tests would have failed on the private-module path too; rev-12 (P1-4) fixes that with `pub mod tray_state;` in Step 6. The rev-13/rev-14 tests additionally fail on the missing `RecordingRenderer`/`TranslationGuard`/`detect_system_locale`/`with_renderer_and_interval` symbols until Step 5 lands them.
-- [ ] **Step 4: Generate the red-dot OVERLAY PNG + dimmed pulse PNG in build.rs (rev-12 P1-1 + P1-2)**
+- [x] **Step 4: Generate the red-dot OVERLAY PNG + dimmed pulse PNG in build.rs (rev-12 P1-1 + P1-2)**
 
 Append this block to `src-tauri/build.rs` (AFTER the existing `tauri_build::try_build` call so a build-failure short-circuits before the icons are regenerated; the block is gated to always run because both PNGs are needed for the `include_bytes!` in Step 5).
 
@@ -4542,7 +4542,7 @@ Run `cargo build --manifest-path src-tauri/Cargo.toml --features xproc-test-help
 
 **Verification (P1-2) — rev-14:** the red-dot-overlay-vs-solid-square guarantee is asserted PROGRAMMATICALLY in Step 2's `red_dot_overlay_preserves_base_icon_outside_the_dot` test (loads the generated `tray-error-32.png` via the `image` dev-dependency, compares pixel-by-pixel against the base `icons/32x32.png`: asserts every pixel OUTSIDE the dot circle is unchanged AND that the dot circle contains `#DC2626` pixels). No manual "open the PNG and eyeball" step — rev-12's note is superseded by this assertion. **rev-14 P2: the test `panic!`s if the PNG is not present** (`unwrap_or_else(|e| panic!("build.rs output not found: {error_png} ({e})"))`) — it does NOT silently `return` (a silent skip would let a build.rs regression pass unnoticed). When this Step 4 build script has produced the file (Step 4's `cargo build` runs first), the test asserts the overlay.
 
-- [ ] **Step 5: Create the tray_state module (rev-19: PulseWorker struct drops `notify` field + `worker_start_count` field on controller; rev-18: sync handle_switch_provider doc note; rev-17: PulseEvent enum + latest_translation_gen + delete record_switch_error/clear_switch_error/clear_translation_error; rev-16: NO overloading + gen guards + switch revision + notify channel; rev-15: `PulseWorker` channel-quit + `finish_translation` merge + no `visual_epoch`/`tick_render`/`stop_timer`; rev-14 sync `parking_lot::Mutex` controller + `current_state`-gated worker swap + `std::thread` timer; rev-13 RAII guard + generation-aware error + injectable TrayRenderer; rev-12 reducer + real icon pulse + base-icon overlay)**
+- [x] **Step 5: Create the tray_state module (rev-19: PulseWorker struct drops `notify` field + `worker_start_count` field on controller; rev-18: sync handle_switch_provider doc note; rev-17: PulseEvent enum + latest_translation_gen + delete record_switch_error/clear_switch_error/clear_translation_error; rev-16: NO overloading + gen guards + switch revision + notify channel; rev-15: `PulseWorker` channel-quit + `finish_translation` merge + no `visual_epoch`/`tick_render`/`stop_timer`; rev-14 sync `parking_lot::Mutex` controller + `current_state`-gated worker swap + `std::thread` timer; rev-13 RAII guard + generation-aware error + injectable TrayRenderer; rev-12 reducer + real icon pulse + base-icon overlay)**
 
 Create `src-tauri/src/tray_state.rs`. **rev-15/rev-16/rev-17 restructure over rev-14:** the module now exposes (a) the `TrayVisualState` enum + `tray_state_priority` (unchanged); (b) a `Locale` enum + `tray_tooltip_text` + `detect_system_locale` (rev-14: `sys_locale::get_locale()`, NOT `std::env::var("LANG")`); (c) `trait TrayRenderer` (rev-14: discrete `set_icon_normal`/`set_icon_dimmed`/`set_icon_error_dot`/`set_tooltip` methods — NOT `set_icon(Option<Image>)`) + `TrayIconRenderer` (prod) + `RecordingRenderer` (test mock, **rev-15 P1-2: `#[cfg(any(test, feature = "xproc-test-helper"))]`-gated** — NOT `#[cfg(test)]`); (d) `TrayStateController` (**rev-17-3 adds `latest_translation_gen: u64`**; **rev-19-4 adds `worker_start_count: u32`** (monotonic counter incremented each time `recompute` enters the `new_state == ActiveTranslation` branch + starts a `PulseWorker`; the no-churn test asserts it does NOT increase on an Active→Active counter bump; initial value 0; `pub fn worker_start_count(&self) -> u32` accessor); **rev-16 fields: `active_translations: u32` + `error_gen: Option<u64>` (translation flow) + `switch_revision: u64` + `switch_error_rev: Option<u64>` (switch flow, rev-16-3 — REPLACES rev-15's `has_error: bool`) + `current_state: TrayVisualState` + `pulse_worker: Option<PulseWorker>` + `tick_interval: Duration` + `renderer: Arc<dyn TrayRenderer>` + `notify_tx: Option<mpsc::Sender<PulseEvent>>` (rev-17-2: `PulseEvent` enum, was `Sender<()>`) + `locale: Locale` — does NOT derive `Debug`; rev-15 REMOVES `visual_epoch`, `pulse_frame`, `pulse_timer`; rev-16-3 REMOVES `has_error`**); (e) `PulseEvent` enum (rev-17-2: `{ Tick, Stopped }`) + `PulseWorker` (**rev-19-3: `pub struct PulseWorker { stop_tx, handle }`** — the struct does NOT hold a `notify` field; the `notify` Sender passed to `start` is MOVED into the worker thread closure which owns + drops it; rev-15 P1-1 + rev-16 P2-1 + rev-17-2: with `mpsc::channel()` + `recv_timeout` loop + per-tick `notify.send(PulseEvent::Tick)` + on-exit `notify.send(PulseEvent::Stopped)` + `stop()` send+join + `Drop`); (f) `TranslationGuard` RAII guard (rev-14/rev-15/rev-16: SYNCHRONOUS `Drop` via `parking_lot::Mutex`; rev-16-2 gen guard; `Drop` calls `finish_translation(gen, succeeded)`); (g) the controller's `render(&mut self)` method (single sync entry point for state-transition writes; the `PulseWorker` writes directly through its own renderer clone on each tick — NO `tick_render()`, NO `stop_timer()`, NO `visual_epoch`). **rev-17-4 methods (NO overloading + NO dead code):** `begin_translation(gen)`/`finish_translation(gen, success)` (gen-guarded, rev-16-2)/`record_translation_error(gen)` (rev-17-3: gen-guarded set gated by `latest_translation_gen`) (translation) + `begin_switch()`/`finish_switch(rev, success)` (switch, rev-16-3 — **rev-17-4: record_switch_error/clear_switch_error DELETED**, finish_switch is the sole switch mutator).
 
@@ -5549,7 +5549,7 @@ impl Drop for TranslationGuard<'_> {
 
 > **rev-15/rev-16 PulseWorker / channel-quit implementation note:** the per-tick invariant is enforced by the controller's `pulse_worker.take()` (→ `PulseWorker::Drop` → `stop()` → `stop_tx.send(())` + `handle.join()`) being performed in `recompute` BEFORE the new state is rendered. The worker's `recv_timeout` returns `Ok(())` on the signal, the thread exits, and `join()` completes — so by the time `recompute` calls `self.render()` for the new state, the worker thread is DEAD. There is no window for a stale tick to overwrite the new icon. The `RecordingRenderer` test `leaving_active_stops_the_worker_no_stale_frames` (renamed from rev-14's `stale_epoch_tick_does_not_clobber_error`) asserts this: after `record_translation_error(1)` (**rev-16-1 renamed from `record_error(1)`**) switches to `Error` + drops the worker (send + join completes), the `notify` channel returns `Err(Disconnected)` (rev-16 P2-1 — NO `thread::sleep`), proving no further ticks fire. **This is rev-15 P1-1's fix for the rev-14 deadlock:** rev-14's pulse thread was an infinite `loop { sleep; render }` with no exit path, and `stop_timer()`'s `join()` waited for it to exit — which never happened → `join()` blocked forever → the whole app hung on the first transition out of `Active`. The `PulseWorker`'s `recv_timeout` + signal-exit makes `join()` return. **rev-15 P1-4 removes the `visual_epoch` field entirely** (it was the marker for the rev-14 in-timer epoch check, which rev-14's prose described but its `spawn_pulse_timer` code never performed — prose and code disagreed; rev-15 keeps only the code model: the worker holds an independent renderer clone and the channel-quit is the sole barrier). The worker does NOT re-lock the controller (the controller cannot own the `Arc<Mutex<TrayStateController>>` it is stored in — a back-reference would be a borrow cycle). **rev-16 P2-1:** the worker carries an `Option<Sender<()>> notify`; per tick it `notify.send(())` (no-op if `None`). Tests `recv_timeout` on the receiver for deterministic frame counting (NO `thread::sleep`); when the worker drops, the Sender drops and the test observes `Err(Disconnected)`.
 
-- [ ] **Step 6: Declare the module in lib.rs (rev-12 P1-4: PUBLIC module) + add `tray` to `AppState` at ALL 5 construction sites + locale at construction (rev-14: parking_lot::Mutex + sys-locale)**
+- [x] **Step 6: Declare the module in lib.rs (rev-12 P1-4: PUBLIC module) + add `tray` to `AppState` at ALL 5 construction sites + locale at construction (rev-14: parking_lot::Mutex + sys-locale)**
 
 In `src-tauri/src/lib.rs`, alongside the other `mod` declarations near the top of the file, add (rev-12 P1-4: `pub mod` — NOT `mod tray_state;` as in rev-11, because the integration test imports via the module path `linguaray_lib::tray_state::...`):
 
@@ -5624,7 +5624,7 @@ pub struct AppState {
 
 **rev-14 locale: NO `read_locale(state)` helper.** rev-12 added a `read_locale` that read `state.settings_locale()` — but `AppState` has NO `settings_locale()` accessor AND `Settings` (settings.rs:9-15) has NO `locale` field (only `default_provider`/`target_language`/`fallback_engine`). rev-13/rev-14 DELETES that helper entirely: the locale is captured ONCE, inside `TrayStateController::new(app)` / `with_renderer(renderer, locale)`, via `detect_system_locale()`. **rev-14: `detect_system_locale()` uses `sys_locale::get_locale()`** (cross-platform — the `sys-locale = "0.3"` crate added in Step 1; rev-13's `std::env::var("LANG")` was Unix-only and returns `None` on Windows). Call sites do NOT pass a locale — they pass only `gen` to the guard/`begin`/`end`/`record_translation_error` methods (rev-16-1 renamed), and the controller uses its captured `self.locale`. The signature change (controller methods take `gen: u64` (translation) or `rev: u64` (switch, rev-16-3), not `app` + `locale`) is reflected in Steps 8-10.
 
-- [ ] **Step 7: Run the test to verify it passes**
+- [x] **Step 7: Run the test to verify it passes**
 
 Run: `cargo test --manifest-path src-tauri/Cargo.toml --features xproc-test-helper --test tray_state`
 Expected: PASS (33 tests, rev-18 count — ALL `#[test]` (SYNC); rev-18-1/3: the functional switch test is now `#[test]` against a real DB, NOT `#[tokio::test]`):
@@ -5641,7 +5641,7 @@ Expected: PASS (33 tests, rev-18 count — ALL `#[test]` (SYNC); rev-18-1/3: the
 - 2 switch does NOT bump generation (rev-15 P1-3 + rev-16 P2-2 + rev-18-3 — 1 functional `switch_handler_does_not_call_gen_next` (**rev-18-3: `#[test]`, calls the REAL SYNC core `handle_switch_provider_core(&app_state, &uuid)` — NO AppHandle — against a real temp DB + inserted provider — NOT `#[tokio::test]`/async**) + 1 structural `switch_arm_source_has_no_gen_next_call` (rev-18 P2-4: ALSO asserts no `.await`/`spawn(async move`/`pub async fn handle_switch_provider`)): replaces the single rev-15 `switch_does_not_bump_translation_generation`.
 - 2 switch revision ordering (rev-16-3, NEW): `two_concurrent_switches_second_wins`, `stale_switch_result_ignored`.
 
-- [ ] **Step 8: Wire TrayStateController into capture_and_translate via TranslationGuard (rev-14 sync P1-1 + P1-2; rev-15 finish_translation merge)**
+- [x] **Step 8: Wire TrayStateController into capture_and_translate via TranslationGuard (rev-14 sync P1-1 + P1-2; rev-15 finish_translation merge)**
 
 In A4's `capture_and_translate` helper (the new fn extracted from `on_hotkey`), add the tray transitions. This is a `diff`-style instruction against the A4 helper body — do NOT rewrite the helper, only add the calls.
 
@@ -5679,7 +5679,7 @@ In A4's `capture_and_translate` helper (the new fn extracted from `on_hotkey`), 
 
 **rev-15/rev-16 precedence summary:** stale-gen no-op → `mark_success` → Drop `finish_translation(gen, true)` → `Normal` (error_gen cleared iff `<= gen`, rev-16-2); `popup::error` → `record_translation_error(gen)` (rev-16-1) → Drop `finish_translation(gen, false)` → `Error` (persists until a same-or-newer-gen success); success emit → `mark_success` → Drop `finish_translation(gen, true)` → `Normal`. **The switch-provider success path (Step 10) calls `finish_switch(rev, true)` (rev-16-3 — NOT a translation-gen method) — switch does not participate in the translation generation.**
 
-- [ ] **Step 9: Wire TrayStateController into translate_clipboard (lib.rs:329) via TranslationGuard**
+- [x] **Step 9: Wire TrayStateController into translate_clipboard (lib.rs:329) via TranslationGuard**
 
 `translate_clipboard` (lib.rs:329-333) owns `app: tauri::AppHandle` by value and takes `app_state: tauri::State<'_, Arc<AppState>>`. Apply the SAME guard pattern as Step 8 (rev-14 P1-1: `app_state.tray`, NOT `state.tray`; rev-14 SYNC — no `.await`):
 
@@ -5695,7 +5695,7 @@ In A4's `capture_and_translate` helper (the new fn extracted from `on_hotkey`), 
 
 > **rev-14/rev-15/rev-16 vs rev-12/rev-13:** rev-12 added manual `begin` at line 335 and manual `end`/`set_error` to every branch — risky given the early returns. rev-13's guard covers ALL paths via Drop; rev-14 makes that Drop SYNCHRONOUS (parking_lot mutex) so the counter is decremented before Drop returns; rev-15 collapses the Drop's work into ONE `finish_translation(gen, succeeded)` call; rev-16-1 renames the error setter to `record_translation_error(gen)` (NO overloading) and rev-16-2 adds the gen guard to both `finish_translation` and `record_translation_error`. The only manual calls are `mark_success` (success) and `record_translation_error(gen)` (error, rev-16-1 renamed) — both SYNC. The `translate_clipboard` body does NOT pass `app`/`locale` to the controller — the controller captured both at construction (Step 6), and the methods take only `gen`.
 
-- [ ] **Step 10: Wire TrayStateController into the switch-provider handler (A4 Step 9) — extract `handle_switch_provider_core` (SYNC, no AppHandle — test entry) + `handle_switch_provider` wrapper (SYNC, AppHandle refresh — tray arm entry) (rev-18-1) + begin_switch/finish_switch revision (rev-16-3) — acquire ONLY app_state via app.state; switch does NOT touch the translation GenerationToken**
+- [x] **Step 10: Wire TrayStateController into the switch-provider handler (A4 Step 9) — extract `handle_switch_provider_core` (SYNC, no AppHandle — test entry) + `handle_switch_provider` wrapper (SYNC, AppHandle refresh — tray arm entry) (rev-18-1) + begin_switch/finish_switch revision (rev-16-3) — acquire ONLY app_state via app.state; switch does NOT touch the translation GenerationToken**
 
 In `handle_tray_menu_event` (lib.rs:2214, the `tray.switch-<uuid>` arm), the A4 Step 9 spec already preserves the old primary on failure and refreshes on success. **rev-16 P2-2 / rev-18-1: EXTRACT the switch handler into TWO functions** so the integration test (Step 2, section 10) can call the testable core directly WITHOUT a `tauri::AppHandle` (the integration-test crate has no Tauri test runtime / `tauri::test::mock_app` — `mock_app` requires a tauri test feature the current `Cargo.toml` does not enable):
 - **`pub fn handle_switch_provider_core(app_state: &Arc<AppState>, uuid: &str) -> Result<(), String>`** — pure SYNC core: DB mutation (`set_active_primary_core`) + tray controller (`begin_switch`/`finish_switch`). Does NOT touch `AppHandle` (no `refresh_tray_if_available`, no icon/tooltip/menu). The functional test (Step 2 section 10) calls THIS fn — no mock AppHandle needed.
@@ -5802,7 +5802,7 @@ The visual-state transitions are inside `finish_switch(rev, success)` (**rev-14/
 
 > **rev-16 vs rev-15 vs rev-14, + rev-17 + rev-18:** rev-14 acquired `session` + `gen = session.gen.next()` + called `record_error(gen)` / `clear_error_for_gen(gen)` (gen-arg overloads). **rev-15 P1-3 removed the `session`/`gen` acquisition** (calling `gen.next()` stales in-flight translations) and used the no-gen `record_error()` / `clear_error()` overloads (sticky `has_error` flag). **rev-16-1 renames them to DISTINCT methods** (NO overloading — `record_translation_error(gen)` for the translation flow). **rev-16-3 replaces the sticky `has_error: bool` with `switch_revision: u64` + `switch_error_rev: Option<u64>`** so concurrent switch completions are ordered (a stale late switch cannot clobber the latest); the switch mutators are `begin_switch()`/`finish_switch(rev, success)`. **rev-17-4 deletes the dead `record_switch_error()`/`clear_switch_error()`** — `finish_switch` is the sole switch mutator. **rev-16 P2-2 / rev-18-1 extracts `handle_switch_provider` as `pub fn` (SYNC)** so the integration test verifies (functionally) that it does NOT touch the translation `GenerationToken`, and a structural `include_str!` grep test guards against regression. **rev-17-1 (superseded by rev-18-1) made it `async`** based on the wrong premise that `set_active_primary_core` was async — rev-18-1 reverts to the SYNC `pub fn` (rev-16's form) because `set_active_primary_core` is itself SYNC (its body is the `spawn_blocking` payload). The regression tests `switch_handler_does_not_call_gen_next` + `switch_arm_source_has_no_gen_next_call` (Step 2, section 10) verify both (rev-18-1: the structural test ALSO asserts no `.await` / no `spawn(async move` in the switch arm). **rev-14 P1-5 (load-bearing, retained):** the handler signature has only `app`, so `app_state` is acquired via `app.state::<Arc<AppState>>().inner().clone()`.
 
-- [ ] **Step 11: Run the full backend test suite + clippy + default build (rev-16 P2-4; rev-17 P2-2 fixes the test count to 32 → rev-17-3 brings it to 33; rev-18-1 SYNC handle_switch_provider + rev-18-3 real-DB functional test; rev-20-2 the structural grep test uses the FULL source window — no `take(4096)` cap; rev-21-1 grep assertion failure messages truncated to first 500 chars of the switch-arm window; rev-21-3 test count reconfirmed as 33 (not 32); rev-22-1 grep preview is UTF-8-safe via `chars().take(500).collect::<String>()` (no byte-slice panic on multi-byte chars); rev-22-2 the grep window is narrowed to brace-matched `extract_function_body` of the three switch functions (core/wrapper/handler) instead of `&src[switch_start..]` to EOF; rev-22-3 SYNC core + SYNC wrapper + switch-arm each asserted independently (no `.await`/`spawn(async move`/`.gen.next()`); rev-22-4 test count reconfirmed as 33 — `extract_function_body` is a local helper fn inside the grep test, NOT a new `#[test]`)**
+- [x] **Step 11: Run the full backend test suite + clippy + default build (rev-16 P2-4; rev-17 P2-2 fixes the test count to 32 → rev-17-3 brings it to 33; rev-18-1 SYNC handle_switch_provider + rev-18-3 real-DB functional test; rev-20-2 the structural grep test uses the FULL source window — no `take(4096)` cap; rev-21-1 grep assertion failure messages truncated to first 500 chars of the switch-arm window; rev-21-3 test count reconfirmed as 33 (not 32); rev-22-1 grep preview is UTF-8-safe via `chars().take(500).collect::<String>()` (no byte-slice panic on multi-byte chars); rev-22-2 the grep window is narrowed to brace-matched `extract_function_body` of the three switch functions (core/wrapper/handler) instead of `&src[switch_start..]` to EOF; rev-22-3 SYNC core + SYNC wrapper + switch-arm each asserted independently (no `.await`/`spawn(async move`/`.gen.next()`); rev-22-4 test count reconfirmed as 33 — `extract_function_body` is a local helper fn inside the grep test, NOT a new `#[test]`)**
 
 Run:
 
@@ -5843,7 +5843,7 @@ Expected: all existing tests pass + the **33** `tray_state` tests pass (rev-19: 
 - **rev-19-5 + rev-21-2: `handle_switch_provider` wrapper sets the failure tooltip AFTER `refresh_tray_if_available`** — `if let Err(ref msg) = result { let tooltip = format!("Switch failed: {msg}"); if let Some(tray) = app.tray_by_id("main-tray") { let _ = tray.set_tooltip(Some(&tooltip)); } log::warn!(...); }` (rev-21-2: tooltip is the PREFIXED `format!("Switch failed: {msg}")`, NOT the raw `msg`; the `log::warn!` line still uses the raw `msg`). The order (refresh THEN set tooltip) ensures the refresh's own `set_tooltip` does not clobber the failure message. The functional test does NOT exercise the wrapper (it calls the core, which has no AppHandle) — the tooltip behavior is covered by the A4 Step 9 spec + rev-19-5/rev-21-2 doc, not by a separate test.
 - **rev-19 P2-1: the `switch_arm_source_has_no_gen_next_call` structural test ALSO asserts `build_switch_provider_submenu` + the `tray.switch-{uuid}` format string exist in lib.rs** — guards against a regression that replaces the dynamic per-provider submenu with a single fixed `MenuItem::with_id(app, "tray.switch-provider", ...)`.
 
-- [ ] **Step 12: Commit**
+- [x] **Step 12: Commit**
 
 ```bash
 git diff --check
@@ -5906,7 +5906,7 @@ Checkpoint goal: the popup renders every state with friendly engine labels and w
 - Consumes: `TranslationState` from `src/features/translation/types.ts` (the `multi-success`/`partial` variants carry `results: ResultEntry[]`).
 - Produces: no new exports; InputPanel renders a `ResultCard` grid for multi/partial, with `engineLabel` resolved via the input controller's name map.
 
-- [ ] **Step 1: Write the failing tests (rev-6-5: unified routeInvoke, NO mockResolvedValueOnce)**
+- [x] **Step 1: Write the failing tests (rev-6-5: unified routeInvoke, NO mockResolvedValueOnce)**
 
 Append to `test/InputPanel.test.tsx`. The test uses the `vi.hoisted + invokeMock + routeInvoke` pattern consistent with `ProviderCenter.test.tsx`. **rev-6-5 (load-bearing):** do NOT mix `mockResolvedValueOnce` (consumed in declaration order, not call order) with the route table — `provider_list` is consumed at mount, so a `mockResolvedValueOnce` for the session result would be eaten by the mount-time `provider_list` call. Every `invoke` is answered by its COMMAND NAME via the route table.
 
@@ -5999,12 +5999,12 @@ it("renders a partial result (one ok, one failed)", async () => {
 
 > If `test/InputPanel.test.tsx` already has a `vi.mock("@tauri-apps/api/core", ...)` + a `routeInvoke`-style helper, reuse the existing hoisted mock name + helper rather than introducing a second. The structural requirement (rev-6-5 + P1-7) is: one hoisted mock per file, route-table style, NO `mockResolvedValueOnce`.
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `pnpm vitest run test/InputPanel.test.tsx`
 Expected: FAIL — InputPanel today only renders `single-success` and passes the raw `s.engine` as `engineLabel`.
 
-- [ ] **Step 3: Create the inputController friendly-label map**
+- [x] **Step 3: Create the inputController friendly-label map**
 
 Create `src/features/translation/inputController.ts`:
 
@@ -6049,7 +6049,7 @@ export function engineLabel(raw: string): string {
 }
 ```
 
-- [ ] **Step 4: Extend InputPanel to render multi/partial/all-failed + friendly labels (rev-7-3: extract InputPanelView)**
+- [x] **Step 4: Extend InputPanel to render multi/partial/all-failed + friendly labels (rev-7-3: extract InputPanelView)**
 
 Edit `src/InputPanel.tsx`. **rev-7-3 (load-bearing for D5):** extract the presentational body into a named export `InputPanelView` so the ui-lab visual fixture (D5) can render the SAME View with canned props, instead of an approximate redraw. The View is a pure function of its props (no signals, no `invoke`, no `localStorage`); the default export owns the controller state. **rev-8-6:** merge the existing solid-js import with the newly-needed `For` + `type JSX` into ONE import line (the existing line 1 is `import { createSignal, createMemo, Show, type Component } from "solid-js";` — add `For` + `type JSX`):
 
@@ -6303,12 +6303,12 @@ export default InputPanel;
 
 (B2's autosave/restore is layered onto this controller — it does not change the View's prop surface.) This is a pure refactor (no behavior change) that makes the surface reusable in the lab.
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `pnpm vitest run test/InputPanel.test.tsx`
 Expected: PASS (existing + 3 new tests).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git diff --check
@@ -6332,7 +6332,7 @@ git commit -m "feat(input): render multi/partial/all-failed with friendly engine
   - `onMount` focuses the textarea.
   - `disabled={!idle()}` on the textarea.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `test/InputPanel.test.tsx`:
 
@@ -6388,12 +6388,12 @@ it("focuses the textarea on mount", () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `pnpm vitest run test/InputPanel.test.tsx`
 Expected: FAIL — no draft restore/persist/clear-purge/focus behavior exists.
 
-- [ ] **Step 3: Implement autosave/restore/focus in InputPanel**
+- [x] **Step 3: Implement autosave/restore/focus in InputPanel**
 
 Edit `src/InputPanel.tsx`. Add `onMount, onCleanup, createEffect` to the solid-js import. Replace the component's state setup + `clear` with autosave/restore:
 
@@ -6453,12 +6453,12 @@ Wire `ref={textareaRef}` on the textarea. Replace the inline `var(--space-3, 12p
       <main class="container" style={{ padding: "var(--space-lg)" }}>
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `pnpm vitest run test/InputPanel.test.tsx`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git diff --check
@@ -6483,7 +6483,7 @@ git commit -m "feat(input): autosave draft + restore + Clear purge + auto-focus 
 - Produces (backend): `provider_get_active_selection() -> ActiveSelection { primary: Option<String>, parallel: Vec<String>, fallback: Option<String> }`.
 - Produces (frontend): `providerGetActiveSelection(): Promise<ActiveSelectionFE>`. The popup controller builds a `Map<uuid, name>` from `providerList()` and labels unknown uuids as `"Fallback"` or `"Unknown"`.
 
-- [ ] **Step 1: Write the failing test (vi.hoisted + invokeMock pattern)**
+- [x] **Step 1: Write the failing test (vi.hoisted + invokeMock pattern)**
 
 Append to `test/Popup.test.tsx`. If the file already has a hoisted `invokeMock`, reuse it; otherwise add one consistent with `ProviderCenter.test.tsx`:
 
@@ -6510,12 +6510,12 @@ it("renders friendly engine label, not secret_ref/uuid", async () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `pnpm vitest run test/Popup.test.tsx`
 Expected: FAIL — the popup passes `engine` straight through.
 
-- [ ] **Step 3: Add the backend read-active-selection IPC**
+- [x] **Step 3: Add the backend read-active-selection IPC**
 
 In `src-tauri/src/db/providers.rs`, `ActiveSelection` (line 649) gains `serde::Serialize`:
 
@@ -6550,12 +6550,12 @@ async fn provider_get_active_selection(
 
 Register in `invoke_handler!` after `provider_list`.
 
-- [ ] **Step 4: Build + run the Rust suite**
+- [x] **Step 4: Build + run the Rust suite**
 
 Run: `cargo build --manifest-path src-tauri/Cargo.toml --features xproc-test-helper && cargo test --manifest-path src-tauri/Cargo.toml --features xproc-test-helper`
 Expected: clean build; all tests pass. Verify `provider_get_active_selection.toml` exists.
 
-- [ ] **Step 5: Add the frontend IPC wrapper + type**
+- [x] **Step 5: Add the frontend IPC wrapper + type**
 
 In `src/features/settings/provider-types.ts`:
 
@@ -6576,7 +6576,7 @@ export const providerGetActiveSelection = (): Promise<ActiveSelectionFE> =>
   invoke<ActiveSelectionFE>("provider_get_active_selection");
 ```
 
-- [ ] **Step 6: Build the friendly-label map in popupController**
+- [x] **Step 6: Build the friendly-label map in popupController**
 
 Edit `src/features/translation/popupController.ts`. Add the `nameMap` load on mount + the `engineLabel` function (the SOURCE-text saving + `retrySelection` land in B4; here only the label map). Add inside `createPopupController`:
 
@@ -6619,16 +6619,16 @@ Edit `src/features/translation/popupController.ts`. Add the `nameMap` load on mo
   return { state, pinned, pin, unpin, dismiss, engineLabel };
 ```
 
-- [ ] **Step 7: Use engineLabel in Popup.tsx**
+- [x] **Step 7: Use engineLabel in Popup.tsx**
 
 In `src/Popup.tsx`, update the two `engineLabel` props to use `ctrl.engineLabel(...)`.
 
-- [ ] **Step 8: Run the test to verify it passes**
+- [x] **Step 8: Run the test to verify it passes**
 
 Run: `pnpm vitest run test/Popup.test.tsx`
 Expected: PASS.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git diff --check
@@ -6658,7 +6658,7 @@ git commit -m "fix(popup): show friendly engine labels via provider name map, hi
   - Keystore-corrupt → `invoke("open_settings_window", { section: "keystore-recovery" })`.
   - TTS/Favorite render with `aria-disabled="true"` (focusable, NOT native `disabled`).
 
-- [ ] **Step 0: Add the clipboard plugin npm dep (REQUIRED — no navigator.clipboard fallback, P1-6)**
+- [x] **Step 0: Add the clipboard plugin npm dep (REQUIRED — no navigator.clipboard fallback, P1-6)**
 
 ```bash
 pnpm add @tauri-apps/plugin-clipboard-manager
@@ -6668,7 +6668,7 @@ The Cargo dep + `.plugin(tauri_plugin_clipboard_manager::init())` + the `clipboa
 
 **There is no navigator.clipboard fallback branch.** Delete any existing `navigator.clipboard?.writeText` call in `src/Popup.tsx` (if present).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `test/Popup.test.tsx`. The file currently mocks `@tauri-apps/api/event` (line 6), `@tauri-apps/api/window` (line 9), and `@tauri-apps/api/core` (line 20), but does NOT mock the clipboard plugin yet. Add the clipboard plugin mock at file scope, immediately after the `core` mock (after line 22):
 
@@ -6792,12 +6792,12 @@ it("rev-5-7: a clipboard-origin result carries source_text so Retry re-translate
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `pnpm vitest run test/Popup.test.tsx`
 Expected: FAIL — no Copied feedback, no settings button, Retry calls `translate_clipboard` (or nothing), TTS/Favorite use native `disabled`, and error-state Retry is unavailable.
 
-- [ ] **Step 3: Add the `open_settings_window` + `translate_selection_ipc` backend commands**
+- [x] **Step 3: Add the `open_settings_window` + `translate_selection_ipc` backend commands**
 
 The `Payload.source_text` + `result_with_source`/`multi_result_with_source`/`error_with_source` emitters landed in A2/A3. Here add the two commands to `src-tauri/src/lib.rs`:
 
@@ -6843,7 +6843,7 @@ async fn translate_selection_ipc(
 
 Register both in `invoke_handler!`. Build to confirm: `cargo build --manifest-path src-tauri/Cargo.toml --features xproc-test-helper`. Verify `open_settings_window.toml` and `translate_selection_ipc.toml` exist.
 
-- [ ] **Step 4: Add the new copy keys**
+- [x] **Step 4: Add the new copy keys**
 
 In `src/features/translation/types.ts`, extend the `CopyKey` union:
 
@@ -6875,7 +6875,7 @@ In `src/features/translation/copy.ts`, add to BOTH `zh` and `en`:
 
 Also extend `PopupStatePayload` (and `PopupMultiPayload`) in `src/features/translation/types.ts` with `source_text?: string`.
 
-- [ ] **Step 5: Make ResultCard forward aria-disabled (focusable disabled actions)**
+- [x] **Step 5: Make ResultCard forward aria-disabled (focusable disabled actions)**
 
 Edit `packages/ui/src/components/ResultCard.tsx`. The `ResultAction` type carries `ariaDisabled?: boolean`; the `IconButton` renders `aria-disabled` instead of `disabled` when set:
 
@@ -6897,7 +6897,7 @@ Edit `packages/ui/src/components/ResultCard.tsx`. The `ResultAction` type carrie
 
 When `ariaDisabled` is true, the button has `aria-disabled="true"` and NO native `disabled`, so it stays in the tab order. `onClick` is `() => {}` for aria-disabled actions.
 
-- [ ] **Step 6: Save the SOURCE text on every state + Retry via translateSelection(sourceText) (P1-3)**
+- [x] **Step 6: Save the SOURCE text on every state + Retry via translateSelection(sourceText) (P1-3)**
 
 Edit `src/features/translation/popupController.ts`. Add `lastSource` (the SOURCE, not the translation), saved on loading/error/result/multi, cleared on a new session:
 
@@ -6951,7 +6951,7 @@ Edit `src/features/translation/popupController.ts`. Add `lastSource` (the SOURCE
 
 **rev-5-7 (clipboard source-text save, load-bearing):** the clipboard translate path MUST also carry `source_text` so Retry works for clipboard-translated text. Edit `translate_clipboard` (lib.rs:329-410) explicitly. Today it reads the clipboard text (L336-339), shows `popup::show_at` (no source), then emits `popup::result` / `popup::multi_result` / `popup::error` (none carry source). Replace each emit with the source-aware variant so the popup controller can save `lastSource` from the clipboard event payloads:
 
-- [ ] **Step 6b: Carry source_text through translate_clipboard (rev-5-7)**
+- [x] **Step 6b: Carry source_text through translate_clipboard (rev-5-7)**
 
 Edit `src-tauri/src/lib.rs`, `translate_clipboard` (lib.rs:329). The clipboard text is read at L336-339 into `text`. Replace the emit sites so each carries `&text`:
 
@@ -7010,7 +7010,7 @@ Then every error path inside `translate_clipboard` (the client/keystore/db guard
 
 Frontend side (rev-5-7): the popup controller's `popup-state` / `popup-multi-result` listeners (B4 Step 6) ALREADY save `payload.source_text` into `lastSource` for EVERY payload — they do not distinguish selection-origin from clipboard-origin. So once the clipboard payloads carry `source_text`, `lastSource` is populated automatically and Retry re-runs via `translateSelection(lastSource)` — which calls `translate_selection_ipc({ text: lastSource })` and does NOT re-read the clipboard. No additional frontend change is needed beyond B4 Step 6; the only edit is the backend `translate_clipboard` emit sites above.
 
-- [ ] **Step 7: Wire Copy feedback, settings nav, recovery CTA, aria-disabled TTS/Favorite, conditional Retry in Popup.tsx**
+- [x] **Step 7: Wire Copy feedback, settings nav, recovery CTA, aria-disabled TTS/Favorite, conditional Retry in Popup.tsx**
 
 Edit `src/Popup.tsx`. Add the clipboard import + `copiedUuid` signal + `openSettings` helper:
 
@@ -7135,12 +7135,12 @@ For the keystore-corrupt state, add a dedicated Show before the closing `</main>
 - Copy writes the TRANSLATION (`textFor(uuid)`, the result) to the clipboard — that is what the user wants to paste.
 - Retry re-translates the SOURCE (`lastSource`) — that is what the user wants to re-run. Retry is hidden when `lastSource` is empty.
 
-- [ ] **Step 8: Run tests to verify they pass**
+- [x] **Step 8: Run tests to verify they pass**
 
 Run: `pnpm vitest run test/Popup.test.tsx && pnpm --filter @linguaray/ui test`
 Expected: PASS.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git diff --check
@@ -7162,7 +7162,7 @@ git commit -m "feat(popup): source_text in every state payload + Tauri clipboard
 
 **Verified fact:** `join_all` preserves INPUT order for READY futures. The bug: pre-failed outcomes are pushed BEFORE `outcomes.append(&mut all)` (service.rs:246), so a later pre-failed profile appears earlier in the result.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `src-tauri/tests/translate_parallel.rs`:
 
@@ -7236,14 +7236,14 @@ async fn ready_outcomes_preserve_input_order_under_completion_jitter() {
 }
 ```
 
-- [ ] **Step 2: Run tests**
+- [x] **Step 2: Run tests**
 
 Run: `cargo test --manifest-path src-tauri/Cargo.toml --features xproc-test-helper --test translate_parallel outcomes_preserve_input_order_with_pre_failed_middle`
 Expected: FAIL — order is `[u2, u1, u3]`.
 
 Run the ready-order test; expected PASS (locks join_all).
 
-- [ ] **Step 3: Implement strict input-order emission (B5 only fixes ORDERING; B6 changes the fallback policy)**
+- [x] **Step 3: Implement strict input-order emission (B5 only fixes ORDERING; B6 changes the fallback policy)**
 
 In `src-tauri/src/service.rs`, replace the body of `translate_parallel` from line 200 (`let mut ready...`) through the end of the fn (line 248) with an input-index-tagged version. Pre-failed outcomes keep their input position:
 
@@ -7302,12 +7302,12 @@ In `src-tauri/src/service.rs`, replace the body of `translate_parallel` from lin
     outcomes
 ```
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Run: `cargo test --manifest-path src-tauri/Cargo.toml --features xproc-test-helper --test translate_parallel`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git diff --check
@@ -7341,7 +7341,7 @@ git commit -m "fix(parallel): strict input-order outcomes incl. pre-failed entri
     - **Mixed rule (P1-4 refined):** if a LOCAL provider is the PRIMARY (input position 0) AND it failed, the session does NOT trigger a remote fallback (the `local_primary_failed` arg short-circuits to false).
   - When eligible, `translate_parallel` calls `eng.translate(...)` ONCE (the fallback engine directly) and appends the result as an independent outcome.
 
-- [ ] **Step 1: Write the failing tests (the full matrix, P1-4; fixed mock URLs on lvh.me, NOT 127.0.0.1:11434)**
+- [x] **Step 1: Write the failing tests (the full matrix, P1-4; fixed mock URLs on lvh.me, NOT 127.0.0.1:11434)**
 
 Append to `src-tauri/tests/translate_parallel.rs`:
 
@@ -7613,12 +7613,12 @@ async fn primary_pre_failed_locality_identified_correctly_rev6_4() {
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cargo test --manifest-path src-tauri/Cargo.toml --features xproc-test-helper --test translate_parallel`
 Expected: FAIL — the `two_remote_transient_failures_trigger_at_most_one_fallback` test fails because `translate_with_fallback_ref(None)` converts `FallbackEligible`→`LocalNoFallback`, so the eligibility check never sees a `FallbackEligible`.
 
-- [ ] **Step 3: Implement `translate_primary_only` + `eligible_for_session_fallback` + the session fallback policy**
+- [x] **Step 3: Implement `translate_primary_only` + `eligible_for_session_fallback` + the session fallback policy**
 
 In `src-tauri/src/service.rs`, add `translate_primary_only` (runs the primary only, preserves the original Error):
 
@@ -7784,12 +7784,12 @@ Now replace the `futs` + post-join logic of `translate_parallel` with the comple
 
 **Note:** `eligible_for_session_fallback` is exposed for unit testing with the full `(outcomes, locality, local_primary_failed)` signature (rev-6-4 folds the local-primary gate into the pure fn so the test matrix can exercise it directly). The live decision in `translate_parallel` builds the `locality` Vec in lockstep with the outcomes Vec and reads `primary_was_local` from `by_idx` before the consuming walk.
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Run: `cargo test --manifest-path src-tauri/Cargo.toml --features xproc-test-helper --test translate_parallel`
 Expected: PASS (all existing + the 6 new matrix tests). Any pre-existing test that asserted per-engine fallback MUST be updated to expect the session-level policy — re-read and fix, documenting each change.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git diff --check
@@ -7876,7 +7876,7 @@ The existing `routeInvoke` helper (test/ProviderCenter.test.tsx:60-66) already c
 
 This satisfies rev-5-5: every test inherits the cold-load defaults, and the `vi.hoisted` `invokeMock` no longer needs a default `mockImplementation` (it can stay a bare `vi.fn(async () => undefined)` since `beforeEach` always installs `DEFAULT_ROUTES` before any render).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `test/ProviderCenter.test.tsx`. Use the `routeInvoke` helper that already exists in the file:
 
@@ -7912,12 +7912,12 @@ it("fail-closed: shows error + Retry and does NOT call providerSetActive when re
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `pnpm vitest run test/ProviderCenter.test.tsx`
 Expected: FAIL — ProviderCenter does not call `provider_get_active_selection`; the fail-closed path does not exist.
 
-- [ ] **Step 3: Wire cold-load selection (fail-closed) into ProviderCenter**
+- [x] **Step 3: Wire cold-load selection (fail-closed) into ProviderCenter**
 
 Edit `src/features/settings/ProviderCenter.tsx`. Replace the `refresh` + `onMount` block with a fail-closed version:
 
@@ -7977,12 +7977,12 @@ Render an error + Retry banner when `selectionError()` is true:
 
 Add `loadFailed` and `retry` copy keys to `src/features/settings/copy.ts` (both zh + en).
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `pnpm vitest run test/ProviderCenter.test.tsx`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git diff --check
@@ -7998,7 +7998,7 @@ git commit -m "feat(provider-center): fail-closed cold-load of active selection 
 - Modify: `src/features/settings/ProviderCenter.tsx` — remove the `google` and `deepl` entries from `PRESETS` (lines 85-86).
 - Test: `test/ProviderCenter.test.tsx` — extend.
 
-- [ ] **Step 1: Write the failing test (deterministic RED, P1-7: proper destructuring)**
+- [x] **Step 1: Write the failing test (deterministic RED, P1-7: proper destructuring)**
 
 Append to `test/ProviderCenter.test.tsx`:
 
@@ -8024,21 +8024,21 @@ it("preset list contains only the 4 supported AI presets", async () => {
 
 If the preset menu toggle is not a button named "Add", read `ProviderCenter.tsx` around line 629 for the actual toggle and click that element. The RED must come from the assertions, not a wrong selector.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `pnpm vitest run test/ProviderCenter.test.tsx preset`
 Expected: FAIL — Google/DeepL appear.
 
-- [ ] **Step 3: Remove google + deepl from PRESETS**
+- [x] **Step 3: Remove google + deepl from PRESETS**
 
 Delete lines 84-86 (the comment + two entries).
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `pnpm vitest run test/ProviderCenter.test.tsx`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git diff --check
@@ -8061,7 +8061,7 @@ git commit -m "fix(provider-center): drop Google/DeepL presets (4 AI presets onl
 
 #### Task C3a: Duplicate provider
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 it("Duplicate button creates a new keyless provider copy", async () => {
@@ -8081,10 +8081,10 @@ it("Duplicate button creates a new keyless provider copy", async () => {
 });
 ```
 
-- [ ] **Step 2: Run → RED** (`pnpm vitest run test/ProviderCenter.test.tsx` — fails: no Duplicate button).
-- [ ] **Step 3: Implement** the Duplicate button in the provider row actions; wire `providerDuplicate(uuid)`.
-- [ ] **Step 4: Run → GREEN**.
-- [ ] **Step 5: Commit**:
+- [x] **Step 2: Run → RED** (`pnpm vitest run test/ProviderCenter.test.tsx` — fails: no Duplicate button).
+- [x] **Step 3: Implement** the Duplicate button in the provider row actions; wire `providerDuplicate(uuid)`.
+- [x] **Step 4: Run → GREEN**.
+- [x] **Step 5: Commit**:
 
 ```bash
 git diff --check
@@ -8094,7 +8094,7 @@ git commit -m "feat(provider-center): Duplicate provider action (C3a)"
 
 #### Task C3b: Empty Key / Save disabled / Save conflict
 
-- [ ] **Step 1: Write the failing tests (COMPLETE bodies, P1-7)**
+- [x] **Step 1: Write the failing tests (COMPLETE bodies, P1-7)**
 
 ```ts
 it("Save button is disabled when the key field is empty for a needs-key provider", async () => {
@@ -8137,10 +8137,10 @@ it("Save shows a conflict error when the backend returns a unique-violation", as
 });
 ```
 
-- [ ] **Step 2: Run → RED.**
-- [ ] **Step 3: Implement** the disabled-until-valid logic (Save `disabled` when `needs_key && keyText().length === 0`) + the conflict error mapping (detect "UNIQUE constraint" in the error and surface a localized "name already exists" message).
-- [ ] **Step 4: Run → GREEN.**
-- [ ] **Step 5: Commit**:
+- [x] **Step 2: Run → RED.**
+- [x] **Step 3: Implement** the disabled-until-valid logic (Save `disabled` when `needs_key && keyText().length === 0`) + the conflict error mapping (detect "UNIQUE constraint" in the error and surface a localized "name already exists" message).
+- [x] **Step 4: Run → GREEN.**
+- [x] **Step 5: Commit**:
 
 ```bash
 git diff --check
@@ -8162,7 +8162,7 @@ git commit -m "feat(provider-center): Save disabled on empty key + conflict erro
 - `ConnectionResult { ok: bool, message: String, latency_ms: Option<u32> }` — `#[derive(Debug, Clone, Serialize)]` (already derived; the new field rides the existing serde).
 - The frontend `ConnectionResultFE` mirror type (in `src/features/settings/provider-types.ts`) gains `latency_ms?: number | null`.
 
-- [ ] **Step 1: Write the failing backend test**
+- [x] **Step 1: Write the failing backend test**
 
 Create `src-tauri/tests/connection_latency.rs`:
 
@@ -8241,12 +8241,12 @@ fn measure_latency_ms_reflects_real_instant_elapsed() {
 
 If `ConnectionResult` is not currently re-exported at the crate root, expose it in `lib.rs` (`pub use ...::ConnectionResult;` or declare the struct `pub` at its existing location — it is already `pub` at lib.rs:1449, so the integration test reaches it via `linguaray_lib::ConnectionResult` once the `latency_ms` field is added in Step 3).
 
-- [ ] **Step 2: Run the backend test to verify it fails**
+- [x] **Step 2: Run the backend test to verify it fails**
 
 Run: `cargo test --manifest-path src-tauri/Cargo.toml --features xproc-test-helper --test connection_latency`
 Expected: FAIL — `no field \`latency_ms\` on type \`ConnectionResult\`` (the struct at lib.rs:1449 currently has only `ok` + `message`) AND `cannot find function \`measure_latency_ms\` in crate \`linguaray_lib\`` (rev-12 helper not yet defined).
 
-- [ ] **Step 3: Add latency_ms to ConnectionResult + time the probe**
+- [x] **Step 3: Add latency_ms to ConnectionResult + time the probe**
 
 Edit `src-tauri/src/lib.rs`. The `ConnectionResult` struct (lib.rs:1449) currently is:
 
@@ -8337,7 +8337,7 @@ pub fn measure_latency_ms(start: std::time::Instant) -> u32 {
 
 The THREE early-return arms before the probe (lib.rs:1525-1537 — empty endpoint, invalid endpoint) also need `latency_ms: None` added to their `ConnectionResult` literals. The `spawn_blocking` that reads the profile (lib.rs:1515-1523) is unchanged.
 
-- [ ] **Step 4: Run the backend test to verify it passes**
+- [x] **Step 4: Run the backend test to verify it passes**
 
 Run: `cargo test --manifest-path src-tauri/Cargo.toml --features xproc-test-helper --test connection_latency`
 Expected: PASS (3 tests — 2 serialization-shape from rev-11 + 1 rev-12 `measure_latency_ms_reflects_real_instant_elapsed`). Then run the full backend suite + clippy to confirm no regression:
@@ -8348,7 +8348,7 @@ cargo test --manifest-path src-tauri/Cargo.toml --features xproc-test-helper
 cargo clippy --manifest-path src-tauri/Cargo.toml --features xproc-test-helper --all-targets -- -D warnings
 ```
 
-- [ ] **Step 5: Write the failing frontend test**
+- [x] **Step 5: Write the failing frontend test**
 
 In `test/ProviderCenter.test.tsx`, REPLACE the two connection-test cases (the success + failure cases from the pre-rev-11 C3c) with cases that assert the latency renders. The new test bodies:
 
@@ -8395,12 +8395,12 @@ it("Connection test shows the failure message WITHOUT latency when latency_ms is
 });
 ```
 
-- [ ] **Step 6: Run the frontend test to verify it fails**
+- [x] **Step 6: Run the frontend test to verify it fails**
 
 Run: `pnpm vitest run test/ProviderCenter.test.tsx`
 Expected: FAIL — the connection row does not yet render `{latency}ms` (Step 5 implements the backend field but the UI still shows `message` only).
 
-- [ ] **Step 7: Implement the frontend latency display**
+- [x] **Step 7: Implement the frontend latency display**
 
 In `src/features/settings/ProviderCenter.tsx`, find the connection-test result render (the row that shows the `message` from `provider_test_connection`). Extend it to render `{latency}ms` when `latency_ms` is a non-null number. The TypeScript mirror type for the connection result (in `src/features/settings/provider-types.ts`) gains:
 
@@ -8415,12 +8415,12 @@ export interface ConnectionResultFE {
 
 The render uses a conditional chip — when `result.latency_ms != null`, render a span with `{latency_ms} ms` (use the semantic `--color-muted` token family for the chip text, NOT a hardcoded hex). When `latency_ms` is `null`/`undefined`, render ONLY the `message` (no chip).
 
-- [ ] **Step 8: Run the frontend test to verify it passes**
+- [x] **Step 8: Run the frontend test to verify it passes**
 
 Run: `pnpm vitest run test/ProviderCenter.test.tsx`
 Expected: PASS — both connection cases pass (latency renders on success; no latency chip on null).
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git diff --check
@@ -8432,7 +8432,7 @@ git commit -m "feat(provider-center): connection test message + latency_ms + sat
 
 #### Task C3d: Delete focus / deleting / retry
 
-- [ ] **Step 1: Write the failing tests (COMPLETE bodies, P1-7)**
+- [x] **Step 1: Write the failing tests (COMPLETE bodies, P1-7)**
 
 ```ts
 it("Delete confirm-cancel returns focus to the delete trigger", async () => {
@@ -8482,10 +8482,10 @@ it("Delete failure offers a Retry and stays in the deleting state until done", a
 });
 ```
 
-- [ ] **Step 2: Run → RED.**
-- [ ] **Step 3: Implement** focus restore (store the trigger ref, restore on cancel) + the deleting/retry state.
-- [ ] **Step 4: Run → GREEN.**
-- [ ] **Step 5: Commit**:
+- [x] **Step 2: Run → RED.**
+- [x] **Step 3: Implement** focus restore (store the trigger ref, restore on cancel) + the deleting/retry state.
+- [x] **Step 4: Run → GREEN.**
+- [x] **Step 5: Commit**:
 
 ```bash
 git diff --check
@@ -8495,7 +8495,7 @@ git commit -m "feat(provider-center): delete focus restore + deleting/retry stat
 
 #### Task C3e: Disabled provider roles
 
-- [ ] **Step 1: Write the failing test (COMPLETE body, P1-7)**
+- [x] **Step 1: Write the failing test (COMPLETE body, P1-7)**
 
 ```ts
 it("a disabled provider's role badge is hidden / not settable", async () => {
@@ -8514,10 +8514,10 @@ it("a disabled provider's role badge is hidden / not settable", async () => {
 });
 ```
 
-- [ ] **Step 2: Run → RED.**
-- [ ] **Step 3: Implement** the disabled-role gating: when `provider.enabled === false`, do not render the role-assign buttons (or render them with `aria-disabled`).
-- [ ] **Step 4: Run → GREEN.**
-- [ ] **Step 5: Commit**:
+- [x] **Step 2: Run → RED.**
+- [x] **Step 3: Implement** the disabled-role gating: when `provider.enabled === false`, do not render the role-assign buttons (or render them with `aria-disabled`).
+- [x] **Step 4: Run → GREEN.**
+- [x] **Step 5: Commit**:
 
 ```bash
 git diff --check
@@ -8529,7 +8529,7 @@ git commit -m "feat(provider-center): hide role controls for disabled providers 
 
 > **rev-11 (B-path):** Balance states (loading/unsupported/rate-limited/error) are deferred to R4/S3 per user-approved scope decision. `provider_get_balance` does NOT exist in the backend. The Balance UI shows a static "Balance check not yet available" string and calls NO IPC. This test asserts the placeholder renders, NOT a fetched value. (rev-10 framed this as "P1-8 frozen Scheme A"; rev-11 re-frames it as an explicit user-approved deferral — the implementation is unchanged, only the governance note.)
 
-- [ ] **Step 1: Write the failing test (COMPLETE body, P1-8: placeholder, no IPC)**
+- [x] **Step 1: Write the failing test (COMPLETE body, P1-8: placeholder, no IPC)**
 
 ```ts
 it("balance shows a 'not yet available' placeholder and calls no balance IPC (P1-8)", async () => {
@@ -8548,10 +8548,10 @@ it("balance shows a 'not yet available' placeholder and calls no balance IPC (P1
 });
 ```
 
-- [ ] **Step 2: Run → RED.**
-- [ ] **Step 3: Implement** a static placeholder row for the balance field: when `capabilities.balance === true`, render the localized "Balance check not yet available" string. **P1-8: do NOT invoke any IPC.**
-- [ ] **Step 4: Run → GREEN.**
-- [ ] **Step 5: Commit**:
+- [x] **Step 2: Run → RED.**
+- [x] **Step 3: Implement** a static placeholder row for the balance field: when `capabilities.balance === true`, render the localized "Balance check not yet available" string. **P1-8: do NOT invoke any IPC.**
+- [x] **Step 4: Run → GREEN.**
+- [x] **Step 5: Commit**:
 
 ```bash
 git diff --check
@@ -8561,7 +8561,7 @@ git commit -m "feat(provider-center): balance placeholder only — no IPC (C3f, 
 
 #### Task C3g: Model fetch (loading / error / manual entry)
 
-- [ ] **Step 1: Write the failing tests (COMPLETE bodies, P1-7)**
+- [x] **Step 1: Write the failing tests (COMPLETE bodies, P1-7)**
 
 ```ts
 it("model fetch error falls back to manual entry", async () => {
@@ -8601,10 +8601,10 @@ it("model fetch loading shows a spinner", async () => {
 });
 ```
 
-- [ ] **Step 2: Run → RED.**
-- [ ] **Step 3: Implement** the model-fetch state machine: `loading` (spinner/`aria-busy`) → `select` (dropdown of fetched models) | `error` (manual `<input>`). Only fetch when `capabilities.model_list === true`.
-- [ ] **Step 4: Run → GREEN.**
-- [ ] **Step 5: Commit**:
+- [x] **Step 2: Run → RED.**
+- [x] **Step 3: Implement** the model-fetch state machine: `loading` (spinner/`aria-busy`) → `select` (dropdown of fetched models) | `error` (manual `<input>`). Only fetch when `capabilities.model_list === true`.
+- [x] **Step 4: Run → GREEN.**
+- [x] **Step 5: Commit**:
 
 ```bash
 git diff --check
@@ -8614,7 +8614,7 @@ git commit -m "feat(provider-center): model fetch loading/error->manual entry (C
 
 #### Task C3h: Toast aria-label + Tooltip
 
-- [ ] **Step 1: Write the failing tests (COMPLETE bodies, P1-7; NO conditional assertions)**
+- [x] **Step 1: Write the failing tests (COMPLETE bodies, P1-7; NO conditional assertions)**
 
 ```ts
 it("toast has role=status and a non-empty aria-label", async () => {
@@ -8658,10 +8658,10 @@ it("Tooltip trigger carries an accessible label", async () => {
 
 > The C3h tooltip test's `if (describedBy)` branch is a structural variant (the component may use either aria-describedby or aria-label), NOT a "skip if absent" — both branches assert a non-empty accessible label. This satisfies P1-7 (no vacuous pass: each branch has a hard assertion).
 
-- [ ] **Step 2: Run → RED.**
-- [ ] **Step 3: Implement** the toast `role="status"` + `aria-label` (the toast message), and wire the Tooltip so its trigger carries `aria-describedby` pointing at the tooltip content element when open.
-- [ ] **Step 4: Run → GREEN.**
-- [ ] **Step 5: Commit**:
+- [x] **Step 2: Run → RED.**
+- [x] **Step 3: Implement** the toast `role="status"` + `aria-label` (the toast message), and wire the Tooltip so its trigger carries `aria-describedby` pointing at the tooltip content element when open.
+- [x] **Step 4: Run → GREEN.**
+- [x] **Step 5: Commit**:
 
 ```bash
 git diff --check
@@ -8681,7 +8681,7 @@ git commit -m "feat(provider-center): toast role=status + aria-label + tooltip a
 - Verify: `src-tauri/tauri.conf.json` main window is 800×600 default + 600×400 min (A4 Step 10).
 - Test: `test/entry-styling.test.ts` **(new)**.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `test/entry-styling.test.ts`:
 
@@ -8720,12 +8720,12 @@ describe("settings entry styling", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `pnpm vitest run test/entry-styling.test.ts`
 Expected: FAIL — the title is still the Tauri default; theme-color is `#000000` with no media variants.
 
-- [ ] **Step 3: Fix index.html**
+- [x] **Step 3: Fix index.html**
 
 Replace `index.html`'s `<head>` (P2: two theme-color metas, dark token `#020617`):
 
@@ -8750,12 +8750,12 @@ Replace `index.html`'s `<head>` (P2: two theme-color metas, dark token `#020617`
 
 Confirm `/src/assets/logo.svg` exists. The theme-color values are meta-tag content (not `src/` CSS), so the no-hex scan does not apply.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `pnpm vitest run test/entry-styling.test.ts`
 Expected: PASS (5 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git diff --check
@@ -8776,7 +8776,7 @@ git commit -m "fix(entry): settings title/favicon + light/dark theme-color metas
 - **(new)** `apps/ui-lab/e2e/keyboard.spec.ts` — **rev-8-4:** the Playwright keyboard spec lives in the ui-lab (port 1421, the existing `apps/ui-lab/playwright.config.ts`), NOT in a root `e2e/keyboard.spec.ts` against port 1420. Reuses the lab's committed Playwright install + webServer config. Locator: the PRECISE selector `page.locator('[data-testid="shell"] .settings-shell__nav .sidebar-item:focus')` (rev-8-4: NOT the ambiguous `button:focus`).
 - Test: `test/SettingsShell.test.tsx` — Vitest for the aria/label contracts (rail accessible name, aria-disabled focusable, disabled aria-label).
 
-- [ ] **Step 1: Write the failing Vitest tests (aria/label contracts)**
+- [x] **Step 1: Write the failing Vitest tests (aria/label contracts)**
 
 Append to `test/SettingsShell.test.tsx`. The rev-9-2 test uses `createSignal` (from `solid-js`) + `SettingsSection` (named type from the `SettingsShell` module). The existing file imports `SettingsShell` (default) + `{ render, cleanup }` from `@solidjs/testing-library` + the file-local `installMatchMedia` helper. Merge `createSignal` into the existing `solid-js` import line and `SettingsSection` into the existing `SettingsShell` import line so the rev-9-2 test type-checks:
 
@@ -8882,7 +8882,7 @@ it("controlled activePage prop reactively updates data-page + sidebar highlight 
 });
 ```
 
-- [ ] **Step 2: Write the failing Playwright keyboard test (real Tab + Enter, P1-9 + rev-8-4)**
+- [x] **Step 2: Write the failing Playwright keyboard test (real Tab + Enter, P1-9 + rev-8-4)**
 
 **rev-8-4 (load-bearing):** the keyboard spec lives at `apps/ui-lab/e2e/keyboard.spec.ts` (port 1421, the existing `apps/ui-lab/playwright.config.ts` which already wires the webServer + committed baselines). It targets the `?nav=settings-keyboard` route added to `apps/ui-lab/src/App.tsx` (Step 4). NO root `e2e/keyboard.spec.ts`, NO root Playwright config, NO port 1420. The shell root locator is `[data-testid="shell"]`; the focused-nav-item locator is the PRECISE `[data-testid="shell"] .settings-shell__nav .sidebar-item:focus` (rev-8-4: NOT `[data-testid="shell"] button:focus`, which is ambiguous — the WindowChrome close/minimize buttons also live inside the shell).
 
@@ -8992,7 +8992,7 @@ test.describe("settings sidebar keyboard nav (P1-9, rev-8-4)", () => {
 });
 ```
 
-- [ ] **Step 3: Run tests to verify they fail**
+- [x] **Step 3: Run tests to verify they fail**
 
 Run Vitest: `pnpm vitest run test/SettingsShell.test.tsx`
 Expected: FAIL — rail-mode items have no persistent accessible name; disabled items use native `disabled` (not focusable); the rev-9-2 controlled-component test fails because `active` is still a read-once `createSignal` (changing the parent's `activePage` does not update `data-page` or the sidebar highlight).
@@ -9000,7 +9000,7 @@ Expected: FAIL — rail-mode items have no persistent accessible name; disabled 
 Run Playwright (rev-6-7: ui-lab): `pnpm --filter @linguaray/ui-lab test:visual keyboard`
 Expected: FAIL — the `?nav=settings-keyboard` route does not exist in `apps/ui-lab/src/App.tsx`; `[data-testid="shell"]` is not found; Tab does not move focus.
 
-- [ ] **Step 4: Add aria-disabled focusable controls + the ui-lab `?nav=settings-keyboard` route (rev-6-7)**
+- [x] **Step 4: Add aria-disabled focusable controls + the ui-lab `?nav=settings-keyboard` route (rev-6-7)**
 
 Edit `packages/ui/src/components/SidebarItem.tsx` — accept `ariaLabel`; render disabled items with `aria-disabled="true"` + `tabindex={0}` + NO native `disabled`:
 
@@ -9098,7 +9098,7 @@ if (nav() === "settings-keyboard") {
 
 This route renders ONLY the SettingsShell (the shell's own `WindowChrome` provides the frame; no lab header/nav/controls) so the keyboard spec's first Tab lands on a rail item. The root `src/App.tsx` is NOT modified for this route — the keyboard fixture lives in the lab, not the main app.
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run Vitest: `pnpm vitest run test/SettingsShell.test.tsx && pnpm --filter @linguaray/ui test`
 Expected: PASS.
@@ -9106,7 +9106,7 @@ Expected: PASS.
 Run Playwright (rev-6-7: ui-lab): `pnpm --filter @linguaray/ui-lab test:visual keyboard`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git diff --check
@@ -9128,7 +9128,7 @@ git commit -m "fix(a11y): rail nav accessible name + aria-disabled focusable ite
 - Consumes: `invoke<boolean>("a11y_status")`; `getCurrentWindow().onFocusChanged()`.
 - Produces: a banner "Accessibility: Required" when `false`, with a Re-check button + an "Open System Settings" link. On window focus, re-run `a11y_status` (P1-9). The `onFocusChanged` listener is stored and called in `onCleanup`.
 
-- [ ] **Step 1: Write the failing tests (P1-9: assert listener registration first)**
+- [x] **Step 1: Write the failing tests (P1-9: assert listener registration first)**
 
 Append to `test/SettingsShell.test.tsx`. Add the file-scope `@tauri-apps/api/window` + `invoke` mocks (via `vi.hoisted`), the `routeInvokeSettings` helper, and a `beforeEach` that resets + installs defaults (rev-5-8: complete helper, NOT a "mirror routeInvoke" instruction).
 
@@ -9244,12 +9244,12 @@ it("onCleanup calls the unlisten returned by onFocusChanged (P1-9)", async () =>
 
 (`routeInvokeSettings` is the COMPLETE helper defined in Step 1 above — it merges the custom routes over `DEFAULT_SETTINGS_ROUTES` and re-installs them on the `invokeMock`. The C6 tests pass `{ a11y_status: () => false }` to force the warning-banner state.)
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `pnpm vitest run test/SettingsShell.test.tsx`
 Expected: FAIL — SettingsShell does not query `a11y_status` or listen to focus.
 
-- [ ] **Step 3: Surface a11y_status with Re-check + onFocus re-check + System Settings**
+- [x] **Step 3: Surface a11y_status with Re-check + onFocus re-check + System Settings**
 
 Edit `src/features/settings/SettingsShell.tsx`:
 
@@ -9323,12 +9323,12 @@ a11y: {
 },
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `pnpm vitest run test/SettingsShell.test.tsx`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git diff --check
@@ -9373,7 +9373,7 @@ Checkpoint goal: no legacy space aliases in `src/`; the test runner's `test:src`
 - Modify: `src/InputPanel.tsx` — already done in B2 (`var(--space-lg)`); verify.
 - Create: `test/no-space-alias.test.ts` — guard.
 
-- [ ] **Step 1: Write the failing guard test**
+- [x] **Step 1: Write the failing guard test**
 
 Create `test/no-space-alias.test.ts`:
 
@@ -9412,12 +9412,12 @@ describe("no --space-N legacy aliases in src/", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `pnpm vitest run test/no-space-alias.test.ts`
 Expected: FAIL — `src/Popup.css` still uses `--space-1/2/3` (lines 22, 25, 31, 38, 50).
 
-- [ ] **Step 3: Replace the aliases in Popup.css**
+- [x] **Step 3: Replace the aliases in Popup.css**
 
 Edit `src/Popup.css`. Replace each occurrence (verified line numbers):
 - Line 22: `padding: var(--space-2, 8px);` → `padding: var(--space-md);`
@@ -9428,12 +9428,12 @@ Edit `src/Popup.css`. Replace each occurrence (verified line numbers):
 
 Verify `src/InputPanel.tsx` is already `var(--space-lg)` (Task B2). Grep `--space-` across `src/` to catch stragglers.
 
-- [ ] **Step 4: Run the guard + the no-hex test**
+- [x] **Step 4: Run the guard + the no-hex test**
 
 Run: `pnpm vitest run test/no-space-alias.test.ts test/no-hardcoded-hex.test.ts`
 Expected: PASS (both).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git diff --check
@@ -9452,19 +9452,19 @@ git commit -m "refactor(tokens): replace --space-N aliases with --space-sm/md/lg
 - Modify: `src/features/settings/ProviderCenter.tsx` — focus restore on dialog close (overlaps with C3d; skip if already covered).
 - Modify: `package.json` — fix `test:src`; add `test:all`.
 
-- [ ] **Step 1: Fix the Tooltip close behavior (RED → GREEN)**
+- [x] **Step 1: Fix the Tooltip close behavior (RED → GREEN)**
 
 Write a failing test that focuses the trigger, asserts the tooltip opens, blurs/presses Escape, asserts it closes. Implement `onBlur`/`onKeyDown(Escape)` handlers. (C3h's tooltip test already covers part of this; if C3h covered close-on-blur, skip and note it.)
 
-- [ ] **Step 2: Fix Provider Center focus restore**
+- [x] **Step 2: Fix Provider Center focus restore**
 
 If C3d's delete-focus test did not cover the general dialog-close restore, add it here. Otherwise skip and note "covered by C3d."
 
-- [ ] **Step 3: Inspect + fix the broken `test:src` script**
+- [x] **Step 3: Inspect + fix the broken `test:src` script**
 
 `package.json` line 14: `"test:src": "vitest run --root test",`. The `--root test` constrains the search root so `src/**/*.test.*` can't match. Drop the flag.
 
-- [ ] **Step 4: Edit package.json**
+- [x] **Step 4: Edit package.json**
 
 ```json
   "scripts": {
@@ -9483,16 +9483,16 @@ If C3d's delete-focus test did not cover the general dialog-close restore, add i
   },
 ```
 
-- [ ] **Step 5: Run the fixed scripts**
+- [x] **Step 5: Run the fixed scripts**
 
 Run: `pnpm test:src`, `pnpm test:ui`, `pnpm test:ui-lab`, `pnpm test:all`.
 Expected: each runs the right suite.
 
-- [ ] **Step 6: Address remaining focus-related failures (no skips)**
+- [x] **Step 6: Address remaining focus-related failures (no skips)**
 
 Restructure any failing focus test to assert the programmatic contract (`aria-describedby`, `document.activeElement`), NOT the visual `:focus-visible` pseudo-class. No `.skip`, no threshold loosening.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git diff --check
@@ -9520,7 +9520,7 @@ git commit -m "fix(ui+tests): Tooltip close + test:src/test:all scripts"
 
 Each annotation is a row in the retroactive table with the column "Design-doc difference" noting the proposal status + the rev-8-9 governance rule ("frozen — not modified; separate approval required").
 
-- [ ] **Step 1: For each plan, build the retroactive table**
+- [x] **Step 1: For each plan, build the retroactive table**
 
 Open each of the three plans. For every original task, determine from git history + the current code whether it shipped, shipped differently, or did not ship. Append a table at the END of each plan:
 
@@ -9541,11 +9541,11 @@ shipped state and where gaps are closed.
 
 Fill each row from the audit's task list (A1-D5).
 
-- [ ] **Step 2: Spot-check against the code**
+- [x] **Step 2: Spot-check against the code**
 
 For each row, grep the cited file/function to confirm the claim. Do not mark a row "shipped" you cannot verify.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git diff --check
@@ -9560,7 +9560,7 @@ git commit -m "docs(plans): append rev-4 retroactive status tables (no historica
 **Files:**
 - No code changes by default. This task runs the full matrix and confirms green.
 
-- [ ] **Step 0: Add the commit-guard helper (one-time)**
+- [x] **Step 0: Add the commit-guard helper (one-time)**
 
 Before any D4 commit, verify the staged file list excludes `.mimosa/`, `dist/`, and `test-results/` (guard):
 
@@ -9570,7 +9570,7 @@ git diff --cached --name-only | grep -E '(^|/)(\.mimosa|dist|test-results)(/|$)'
 
 Do NOT use `git add -A` or `git add .` anywhere in D4.
 
-- [ ] **Step 1: Run the full Rust suite**
+- [x] **Step 1: Run the full Rust suite**
 
 Run:
 ```bash
@@ -9580,7 +9580,7 @@ cargo clippy --manifest-path src-tauri/Cargo.toml --features xproc-test-helper -
 ```
 Expected: clean build, all tests pass, no clippy warnings.
 
-- [ ] **Step 2: Run the full frontend suite**
+- [x] **Step 2: Run the full frontend suite**
 
 Run:
 ```bash
@@ -9589,7 +9589,7 @@ pnpm test:all
 ```
 Expected: typecheck clean; all tests pass across root + ui + ui-lab.
 
-- [ ] **Step 3: Run the static acceptance scans**
+- [x] **Step 3: Run the static acceptance scans**
 
 Run:
 ```bash
@@ -9597,7 +9597,7 @@ pnpm vitest run test/no-hardcoded-hex.test.ts test/no-space-alias.test.ts
 ```
 Expected: both pass.
 
-- [ ] **Step 4: Re-check the new IPC commands are fully permission-authorized**
+- [x] **Step 4: Re-check the new IPC commands are fully permission-authorized**
 
 Run:
 ```bash
@@ -9607,7 +9607,7 @@ cargo test --manifest-path src-tauri/Cargo.toml --features xproc-test-helper --t
 ```
 Expected: every command appears in `build.rs` AND in the capability that the calling window uses AND the capabilities integration test passes (P1-6).
 
-- [ ] **Step 5: Manual contract smoke (documented)**
+- [x] **Step 5: Manual contract smoke (documented)**
 
 Document the expected outcomes for the reviewer:
 - Alt+Space on a selection → popup shows at 200×40 (loading) then resizes to 400×300 (single) or 600×400 (multi) with a friendly engine name (no `provider/<uuid>`). On Retina, the physical size is 2x; no clamping overflow.
@@ -9620,7 +9620,7 @@ Document the expected outcomes for the reviewer:
 - Popup Copy → "Copied" 1.2s (Tauri clipboard; copies the translation). Retry → re-translates the saved SOURCE (not the translation, not the clipboard). Retry is available in the error state too (P1-3); hidden when no source.
 - Local primary failure → no remote fallback. Config/401 → no fallback. Two remote 500s → exactly one fallback call + one card (P1-4: eligibility actually hits).
 
-- [ ] **Step 6: Commit any doc-only fixups**
+- [x] **Step 6: Commit any doc-only fixups**
 
 ```bash
 git diff --check
@@ -9658,7 +9658,7 @@ If the sweep is fully green with no fixups, no commit is needed.
   - **Tray** — NOT browser-screenshotted; documented as "manual screenshot acceptance required."
 - Baselines are committed under `apps/ui-lab/e2e/surfaces.visual.spec.ts-snapshots/`.
 
-- [ ] **Step 0: Verify + extend the ui-lab fixtures (rev-5-9)**
+- [x] **Step 0: Verify + extend the ui-lab fixtures (rev-5-9)**
 
 Verify the existing lab runs and the popup fixtures render. Run (from the repo root; rev-6-8: script is `test:visual`):
 
@@ -10015,7 +10015,7 @@ export default KeystoreRecovery;
 
 The View's Reset button calls `props.onOpenReset` (opens the Confirm); the Confirm's `onOpenChange` routes `open=true`→`onOpenReset` / `open=false`→`onCloseReset` (rev-8-7); the Confirm/Cancel actions call `props.onReset`/`props.onCloseReset`. The production controller passes `onOpenReset={() => setResetOpen(true)}` + `onCloseReset={() => setResetOpen(false)}`; the lab fixture passes `onOpenReset={() => {}}` + `onCloseReset={() => {}}`. The full surface — destructive Banner (corrupt) + info Banner (archived) + destructive Cancel-focused Confirm + Toast stack + busy + resetTriggerRef focus restore — is reproduced verbatim; NOTHING is simplified.
 
-- [ ] **Step 1: Wire the new fixtures into the lab router**
+- [x] **Step 1: Wire the new fixtures into the lab router**
 
 Edit `apps/ui-lab/src/App.tsx`. The existing router reads `?nav=` + `?state=` + `?theme=`. Add: import `InputPanel` + `KeystoreRecovery`, extend the `nav` handling so `?nav=input-window&state=<idle|multi|partial|error>` renders `<InputPanel state={...} />` and `?nav=keystore&fixture=<healthy|corrupt>` renders `<KeystoreRecovery state={...} />`. For the Provider Center empty/populated variant, pass the existing `provState` signal seeded from a new `?fixture=` param read (the existing App already has a `provState` signal defaulting to `"empty"`; wire `?fixture=populated` to seed it with the populated mock).
 
@@ -10069,7 +10069,7 @@ Then add two `<Match>` branches to the EXISTING `<Switch>` block in `apps/ui-lab
 
 (The existing `nav() === "provider-center"` branch already renders `<ProviderCenter state={provState()} ... />`; seeding `provState` from `?fixture=` makes the empty/populated screenshots deterministic.)
 
-- [ ] **Step 2: Write the visual test (P1-10: every real surface)**
+- [x] **Step 2: Write the visual test (P1-10: every real surface)**
 
 Create `apps/ui-lab/e2e/surfaces.visual.spec.ts` (lives next to the existing `component-gallery.visual.spec.ts` so it reuses `apps/ui-lab/playwright.config.ts`, which already points `webServer` at the lab dev server on port **1421**):
 
@@ -10152,7 +10152,7 @@ test("no horizontal overflow at 699px (provider center)", async ({ page }) => {
 
 > The tray is native OS UI and cannot be browser-screenshotted. D5 documents it as "manual screenshot acceptance required" in the commit message body (NOT a new `.md` file — per the project's no-new-docs convention). The manual capture steps: open the running app, click the tray icon, screenshot the menu (Translate Selection / Translate Clipboard / Switch Provider submenu / Settings / Quit) in light + dark, and attach the two PNGs to the PR.
 
-- [ ] **Step 3: Generate baselines**
+- [x] **Step 3: Generate baselines**
 
 Run (rev-6-8: the ui-lab script is `test:visual`, NOT `test:e2e`):
 ```bash
@@ -10160,7 +10160,7 @@ pnpm --filter @linguaray/ui-lab exec playwright test surfaces.visual --update-sn
 ```
 Expected: baselines generated under `apps/ui-lab/e2e/surfaces.visual.spec.ts-snapshots/`.
 
-- [ ] **Step 4: Run the visual suite**
+- [x] **Step 4: Run the visual suite**
 
 Run (rev-6-8):
 ```bash
@@ -10168,7 +10168,7 @@ pnpm --filter @linguaray/ui-lab test:visual surfaces.visual
 ```
 Expected: all surface/width/theme combinations pass + the no-overflow test passes. If a baseline needs updating (intentional UI change), re-run with `--update-snapshots` and document why in the commit.
 
-- [ ] **Step 5: Commit baselines + fixtures**
+- [x] **Step 5: Commit baselines + fixtures**
 
 ```bash
 git diff --check
