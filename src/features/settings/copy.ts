@@ -155,6 +155,9 @@ type ProviderCopy = {
   saveProfile: string;
   saving: string;
   saveFailed: string;
+  /** R2-E: save-conflict banner — the provider was modified elsewhere and the
+   *  optimistic-lock CAS rejected this save. Paired with a Reload button. */
+  saveConflict: string;
   /** Surfaced when a save rejects with a UNIQUE constraint violation
    *  (duplicate name / secret_ref). Carries no placeholder. */
   keyAlreadyExists: string;
@@ -277,6 +280,7 @@ const EN: SettingsCopy = {
     saveProfile: "Save profile",
     saving: "Saving…",
     saveFailed: "Failed to save: network error",
+    saveConflict: "This provider was modified elsewhere",
     keyAlreadyExists: "A provider with this name already exists",
     nameExists: "Another provider already uses this name",
     loadFailed: "Provider load failed",
@@ -406,6 +410,7 @@ const ZH: SettingsCopy = {
     saveProfile: "保存配置",
     saving: "保存中…",
     saveFailed: "保存失败：网络错误",
+    saveConflict: "此服务商已在别处修改",
     keyAlreadyExists: "该名称的服务商已存在",
     nameExists: "该名称已被其他提供商使用",
     loadFailed: "加载失败",

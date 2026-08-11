@@ -34,6 +34,7 @@ const mkProvider = (over: Partial<ProviderProfileFE> = {}): ProviderProfileFE =>
   needs_key: true,
   secret_ref: "provider/p1",
   capabilities: { balance: false, quota: false, model_list: false },
+  version: 1,
   ...over,
 });
 

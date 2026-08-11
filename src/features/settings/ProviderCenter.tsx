@@ -143,6 +143,11 @@ const ProviderCenter: Component = () => {
   // Per-provider deleting busy state. Set while `provider_delete` is in-flight
   // so the row's action buttons are locked (prevents double-delete / races).
   const [deletingUuid, setDeletingUuid] = createSignal<string | null>(null);
+  // R2-E: save-conflict signal. Set when an optimistic-lock CAS rejects a save
+  // (`stale_version` — the provider was modified elsewhere). The banner offers a
+  // Reload that re-fetches fresh data; the user's in-progress draft is PRESERVED
+  // so they can reconcile manually instead of losing their edits.
+  const [saveConflictUuid, setSaveConflictUuid] = createSignal<string | null>(null);
   const [consentOpen, setConsentOpen] = createSignal(false);
   const [pendingParallelUuid, setPendingParallelUuid] = createSignal<string | null>(null);
   const [consentActualScope, setConsentActualScope] = createSignal<string | null>(null);
@@ -444,13 +449,27 @@ const ProviderCenter: Component = () => {
         name: effectiveName,
         endpoint: effectiveEndpoint,
         model: modelDraft ?? provider.model,
+        // R2-E optimistic lock: echo back the last-read version. A mismatch
+        // (someone else saved first) rejects with `stale_version` below.
+        expected_version: provider.version,
       });
       setProviders((prev) => prev.map((p) => (p.uuid === uuid ? { ...p, ...updated, hasKey: p.hasKey } : p)));
       setSaveByUuid((prev) => ({ ...prev, [uuid]: "saved" }));
+      // A successful save clears any prior conflict banner for this provider.
+      setSaveConflictUuid((prev) => (prev === uuid ? null : prev));
       pushToast("success", t.profileSaved);
     } catch (e) {
-      setSaveByUuid((prev) => ({ ...prev, [uuid]: "failed" }));
-      pushToast("destructive", t.saveFailed);
+      // R2-E: a structured stale_version rejection = save conflict. Keep the
+      // user's draft intact (do NOT overwrite) and surface a conflict banner
+      // with a Reload button so they can pull fresh data and reconcile.
+      const err = e as { error?: string };
+      if (err?.error === "stale_version") {
+        setSaveByUuid((prev) => ({ ...prev, [uuid]: "failed" }));
+        setSaveConflictUuid(uuid);
+      } else {
+        setSaveByUuid((prev) => ({ ...prev, [uuid]: "failed" }));
+        pushToast("destructive", t.saveFailed);
+      }
     }
   };
 
@@ -872,6 +891,25 @@ const ProviderCenter: Component = () => {
               });
               return (
                 <div class="pc__detail-content">
+                  {/* R2-E: save-conflict banner. Surfaces when an optimistic-lock
+                      CAS rejected this save (`stale_version`). The user's draft
+                      is preserved (not overwritten); Reload re-fetches fresh data
+                      so they can reconcile against the other writer's version. */}
+                  <Show when={saveConflictUuid() === uuid}>
+                    <div class="pc__retry" role="alert">
+                      <span class="pc__load-failed">{t.saveConflict}</span>
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={() => {
+                          setSaveConflictUuid(null);
+                          void refresh();
+                        }}
+                      >
+                        {t.reload}
+                      </Button>
+                    </div>
+                  </Show>
                   {/* Name (editable — backend supports `name` patches). */}
                   <TextField
                     label={t.name}

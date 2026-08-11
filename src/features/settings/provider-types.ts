@@ -51,11 +51,16 @@ export type ProviderProfile = {
   secret_ref: string;
   capabilities: ProviderCapabilities;
   status: ProviderStatus;
+  /** Optimistic-lock version (R2-E). Bumped on every save; echoed back as
+   *  `ProviderPatch.expected_version`. A mismatch rejects with `stale_version`. */
+  version: number;
 };
 
 /**
  * `#[serde(deny_unknown_fields)]` patch — do not send unknown keys.
- * All fields optional; only the supplied keys are applied.
+ * `expected_version` is REQUIRED (R2-E optimistic lock): it must equal the
+ * row's current `version` for the save to apply; otherwise the backend rejects
+ * with a structured `stale_version` error so the UI can prompt a reload.
  */
 export type ProviderPatch = {
   name?: string;
@@ -63,6 +68,7 @@ export type ProviderPatch = {
   model?: string | null;
   enabled?: boolean;
   sort_order?: number;
+  expected_version: number;
 };
 
 // --- Frontend-augmented profile -----------------------------------------
@@ -116,15 +122,19 @@ export type SetActiveResult =
   | { outcome: "needs_consent"; actual_scope: string };
 
 /**
- * `provider_confirm_and_set_active` structured error. Wire shape (tagged on
- * `error`): `{ error: "stale_scope", actual_scope }` | `{ error: "db", message }`
- * | `{ error: "validation", message }`.
+ * `provider_confirm_and_set_active` / `provider_update` structured error. Wire
+ * shape (tagged on `error`):
+ * - `{ error: "stale_scope", actual_scope }` (confirm-and-set-active)
+ * - `{ error: "stale_version", actual_version }` (provider_update optimistic lock, R2-E)
+ * - `{ error: "db", message }`
+ * - `{ error: "validation", message }`.
  *
  * The IPC wrapper does NOT swallow this rejection — the component catches and
- * narrows on `e?.error === "stale_scope"`.
+ * narrows on `e?.error === "stale_scope"` / `e?.error === "stale_version"`.
  */
 export type ProviderCommandError =
   | { error: "stale_scope"; actual_scope: string }
+  | { error: "stale_version"; actual_version: number }
   | { error: "db"; message: string }
   | { error: "validation"; message: string };
 
