@@ -360,35 +360,120 @@ pub fn migrate_v1_to_v2(conn: &Connection) -> Result<(), DbError> {
         }
     }
     // Bump the recorded schema version (idempotent: re-writing 2→2 is a no-op).
+    // P2: literal 2 — not SCHEMA_VERSION — so a future v3 bump doesn't skip the
+    // v2→v3 migration by accidentally writing 3 here before the v3 migration runs.
     conn.execute(
         "UPDATE _schema_migrations SET schema_version=?1 WHERE id=1",
-        rusqlite::params![SCHEMA_VERSION as i64],
+        rusqlite::params![2i64],
     )?;
     Ok(())
 }
 
 /// P1-2: Validate the v2 schema structure. Called on every startup, even for
-/// "Complete" DBs, so a corrupted `providers` table (e.g. a manually dropped or
-/// altered `version` column) is detected instead of silently trusted.
+/// "Complete" DBs, so a corrupted schema (e.g. a manually dropped or altered
+/// table/column — including the `providers.version` optimistic-lock column) is
+/// detected instead of silently trusted.
 ///
-/// Fail-closed: returns [`DbError::Integrity`] if the `version` column is
-/// missing OR has a shape incompatible with the optimistic lock (must be
-/// `INTEGER NOT NULL DEFAULT 1`). Reuses [`table_columns`] +
+/// Validates that ALL 8 required tables exist with their key columns, and that
+/// `providers.version` has the exact shape the optimistic lock requires
+/// (`INTEGER NOT NULL DEFAULT 1`). Reuses [`table_columns`] +
 /// [`version_column_is_correct`] so this path and [`migrate_v1_to_v2`] agree on
-/// what "correct" means.
+/// what "correct" means. Column TYPES are advisory in SQLite, so for every table
+/// except the `version` invariant we check column EXISTENCE (name) only.
 pub fn validate_v2_schema(conn: &Connection) -> Result<(), DbError> {
-    let columns = table_columns(conn, "providers")?;
-    let version_col = columns.iter().find(|c| c.name == "version");
-    match version_col {
-        Some(col) if version_column_is_correct(col) => Ok(()),
-        Some(col) => Err(DbError::Integrity(format!(
-            "providers.version has an incompatible shape: \
-             type={}, notnull={}, default={:?}; \
-             expected INTEGER NOT NULL DEFAULT 1",
-            col.col_type, col.notnull, col.dflt
-        ))),
-        None => Err(DbError::Integrity(
-            "providers.version column is missing in a v2-complete database".into(),
-        )),
+    // 1. _schema_migrations: the migration-state singleton.
+    validate_table_columns(conn, "_schema_migrations", &["schema_version", "migration_complete"])?;
+
+    // 2. preferences: the active-selection singleton.
+    validate_table_columns(
+        conn,
+        "preferences",
+        &["primary_uuid", "parallel_uuids", "fallback_uuid"],
+    )?;
+
+    // 3. providers: uuid/name/endpoint existence + the strict version invariant.
+    let provider_cols = table_columns(conn, "providers").map_err(|e| {
+        DbError::Integrity(format!(
+            "validate_v2_schema: table 'providers' unreadable: {e}"
+        ))
+    })?;
+    if provider_cols.is_empty() {
+        return Err(DbError::Integrity(
+            "validate_v2_schema: required table 'providers' is missing".into(),
+        ));
     }
+    for required in &["uuid", "name", "endpoint"] {
+        if !provider_cols.iter().any(|c| c.name == *required) {
+            return Err(DbError::Integrity(format!(
+                "validate_v2_schema: table 'providers' missing required column '{required}'"
+            )));
+        }
+    }
+    match provider_cols.iter().find(|c| c.name == "version") {
+        Some(col) if version_column_is_correct(col) => {}
+        Some(col) => {
+            return Err(DbError::Integrity(format!(
+                "providers.version has an incompatible shape: \
+                 type={}, notnull={}, default={:?}; \
+                 expected INTEGER NOT NULL DEFAULT 1",
+                col.col_type, col.notnull, col.dflt
+            )))
+        }
+        None => {
+            return Err(DbError::Integrity(
+                "validate_v2_schema: table 'providers' missing required column 'version'".into(),
+            ))
+        }
+    }
+
+    // 4. shortcuts
+    validate_table_columns(conn, "shortcuts", &["action", "keys"])?;
+    // 5. history_sessions
+    validate_table_columns(
+        conn,
+        "history_sessions",
+        &["session_uuid", "source_text_encrypted"],
+    )?;
+    // 6. history_results
+    validate_table_columns(
+        conn,
+        "history_results",
+        &["result_uuid", "session_uuid", "engine_id"],
+    )?;
+    // 7. vocabulary
+    validate_table_columns(conn, "vocabulary", &["item_uuid", "word_encrypted"])?;
+    // 8. dict_packages
+    validate_table_columns(conn, "dict_packages", &["package_id", "name"])?;
+
+    Ok(())
+}
+
+/// Helper for [`validate_v2_schema`]: read a table's columns via
+/// [`table_columns`] and verify every required column NAME is present. Column
+/// types are advisory in SQLite, so only names are checked (the `version`
+/// invariant is enforced separately with its strict shape check). An empty
+/// column list means the table does not exist → [`DbError::Integrity`].
+fn validate_table_columns(
+    conn: &Connection,
+    table: &str,
+    required: &[&str],
+) -> Result<(), DbError> {
+    let columns = table_columns(conn, table).map_err(|e| {
+        DbError::Integrity(format!(
+            "validate_v2_schema: table '{table}' unreadable: {e}"
+        ))
+    })?;
+    if columns.is_empty() {
+        return Err(DbError::Integrity(format!(
+            "validate_v2_schema: required table '{table}' is missing"
+        )));
+    }
+    for col_name in required {
+        if !columns.iter().any(|c| c.name == *col_name) {
+            return Err(DbError::Integrity(format!(
+                "validate_v2_schema: table '{table}' missing required column '{col_name}'"
+            )));
+        }
+    }
+    Ok(())
 }
