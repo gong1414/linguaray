@@ -455,6 +455,20 @@ export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element 
               // success). Other providers' fields are unaffected.
               const isReloading = () => props.reloadingUuid === uuid();
               const canListModels = () => d().provider.capabilities.model_list;
+              // R8-P1: the Test button is blocked while the user has unsaved
+              // drafts — `providerTestConnection` probes the BACKEND's stored
+              // config, so testing with unsaved edits would probe a config the
+              // user no longer sees. The detail memo resolves each draft against
+              // the stored value, so a draft equal to the stored value (a no-op
+              // edit) does NOT count as unsaved.
+              const hasUnsavedDrafts = () => {
+                const p = d().provider;
+                return (
+                  d().nameDraft !== p.name ||
+                  d().endpointDraft !== p.endpoint ||
+                  d().modelDraft !== (p.model ?? "")
+                );
+              };
               const selectOptions = createMemo<SelectOption[]>(() => {
                 const opts = d().modelOptions;
                 if (opts && opts.length > 0) {
@@ -599,15 +613,22 @@ export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element 
 
                   {/* Connection test */}
                   <div class="pc__conn-section">
+                    {/* R8-P1: `providerTestConnection` probes the BACKEND's stored
+                        config, NOT the user's unsaved drafts. `hasUnsavedDrafts`
+                        blocks the Test button and surfaces `saveFirstToTest` so
+                        the user saves before probing. */}
                     <Button
                       variant="secondary"
                       size="sm"
                       loading={d().conn === "testing"}
-                      disabled={locked()}
+                      disabled={locked() || hasUnsavedDrafts()}
                       onClick={() => props.onTestConnection(uuid())}
                     >
                       {t().testConnection}
                     </Button>
+                    <Show when={hasUnsavedDrafts()}>
+                      <span class="pc__save-first-hint">{t().saveFirstToTest}</span>
+                    </Show>
                     <Show when={d().conn && d().conn !== "testing" && d().conn !== "idle"}>
                       <StatusBadge
                         variant={
@@ -766,6 +787,11 @@ const ProviderCenter: Component = () => {
   const [connRequestIdByUuid, setConnRequestIdByUuid] = createSignal<Record<string, number>>({});
   const [modelOptionsByUuid, setModelOptionsByUuid] = createSignal<Record<string, ModelInfo[]>>({});
   const [modelFetchByUuid, setModelFetchByUuid] = createSignal<Record<string, "idle" | "loading" | "error">>({});
+  // R8-P2-1: per-UUID request counter for Fetch Models. Same ABA rationale as
+  // `connRequestIdByUuid`: a stale completion (from an earlier Fetch whose await
+  // resolved after a newer Fetch, OR after a save bumped the config version) is
+  // discarded. Paired with the config-version guard in handleFetchModels.
+  const [modelRequestIdByUuid, setModelRequestIdByUuid] = createSignal<Record<string, number>>({});
 
   // --- Dialogs + toasts ---
   const [deleteConfirmUuid, setDeleteConfirmUuid] = createSignal<string | null>(null);
@@ -1060,8 +1086,15 @@ const ProviderCenter: Component = () => {
       const name = preset.name ?? "Ollama";
       try {
         await providerCreate(preset.templateId, name, preset.endpoint, preset.model ?? undefined);
-        await refreshCore();
-        pushToast("success", t.profileSaved);
+        // R8-P2-2: refreshCore never rejects — it surfaces its own error toast
+        // and returns false. Branch on the boolean so a successful create whose
+        // list-refresh failed does NOT also show a misleading success toast.
+        const ok = await refreshCore();
+        if (ok) {
+          pushToast("success", t.profileSaved);
+        } else {
+          pushToast("warning", t.mutationSuccessReloadFailed);
+        }
       } catch {
         pushToast("destructive", t.saveFailed);
       }
@@ -1074,8 +1107,13 @@ const ProviderCenter: Component = () => {
     await runExclusive(async () => {
       try {
         await providerDuplicate(uuid);
-        await refreshCore();
-        pushToast("success", t.profileSaved);
+        // R8-P2-2: same boolean branch as handleAddPreset.
+        const ok = await refreshCore();
+        if (ok) {
+          pushToast("success", t.profileSaved);
+        } else {
+          pushToast("warning", t.mutationSuccessReloadFailed);
+        }
       } catch {
         pushToast("destructive", t.saveFailed);
       }
@@ -1129,6 +1167,15 @@ const ProviderCenter: Component = () => {
         setSaveByUuid((prev) => ({ ...prev, [uuid]: "saved" }));
         // A successful save clears any prior conflict banner for this provider.
         setSaveConflictUuid((prev) => (prev === uuid ? null : prev));
+        // R8-P1/P2-1: the save bumped the config version, so any in-flight or
+        // completed connection-test / model-fetch result is now for a stale
+        // config. Drop the cached results + counters so a pending completion
+        // (whose await resolves after this save) is discarded by the version
+        // guard, and the UI does not show a stale badge/model list next to the
+        // freshly-saved row.
+        setConnByUuid((prev) => { const n = { ...prev }; delete n[uuid]; return n; });
+        setModelOptionsByUuid((prev) => { const n = { ...prev }; delete n[uuid]; return n; });
+        setModelFetchByUuid((prev) => { const n = { ...prev }; delete n[uuid]; return n; });
         pushToast("success", t.profileSaved);
       } catch (e) {
         // R2-E: a structured stale_version rejection = save conflict. Keep the
@@ -1189,12 +1236,37 @@ const ProviderCenter: Component = () => {
   };
 
   const handleFetchModels = async (uuid: string) => {
+    // R8-P2-1: `providerGetModels` reads the BACKEND's stored config. Capture
+    // the config signature at fetch start so a completion that lands after the
+    // config changed (a save bumped the version, or the endpoint/model drifted)
+    // is discarded instead of writing a model list for a config the user no
+    // longer sees.
+    const provider = providers().find((p) => p.uuid === uuid);
+    if (!provider) return;
+    const configVersion = provider.version;
+    const configEndpoint = provider.endpoint;
+    const configModel = provider.model ?? "";
+    // R8-P2-1: bump the request counter so a stale completion (from an earlier
+    // Fetch whose await resolved after a newer Fetch started) is discarded.
+    const requestId = (modelRequestIdByUuid()[uuid] ?? 0) + 1;
+    setModelRequestIdByUuid((prev) => ({ ...prev, [uuid]: requestId }));
     setModelFetchByUuid((prev) => ({ ...prev, [uuid]: "loading" }));
     try {
       const models = await providerGetModels(uuid);
+      // Guard 1: a newer Fetch superseded this one.
+      if (modelRequestIdByUuid()[uuid] !== requestId) return;
+      // Guard 2: provider still exists + config unchanged since fetch start.
+      const current = providers().find((p) => p.uuid === uuid);
+      if (!current) return;
+      if (current.version !== configVersion) return;
+      if (current.endpoint !== configEndpoint) return;
+      if ((current.model ?? "") !== configModel) return;
       setModelOptionsByUuid((prev) => ({ ...prev, [uuid]: models }));
       setModelFetchByUuid((prev) => ({ ...prev, [uuid]: "idle" }));
-    } catch (e) {
+    } catch {
+      if (modelRequestIdByUuid()[uuid] !== requestId) return;
+      const current = providers().find((p) => p.uuid === uuid);
+      if (!current || current.version !== configVersion) return;
       setModelFetchByUuid((prev) => ({ ...prev, [uuid]: "error" }));
       // Surface the failure so the user knows why no dropdown appeared.
       pushToast("warning", t.modelFetchError);
@@ -1202,6 +1274,17 @@ const ProviderCenter: Component = () => {
   };
 
   const handleTestConnection = async (uuid: string) => {
+    // R8-P1: `providerTestConnection` probes the BACKEND's stored config, NOT
+    // the user's unsaved drafts. Capture the config signature at test start so
+    // a completion that lands AFTER the config changed (a save bumped the
+    // version, or the endpoint/model drifted) is discarded — otherwise a stale
+    // "Connected" from the old endpoint would mislead the user into trusting a
+    // config they already replaced.
+    const provider = providers().find((p) => p.uuid === uuid);
+    if (!provider) return;
+    const configVersion = provider.version;
+    const configEndpoint = provider.endpoint;
+    const configModel = provider.model ?? "";
     // R6-P1-3: bump the request counter so a stale completion (from an earlier
     // Test click whose await resolved after a newer Test) is discarded.
     const requestId = (connRequestIdByUuid()[uuid] ?? 0) + 1;
@@ -1209,11 +1292,19 @@ const ProviderCenter: Component = () => {
     setConnByUuid((prev) => ({ ...prev, [uuid]: "testing" }));
     try {
       const result = await providerTestConnection(uuid);
-      // Only apply if this is still the latest request for this UUID.
+      // Guard 1: a newer Test superseded this one.
       if (connRequestIdByUuid()[uuid] !== requestId) return;
+      // Guard 2: provider still exists + config unchanged since test start.
+      const current = providers().find((p) => p.uuid === uuid);
+      if (!current) return;
+      if (current.version !== configVersion) return;
+      if (current.endpoint !== configEndpoint) return;
+      if ((current.model ?? "") !== configModel) return;
       setConnByUuid((prev) => ({ ...prev, [uuid]: result }));
-    } catch (e) {
+    } catch {
       if (connRequestIdByUuid()[uuid] !== requestId) return;
+      const current = providers().find((p) => p.uuid === uuid);
+      if (!current || current.version !== configVersion) return;
       setConnByUuid((prev) => ({
         ...prev,
         [uuid]: { ok: false, message: t.connectionFailed },
@@ -1231,7 +1322,18 @@ const ProviderCenter: Component = () => {
         setDeleteError(false);
         setDeleteFailedUuid(null);
         setDeleteConfirmUuid(null);
-        await refreshCore();
+        // R8-P2-2: refreshCore never rejects — branch on its boolean. The row
+        // was deleted on the backend; only the list refresh can fail. On
+        // failure the provider list is in an unknown state, so the DOM-dependent
+        // focus restoration (querySelector for the next row's Edit button) is
+        // UNSAFE — skip it. refreshCore already set loadError + pushed its own
+        // error toast; add the accurate "saved but reload failed" warning so
+        // the user knows the delete went through and Reload will reconcile.
+        const ok = await refreshCore();
+        if (!ok) {
+          pushToast("warning", t.mutationSuccessReloadFailed);
+          return;
+        }
         // R6-P1-3: after a successful delete the trigger button's row is removed
         // by refreshCore(). Kobalte's Dialog onCloseAutoFocus tried to restore
         // focus to the trigger BEFORE refresh detached it, so focus is now lost
@@ -1436,12 +1538,25 @@ const ProviderCenter: Component = () => {
           return { ...prev, [uuid]: value };
         })
       }
-      onEndpointInput={(uuid, value) =>
-        setEndpointDraft((prev) => ({ ...prev, [uuid]: value }))
-      }
-      onModelInput={(uuid, value) =>
-        setModelDraftByUuid((prev) => ({ ...prev, [uuid]: value }))
-      }
+      onEndpointInput={(uuid, value) => {
+        setEndpointDraft((prev) => ({ ...prev, [uuid]: value }));
+        // R8-P1/P2-1: an endpoint draft means the displayed config no longer
+        // matches what was last tested / fetched against. Drop the cached
+        // connection + model results so a stale "Connected" badge or model list
+        // is not shown next to the edited endpoint. (A pending completion is
+        // still discarded by the version guard once the draft is saved.)
+        setConnByUuid((prev) => { const n = { ...prev }; delete n[uuid]; return n; });
+        setModelOptionsByUuid((prev) => { const n = { ...prev }; delete n[uuid]; return n; });
+        setModelFetchByUuid((prev) => { const n = { ...prev }; delete n[uuid]; return n; });
+      }}
+      onModelInput={(uuid, value) => {
+        setModelDraftByUuid((prev) => ({ ...prev, [uuid]: value }));
+        // R8-P1/P2-1: same rationale as onEndpointInput — a model draft
+        // invalidates the last-tested / last-fetched config signature.
+        setConnByUuid((prev) => { const n = { ...prev }; delete n[uuid]; return n; });
+        setModelOptionsByUuid((prev) => { const n = { ...prev }; delete n[uuid]; return n; });
+        setModelFetchByUuid((prev) => { const n = { ...prev }; delete n[uuid]; return n; });
+      }}
       onModelChange={(uuid, value) =>
         // Idempotent: return the SAME `prev` reference when the value is
         // unchanged. The Kobalte Select re-emits `onChange` with the current

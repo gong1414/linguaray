@@ -226,6 +226,13 @@
   display: flex;
   align-items: center;
   gap: var(--space-md, 16px);
+  flex-wrap: wrap;
+}
+
+/* R8-P1: hint shown next to a Test button disabled by unsaved drafts. */
+.pc__save-first-hint {
+  font-size: var(--text-sm, 0.85rem);
+  color: var(--color-fg-muted, #64748b);
 }
 
 /* Balance — R3a limitation: muted TODO note, no fetch button. */

@@ -145,6 +145,11 @@ type ProviderCopy = {
   testing: string;
   connectionOk: string;
   connectionFailed: string;
+  /** R8-P1: hint shown next to a disabled Test button when unsaved drafts
+   *  exist. The Test runs against the BACKEND's stored config, so testing with
+   *  unsaved edits would probe a config the user no longer sees — block it and
+   *  tell them to save first. */
+  saveFirstToTest: string;
   keySaved: string;
   profileSaved: string;
   keyMissing: string;
@@ -155,6 +160,12 @@ type ProviderCopy = {
   saveProfile: string;
   saving: string;
   saveFailed: string;
+  /** R8-P2-2: the mutation (create/duplicate/delete) succeeded on the backend,
+   *  but the post-mutation list refresh failed. The destructive `saveFailed`
+   *  toast from refreshCore already surfaced the reload failure; this warning
+   *  adds the accurate context that the write itself went through, so the user
+   *  knows to click Reload rather than re-issue the mutation. */
+  mutationSuccessReloadFailed: string;
   /** R2-E: save-conflict banner — the provider was modified elsewhere and the
    *  optimistic-lock CAS rejected this save. Paired with a Reload button. */
   saveConflict: string;
@@ -274,6 +285,7 @@ const EN: SettingsCopy = {
     testing: "Testing…",
     connectionOk: "Connected",
     connectionFailed: "Connection failed",
+    saveFirstToTest: "Save changes before testing",
     keySaved: "Key saved",
     profileSaved: "Profile saved",
     keyMissing: "Key missing",
@@ -284,6 +296,7 @@ const EN: SettingsCopy = {
     saveProfile: "Save profile",
     saving: "Saving…",
     saveFailed: "Failed to save: network error",
+    mutationSuccessReloadFailed: "Saved, but the list could not be refreshed. Click Reload to retry.",
     saveConflict: "This provider was modified elsewhere",
     keyAlreadyExists: "A provider with this name already exists",
     nameExists: "Another provider already uses this name",
@@ -405,6 +418,7 @@ const ZH: SettingsCopy = {
     testing: "测试中…",
     connectionOk: "已连接",
     connectionFailed: "连接失败",
+    saveFirstToTest: "请先保存更改再测试",
     keySaved: "密钥已保存",
     profileSaved: "配置已保存",
     keyMissing: "缺少密钥",
@@ -415,6 +429,7 @@ const ZH: SettingsCopy = {
     saveProfile: "保存配置",
     saving: "保存中…",
     saveFailed: "保存失败：网络错误",
+    mutationSuccessReloadFailed: "已保存，但列表刷新失败。点击重新加载重试。",
     saveConflict: "此服务商已在别处修改",
     keyAlreadyExists: "该名称的服务商已存在",
     nameExists: "该名称已被其他提供商使用",
