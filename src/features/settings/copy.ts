@@ -170,6 +170,10 @@ type ProviderCopy = {
   /** Retry button on the cold-load failure banner. */
   retry: string;
   reload: string;
+  /** R6-P1-1: accessible label for the Reload button's spinner while a Reload
+   *  (global mutation lock) is in-flight. Shown while all sidebar mutations are
+   *  blocked. */
+  reloading: string;
   cancel: string;
   deleteConfirmTitle: string;
   deleteConfirmMsg: string;
@@ -286,6 +290,7 @@ const EN: SettingsCopy = {
     loadFailed: "Provider load failed",
     retry: "Retry",
     reload: "Reload",
+    reloading: "Reloading…",
     cancel: "Cancel",
     deleteConfirmTitle: "Delete provider?",
     deleteConfirmMsg: "History references are preserved.",
@@ -416,6 +421,7 @@ const ZH: SettingsCopy = {
     loadFailed: "加载失败",
     retry: "重试",
     reload: "重新加载",
+    reloading: "正在重新加载…",
     cancel: "取消",
     deleteConfirmTitle: "删除服务商？",
     deleteConfirmMsg: "历史引用将被保留。",

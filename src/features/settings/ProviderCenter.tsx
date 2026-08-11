@@ -143,6 +143,11 @@ export type ProviderCenterViewProps = {
   // detail-panel fields for that UUID are disabled (prevents the user from
   // typing drafts that the in-flight refresh would unconditionally discard).
   reloadingUuid: string | null;
+  // R6-P1-1: global mutation lock — true while ANY refresh() is in-flight
+  // (initial load, Reload, post-create/delete/duplicate re-fetch). While true,
+  // ALL sidebar action buttons for ALL providers are disabled (prevents a
+  // concurrent mutation from being overwritten by the refresh's setProviders).
+  globalMutationLock: boolean;
   presets: Preset[];
   detail: ProviderDetailState | null;
   // dialogs + toasts
@@ -192,6 +197,11 @@ export type ProviderCenterViewProps = {
 
 export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element {
   const t = () => props.t;
+
+  // R6-P1-1: while the global mutation lock is held (a refresh is in-flight),
+  // every sidebar action for EVERY provider is disabled. Composed with the
+  // per-row deleting state below.
+  const locked = () => props.globalMutationLock;
 
   const sortedProviders = createMemo(() =>
     [...props.providers].sort((a, b) => a.sort_order - b.sort_order),
@@ -265,6 +275,9 @@ export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element 
                   // role is reactive: re-evaluated when props.selection changes.
                   const role = () => roleFor(p.uuid);
                   const isDeleting = () => props.deletingUuid === p.uuid;
+                  // R6-P1-1: disable the row + every sibling icon button while the
+                  // global mutation lock is held OR this row is being deleted.
+                  const rowDisabled = () => isDeleting() || locked();
                   return (
                     <li class="pc__provider-row-wrapper" data-status={isDeleting() ? "deleting" : p.status}>
                       <div class="pc__provider-row-main">
@@ -275,7 +288,7 @@ export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element 
                           role={role()}
                           enabled={p.enabled}
                           active={props.selectedUuid === p.uuid}
-                          disabled={isDeleting()}
+                          disabled={rowDisabled()}
                           labels={rowLabelsFor(p.name)}
                           onToggle={(enabled) => props.onToggle(p.uuid, enabled)}
                           onEdit={() => props.onEdit(p.uuid)}
@@ -294,7 +307,7 @@ export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element 
                                 class="pc__icon-btn"
                                 aria-label={t().setPrimary}
                                 title={t().setPrimary}
-                                disabled={isDeleting()}
+                                disabled={rowDisabled()}
                                 onClick={() => props.onSetPrimary(p.uuid)}
                               >
                                 <Star size={14} />
@@ -306,7 +319,7 @@ export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element 
                                 class="pc__icon-btn"
                                 aria-label={t().removeParallel}
                                 title={t().removeParallel}
-                                disabled={isDeleting()}
+                                disabled={rowDisabled()}
                                 onClick={() => props.onRemoveParallel(p.uuid)}
                               >
                                 <Layers size={14} />
@@ -318,7 +331,7 @@ export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element 
                                 class="pc__icon-btn"
                                 aria-label={t().addParallel}
                                 title={t().addParallel}
-                                disabled={isDeleting()}
+                                disabled={rowDisabled()}
                                 onClick={(e) =>
                                   props.onAddParallel(
                                     p.uuid,
@@ -335,7 +348,7 @@ export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element 
                                 class="pc__icon-btn"
                                 aria-label={t().setFallback}
                                 title={t().setFallback}
-                                disabled={isDeleting()}
+                                disabled={rowDisabled()}
                                 onClick={() => props.onSetFallback(p.uuid)}
                               >
                                 <CornerDownLeft size={14} />
@@ -348,7 +361,7 @@ export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element 
                             class="pc__icon-btn"
                             aria-label={t().duplicate}
                             title={t().duplicate}
-                            disabled={isDeleting()}
+                            disabled={rowDisabled()}
                             onClick={() => props.onDuplicate(p.uuid)}
                           >
                             <Copy size={14} />
@@ -359,7 +372,7 @@ export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element 
                             class="pc__icon-btn"
                             aria-label={t().moveUp}
                             title={t().moveUp}
-                            disabled={isDeleting()}
+                            disabled={rowDisabled()}
                             onClick={() => props.onMoveUp(p.uuid)}
                           >
                             <ArrowUp size={14} />
@@ -369,7 +382,7 @@ export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element 
                             class="pc__icon-btn"
                             aria-label={t().moveDown}
                             title={t().moveDown}
-                            disabled={isDeleting()}
+                            disabled={rowDisabled()}
                             onClick={() => props.onMoveDown(p.uuid)}
                           >
                             <ArrowDown size={14} />
@@ -407,6 +420,7 @@ export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element 
                 <button
                   type="button"
                   class="pc__preset"
+                  disabled={locked()}
                   onClick={() => props.onAddPreset(preset)}
                 >
                   <Plus size={12} />
@@ -460,6 +474,7 @@ export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element 
                         size="sm"
                         loading={isReloading()}
                         disabled={isReloading()}
+                        loadingLabel={t().reloading}
                         onClick={() => props.onResolveSaveConflict(uuid())}
                       >
                         {t().reload}
@@ -759,6 +774,13 @@ const ProviderCenter: Component = () => {
   // typing drafts that the in-flight refresh would unconditionally discard on
   // success) and a second Reload click is blocked (re-entrancy guard).
   const [reloadingUuid, setReloadingUuid] = createSignal<string | null>(null);
+  // R6-P1-1: global mutation lock. While ANY refresh() is in-flight (initial
+  // load, Reload, post-create/delete/duplicate re-fetch), ALL provider mutations
+  // are blocked. This prevents the race where a concurrent mutation's
+  // setProviders(...) is overwritten when the refresh's setProviders(list)
+  // resolves. `reloadingUuid` (above) only disables ONE provider's detail panel;
+  // this lock disables every sidebar action for EVERY provider.
+  const [globalMutationLock, setGlobalMutationLock] = createSignal(false);
   const [consentOpen, setConsentOpen] = createSignal(false);
   const [pendingParallelUuid, setPendingParallelUuid] = createSignal<string | null>(null);
   const [consentActualScope, setConsentActualScope] = createSignal<string | null>(null);
@@ -785,6 +807,11 @@ const ProviderCenter: Component = () => {
    *  callers that need to react to failure — e.g. the save-conflict Reload —
    *  branch on the boolean instead of try/catch, since refresh never rejects). */
   const refresh = async (): Promise<boolean> => {
+    // R6-P1-1: acquire the global mutation lock for the full duration of the
+    // await. While held, every sidebar mutation handler early-returns so a
+    // concurrent setProviders(...) from a save/toggle/delete/reorder cannot be
+    // overwritten by this refresh's setProviders(list) when it resolves.
+    setGlobalMutationLock(true);
     setSelectionLoading(true);
     setSelectionError(false);
     try {
@@ -807,6 +834,7 @@ const ProviderCenter: Component = () => {
       return false;
     } finally {
       setSelectionLoading(false);
+      setGlobalMutationLock(false);
     }
   };
 
@@ -822,6 +850,7 @@ const ProviderCenter: Component = () => {
 
   /** Toggle: optimistic flip → IPC → revert + toast on error. */
   const handleToggle = async (uuid: string, enabled: boolean) => {
+    if (globalMutationLock()) return; // R6-P1-1
     const prev = providers();
     const next = prev.map((p) => (p.uuid === uuid ? { ...p, enabled } : p));
     setProviders(next);
@@ -854,6 +883,7 @@ const ProviderCenter: Component = () => {
     // Fail-closed: never call providerSetActive while the cold-load read is
     // in-flight or has failed (prevents overwriting a stored selection we
     // failed to read).
+    if (globalMutationLock()) return; // R6-P1-1
     if (selectionLoading() || selectionError()) return;
     const candidate = buildCandidatePrimary(uuid);
     try {
@@ -872,6 +902,7 @@ const ProviderCenter: Component = () => {
   };
 
   const handleAddParallel = (uuid: string, triggerEl?: HTMLElement) => {
+    if (globalMutationLock()) return; // R6-P1-1
     if (selectionLoading() || selectionError()) return;
     if (triggerEl) consentTriggerRef.current = triggerEl;
     const candidate: ActiveSelection = {
@@ -902,6 +933,7 @@ const ProviderCenter: Component = () => {
   const confirmConsent = async () => {
     const uuid = pendingParallelUuid();
     if (!uuid) return;
+    if (globalMutationLock()) return; // R6-P1-1
     if (selectionLoading() || selectionError()) return;
     const candidate: ActiveSelection = {
       ...selection(),
@@ -940,6 +972,7 @@ const ProviderCenter: Component = () => {
   };
 
   const handleSetFallback = async (uuid: string) => {
+    if (globalMutationLock()) return; // R6-P1-1
     if (selectionLoading() || selectionError()) return;
     const prev = selection();
     const candidate: ActiveSelection = {
@@ -960,6 +993,7 @@ const ProviderCenter: Component = () => {
   };
 
   const handleRemoveParallel = async (uuid: string) => {
+    if (globalMutationLock()) return; // R6-P1-1
     if (selectionLoading() || selectionError()) return;
     const candidate: ActiveSelection = {
       ...selection(),
@@ -978,6 +1012,7 @@ const ProviderCenter: Component = () => {
   };
 
   const handleAddPreset = async (preset: Preset) => {
+    if (globalMutationLock()) return; // R6-P1-1
     const name = preset.name ?? "Ollama";
     try {
       await providerCreate(preset.templateId, name, preset.endpoint, preset.model ?? undefined);
@@ -991,6 +1026,7 @@ const ProviderCenter: Component = () => {
   /** Duplicate a provider: new UUID, new secret_ref, keyless. Re-fetches the
    *  list so the clone appears. */
   const handleDuplicate = async (uuid: string) => {
+    if (globalMutationLock()) return; // R6-P1-1
     try {
       await providerDuplicate(uuid);
       await refresh();
@@ -1003,6 +1039,7 @@ const ProviderCenter: Component = () => {
   /** Save profile: validate endpoint locally (reactive epError already shown),
    *  then IPC. Aborts on invalid endpoint or a duplicate-name conflict. */
   const handleSaveProfile = async (uuid: string) => {
+    if (globalMutationLock()) return; // R6-P1-1
     const draft = endpointDraft()[uuid];
     const modelDraft = modelDraftByUuid()[uuid];
     const nameDraft = nameDraftByUuid()[uuid];
@@ -1068,6 +1105,7 @@ const ProviderCenter: Component = () => {
    * re-read from the input after submit — the input stays cleared.
    */
   const handleSaveKey = async (uuid: string) => {
+    if (globalMutationLock()) return; // R6-P1-1
     const key = keyInputByUuid()[uuid];
     // Clear IMMEDIATELY — never readable back, never in DOM after submit.
     setKeyInputByUuid((prev) => {
@@ -1131,6 +1169,7 @@ const ProviderCenter: Component = () => {
   const confirmDelete = async () => {
     const uuid = deleteConfirmUuid() ?? deleteFailedUuid();
     if (!uuid) return;
+    if (globalMutationLock()) return; // R6-P1-1
     setDeletingUuid(uuid);
     try {
       await providerDelete(uuid);
@@ -1194,6 +1233,7 @@ const ProviderCenter: Component = () => {
 
   /** Reorder: optimistic local swap → IPC → revert + toast on error. */
   const moveProvider = async (uuid: string, dir: "up" | "down") => {
+    if (globalMutationLock()) return; // R6-P1-1
     const ordered = [...providers()].sort((a, b) => a.sort_order - b.sort_order);
     const idx = ordered.findIndex((p) => p.uuid === uuid);
     if (idx < 0) return;
@@ -1278,6 +1318,7 @@ const ProviderCenter: Component = () => {
       selectionLoading={selectionLoading()}
       deletingUuid={deletingUuid()}
       reloadingUuid={reloadingUuid()}
+      globalMutationLock={globalMutationLock()}
       presets={PRESETS}
       detail={detail()}
       deleteConfirmUuid={deleteConfirmUuid()}

@@ -1427,9 +1427,10 @@ describe("ProviderCenter (Surface 05)", () => {
     expect((screen.getByLabelText("Model") as HTMLInputElement).disabled).toBe(false);
   });
 
-  it("u1 Reload pending — u2 conflict appears — u1 completes; u2 conflict survives (R5-P1-1)", async () => {
+  it("u1 Reload pending — global lock blocks u2 mutations, u1 conflict clears on completion (R5-P1-1/R6-P1-1)", async () => {
     let reloadPending = false;
     let resolveReload: () => void = () => {};
+    let updateCount = 0;
     routeInvoke({
       ...DEFAULT_ROUTES,
       provider_list: () => [
@@ -1438,6 +1439,7 @@ describe("ProviderCenter (Surface 05)", () => {
       ],
       key_status: () => ({ "provider/u1": true, "provider/u2": true }),
       provider_update: () => {
+        updateCount += 1;
         throw Object.assign(new Error("stale"), {
           error: "stale_version",
           actual_version: 2,
@@ -1464,32 +1466,30 @@ describe("ProviderCenter (Surface 05)", () => {
     await waitFor(() =>
       expect(screen.getAllByText("This provider was modified elsewhere").length).toBeGreaterThanOrEqual(1),
     );
+    expect(updateCount).toBe(1);
 
-    // Click Reload on u1 — refresh hangs (deferred selection).
+    // Click Reload on u1 — refresh hangs (deferred selection). The global
+    // mutation lock is now held (R6-P1-1).
     reloadPending = true;
     fireEvent.click(screen.getByText("Reload"));
     await flush();
 
-    // While u1's reload is pending, switch to u2 and trigger u2's own conflict.
-    // (u2's fields are NOT disabled — reloadingUuid is u1, not u2.)
-    fireEvent.click(screen.getByLabelText("Edit ProvB"));
-    await flush();
-    const ep2 = screen.getByLabelText("Endpoint") as HTMLInputElement;
-    fireEvent.input(ep2, { target: { value: "https://new-b.example.com" } });
-    await flush();
-    fireEvent.click(screen.getByText("Save profile"));
+    // R6-P1-1: while the lock is held, u2's sidebar actions are ALL disabled,
+    // so the old race (u2's conflict appearing during u1's reload) is now
+    // architecturally impossible. u2's Edit button is disabled.
     await waitFor(() =>
-      expect(screen.getAllByText("This provider was modified elsewhere").length).toBeGreaterThanOrEqual(1),
+      expect((screen.getByLabelText("Edit ProvB") as HTMLButtonElement).disabled).toBe(true),
     );
+    // No additional provider_update fired during the locked window.
+    expect(updateCount).toBe(1);
 
-    // Resolve u1's pending reload.
+    // Resolve u1's pending reload → lock released, conflict cleared (conditional
+    // on saveConflictUuid === u1, which it still is since no other mutation
+    // could run during the lock).
     resolveReload();
     await flush();
-
-    // u2's conflict banner SURVIVES — setSaveConflictUuid was conditional on
-    // uuid===u1, so u2's conflict (set during the reload) was not clobbered.
     await waitFor(() =>
-      expect(screen.getAllByText("This provider was modified elsewhere").length).toBeGreaterThanOrEqual(1),
+      expect(screen.queryByText("This provider was modified elsewhere")).toBeNull(),
     );
   });
 
@@ -1626,5 +1626,202 @@ describe("ProviderCenter (Surface 05)", () => {
     await waitFor(() =>
       expect((screen.getByLabelText("Endpoint") as HTMLInputElement).value).toBe("https://remote.example.com"),
     );
+  });
+
+  // ─── R6-P1-1: Global mutation lock during Reload ──────────────────────────
+
+  it("Reload pending blocks concurrent mutations — provider_update/provider_toggle NOT called (R6-P1-1)", async () => {
+    let reloadPending = false;
+    let resolveReload: () => void = () => {};
+    let updateCount = 0;
+    let toggleCount = 0;
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => [
+        profile({ uuid: "u1", name: "ProvA", sort_order: 0, secret_ref: "provider/u1" }),
+        profile({ uuid: "u2", name: "ProvB", sort_order: 1, secret_ref: "provider/u2" }),
+      ],
+      key_status: () => ({ "provider/u1": true, "provider/u2": true }),
+      provider_update: () => {
+        updateCount += 1;
+        throw Object.assign(new Error("stale"), {
+          error: "stale_version",
+          actual_version: 2,
+        });
+      },
+      provider_toggle: () => {
+        toggleCount += 1;
+      },
+      provider_get_active_selection: () =>
+        reloadPending
+          ? new Promise((res) => {
+              resolveReload = () =>
+                res({ primary: null, parallel: [], fallback: null });
+            })
+          : { primary: null, parallel: [], fallback: null },
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("ProvA")).toBeTruthy());
+
+    // Trigger u1's save-conflict banner.
+    fireEvent.click(screen.getByLabelText("Edit ProvA"));
+    await flush();
+    const ep = screen.getByLabelText("Endpoint") as HTMLInputElement;
+    fireEvent.input(ep, { target: { value: "https://new-a.example.com" } });
+    await flush();
+    fireEvent.click(screen.getByText("Save profile"));
+    await waitFor(() =>
+      expect(screen.getAllByText("This provider was modified elsewhere").length).toBeGreaterThanOrEqual(1),
+    );
+    expect(updateCount).toBe(1); // the stale save
+
+    // Click Reload → refresh hangs (deferred selection). globalMutationLock is true.
+    reloadPending = true;
+    fireEvent.click(screen.getByText("Reload"));
+    await flush();
+
+    // While the lock is held: NO additional mutations can fire. The sidebar
+    // buttons are all disabled (rowDisabled), so clicking them is a no-op. The
+    // handler guards also early-return. Either way, no IPC calls land.
+    // (provider_toggle has 0 calls because the toggle switches are disabled.)
+    await flush();
+    expect(updateCount).toBe(1); // unchanged — no save during the lock
+    expect(toggleCount).toBe(0); // no toggle during the lock
+
+    // Resolve the reload → lock released.
+    resolveReload();
+    await flush();
+    await waitFor(() =>
+      expect(screen.queryByText("This provider was modified elsewhere")).toBeNull(),
+    );
+
+    // After the lock: mutations work again. Click u2's toggle → provider_toggle fires.
+    const switches = screen.getAllByRole("switch");
+    // u2 is the second row → second switch (both start enabled=true).
+    fireEvent.click(switches[1]);
+    await whenCalledWith("provider_toggle");
+    expect(toggleCount).toBe(1);
+  });
+
+  it("Reload pending disables ALL of u2's sidebar action buttons (R6-P1-1)", async () => {
+    let reloadPending = false;
+    let resolveReload: () => void = () => {};
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => [
+        profile({ uuid: "u1", name: "ProvA", sort_order: 0, secret_ref: "provider/u1" }),
+        profile({ uuid: "u2", name: "ProvB", sort_order: 1, secret_ref: "provider/u2" }),
+      ],
+      key_status: () => ({ "provider/u1": true, "provider/u2": true }),
+      provider_update: () => {
+        throw Object.assign(new Error("stale"), {
+          error: "stale_version",
+          actual_version: 2,
+        });
+      },
+      provider_get_active_selection: () =>
+        reloadPending
+          ? new Promise((res) => {
+              resolveReload = () =>
+                res({ primary: null, parallel: [], fallback: null });
+            })
+          : { primary: null, parallel: [], fallback: null },
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("ProvA")).toBeTruthy());
+
+    // Trigger u1's save-conflict → Reload → lock pending.
+    fireEvent.click(screen.getByLabelText("Edit ProvA"));
+    await flush();
+    const ep = screen.getByLabelText("Endpoint") as HTMLInputElement;
+    fireEvent.input(ep, { target: { value: "https://new-a.example.com" } });
+    await flush();
+    fireEvent.click(screen.getByText("Save profile"));
+    await waitFor(() =>
+      expect(screen.getAllByText("This provider was modified elsewhere").length).toBeGreaterThanOrEqual(1),
+    );
+
+    // Before the lock: u2's sidebar buttons are enabled.
+    const toggleBefore = screen.getAllByRole("switch")[1] as HTMLInputElement;
+    const editBefore = screen.getByLabelText("Edit ProvB") as HTMLButtonElement;
+    const deleteBefore = screen.getByLabelText("Delete ProvB") as HTMLButtonElement;
+    const moveUpBefore = screen.getAllByLabelText("Move up")[1] as HTMLButtonElement;
+    expect(toggleBefore.disabled).toBe(false);
+    expect(editBefore.disabled).toBe(false);
+    expect(deleteBefore.disabled).toBe(false);
+    expect(moveUpBefore.disabled).toBe(false);
+
+    // Click Reload → lock acquired.
+    reloadPending = true;
+    fireEvent.click(screen.getByText("Reload"));
+    await flush();
+
+    // While the lock is held: u2's sidebar buttons are ALL disabled.
+    await waitFor(() => expect((screen.getAllByRole("switch")[1] as HTMLInputElement).disabled).toBe(true));
+    expect((screen.getByLabelText("Edit ProvB") as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByLabelText("Delete ProvB") as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getAllByLabelText("Move up")[1] as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getAllByLabelText("Move down")[1] as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getAllByLabelText("Duplicate")[1] as HTMLButtonElement).disabled).toBe(true);
+
+    // Resolve the reload → buttons re-enable.
+    resolveReload();
+    await flush();
+    await waitFor(() =>
+      expect((screen.getAllByRole("switch")[1] as HTMLInputElement).disabled).toBe(false),
+    );
+    expect((screen.getByLabelText("Edit ProvB") as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("Reload loadingLabel is localized (zh: 正在重新加载…) (R6-P1-1)", async () => {
+    localeMock.current = "zh";
+    let reloadPending = false;
+    let resolveReload: () => void = () => {};
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => [profile({ uuid: "u1", name: "测试引擎", secret_ref: "provider/u1" })],
+      key_status: () => ({ "provider/u1": true }),
+      provider_update: () => {
+        throw Object.assign(new Error("stale"), {
+          error: "stale_version",
+          actual_version: 2,
+        });
+      },
+      provider_get_active_selection: () =>
+        reloadPending
+          ? new Promise((res) => {
+              resolveReload = () =>
+                res({ primary: null, parallel: [], fallback: null });
+            })
+          : { primary: null, parallel: [], fallback: null },
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("测试引擎")).toBeTruthy());
+
+    // Trigger the save-conflict banner (zh copy).
+    fireEvent.click(screen.getByLabelText("编辑测试引擎"));
+    await flush();
+    const ep = screen.getByLabelText("端点") as HTMLInputElement;
+    fireEvent.input(ep, { target: { value: "https://new.example.com" } });
+    await flush();
+    fireEvent.click(screen.getByText("保存配置"));
+    await waitFor(() =>
+      expect(screen.getAllByText("此服务商已在别处修改").length).toBeGreaterThanOrEqual(1),
+    );
+
+    // Click Reload (zh: 重新加载) → spinner shows the localized loadingLabel.
+    reloadPending = true;
+    fireEvent.click(screen.getByText("重新加载"));
+    await flush();
+
+    // The spinner's accessible label is the zh "正在重新加载…" (not the
+    // English fallback "Loading…" or the generic saving label).
+    await waitFor(() =>
+      expect(screen.getAllByText("正在重新加载…").length).toBeGreaterThanOrEqual(1),
+    );
+
+    // Resolve to settle the pending promise.
+    resolveReload();
+    await flush();
   });
 });
