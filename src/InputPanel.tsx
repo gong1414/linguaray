@@ -67,6 +67,7 @@ export function InputPanelView(props: InputPanelViewProps): JSX.Element {
       <h2 class="input-title">{t("input.title")}</h2>
       <TextArea
         ref={props.textareaRef}
+        label={t("input.title")}
         rows={4}
         placeholder={t("input.placeholder")}
         value={props.text}
