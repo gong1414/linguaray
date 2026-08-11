@@ -2817,10 +2817,19 @@ async fn read_primary_status(app: &tauri::AppHandle) -> String {
 ///
 /// rev-5-4: refresh the EXISTING `"main-tray"` in place — rebuild the menu +
 /// re-set the status tooltip via `app.tray_by_id("main-tray")`. Rebuilding from
-/// scratch via `build_tray` would register a DUPLICATE tray icon (Tauri panics
-/// on duplicate id). Instead, fetch the existing tray and update its menu +
-/// tooltip. If the tray does not exist yet (first build), fall back to
-/// `build_tray`. Errors are PROPAGATED so the wrapper can log them.
+/// scratch via the setup-time builder would register a DUPLICATE tray icon
+/// (Tauri panics on duplicate id). Instead, fetch the existing tray and update
+/// its menu + tooltip. Errors are PROPAGATED so the wrapper can log them.
+///
+/// P1-2 (R2-A): if the tray does not exist yet, this is a NO-OP. The
+/// setup-time first-build helper nests a single legitimate blocking drive of the
+/// runtime, but that is safe ONLY in `setup()` (sync, on the main thread, before
+/// the runtime serves commands). Calling it from here — an `async fn` awaited on
+/// a runtime worker thread — would nest that blocking drive inside the async
+/// runtime and risk a panic ("Cannot start a runtime from within a runtime").
+/// The tray is built exactly once in `setup()`; a refresh finding no tray has
+/// nothing to update, so it returns `Ok(())`. The tray will be present on the
+/// next launch / setup run.
 pub async fn refresh_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
     if let Some(tray) = app.tray_by_id("main-tray") {
         let menu = build_tray_menu(app).await?;
@@ -2828,7 +2837,12 @@ pub async fn refresh_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
         tray.set_tooltip(Some(&read_primary_status(app).await))?;
         Ok(())
     } else {
-        build_tray(app)
+        // P1-2: Do NOT reach for the setup-time tray builder here — it nests a
+        // runtime blocking drive that is unsafe inside this async context. The
+        // tray is built once in setup(); if it is absent, there is nothing to
+        // refresh yet.
+        log::debug!("refresh_tray: main-tray not found, skipping refresh");
+        Ok(())
     }
 }
 
