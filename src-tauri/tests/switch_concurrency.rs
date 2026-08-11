@@ -50,9 +50,13 @@ fn rapid_switch_a_then_b_results_in_b() {
         .expect("create B");
 
     // Switch to A, then immediately switch to B (simulating rapid clicks).
-    // begin_switch bumps the revision for each call; the DB write checks it.
-    linguaray_lib::handle_switch_provider_core(&app_state, &p1.uuid).expect("switch A");
-    linguaray_lib::handle_switch_provider_core(&app_state, &p2.uuid).expect("switch B");
+    // R2-B: the revision is now allocated by the SYNC caller BEFORE the core
+    // (mirroring the menu callback), so revision order = click order; the DB
+    // write checks the supplied rev.
+    let rev_a = app_state.tray.lock().begin_switch();
+    linguaray_lib::handle_switch_provider_core(&app_state, &p1.uuid, rev_a).expect("switch A");
+    let rev_b = app_state.tray.lock().begin_switch();
+    linguaray_lib::handle_switch_provider_core(&app_state, &p2.uuid, rev_b).expect("switch B");
 
     let selection = db_read
         .with_conn(|conn| db_providers::read_active_selection(conn))
@@ -102,5 +106,39 @@ fn stale_revision_db_write_is_rejected() {
     assert_eq!(
         selection.primary, None,
         "the stale write must not have committed"
+    );
+}
+
+// R2-B (P1-3 residual): the switch arm must allocate the revision in the SYNC
+// menu callback BEFORE spawn_blocking, so revision order = click order
+// regardless of OS thread scheduling.
+#[test]
+fn switch_arm_allocates_revision_before_spawn() {
+    let src = include_str!("../src/lib.rs");
+    let arm_start = src
+        .find("strip_prefix(\"tray.switch-\")")
+        .expect("switch arm not found");
+    let arm_body = &src[arm_start..];
+    // Find the end of the if-let block (the `return;` that closes the arm).
+    let arm_end = arm_body
+        .find("return;")
+        .map(|i| arm_body[..i].len())
+        .unwrap_or(arm_body.len());
+    let arm = &arm_body[..arm_end];
+    // Strip `//` line comments so a comment that merely MENTIONS
+    // "spawn_blocking" can't fool the call-order check (we assert on real code).
+    let arm_code: String = arm
+        .lines()
+        .map(|l| match l.find("//") {
+            Some(i) => &l[..i],
+            None => l,
+        })
+        .collect::<Vec<&str>>()
+        .join("\n");
+    let begin_pos = arm_code.find("begin_switch").unwrap_or(usize::MAX);
+    let spawn_pos = arm_code.find("spawn_blocking").unwrap_or(usize::MAX);
+    assert!(
+        begin_pos < spawn_pos,
+        "begin_switch must be called BEFORE spawn_blocking in the switch arm (R2-B: revision order = click order)"
     );
 }
