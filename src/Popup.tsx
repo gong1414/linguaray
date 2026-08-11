@@ -167,10 +167,9 @@ export function PopupView(props: PopupViewProps): JSX.Element {
   };
 
   return (
-    <main
+    <section
       class="popup-shell"
       classList={{ "popup-shell--compact": isCompact() }}
-      role="region"
       aria-label={headlineKey(props.state)}
       aria-busy={props.state.kind === "loading" ? "true" : undefined}
       onKeyDown={onKeyDown}
@@ -300,7 +299,7 @@ export function PopupView(props: PopupViewProps): JSX.Element {
           />
         </div>
       </Show>
-    </main>
+    </section>
   );
 }
 

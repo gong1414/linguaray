@@ -7,19 +7,18 @@
  * production `Popup` controller, emit popup-state events to drive different
  * states, and run axe against the full rendered output.
  *
- * Rules disabled beyond color-contrast:
- *  - aria-allowed-role: PopupView uses `<main role="region">` (the popup is a
- *    landmark region, not the page's main content). axe's aria-allowed-role
- *    flags `region` on `<main>` as a minor violation. Fixing it properly
- *    (changing the element) would break 19+ existing Popup tests and change the
- *    semantic element — out of scope for R6's test-migration task. All other
- *    axe rules are enforced.
+ * R7-P1-3: `aria-allowed-role` is now ENFORCED (previously disabled because
+ * PopupView used `<main role="region">` which violated aria-allowed-role; R7
+ * changed it to `<section>` which is compliant). Only `color-contrast` remains
+ * disabled (jsdom cannot compute it). The dark+Chinese test sets
+ * `localStorage("linguaray.locale", "zh")` so `detectLocale()` returns zh and
+ * the component renders real Chinese labels (not just dark-theme styling).
  */
-import { describe, it, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, cleanup } from "@solidjs/testing-library";
 import { assertNoAxeViolations } from "./axe";
 
-const AXE_DISABLE = ["color-contrast", "aria-allowed-role"];
+const AXE_DISABLE = ["color-contrast"];
 
 vi.mock("@tauri-apps/api/event", () => ({
   listen: vi.fn(async () => () => {}),
@@ -56,6 +55,8 @@ async function emitEvent(name: string, payload: unknown) {
 beforeEach(() => {
   vi.clearAllMocks();
   document.documentElement.dataset.theme = "light";
+  // Reset locale so tests don't leak the zh setting across cases.
+  localStorage.removeItem("linguaray.locale");
 });
 
 afterEach(async () => {
@@ -81,9 +82,11 @@ describe("Popup — accessibility (axe)", () => {
 
   it("has no axe violations in dark + Chinese", async () => {
     document.documentElement.dataset.theme = "dark";
-    // The Popup reads locale via detectLocale() on mount; t() falls back to
-    // zh labels when the html lang attribute is zh.
-    document.documentElement.lang = "zh";
+    // R7-P1-3: detectLocale() reads localStorage("linguaray.locale"), NOT
+    // document.documentElement.lang. Setting localStorage ensures the Popup
+    // renders real Chinese labels (aria-labels, button text) — not just dark
+    // theme styling.
+    localStorage.setItem("linguaray.locale", "zh");
     render(() => <Popup />);
     await emitEvent("popup-state", {
       status: "result",
@@ -91,6 +94,10 @@ describe("Popup — accessibility (axe)", () => {
       engine: "deepseek/u1",
       source_text: "hello",
     });
+    // Assert at least one Chinese accessible name exists (the popup-shell
+    // section's aria-label is headlineKey(state) → "多引擎结果" in zh).
+    const shell = document.querySelector(".popup-shell");
+    expect(shell?.getAttribute("aria-label")).toMatch(/[\u4e00-\u9fff]/);
     await assertNoAxeViolations({ disableRules: AXE_DISABLE });
   });
 

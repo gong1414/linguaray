@@ -49,6 +49,17 @@ export function createPopupController() {
    * already ran (no leaked listener registered after unmount).
    */
   let cancelled = false;
+  /**
+   * R7-P1-2: state generation counter. Bumped in EVERY event listener
+   * (popup-state + popup-multi-result) AND at the start of retrySelection.
+   * The Retry captures its generation (`myGen`) and only writes state in its
+   * catch block if `myGen === stateGeneration` — a newer event/listener would
+   * have bumped the counter, signalling that the Retry's result is stale and
+   * must not overwrite the newer state. This prevents the race where Retry
+   * rejects (e.g. IPC error) AFTER a newer popup-state event has already set a
+   * success state.
+   */
+  let stateGeneration = 0;
 
   onMount(async () => {
     // B2/P1-9: register event listeners BEFORE loading provider_list. Events
@@ -57,6 +68,9 @@ export function createPopupController() {
     const unState = await listen<PopupStatePayload>("popup-state", (e) => {
       if (cancelled) return;
       const payload = e.payload;
+      // R7-P1-2: bump the generation — any in-flight Retry whose generation no
+      // longer matches is now stale and must not overwrite this state.
+      stateGeneration++;
       // P1-3: loading opens a new translation session — clear the prior
       // source, then adopt this session's source if the backend carried it.
       if (payload.status === "loading") {
@@ -74,6 +88,8 @@ export function createPopupController() {
     const unMulti = await listen<PopupMultiPayload>("popup-multi-result", (e) => {
       if (cancelled) return;
       const payload = e.payload;
+      // R7-P1-2: bump the generation — same stale-Retry guard as popup-state.
+      stateGeneration++;
       if (payload.source_text) setLastSource(payload.source_text);
       setState(decodePopupMultiResult(payload));
     });
@@ -146,14 +162,32 @@ export function createPopupController() {
    * (translateSelection). Never translate_clipboard, never the translation
    * result. No-op when there is no saved source. The backend re-emits
    * popup-state / popup-multi-result, which re-decode here.
+   *
+   * R7-P1-2: generation guard. Retry captures `myGen = ++stateGeneration` and
+   * only applies its error in the catch block if `myGen === stateGeneration`.
+   * A newer popup-state/popup-multi-result event arriving during the await
+   * bumps the counter, so the stale Retry's error does NOT overwrite the newer
+   * state. This prevents the race: Retry starts → state=loading → a NEW
+   * popup-state arrives → state=success → Retry's IPC rejects → catch sets
+   * state=error (overwriting the success). The guard skips the stale error.
    */
   const retrySelection = async () => {
     if (!lastSource()) return;
+    const myGen = ++stateGeneration;
     setState({ kind: "loading" });
     try {
       await translateSelection(lastSource());
+      // The backend emits popup-state/popup-multi-result which bumps
+      // stateGeneration and sets state. If translateSelection resolved
+      // WITHOUT an event (silent success), the generation still matches and
+      // state was already set by the event — nothing to do here.
     } catch (e) {
-      setState({ kind: "error", sub: "generic", message: String(e) });
+      // Only apply the error if no newer event/state change happened during
+      // the await. A newer event means the Retry is stale — its error must
+      // NOT overwrite the newer state.
+      if (myGen === stateGeneration) {
+        setState({ kind: "error", sub: "generic", message: String(e) });
+      }
     }
   };
 
