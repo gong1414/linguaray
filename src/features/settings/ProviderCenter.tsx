@@ -28,6 +28,7 @@ import {
   createSignal,
   createMemo,
   onMount,
+  onCleanup,
   type Component,
   type JSX,
 } from "solid-js";
@@ -143,11 +144,13 @@ export type ProviderCenterViewProps = {
   // detail-panel fields for that UUID are disabled (prevents the user from
   // typing drafts that the in-flight refresh would unconditionally discard).
   reloadingUuid: string | null;
-  // R6-P1-1: global mutation lock — true while ANY refresh() is in-flight
-  // (initial load, Reload, post-create/delete/duplicate re-fetch). While true,
-  // ALL sidebar action buttons for ALL providers are disabled (prevents a
-  // concurrent mutation from being overwritten by the refresh's setProviders).
-  globalMutationLock: boolean;
+  // R7-P1-1: serial operation queue busy signal — true while ANY mutation or
+  // refresh is in-flight (the async mutex is held). While true, ALL sidebar
+  // action buttons for ALL providers AND ALL detail-panel controls are disabled
+  // (prevents a concurrent mutation from being overwritten by a refresh's
+  // setProviders, and vice versa). No button appears enabled but silently
+  // returns — disabled is the sole gate.
+  exclusiveBusy: boolean;
   presets: Preset[];
   detail: ProviderDetailState | null;
   // dialogs + toasts
@@ -198,10 +201,10 @@ export type ProviderCenterViewProps = {
 export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element {
   const t = () => props.t;
 
-  // R6-P1-1: while the global mutation lock is held (a refresh is in-flight),
-  // every sidebar action for EVERY provider is disabled. Composed with the
-  // per-row deleting state below.
-  const locked = () => props.globalMutationLock;
+  // R7-P1-1: while the serial operation queue is busy (any mutation or refresh
+  // is in-flight), every sidebar action for EVERY provider AND every detail-
+  // panel control is disabled. Composed with the per-row deleting state below.
+  const locked = () => props.exclusiveBusy;
 
   const sortedProviders = createMemo(() =>
     [...props.providers].sort((a, b) => a.sort_order - b.sort_order),
@@ -235,7 +238,7 @@ export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element 
       <Show when={props.loadError}>
         <InlineError>{t().saveFailed}</InlineError>
         <div class="pc__retry">
-          <Button variant="primary" size="sm" onClick={() => props.onReloadFromError()}>
+          <Button variant="primary" size="sm" disabled={locked()} onClick={() => props.onReloadFromError()}>
             {t().reload}
           </Button>
         </div>
@@ -246,7 +249,7 @@ export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element 
       <Show when={props.selectionError}>
         <div class="pc__retry" role="alert">
           <span class="pc__load-failed">{t().loadFailed}</span>
-          <Button variant="secondary" size="sm" onClick={() => props.onRetrySelectionLoad()}>
+          <Button variant="secondary" size="sm" disabled={locked()} onClick={() => props.onRetrySelectionLoad()}>
             {t().retry}
           </Button>
         </div>
@@ -473,7 +476,7 @@ export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element 
                         variant="primary"
                         size="sm"
                         loading={isReloading()}
-                        disabled={isReloading()}
+                        disabled={isReloading() || locked()}
                         loadingLabel={t().reloading}
                         onClick={() => props.onResolveSaveConflict(uuid())}
                       >
@@ -486,7 +489,7 @@ export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element 
                     label={t().name}
                     value={d().nameDraft}
                     errorText={d().nameError ?? undefined}
-                    disabled={d().saveState === "saving" || isReloading()}
+                    disabled={d().saveState === "saving" || isReloading() || locked()}
                     onInput={(e) => {
                       props.onNameInput(uuid(), e.currentTarget.value);
                     }}
@@ -498,7 +501,7 @@ export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element 
                     value={d().endpointDraft}
                     placeholder={t().endpoint.placeholder}
                     errorText={d().endpointError ?? undefined}
-                    disabled={d().saveState === "saving" || isReloading()}
+                    disabled={d().saveState === "saving" || isReloading() || locked()}
                     onInput={(e) =>
                       props.onEndpointInput(uuid(), e.currentTarget.value)
                     }
@@ -514,7 +517,7 @@ export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element 
                         label={t().models}
                         value={d().modelDraft}
                         placeholder={t().manualModelPlaceholder}
-                        disabled={d().saveState === "saving" || isReloading()}
+                        disabled={d().saveState === "saving" || isReloading() || locked()}
                         onInput={(e) =>
                           props.onModelInput(uuid(), e.currentTarget.value)
                         }
@@ -528,7 +531,7 @@ export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element 
                         options={selectOptions()}
                         loading={d().modelFetch === "loading"}
                         loadingLabel={t().loadingModels}
-                        disabled={d().saveState === "saving" || isReloading()}
+                        disabled={d().saveState === "saving" || isReloading() || locked()}
                         onChange={(v) =>
                           props.onModelChange(uuid(), v)
                         }
@@ -536,6 +539,7 @@ export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element 
                       <Button
                         variant="ghost"
                         size="sm"
+                        disabled={locked()}
                         onClick={() => props.onFetchModels(uuid())}
                       >
                         {t().fetchModels}
@@ -548,7 +552,7 @@ export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element 
                       variant="primary"
                       size="sm"
                       loading={d().saveState === "saving"}
-                      disabled={isReloading()}
+                      disabled={isReloading() || locked()}
                       onClick={() => props.onSaveProfile(uuid())}
                     >
                       {t().saveProfile}
@@ -570,7 +574,7 @@ export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element 
                             value={d().keyText}
                             placeholder={t().apiKeyPlaceholder}
                             errorText={d().keyError ?? undefined}
-                            disabled={d().saveState === "saving"}
+                            disabled={d().saveState === "saving" || locked()}
                             onInput={(e) => {
                               props.onKeyInput(uuid(), e.currentTarget.value);
                             }}
@@ -578,7 +582,7 @@ export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element 
                           <Button
                             variant="primary"
                             size="sm"
-                            disabled={d().provider.needs_key && d().keyText.length === 0}
+                            disabled={(d().provider.needs_key && d().keyText.length === 0) || locked()}
                             loading={d().saveState === "saving"}
                             onClick={() => props.onSaveKey(uuid())}
                           >
@@ -599,6 +603,7 @@ export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element 
                       variant="secondary"
                       size="sm"
                       loading={d().conn === "testing"}
+                      disabled={locked()}
                       onClick={() => props.onTestConnection(uuid())}
                     >
                       {t().testConnection}
@@ -664,7 +669,7 @@ export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element 
       <Show when={props.deleteError}>
         <div class="pc__delete-error-banner" role="alert">
           <span class="pc__delete-error-msg">{t().saveFailed}</span>
-          <Button variant="secondary" size="sm" onClick={() => props.onRetryDelete()}>
+          <Button variant="secondary" size="sm" disabled={locked()} onClick={() => props.onRetryDelete()}>
             {t().retry}
           </Button>
           <Button variant="ghost" size="sm" onClick={() => props.onDismissDeleteError()}>
@@ -716,6 +721,12 @@ export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element 
 const ProviderCenter: Component = () => {
   const locale = detectLocale();
   const t = SETTINGS_COPY[locale].provider;
+
+  // R7-P1-1: disposal flag — prevents stale setTimeout callbacks (e.g. the
+  // post-delete focus restoration) from running after the component unmounts
+  // and stealing focus in a subsequently-rendered instance (test isolation).
+  let disposed = false;
+  onCleanup(() => { disposed = true; });
 
   // --- Core state ---
   const [providers, setProviders] = createSignal<ProviderProfileFE[]>([]);
@@ -779,13 +790,36 @@ const ProviderCenter: Component = () => {
   // typing drafts that the in-flight refresh would unconditionally discard on
   // success) and a second Reload click is blocked (re-entrancy guard).
   const [reloadingUuid, setReloadingUuid] = createSignal<string | null>(null);
-  // R6-P1-1: global mutation lock. While ANY refresh() is in-flight (initial
-  // load, Reload, post-create/delete/duplicate re-fetch), ALL provider mutations
-  // are blocked. This prevents the race where a concurrent mutation's
-  // setProviders(...) is overwritten when the refresh's setProviders(list)
-  // resolves. `reloadingUuid` (above) only disables ONE provider's detail panel;
-  // this lock disables every sidebar action for EVERY provider.
-  const [globalMutationLock, setGlobalMutationLock] = createSignal(false);
+  // R7-P1-1: serial operation queue (async mutex). ALL provider mutations AND
+  // refresh run exclusively — no two operations overlap, so a concurrent
+  // mutation's setProviders(...) can never be overwritten by a refresh's
+  // setProviders(list) resolving mid-mutation. Mutations that need a re-fetch
+  // call refreshCore() directly (NOT refresh, which re-enters the mutex →
+  // deadlock). The boolean lock from R6 could not handle: (a) mutations already
+  // in-flight when Reload starts, (b) overlapping refreshes, (c) mutations that
+  // internally call refresh (create/delete/duplicate). The async mutex handles
+  // all three by serializing.
+  let exclusiveInProgress = false;
+  const exclusiveQueue: Array<() => void> = [];
+  const [exclusiveBusy, setExclusiveBusy] = createSignal(false);
+
+  async function runExclusive<T>(fn: () => Promise<T>): Promise<T> {
+    // Wait for any in-flight operation to finish before starting.
+    while (exclusiveInProgress) {
+      await new Promise<void>((resolve) => exclusiveQueue.push(resolve));
+    }
+    exclusiveInProgress = true;
+    setExclusiveBusy(true);
+    try {
+      return await fn();
+    } finally {
+      exclusiveInProgress = false;
+      setExclusiveBusy(false);
+      // Wake the next queued operation.
+      const next = exclusiveQueue.shift();
+      if (next) next();
+    }
+  }
   const [consentOpen, setConsentOpen] = createSignal(false);
   const [pendingParallelUuid, setPendingParallelUuid] = createSignal<string | null>(null);
   const [consentActualScope, setConsentActualScope] = createSignal<string | null>(null);
@@ -807,16 +841,17 @@ const ProviderCenter: Component = () => {
   // BOTH the provider list AND the stored active selection must resolve before
   // roles are applied. If either rejects, no `providerSetActive` is allowed
   // (handlers short-circuit on `selectionError()`/`selectionLoading()`).
-  /** Re-fetch the provider list + stored selection. Returns `true` on success,
-   *  `false` on failure (the error is already surfaced via loadError + a toast;
-   *  callers that need to react to failure — e.g. the save-conflict Reload —
-   *  branch on the boolean instead of try/catch, since refresh never rejects). */
-  const refresh = async (): Promise<boolean> => {
-    // R6-P1-1: acquire the global mutation lock for the full duration of the
-    // await. While held, every sidebar mutation handler early-returns so a
-    // concurrent setProviders(...) from a save/toggle/delete/reorder cannot be
-    // overwritten by this refresh's setProviders(list) when it resolves.
-    setGlobalMutationLock(true);
+  /** Raw re-fetch of the provider list + stored selection (NO mutex management).
+   *  Returns `true` on success, `false` on failure (the error is already
+   *  surfaced via loadError + a toast; callers that need to react to failure —
+   *  e.g. the save-conflict Reload — branch on the boolean instead of try/catch,
+   *  since refreshCore never rejects).
+   *
+   *  R7-P1-1: callers that are ALREADY inside `runExclusive` (mutation handlers
+   *  that need a post-mutation re-fetch) call this directly. The public
+   *  `refresh()` wraps this in the mutex. Never call `refresh()` from inside a
+   *  `runExclusive` body — it re-enters the mutex and deadlocks. */
+  const refreshCore = async (): Promise<boolean> => {
     setSelectionLoading(true);
     setSelectionError(false);
     try {
@@ -832,16 +867,21 @@ const ProviderCenter: Component = () => {
       });
       setLoadError(false);
       return true;
-    } catch (e) {
+    } catch {
       setLoadError(true);
       setSelectionError(true);
       pushToast("destructive", t.saveFailed);
       return false;
     } finally {
       setSelectionLoading(false);
-      setGlobalMutationLock(false);
     }
   };
+
+  /** Public refresh entry — acquires the serial-operation mutex, then runs
+   *  refreshCore. Use for top-level triggers (onMount, error-retry banners).
+   *  Mutation handlers that are already inside `runExclusive` must call
+   *  `refreshCore()` directly to avoid re-entering the mutex. */
+  const refresh = (): Promise<boolean> => runExclusive(() => refreshCore());
 
   onMount(() => {
     void refresh();
@@ -855,24 +895,25 @@ const ProviderCenter: Component = () => {
 
   /** Toggle: optimistic flip → IPC → revert + toast on error. */
   const handleToggle = async (uuid: string, enabled: boolean) => {
-    if (globalMutationLock()) return; // R6-P1-1
-    const prev = providers();
-    const next = prev.map((p) => (p.uuid === uuid ? { ...p, enabled } : p));
-    setProviders(next);
-    try {
-      await providerToggle(uuid, enabled);
-      // Backend evicts slots, but our session mirror must too.
-      if (!enabled) {
-        setSelection((sel) => ({
-          primaryUuid: sel.primaryUuid === uuid ? null : sel.primaryUuid,
-          parallelUuids: sel.parallelUuids.filter((u) => u !== uuid),
-          fallbackUuid: sel.fallbackUuid === uuid ? null : sel.fallbackUuid,
-        }));
+    await runExclusive(async () => {
+      const prev = providers();
+      const next = prev.map((p) => (p.uuid === uuid ? { ...p, enabled } : p));
+      setProviders(next);
+      try {
+        await providerToggle(uuid, enabled);
+        // Backend evicts slots, but our session mirror must too.
+        if (!enabled) {
+          setSelection((sel) => ({
+            primaryUuid: sel.primaryUuid === uuid ? null : sel.primaryUuid,
+            parallelUuids: sel.parallelUuids.filter((u) => u !== uuid),
+            fallbackUuid: sel.fallbackUuid === uuid ? null : sel.fallbackUuid,
+          }));
+        }
+      } catch {
+        setProviders(prev); // rollback
+        pushToast("destructive", t.saveFailed);
       }
-    } catch (e) {
-      setProviders(prev); // rollback
-      pushToast("destructive", t.saveFailed);
-    }
+    });
   };
 
   const buildCandidatePrimary = (uuid: string): ActiveSelection => {
@@ -888,34 +929,34 @@ const ProviderCenter: Component = () => {
     // Fail-closed: never call providerSetActive while the cold-load read is
     // in-flight or has failed (prevents overwriting a stored selection we
     // failed to read).
-    if (globalMutationLock()) return; // R6-P1-1
     if (selectionLoading() || selectionError()) return;
-    const candidate = buildCandidatePrimary(uuid);
-    try {
-      const result = await providerSetActive(
-        candidate.primaryUuid!,
-        candidate.parallelUuids,
-        candidate.fallbackUuid,
-      );
-      if (result.outcome === "written") {
-        setSelection(candidate);
+    await runExclusive(async () => {
+      const candidate = buildCandidatePrimary(uuid);
+      try {
+        const result = await providerSetActive(
+          candidate.primaryUuid!,
+          candidate.parallelUuids,
+          candidate.fallbackUuid,
+        );
+        if (result.outcome === "written") {
+          setSelection(candidate);
+        }
+        // set-primary alone has empty parallel → always "written".
+      } catch {
+        pushToast("destructive", t.saveFailed);
       }
-      // set-primary alone has empty parallel → always "written".
-    } catch (e) {
-      pushToast("destructive", t.saveFailed);
-    }
+    });
   };
 
   const handleAddParallel = (uuid: string, triggerEl?: HTMLElement) => {
-    if (globalMutationLock()) return; // R6-P1-1
     if (selectionLoading() || selectionError()) return;
     if (triggerEl) consentTriggerRef.current = triggerEl;
-    const candidate: ActiveSelection = {
-      ...selection(),
-      parallelUuids: [...selection().parallelUuids, uuid],
-      fallbackUuid: selection().fallbackUuid === uuid ? null : selection().fallbackUuid,
-    };
-    void (async () => {
+    void runExclusive(async () => {
+      const candidate: ActiveSelection = {
+        ...selection(),
+        parallelUuids: [...selection().parallelUuids, uuid],
+        fallbackUuid: selection().fallbackUuid === uuid ? null : selection().fallbackUuid,
+      };
       try {
         const result = await providerSetActive(
           candidate.primaryUuid ?? "",
@@ -929,45 +970,41 @@ const ProviderCenter: Component = () => {
           setConsentActualScope(result.actual_scope);
           setConsentOpen(true);
         }
-      } catch (e) {
+      } catch {
         pushToast("destructive", t.saveFailed);
       }
-    })();
+    });
   };
 
   const confirmConsent = async () => {
     const uuid = pendingParallelUuid();
     if (!uuid) return;
-    if (globalMutationLock()) return; // R6-P1-1
     if (selectionLoading() || selectionError()) return;
-    const candidate: ActiveSelection = {
-      ...selection(),
-      parallelUuids: [...selection().parallelUuids, uuid],
-      fallbackUuid: selection().fallbackUuid === uuid ? null : selection().fallbackUuid,
-    };
-    const scope = consentActualScope();
-    try {
-      await providerConfirmAndSetActive(
-        candidate.primaryUuid ?? "",
-        candidate.parallelUuids,
-        candidate.fallbackUuid,
-        scope ?? "",
-      );
-      setSelection(candidate);
-      setConsentOpen(false);
-      setPendingParallelUuid(null);
-      setConsentActualScope(null);
-    } catch (e) {
-      const err = e as { error?: string };
-      if (err?.error === "stale_scope") {
+    await runExclusive(async () => {
+      const candidate: ActiveSelection = {
+        ...selection(),
+        parallelUuids: [...selection().parallelUuids, uuid],
+        fallbackUuid: selection().fallbackUuid === uuid ? null : selection().fallbackUuid,
+      };
+      const scope = consentActualScope();
+      try {
+        await providerConfirmAndSetActive(
+          candidate.primaryUuid ?? "",
+          candidate.parallelUuids,
+          candidate.fallbackUuid,
+          scope ?? "",
+        );
+        setSelection(candidate);
+        setConsentOpen(false);
+        setPendingParallelUuid(null);
+        setConsentActualScope(null);
+      } catch {
         pushToast("destructive", t.saveFailed);
-      } else {
-        pushToast("destructive", t.saveFailed);
+        setConsentOpen(false);
+        setPendingParallelUuid(null);
+        setConsentActualScope(null);
       }
-      setConsentOpen(false);
-      setPendingParallelUuid(null);
-      setConsentActualScope(null);
-    }
+    });
   };
 
   const cancelConsent = () => {
@@ -977,131 +1014,136 @@ const ProviderCenter: Component = () => {
   };
 
   const handleSetFallback = async (uuid: string) => {
-    if (globalMutationLock()) return; // R6-P1-1
     if (selectionLoading() || selectionError()) return;
-    const prev = selection();
-    const candidate: ActiveSelection = {
-      primaryUuid: prev.primaryUuid === uuid ? null : prev.primaryUuid,
-      parallelUuids: prev.parallelUuids.filter((u) => u !== uuid),
-      fallbackUuid: uuid,
-    };
-    try {
-      const result = await providerSetActive(
-        candidate.primaryUuid ?? "",
-        candidate.parallelUuids,
-        candidate.fallbackUuid,
-      );
-      if (result.outcome === "written") setSelection(candidate);
-    } catch (e) {
-      pushToast("destructive", t.saveFailed);
-    }
+    await runExclusive(async () => {
+      const prev = selection();
+      const candidate: ActiveSelection = {
+        primaryUuid: prev.primaryUuid === uuid ? null : prev.primaryUuid,
+        parallelUuids: prev.parallelUuids.filter((u) => u !== uuid),
+        fallbackUuid: uuid,
+      };
+      try {
+        const result = await providerSetActive(
+          candidate.primaryUuid ?? "",
+          candidate.parallelUuids,
+          candidate.fallbackUuid,
+        );
+        if (result.outcome === "written") setSelection(candidate);
+      } catch {
+        pushToast("destructive", t.saveFailed);
+      }
+    });
   };
 
   const handleRemoveParallel = async (uuid: string) => {
-    if (globalMutationLock()) return; // R6-P1-1
     if (selectionLoading() || selectionError()) return;
-    const candidate: ActiveSelection = {
-      ...selection(),
-      parallelUuids: selection().parallelUuids.filter((u) => u !== uuid),
-    };
-    try {
-      const result = await providerSetActive(
-        candidate.primaryUuid ?? "",
-        candidate.parallelUuids,
-        candidate.fallbackUuid,
-      );
-      if (result.outcome === "written") setSelection(candidate);
-    } catch (e) {
-      pushToast("destructive", t.saveFailed);
-    }
+    await runExclusive(async () => {
+      const candidate: ActiveSelection = {
+        ...selection(),
+        parallelUuids: selection().parallelUuids.filter((u) => u !== uuid),
+      };
+      try {
+        const result = await providerSetActive(
+          candidate.primaryUuid ?? "",
+          candidate.parallelUuids,
+          candidate.fallbackUuid,
+        );
+        if (result.outcome === "written") setSelection(candidate);
+      } catch {
+        pushToast("destructive", t.saveFailed);
+      }
+    });
   };
 
   const handleAddPreset = async (preset: Preset) => {
-    if (globalMutationLock()) return; // R6-P1-1
-    const name = preset.name ?? "Ollama";
-    try {
-      await providerCreate(preset.templateId, name, preset.endpoint, preset.model ?? undefined);
-      await refresh();
-      pushToast("success", t.profileSaved);
-    } catch (e) {
-      pushToast("destructive", t.saveFailed);
-    }
+    await runExclusive(async () => {
+      const name = preset.name ?? "Ollama";
+      try {
+        await providerCreate(preset.templateId, name, preset.endpoint, preset.model ?? undefined);
+        await refreshCore();
+        pushToast("success", t.profileSaved);
+      } catch {
+        pushToast("destructive", t.saveFailed);
+      }
+    });
   };
 
   /** Duplicate a provider: new UUID, new secret_ref, keyless. Re-fetches the
    *  list so the clone appears. */
   const handleDuplicate = async (uuid: string) => {
-    if (globalMutationLock()) return; // R6-P1-1
-    try {
-      await providerDuplicate(uuid);
-      await refresh();
-      pushToast("success", t.profileSaved);
-    } catch (e) {
-      pushToast("destructive", t.saveFailed);
-    }
+    await runExclusive(async () => {
+      try {
+        await providerDuplicate(uuid);
+        await refreshCore();
+        pushToast("success", t.profileSaved);
+      } catch {
+        pushToast("destructive", t.saveFailed);
+      }
+    });
   };
 
   /** Save profile: validate endpoint locally (reactive epError already shown),
    *  then IPC. Aborts on invalid endpoint or a duplicate-name conflict. */
   const handleSaveProfile = async (uuid: string) => {
-    if (globalMutationLock()) return; // R6-P1-1
-    const draft = endpointDraft()[uuid];
-    const modelDraft = modelDraftByUuid()[uuid];
-    const nameDraft = nameDraftByUuid()[uuid];
-    const provider = providers().find((p) => p.uuid === uuid);
-    if (!provider) return;
-    const effectiveEndpoint = draft ?? provider.endpoint;
-    const epCheck = validateEndpoint(effectiveEndpoint);
-    if (!epCheck.ok) {
-      // The reactive epError memo will surface the message; abort the save.
-      return;
-    }
-    const effectiveName = (nameDraft ?? provider.name).trim();
-    // Structured duplicate-name conflict: the DB has no UNIQUE constraint on
-    // name, so enforce uniqueness client-side before the IPC round-trip.
-    if (effectiveName !== provider.name) {
-      const conflict = providers().some(
-        (other) => other.uuid !== uuid && other.name === effectiveName,
-      );
-      if (conflict) {
-        setNameErrorByUuid((prev) => ({ ...prev, [uuid]: t.nameExists }));
+    await runExclusive(async () => {
+      const draft = endpointDraft()[uuid];
+      const modelDraft = modelDraftByUuid()[uuid];
+      const nameDraft = nameDraftByUuid()[uuid];
+      const provider = providers().find((p) => p.uuid === uuid);
+      if (!provider) return;
+      const effectiveEndpoint = draft ?? provider.endpoint;
+      const epCheck = validateEndpoint(effectiveEndpoint);
+      if (!epCheck.ok) {
+        // The reactive epError memo will surface the message; abort the save.
         return;
       }
-    }
-    // Clear any stale name conflict error now that the name is valid.
-    setNameErrorByUuid((prev) => {
-      const n = { ...prev };
-      delete n[uuid];
-      return n;
-    });
-    setSaveByUuid((prev) => ({ ...prev, [uuid]: "saving" }));
-    try {
-      const updated = await providerUpdate(uuid, {
-        name: effectiveName,
-        endpoint: effectiveEndpoint,
-        model: modelDraft ?? provider.model,
-        // R2-E optimistic lock: echo back the last-read version. A mismatch
-        // (someone else saved first) rejects with `stale_version` below.
-        expected_version: provider.version,
-      });
-      setProviders((prev) => prev.map((p) => (p.uuid === uuid ? { ...p, ...updated, hasKey: p.hasKey } : p)));
-      setSaveByUuid((prev) => ({ ...prev, [uuid]: "saved" }));
-      // A successful save clears any prior conflict banner for this provider.
-      setSaveConflictUuid((prev) => (prev === uuid ? null : prev));
-      pushToast("success", t.profileSaved);
-    } catch (e) {
-      // R2-E: a structured stale_version rejection = save conflict. Keep the
-      // user's draft intact (do NOT overwrite) and surface a conflict banner
-      // with a Reload button so they can pull fresh data and reconcile.
-      const err = e as { error?: string };
-      if (err?.error === "stale_version") {
-        setSaveByUuid((prev) => ({ ...prev, [uuid]: "failed" }));
-        setSaveConflictUuid(uuid);
-      } else {
-        setSaveByUuid((prev) => ({ ...prev, [uuid]: "failed" }));
-        pushToast("destructive", t.saveFailed);
+      const effectiveName = (nameDraft ?? provider.name).trim();
+      // Structured duplicate-name conflict: the DB has no UNIQUE constraint on
+      // name, so enforce uniqueness client-side before the IPC round-trip.
+      if (effectiveName !== provider.name) {
+        const conflict = providers().some(
+          (other) => other.uuid !== uuid && other.name === effectiveName,
+        );
+        if (conflict) {
+          setNameErrorByUuid((prev) => ({ ...prev, [uuid]: t.nameExists }));
+          return;
+        }
       }
-    }
+      // Clear any stale name conflict error now that the name is valid.
+      setNameErrorByUuid((prev) => {
+        const n = { ...prev };
+        delete n[uuid];
+        return n;
+      });
+      setSaveByUuid((prev) => ({ ...prev, [uuid]: "saving" }));
+      try {
+        const updated = await providerUpdate(uuid, {
+          name: effectiveName,
+          endpoint: effectiveEndpoint,
+          model: modelDraft ?? provider.model,
+          // R2-E optimistic lock: echo back the last-read version. A mismatch
+          // (someone else saved first) rejects with `stale_version` below.
+          expected_version: provider.version,
+        });
+        setProviders((prev) => prev.map((p) => (p.uuid === uuid ? { ...p, ...updated, hasKey: p.hasKey } : p)));
+        setSaveByUuid((prev) => ({ ...prev, [uuid]: "saved" }));
+        // A successful save clears any prior conflict banner for this provider.
+        setSaveConflictUuid((prev) => (prev === uuid ? null : prev));
+        pushToast("success", t.profileSaved);
+      } catch (e) {
+        // R2-E: a structured stale_version rejection = save conflict. Keep the
+        // user's draft intact (do NOT overwrite) and surface a conflict banner
+        // with a Reload button so they can pull fresh data and reconcile.
+        const err = e as { error?: string };
+        if (err?.error === "stale_version") {
+          setSaveByUuid((prev) => ({ ...prev, [uuid]: "failed" }));
+          setSaveConflictUuid(uuid);
+        } else {
+          setSaveByUuid((prev) => ({ ...prev, [uuid]: "failed" }));
+          pushToast("destructive", t.saveFailed);
+        }
+      }
+    });
   };
 
   /**
@@ -1110,39 +1152,40 @@ const ProviderCenter: Component = () => {
    * re-read from the input after submit — the input stays cleared.
    */
   const handleSaveKey = async (uuid: string) => {
-    if (globalMutationLock()) return; // R6-P1-1
-    const key = keyInputByUuid()[uuid];
-    // Clear IMMEDIATELY — never readable back, never in DOM after submit.
-    setKeyInputByUuid((prev) => {
-      const n = { ...prev };
-      delete n[uuid];
-      return n;
-    });
-    setSaveByUuid((prev) => ({ ...prev, [uuid]: "saving" }));
-    setKeyErrorByUuid((prev) => {
-      const n = { ...prev };
-      delete n[uuid];
-      return n;
-    });
-    try {
-      await providerSetKey(uuid, key);
-      setSaveByUuid((prev) => ({ ...prev, [uuid]: "saved" }));
-      // Re-fetch to update hasKey.
-      const list = await loadProviders();
-      setProviders(list);
-      pushToast("success", t.keySaved);
-    } catch (e) {
-      setSaveByUuid((prev) => ({ ...prev, [uuid]: "failed" }));
-      // Detect UNIQUE constraint violations and surface a localized "already
-      // exists" message; everything else is a generic save-failed.
-      const msg = (e as { message?: string })?.message ?? "";
-      if (/UNIQUE constraint/i.test(String(msg))) {
-        setKeyErrorByUuid((prev) => ({ ...prev, [uuid]: t.keyAlreadyExists }));
-        pushToast("destructive", t.keyAlreadyExists);
-      } else {
-        pushToast("destructive", t.saveFailed);
+    await runExclusive(async () => {
+      const key = keyInputByUuid()[uuid];
+      // Clear IMMEDIATELY — never readable back, never in DOM after submit.
+      setKeyInputByUuid((prev) => {
+        const n = { ...prev };
+        delete n[uuid];
+        return n;
+      });
+      setSaveByUuid((prev) => ({ ...prev, [uuid]: "saving" }));
+      setKeyErrorByUuid((prev) => {
+        const n = { ...prev };
+        delete n[uuid];
+        return n;
+      });
+      try {
+        await providerSetKey(uuid, key);
+        setSaveByUuid((prev) => ({ ...prev, [uuid]: "saved" }));
+        // Re-fetch to update hasKey.
+        const list = await loadProviders();
+        setProviders(list);
+        pushToast("success", t.keySaved);
+      } catch (e) {
+        setSaveByUuid((prev) => ({ ...prev, [uuid]: "failed" }));
+        // Detect UNIQUE constraint violations and surface a localized "already
+        // exists" message; everything else is a generic save-failed.
+        const msg = (e as { message?: string })?.message ?? "";
+        if (/UNIQUE constraint/i.test(String(msg))) {
+          setKeyErrorByUuid((prev) => ({ ...prev, [uuid]: t.keyAlreadyExists }));
+          pushToast("destructive", t.keyAlreadyExists);
+        } else {
+          pushToast("destructive", t.saveFailed);
+        }
       }
-    }
+    });
   };
 
   const handleFetchModels = async (uuid: string) => {
@@ -1181,45 +1224,55 @@ const ProviderCenter: Component = () => {
   const confirmDelete = async () => {
     const uuid = deleteConfirmUuid() ?? deleteFailedUuid();
     if (!uuid) return;
-    if (globalMutationLock()) return; // R6-P1-1
-    setDeletingUuid(uuid);
-    try {
-      await providerDelete(uuid);
-      setDeleteError(false);
-      setDeleteFailedUuid(null);
-      setDeleteConfirmUuid(null);
-      await refresh();
-      // R6-P1-3: after a successful delete the trigger button's row is removed
-      // by refresh(). Kobalte's Dialog onCloseAutoFocus tried to restore focus
-      // to the trigger BEFORE refresh detached it, so focus is now lost to
-      // body. Restore focus to a safe fallback: the first remaining provider's
-      // Edit button, or the first preset button if the list is now empty.
-      queueMicrotask(() => {
-        if (deleteTriggerRef.current && document.contains(deleteTriggerRef.current)) {
-          // Trigger still in the DOM → focus is already restored.
-          return;
-        }
-        const firstEdit = document.querySelector<HTMLButtonElement>(
-          'button[aria-label^="Edit "]',
-        );
-        if (firstEdit) {
-          firstEdit.focus();
-          return;
-        }
-        const firstPreset = document.querySelector<HTMLButtonElement>(".pc__preset");
-        firstPreset?.focus();
-      });
-    } catch (e) {
-      // Close the dialog and surface a Retry banner in the main area. Kobalte's
-      // Dialog sets body pointer-events:none during its close transition, so an
-      // in-dialog Retry button would have its clicks swallowed.
-      setDeleteError(true);
-      setDeleteFailedUuid(uuid);
-      setDeleteConfirmUuid(null);
-      pushToast("destructive", t.saveFailed);
-    } finally {
-      setDeletingUuid(null);
-    }
+    await runExclusive(async () => {
+      setDeletingUuid(uuid);
+      try {
+        await providerDelete(uuid);
+        setDeleteError(false);
+        setDeleteFailedUuid(null);
+        setDeleteConfirmUuid(null);
+        await refreshCore();
+        // R6-P1-3: after a successful delete the trigger button's row is removed
+        // by refreshCore(). Kobalte's Dialog onCloseAutoFocus tried to restore
+        // focus to the trigger BEFORE refresh detached it, so focus is now lost
+        // to body. Restore focus to a safe fallback: the first remaining
+        // provider's Edit button, or the first preset button if the list is
+        // empty.
+        // R7-P1-1: setTimeout (not queueMicrotask) so this runs AFTER all
+        // microtask-based dialog-close focus restoration settles — the async
+        // mutex changes the microtask ordering, and a macrotask guarantees our
+        // focus wins over Kobalte's close-transition auto-focus. The disposed
+        // guard prevents this callback from stealing focus in a new instance
+        // after unmount (test isolation).
+        setTimeout(() => {
+          if (disposed) return;
+          if (deleteTriggerRef.current && document.contains(deleteTriggerRef.current)) {
+            // Trigger still in the DOM → focus is already restored.
+            return;
+          }
+          const firstEdit = document.querySelector<HTMLButtonElement>(
+            'button[aria-label^="Edit "]',
+          );
+          if (firstEdit) {
+            firstEdit.focus();
+            return;
+          }
+          const firstPreset = document.querySelector<HTMLButtonElement>(".pc__preset");
+          firstPreset?.focus();
+        });
+      } catch {
+        // Close the dialog and surface a Retry banner in the main area.
+        // Kobalte's Dialog sets body pointer-events:none during its close
+        // transition, so an in-dialog Retry button would have its clicks
+        // swallowed.
+        setDeleteError(true);
+        setDeleteFailedUuid(uuid);
+        setDeleteConfirmUuid(null);
+        pushToast("destructive", t.saveFailed);
+      } finally {
+        setDeletingUuid(null);
+      }
+    });
   };
 
   /** Retry a failed delete (re-attempts providerDelete for the failed uuid). */
@@ -1265,27 +1318,28 @@ const ProviderCenter: Component = () => {
 
   /** Reorder: optimistic local swap → IPC → revert + toast on error. */
   const moveProvider = async (uuid: string, dir: "up" | "down") => {
-    if (globalMutationLock()) return; // R6-P1-1
-    const ordered = [...providers()].sort((a, b) => a.sort_order - b.sort_order);
-    const idx = ordered.findIndex((p) => p.uuid === uuid);
-    if (idx < 0) return;
-    const swap = dir === "up" ? idx - 1 : idx + 1;
-    if (swap < 0 || swap >= ordered.length) return;
-    const snapshot = [...ordered];
-    const newOrder = [...ordered];
-    [newOrder[idx], newOrder[swap]] = [newOrder[swap], newOrder[idx]];
-    // Optimistic: re-number sort_order.
-    const renumbered = newOrder.map((p, i) => ({ ...p, sort_order: i }));
-    setProviders(renumbered);
-    try {
-      await providerReorder(renumbered.map((p) => p.uuid));
-    } catch (e) {
-      // Revert to snapshot order.
-      setProviders(
-        snapshot.map((p, i) => ({ ...p, sort_order: i })),
-      );
-      pushToast("destructive", t.reorderReverted);
-    }
+    await runExclusive(async () => {
+      const ordered = [...providers()].sort((a, b) => a.sort_order - b.sort_order);
+      const idx = ordered.findIndex((p) => p.uuid === uuid);
+      if (idx < 0) return;
+      const swap = dir === "up" ? idx - 1 : idx + 1;
+      if (swap < 0 || swap >= ordered.length) return;
+      const snapshot = [...ordered];
+      const newOrder = [...ordered];
+      [newOrder[idx], newOrder[swap]] = [newOrder[swap], newOrder[idx]];
+      // Optimistic: re-number sort_order.
+      const renumbered = newOrder.map((p, i) => ({ ...p, sort_order: i }));
+      setProviders(renumbered);
+      try {
+        await providerReorder(renumbered.map((p) => p.uuid));
+      } catch {
+        // Revert to snapshot order.
+        setProviders(
+          snapshot.map((p, i) => ({ ...p, sort_order: i })),
+        );
+        pushToast("destructive", t.reorderReverted);
+      }
+    });
   };
 
   // --- Detail state memo (gathered for the View) ---
@@ -1350,7 +1404,7 @@ const ProviderCenter: Component = () => {
       selectionLoading={selectionLoading()}
       deletingUuid={deletingUuid()}
       reloadingUuid={reloadingUuid()}
-      globalMutationLock={globalMutationLock()}
+      exclusiveBusy={exclusiveBusy()}
       presets={PRESETS}
       detail={detail()}
       deleteConfirmUuid={deleteConfirmUuid()}
@@ -1425,10 +1479,13 @@ const ProviderCenter: Component = () => {
         // clear this UUID's drafts/errors and the conflict banner ONLY if the
         // conflict is still for THIS uuid — a different provider's conflict may
         // have appeared during the reload and must survive.
+        // R7-P1-1: the whole body runs inside runExclusive (serial operation
+        // queue) and calls refreshCore directly (NOT refresh — the mutex is
+        // already held here, re-entering would deadlock).
         if (reloadingUuid()) return; // prevent double-click re-entry
         setReloadingUuid(uuid);
-        void (async () => {
-          const ok = await refresh();
+        void runExclusive(async () => {
+          const ok = await refreshCore();
           if (!ok) {
             // Reload failed: keep banner + drafts + errors. Restore editability.
             setReloadingUuid(null);
@@ -1469,7 +1526,7 @@ const ProviderCenter: Component = () => {
           // during the reload and must NOT be clobbered.
           setSaveConflictUuid((prev) => (prev === uuid ? null : prev));
           setReloadingUuid(null);
-        })();
+        });
       }}
       onReloadFromError={() => void refresh()}
       onRetrySelectionLoad={() => void refresh()}
