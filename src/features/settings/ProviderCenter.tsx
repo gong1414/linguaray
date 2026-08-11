@@ -748,6 +748,11 @@ const ProviderCenter: Component = () => {
   // the next name edit.
   const [nameErrorByUuid, setNameErrorByUuid] = createSignal<Record<string, string>>({});
   const [connByUuid, setConnByUuid] = createSignal<Record<string, ConnectionResult | "testing">>({});
+  // R6-P1-3: per-UUID request counter for connection tests. Each Test click
+  // bumps the counter; the await resolution only applies if the counter is
+  // unchanged (no newer Test started during the await). This prevents a stale
+  // completion from overwriting a newer result (connection-test ABA).
+  const [connRequestIdByUuid, setConnRequestIdByUuid] = createSignal<Record<string, number>>({});
   const [modelOptionsByUuid, setModelOptionsByUuid] = createSignal<Record<string, ModelInfo[]>>({});
   const [modelFetchByUuid, setModelFetchByUuid] = createSignal<Record<string, "idle" | "loading" | "error">>({});
 
@@ -1154,11 +1159,18 @@ const ProviderCenter: Component = () => {
   };
 
   const handleTestConnection = async (uuid: string) => {
+    // R6-P1-3: bump the request counter so a stale completion (from an earlier
+    // Test click whose await resolved after a newer Test) is discarded.
+    const requestId = (connRequestIdByUuid()[uuid] ?? 0) + 1;
+    setConnRequestIdByUuid((prev) => ({ ...prev, [uuid]: requestId }));
     setConnByUuid((prev) => ({ ...prev, [uuid]: "testing" }));
     try {
       const result = await providerTestConnection(uuid);
+      // Only apply if this is still the latest request for this UUID.
+      if (connRequestIdByUuid()[uuid] !== requestId) return;
       setConnByUuid((prev) => ({ ...prev, [uuid]: result }));
     } catch (e) {
+      if (connRequestIdByUuid()[uuid] !== requestId) return;
       setConnByUuid((prev) => ({
         ...prev,
         [uuid]: { ok: false, message: t.connectionFailed },
@@ -1177,6 +1189,26 @@ const ProviderCenter: Component = () => {
       setDeleteFailedUuid(null);
       setDeleteConfirmUuid(null);
       await refresh();
+      // R6-P1-3: after a successful delete the trigger button's row is removed
+      // by refresh(). Kobalte's Dialog onCloseAutoFocus tried to restore focus
+      // to the trigger BEFORE refresh detached it, so focus is now lost to
+      // body. Restore focus to a safe fallback: the first remaining provider's
+      // Edit button, or the first preset button if the list is now empty.
+      queueMicrotask(() => {
+        if (deleteTriggerRef.current && document.contains(deleteTriggerRef.current)) {
+          // Trigger still in the DOM → focus is already restored.
+          return;
+        }
+        const firstEdit = document.querySelector<HTMLButtonElement>(
+          'button[aria-label^="Edit "]',
+        );
+        if (firstEdit) {
+          firstEdit.focus();
+          return;
+        }
+        const firstPreset = document.querySelector<HTMLButtonElement>(".pc__preset");
+        firstPreset?.focus();
+      });
     } catch (e) {
       // Close the dialog and surface a Retry banner in the main area. Kobalte's
       // Dialog sets body pointer-events:none during its close transition, so an
