@@ -381,17 +381,39 @@ pub fn migrate_v1_to_v2(conn: &Connection) -> Result<(), DbError> {
 /// what "correct" means. Column TYPES are advisory in SQLite, so for every table
 /// except the `version` invariant we check column EXISTENCE (name) only.
 pub fn validate_v2_schema(conn: &Connection) -> Result<(), DbError> {
-    // 1. _schema_migrations: the migration-state singleton.
-    validate_table_columns(conn, "_schema_migrations", &["schema_version", "migration_complete"])?;
+    // R6-P1-2: validate EVERY column declared in create_all_tables, not just a
+    // subset. A manually dropped column (e.g. `providers.secret_ref`) must be
+    // detected on startup instead of silently trusted just because the table
+    // still has a few "key" columns. Column TYPES are advisory in SQLite, so
+    // for every column except `providers.version` we check NAME existence only.
+    // `providers.version` keeps its strict `INTEGER NOT NULL DEFAULT 1` shape
+    // invariant (the optimistic lock depends on it).
 
-    // 2. preferences: the active-selection singleton.
+    // 1. _schema_migrations: the migration-state singleton.
+    validate_table_columns(
+        conn,
+        "_schema_migrations",
+        &["id", "schema_version", "migration_complete", "migration_checkpoint", "migrated_at"],
+    )?;
+
+    // 2. preferences: the active-selection singleton + settings.
     validate_table_columns(
         conn,
         "preferences",
-        &["primary_uuid", "parallel_uuids", "fallback_uuid"],
+        &[
+            "id",
+            "target_language",
+            "primary_uuid",
+            "parallel_uuids",
+            "fallback_uuid",
+            "parallel_consent_version",
+            "parallel_consent_scope",
+            "history_enabled",
+            "history_retention_days",
+        ],
     )?;
 
-    // 3. providers: uuid/name/endpoint existence + the strict version invariant.
+    // 3. providers: ALL columns + the strict version invariant.
     let provider_cols = table_columns(conn, "providers").map_err(|e| {
         DbError::Integrity(format!(
             "validate_v2_schema: table 'providers' unreadable: {e}"
@@ -402,7 +424,22 @@ pub fn validate_v2_schema(conn: &Connection) -> Result<(), DbError> {
             "validate_v2_schema: required table 'providers' is missing".into(),
         ));
     }
-    for required in &["uuid", "name", "endpoint"] {
+    for required in &[
+        "uuid",
+        "template_id",
+        "name",
+        "protocol",
+        "endpoint",
+        "model",
+        "enabled",
+        "sort_order",
+        "is_local",
+        "needs_key",
+        "secret_ref",
+        "capabilities",
+        "status",
+        "version",
+    ] {
         if !provider_cols.iter().any(|c| c.name == *required) {
             return Err(DbError::Integrity(format!(
                 "validate_v2_schema: table 'providers' missing required column '{required}'"
@@ -432,18 +469,60 @@ pub fn validate_v2_schema(conn: &Connection) -> Result<(), DbError> {
     validate_table_columns(
         conn,
         "history_sessions",
-        &["session_uuid", "source_text_encrypted"],
+        &[
+            "session_uuid",
+            "timestamp",
+            "trigger_source",
+            "detected_language",
+            "target_language",
+            "is_favorite",
+            "source_text_encrypted",
+            "source_text_nonce",
+            "crypto_version",
+        ],
     )?;
     // 6. history_results
     validate_table_columns(
         conn,
         "history_results",
-        &["result_uuid", "session_uuid", "engine_id"],
+        &[
+            "result_uuid",
+            "session_uuid",
+            "provider_uuid",
+            "provider_name_snapshot",
+            "engine_id",
+            "elapsed_ms",
+            "outcome_tag",
+            "result_text_encrypted",
+            "result_text_nonce",
+            "error_kind",
+            "error_message_encrypted",
+            "error_message_nonce",
+            "crypto_version",
+        ],
     )?;
     // 7. vocabulary
-    validate_table_columns(conn, "vocabulary", &["item_uuid", "word_encrypted"])?;
+    validate_table_columns(
+        conn,
+        "vocabulary",
+        &[
+            "item_uuid",
+            "timestamp",
+            "source_language",
+            "target_language",
+            "word_encrypted",
+            "word_nonce",
+            "definition_encrypted",
+            "definition_nonce",
+            "crypto_version",
+        ],
+    )?;
     // 8. dict_packages
-    validate_table_columns(conn, "dict_packages", &["package_id", "name"])?;
+    validate_table_columns(
+        conn,
+        "dict_packages",
+        &["package_id", "name", "version", "installed_at"],
+    )?;
 
     Ok(())
 }
