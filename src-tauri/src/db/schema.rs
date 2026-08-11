@@ -6,7 +6,10 @@ use rusqlite::{Connection, OptionalExtension};
 use crate::db::DbError;
 
 /// Current schema version. Bumped only on breaking schema changes.
-pub const SCHEMA_VERSION: u32 = 1;
+///
+/// v2 (R2-E): added `providers.version INTEGER NOT NULL DEFAULT 1` for
+/// optimistic-lock (CAS) updates. See [`migrate_v1_to_v2`].
+pub const SCHEMA_VERSION: u32 = 2;
 
 /// Migration state for the preflight read-only check.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -69,7 +72,8 @@ pub fn create_all_tables(conn: &Connection) -> Result<(), DbError> {
             needs_key INTEGER NOT NULL CHECK (needs_key IN (0,1)),
             secret_ref TEXT NOT NULL UNIQUE,
             capabilities TEXT NOT NULL DEFAULT '{}',
-            status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','deleting','deleted'))
+            status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','deleting','deleted')),
+            version INTEGER NOT NULL DEFAULT 1
         );
         CREATE INDEX IF NOT EXISTS idx_providers_status ON providers(status);"
     )?;
@@ -250,6 +254,45 @@ pub fn set_migration_complete(conn: &Connection) -> Result<(), DbError> {
     conn.execute(
         "UPDATE _schema_migrations SET migration_complete=1, migrated_at=? WHERE id=1",
         rusqlite::params![now],
+    )?;
+    Ok(())
+}
+
+/// v1 → v2 migration (R2-E): add the `providers.version` optimistic-lock column.
+///
+/// Idempotent: probes `PRAGMA table_info(providers)` for a `version` column and
+/// only runs the `ALTER TABLE` when it's missing (so a crash-replay, a v2 DB,
+/// or a DB mid-migration all converge safely). After ensuring the column exists,
+/// bumps `_schema_migrations.schema_version` to 2.
+///
+/// Caller MUST be inside a transaction (the ALTER + the version bump commit
+/// atomically — a crash between them would leave schema_version stale and force
+/// a harmless re-run on the next startup, but co-locating them in one tx is
+/// cleaner and matches the create_all_tables + seed_singletons pattern).
+pub fn migrate_v1_to_v2(conn: &Connection) -> Result<(), DbError> {
+    // Idempotent guard: only ALTER if the column is absent. PRAGMA table_info
+    // returns one row per column; index 1 is the column name.
+    let mut has_version = false;
+    {
+        let mut stmt = conn.prepare("PRAGMA table_info(providers)")?;
+        let names = stmt.query_map([], |r| r.get::<_, String>(1))?;
+        for name in names {
+            if name? == "version" {
+                has_version = true;
+                break;
+            }
+        }
+    }
+    if !has_version {
+        conn.execute(
+            "ALTER TABLE providers ADD COLUMN version INTEGER NOT NULL DEFAULT 1",
+            [],
+        )?;
+    }
+    // Bump the recorded schema version (idempotent: re-writing 2→2 is a no-op).
+    conn.execute(
+        "UPDATE _schema_migrations SET schema_version=?1 WHERE id=1",
+        rusqlite::params![SCHEMA_VERSION as i64],
     )?;
     Ok(())
 }

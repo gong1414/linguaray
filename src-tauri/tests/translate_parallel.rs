@@ -43,6 +43,7 @@ fn profile(uuid: &str, endpoint: &str) -> ProviderProfile {
         secret_ref: format!("provider/{uuid}"),
         capabilities: ProviderCapabilities::default(),
         status: "active".into(),
+        version: 1,
     }
 }
 

@@ -547,6 +547,26 @@ fn run_migration_core<K: KeystoreIo>(
     })?;
     fp.maybe_fail(Failpoint::AfterSchema)?;
 
+    // ── PHASE 2c: v1→v2 schema migration (R2-E optimistic-lock column) ───
+    // Runs only when the recorded schema_version predates v2. Idempotent (the
+    // migration itself re-checks column existence), and short-tx like Phase 2.
+    // On a fresh v2 install seed_singletons already wrote schema_version=2, so
+    // this is a no-op; on an upgraded v1 DB it ALTERs `providers` to add the
+    // `version` column and bumps the recorded version.
+    db.with_conn(|conn| {
+        let tx = conn.transaction()?;
+        let stored: i64 = tx.query_row(
+            "SELECT COALESCE((SELECT schema_version FROM _schema_migrations WHERE id=1), 0)",
+            [],
+            |r| r.get(0),
+        )?;
+        if stored < schema::SCHEMA_VERSION as i64 {
+            schema::migrate_v1_to_v2(&tx)?;
+        }
+        tx.commit()?;
+        Ok(())
+    })?;
+
     // ── PHASE 2b: Seed preferences from settings (short tx) ──────────────
     db.with_conn(|conn| {
         let tx = conn.transaction()?;
