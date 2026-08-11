@@ -6,11 +6,22 @@
  * drive the REAL production ProviderCenter controller against mocked invoke
  * routes and verify cross-provider isolation + async-safety contracts:
  *
- *  - save-key ABA: per-UUID key state is not polluted across providers.
- *  - connection test ABA: a stale completion does not overwrite a newer result
- *    (cross-UUID — the Test button auto-disables during loading, so same-UUID
- *    overlapping tests are architecturally blocked; the per-UUID request
- *    counter is defense-in-depth for the unreachable same-UUID race).
+ *  - save-key isolation: per-UUID key state is not polluted across providers.
+ *    The async mutex (`runExclusive`) structurally eliminates the ABA race —
+ *    two key saves for different providers can never overlap — so this verifies
+ *    cross-UUID isolation after a completed save, NOT a true ABA window.
+ *  - connection test isolation (cross-UUID): a stale completion does not
+ *    overwrite another provider's panel.
+ *  - connection test config-version binding (same-UUID): a Test started against
+ *    config version N is discarded if a save bumps the config to version N+1
+ *    before the probe resolves (R8-P1). This is the true same-UUID ABA window
+ *    the mutex CANNOT close — Test/Fetch run outside the mutex — closed by a
+ *    config-version guard instead of the requestId counter alone.
+ *  - fetch models config-version binding (same-UUID): same guard for Fetch
+ *    Models (R8-P2-1).
+ *  - refreshCore failure feedback: a successful mutation whose list-refresh
+ *    fails shows the warning, not the success toast, and skips DOM-dependent
+ *    focus restoration (R8-P2-2).
  *  - delete focus: after the deleted row is removed, focus lands on a safe
  *    fallback (not lost to body).
  *
@@ -82,7 +93,15 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe("ProviderCenter — production interaction contracts", () => {
-  it("save-key ABA: saving u1's key does not pollute u2's key state", async () => {
+  it("save-key isolation: completed save for one provider does not pollute another's key state", async () => {
+    // R8-P2-3: this is cross-UUID isolation after a COMPLETED save, not a true
+    // ABA race. The async mutex (`runExclusive`) serializes every mutation, so
+    // two key saves for different providers can never overlap — the mutex
+    // structurally eliminates the ABA window. The test still has value: it
+    // verifies per-UUID key state does not leak across providers once a save
+    // settles. For the real same-UUID config-version ABA that the mutex CANNOT
+    // close (Test/Fetch run outside the mutex), see the connection-test and
+    // fetch-models config-version binding tests below.
     let u1HasKey = false;
     routeInvoke({
       ...DEFAULT_ROUTES,
@@ -179,6 +198,216 @@ describe("ProviderCenter — production interaction contracts", () => {
     fireEvent.click(screen.getByLabelText("Edit Alpha"));
     await flush();
     await waitFor(() => expect(screen.getByText("u1 unreachable (stale)")).toBeTruthy());
+  });
+
+  it("connection test config-version binding: a Test started against an old config is discarded after a save bumps the version (R8-P1)", async () => {
+    // R8-P1: the true same-UUID ABA window. `providerTestConnection` probes the
+    // BACKEND's stored config. If the user starts a Test, then saves a NEW
+    // endpoint (bumping the config version), the in-flight Test still resolves
+    // against the OLD endpoint. Without the config-version guard, its stale
+    // "Connected" would overwrite the cleared result next to the freshly-saved
+    // row. The mutex CANNOT close this — Test runs outside runExclusive — so a
+    // config-version guard discards the stale completion.
+    let resolveFirstTest!: (r: { ok: boolean; message: string }) => void;
+    let testCallCount = 0;
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_test_connection: () => {
+        testCallCount++;
+        if (testCallCount === 1) {
+          // First Test stays pending across the save.
+          return new Promise((res) => {
+            resolveFirstTest = res as (r: { ok: boolean; message: string }) => void;
+          });
+        }
+        // Second Test (after save) resolves immediately against the new config.
+        return { ok: true, message: "new reachable" };
+      },
+      provider_update: () =>
+        profile({ uuid: "u1", name: "Alpha", endpoint: "https://new.example.com", version: 2 }),
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("Alpha")).toBeTruthy());
+
+    // Select u1 (version=1, old endpoint) and start a Test — stays pending.
+    fireEvent.click(screen.getByLabelText("Edit Alpha"));
+    await flush();
+    // No drafts yet → Test button is enabled.
+    expect((screen.getByText("Test").closest("button") as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(screen.getByText("Test"));
+    await flush();
+
+    // Edit the endpoint → unsaved drafts disable the Test button + surface the
+    // hint, and clear any prior connection result for this UUID.
+    const ep = screen.getByLabelText("Endpoint") as HTMLInputElement;
+    fireEvent.input(ep, { target: { value: "https://new.example.com" } });
+    await flush();
+    await waitFor(() =>
+      expect((screen.getByText("Test").closest("button") as HTMLButtonElement).disabled).toBe(true),
+    );
+    expect(screen.getByText("Save changes before testing")).toBeTruthy();
+
+    // Save → provider_update returns version=2 + the new endpoint. The Test
+    // button re-enables (the saved value now matches the draft).
+    fireEvent.click(screen.getByText("Save profile"));
+    await flush();
+    await waitFor(() =>
+      expect((screen.getByText("Test").closest("button") as HTMLButtonElement).disabled).toBe(false),
+    );
+
+    // The OLD Test (against version=1) now resolves. Its stale result MUST be
+    // discarded — not shown as "Connected" or "old reachable".
+    resolveFirstTest({ ok: true, message: "old reachable" });
+    await flush();
+    await flush();
+    expect(screen.queryByText("old reachable")).toBeNull();
+    expect(screen.queryByText("Connected")).toBeNull();
+
+    // A fresh Test against the saved config (version=2) writes its result.
+    fireEvent.click(screen.getByText("Test"));
+    await flush();
+    await waitFor(() => expect(screen.getByText("new reachable")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Connected")).toBeTruthy());
+  });
+
+  it("fetch models config-version binding: a Fetch started against an old config is discarded after a save bumps the version (R8-P2-1)", async () => {
+    // R8-P2-1: same ABA window as the connection test, but for Fetch Models.
+    // A Fetch started against version=1 whose await resolves AFTER a save bumps
+    // the config to version=2 must NOT write its (stale) model list — the
+    // config-version guard discards it.
+    //
+    // Observable strategy: the Model Select's trigger displays the label of the
+    // option matching the current modelDraft ("gpt-4o-mini"). While the fetched
+    // model list is empty, the only option IS the modelDraft, so the trigger
+    // shows "gpt-4o-mini". If the STALE list were written, its options would
+    // REPLACE the fallback and "gpt-4o-mini" would no longer match any option —
+    // the trigger would fall back to its (empty) placeholder. So "trigger still
+    // shows gpt-4o-mini after the stale resolve" proves the guard discarded it.
+    const listable = (over: Partial<ProviderProfile> = {}): ProviderProfile =>
+      profile({
+        uuid: "u1",
+        name: "Alpha",
+        sort_order: 0,
+        secret_ref: "provider/u1",
+        capabilities: { balance: false, quota: false, model_list: true },
+        ...over,
+      });
+    let resolveFirstFetch!: (m: { id: string; label: string }[]) => void;
+    let fetchCallCount = 0;
+    let saved = false;
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => [listable(saved ? { endpoint: "https://new.example.com", version: 2 } : {})],
+      provider_get_models: () => {
+        fetchCallCount++;
+        if (fetchCallCount === 1) {
+          // First Fetch stays pending across the save.
+          return new Promise((res) => {
+            resolveFirstFetch = res as (m: { id: string; label: string }[]) => void;
+          });
+        }
+        // Second Fetch (after save) returns a list that includes the current
+        // modelDraft so the trigger keeps its match.
+        return [
+          { id: "gpt-4o-mini", label: "gpt-4o-mini" },
+          { id: "new-model", label: "New Model" },
+        ];
+      },
+      provider_update: () => {
+        saved = true;
+        return listable({ endpoint: "https://new.example.com", version: 2 });
+      },
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("Alpha")).toBeTruthy());
+
+    const triggerValue = () =>
+      (document.querySelector(".lr-select__value") as HTMLElement | null)?.textContent ?? "";
+
+    // Select u1 and start a Fetch — stays pending.
+    fireEvent.click(screen.getByLabelText("Edit Alpha"));
+    await flush();
+    await waitFor(() => expect(triggerValue()).toBe("gpt-4o-mini"));
+    fireEvent.click(screen.getByText("Fetch models"));
+    await flush();
+
+    // Edit the endpoint + save → version bumps to 2 (clears model state).
+    const ep = screen.getByLabelText("Endpoint") as HTMLInputElement;
+    fireEvent.input(ep, { target: { value: "https://new.example.com" } });
+    await flush();
+    fireEvent.click(screen.getByText("Save profile"));
+    await flush();
+    await waitFor(() =>
+      expect(screen.getAllByText("Profile saved").length).toBeGreaterThanOrEqual(1),
+    );
+    // After save the model state was cleared → trigger back to the modelDraft.
+    await waitFor(() => expect(triggerValue()).toBe("gpt-4o-mini"));
+
+    // The OLD Fetch (against version=1) resolves with stale models. They MUST
+    // be discarded — the trigger must NOT lose its match (which would happen if
+    // the stale list replaced the fallback options).
+    resolveFirstFetch([{ id: "stale-model", label: "Stale Model" }]);
+    await flush();
+    await flush();
+    expect(triggerValue()).toBe("gpt-4o-mini");
+    expect(screen.queryByText("Stale Model")).toBeNull();
+
+    // A fresh Fetch against the saved config writes the new model list (which
+    // includes the current modelDraft, so the trigger keeps its match and the
+    // fetch settles to idle — no loading spinner, no error toast).
+    fireEvent.click(screen.getByText("Fetch models"));
+    await flush();
+    await waitFor(() => expect(triggerValue()).toBe("gpt-4o-mini"));
+    // No fetch-error toast surfaced.
+    expect(screen.queryByText("Failed to fetch models — enter manually")).toBeNull();
+    expect(fetchCallCount).toBe(2);
+  });
+
+  it("refreshCore failure: a successful mutation whose list-refresh fails shows the warning, not the success toast (R8-P2-2)", async () => {
+    // R8-P2-2: provider_delete succeeds, but the post-delete refreshCore fails
+    // (provider_list rejects). confirmDelete must NOT run the DOM-dependent
+    // focus restoration, and must show the "saved but reload failed" warning
+    // instead of the (now-misleading) success path. refreshCore already pushes
+    // its own destructive toast + sets loadError; the warning adds the accurate
+    // context that the delete itself went through.
+    let deleted = false;
+    let refreshShouldFail = false;
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_delete: () => {
+        deleted = true;
+      },
+      provider_list: () => {
+        if (refreshShouldFail) throw new Error("reload failed");
+        return deleted
+          ? [profile({ uuid: "u2", name: "Beta", sort_order: 0, secret_ref: "provider/u2" })]
+          : TWO_NO_KEY;
+      },
+      provider_get_active_selection: () => {
+        if (refreshShouldFail) throw new Error("reload failed");
+        return { primary: null, parallel: [], fallback: null };
+      },
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("Alpha")).toBeTruthy());
+
+    // Make the post-delete refresh fail.
+    refreshShouldFail = true;
+    fireEvent.click(screen.getByLabelText("Delete Alpha"));
+    await waitFor(() => expect(screen.getByText("Delete provider?")).toBeTruthy());
+    fireEvent.click(screen.getByText("Delete"));
+    await flush();
+
+    // The delete went through on the backend; the reload failed. The warning
+    // surfaces (refreshCore's destructive toast is also present).
+    await waitFor(() =>
+      expect(
+        screen.getByText("Saved, but the list could not be refreshed. Click Reload to retry."),
+      ).toBeTruthy(),
+    );
+    expect(deleted).toBe(true);
+    // The success toast must NOT have appeared.
+    expect(screen.queryByText("Profile saved")).toBeNull();
   });
 
   it("delete: focus falls to a safe fallback when the trigger row is removed", async () => {
