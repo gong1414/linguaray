@@ -144,6 +144,28 @@ describe("Popup (Surface 01)", () => {
     cleanup();
   });
 
+  it("writeText rejection does NOT show Copied and produces no unhandled rejection (R3-P1-3)", async () => {
+    const { writeText } = await import("@tauri-apps/plugin-clipboard-manager");
+    vi.mocked(writeText).mockRejectedValueOnce(new Error("clipboard denied"));
+    const { findByLabelText, queryByText } = render(() => <Popup />);
+    await emitEvent("popup-state", {
+      status: "result",
+      text: "你好",
+      engine: "deepseek/u1",
+      source_text: "hello",
+    });
+    const copyBtn = await findByLabelText(/复制|Copy/);
+    await fireEvent.click(copyBtn);
+    // Give the awaited rejection a tick to settle (the handler awaits onCopy,
+    // catches the rejection, and never sets the Copied feedback).
+    await new Promise((r) => setTimeout(r, 50));
+    // Copied feedback must NOT appear on copy failure (no false positive).
+    expect(queryByText(/已复制|Copied/)).toBeNull();
+    // writeText was still called with the TRANSLATION text.
+    expect(vi.mocked(writeText)).toHaveBeenCalledWith("你好");
+    cleanup();
+  });
+
   it("Retry reuses the saved SOURCE text, not the translation result and not the clipboard", async () => {
     const { invoke } = await import("@tauri-apps/api/core");
     vi.mocked(invoke).mockClear();

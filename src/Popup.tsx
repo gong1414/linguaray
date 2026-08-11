@@ -125,13 +125,20 @@ export function PopupView(props: PopupViewProps): JSX.Element {
         icon: isCopied
           ? <span class="popup-copy-copied">{t("selection.action.copied")}</span>
           : <Copy size={14} />,
-        onClick: () => {
+        onClick: async () => {
           const translationText = textFor(uuid) ?? "";
-          void Promise.resolve(props.onCopy(translationText)).then(() => {
+          try {
+            // Await the copy so a rejection (clipboard unavailable / denied) is
+            // observed here rather than becoming an unhandled promise rejection.
+            await props.onCopy(translationText);
+            // Copy succeeded — show the Copied feedback.
             setCopiedUuid(uuid);
             if (copiedTimer) clearTimeout(copiedTimer);
             copiedTimer = setTimeout(() => setCopiedUuid(null), COPIED_FEEDBACK_MS);
-          });
+          } catch {
+            // Copy failed — do NOT show Copied (no false-positive feedback).
+            // Best-effort: no error UI (clipboard may simply be unavailable).
+          }
         },
       },
       {
@@ -311,7 +318,7 @@ const Popup: Component = () => {
       pinned={ctrl.pinned()}
       hasSource={ctrl.hasSource()}
       engineLabel={ctrl.engineLabel}
-      onCopy={(text) => { void writeText(text); }}
+      onCopy={(text) => writeText(text)}
       onPin={() => ctrl.pin()}
       onUnpin={() => ctrl.unpin()}
       onDismiss={() => { void ctrl.dismiss(); }}
