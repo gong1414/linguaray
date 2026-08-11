@@ -1,6 +1,11 @@
 /**
  * Provider Center (Surface 05) — production component on real IPC.
  *
+ * rev-7-3: the presentational body is extracted into `ProviderCenterView`
+ * (a pure props-driven View, shared with the ui-lab visual fixture). The
+ * default export is the controller: it owns the signals + IPC and renders
+ * `<ProviderCenterView ... />` with signal-derived props.
+ *
  * Ported from `apps/ui-lab/src/pages/ProviderCenter.tsx` and rewired to the
  * Task 2 IPC wrappers. Mock-fixture/state-driver props and the OpRegistry
  * mock timers are DELETED — real IPC awaits replace them.
@@ -24,6 +29,7 @@ import {
   createMemo,
   onMount,
   type Component,
+  type JSX,
 } from "solid-js";
 import {
   Server,
@@ -48,7 +54,7 @@ import {
   type ProviderRowLabels,
   type SelectOption,
 } from "@linguaray/ui";
-import { SETTINGS_COPY } from "./copy";
+import { SETTINGS_COPY, type SettingsCopy } from "./copy";
 import { detectLocale } from "../../i18n";
 import type {
   ProviderProfileFE,
@@ -79,18 +85,601 @@ import "./ProviderCenter.css";
 // `name` may be null to signal "use the localized Ollama label" at render.
 // R2/C2: only the 4 supported AI presets are exposed. Traditional MT engines
 // (google / deepl) are no longer offered as presets.
-type Preset = { templateId: string; name: string | null; endpoint: string; model: string | null };
+export type Preset = { templateId: string; name: string | null; endpoint: string; model: string | null };
 
 /** Escape a literal string for use inside a CSS attribute selector. Provider
  *  names may contain characters that break `button[aria-label="..."]` otherwise. */
 const cssEscape = (s: string): string =>
   s.replace(/["\\]/g, (c) => `\\${c}`);
-const PRESETS: Preset[] = [
+
+export const PRESETS: Preset[] = [
   { templateId: "openai", name: "OpenAI", endpoint: "https://api.openai.com/v1/chat/completions", model: "gpt-4o-mini" },
   { templateId: "anthropic", name: "Anthropic", endpoint: "https://api.anthropic.com/v1/messages", model: "claude-sonnet-4-5" },
   { templateId: "gemini", name: "Gemini", endpoint: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", model: "gemini-3.6-flash" },
   { templateId: "ollama", name: null, endpoint: "http://localhost:11434/v1/chat/completions", model: "qwen2.5:7b" },
 ];
+
+export type ToastVariant = "info" | "success" | "warning" | "destructive";
+export type ToastEntry = { id: number; variant: ToastVariant; message: string };
+export type ConsentRecipient = { name: string; localLabel: string };
+
+/**
+ * The detail-panel state for the currently-selected provider. The controller
+ * gathers every per-UUID draft/error/status for the selected provider into this
+ * object so the View is pure (no signal reads inside the panel).
+ */
+export type ProviderDetailState = {
+  provider: ProviderProfileFE;
+  nameDraft: string;
+  endpointDraft: string;
+  modelDraft: string;
+  keyText: string;
+  nameError?: string;
+  keyError?: string;
+  endpointError?: string;
+  saveState: "idle" | "saving" | "saved" | "failed";
+  conn: ConnectionResult | "testing" | "idle";
+  modelOptions: ModelInfo[];
+  modelFetch: "idle" | "loading" | "error";
+  saveConflict: boolean;
+};
+
+/**
+ * Pure presentational View for Surface 05 (Provider Center). Shared by the
+ * production controller (default export below) + the ui-lab visual fixture
+ * (apps/ui-lab/src/pages/ProviderCenter.tsx). No signals, no IPC — all data
+ * and mutations flow through props.
+ */
+export type ProviderCenterViewProps = {
+  t: SettingsCopy["provider"];
+  providers: ProviderProfileFE[];
+  selection: ActiveSelection;
+  selectedUuid: string | null;
+  loadError: boolean;
+  selectionError: boolean;
+  selectionLoading: boolean;
+  deletingUuid: string | null;
+  presets: Preset[];
+  detail: ProviderDetailState | null;
+  // dialogs + toasts
+  deleteConfirmUuid: string | null;
+  deleteError: boolean;
+  deleteFailedUuid: string | null;
+  consentOpen: boolean;
+  consentRecipients: ConsentRecipient[];
+  toasts: ToastEntry[];
+  // refs forwarded to Confirm (focus restore)
+  deleteTriggerRef: { current?: HTMLElement };
+  consentTriggerRef: { current?: HTMLElement };
+  // --- sidebar row callbacks ---
+  onToggle: (uuid: string, enabled: boolean) => void;
+  onEdit: (uuid: string) => void;
+  onDelete: (uuid: string) => void;
+  onSetPrimary: (uuid: string) => void;
+  onAddParallel: (uuid: string, triggerEl?: HTMLElement) => void;
+  onRemoveParallel: (uuid: string) => void;
+  onSetFallback: (uuid: string) => void;
+  onDuplicate: (uuid: string) => void;
+  onMoveUp: (uuid: string) => void;
+  onMoveDown: (uuid: string) => void;
+  onAddPreset: (preset: Preset) => void;
+  // --- detail-panel callbacks ---
+  onNameInput: (uuid: string, value: string) => void;
+  onEndpointInput: (uuid: string, value: string) => void;
+  onModelInput: (uuid: string, value: string) => void;
+  onModelChange: (uuid: string, value: string) => void;
+  onKeyInput: (uuid: string, value: string) => void;
+  onSaveProfile: (uuid: string) => void;
+  onSaveKey: (uuid: string) => void;
+  onFetchModels: (uuid: string) => void;
+  onTestConnection: (uuid: string) => void;
+  onResolveSaveConflict: (uuid: string) => void;
+  // --- top-level error + dialog callbacks ---
+  onReloadFromError: () => void;
+  onRetrySelectionLoad: () => void;
+  onConfirmDelete: () => void;
+  onCancelDelete: () => void;
+  onRetryDelete: () => void;
+  onDismissDeleteError: () => void;
+  onConfirmConsent: () => void;
+  onCancelConsent: () => void;
+  onDismissToast: (id: number) => void;
+};
+
+export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element {
+  const t = () => props.t;
+
+  const sortedProviders = createMemo(() =>
+    [...props.providers].sort((a, b) => a.sort_order - b.sort_order),
+  );
+
+  // --- Derived role for a provider (session mirror) ---
+  const roleFor = (uuid: string): ProviderRole => {
+    const sel = props.selection;
+    if (sel.primaryUuid === uuid) return { kind: "primary" };
+    const idx = sel.parallelUuids.indexOf(uuid);
+    if (idx >= 0) return { kind: "parallel", index: idx + 1 };
+    if (sel.fallbackUuid === uuid) return { kind: "fallback" };
+    return { kind: "none" };
+  };
+
+  // --- Row labels for ProviderRow (per-provider: {name} interpolated) ---
+  const rowLabelsFor = (name: string): ProviderRowLabels => ({
+    edit: t().cardEdit.replace("{name}", name),
+    delete: t().cardDelete.replace("{name}", name),
+    enabled: t().enabled,
+    statusText: {
+      active: t().role.primary,
+      available: t().role.none,
+      "key-missing": t().keyMissing,
+      disabled: t().disabled,
+    },
+  });
+
+  return (
+    <div class="pc__body" role="region" aria-label={t().providerListLabel}>
+      <Show when={props.loadError}>
+        <InlineError>{t().saveFailed}</InlineError>
+        <div class="pc__retry">
+          <Button variant="primary" size="sm" onClick={() => props.onReloadFromError()}>
+            {t().reload}
+          </Button>
+        </div>
+      </Show>
+
+      {/* Cold-load failure: selection read failed → fail-closed. Role mutations
+          are disabled (see handler guards) until a successful retry. */}
+      <Show when={props.selectionError}>
+        <div class="pc__retry" role="alert">
+          <span class="pc__load-failed">{t().loadFailed}</span>
+          <Button variant="secondary" size="sm" onClick={() => props.onRetrySelectionLoad()}>
+            {t().retry}
+          </Button>
+        </div>
+      </Show>
+
+      <div class="pc__layout">
+        {/* Sidebar: provider list */}
+        <aside class="pc__sidebar" aria-label={t().providerListLabel}>
+          <div class="pc__sidebar-header">
+            <h2 class="pc__sidebar-title">{t().addProvider}</h2>
+          </div>
+
+          <Show
+            when={props.providers.length > 0}
+            fallback={
+              <EmptyState
+                icon={<Server size={32} />}
+                title={t().empty.title}
+                description={t().empty.description}
+              />
+            }
+          >
+            <ul class="pc__provider-list" role="list">
+              <For each={sortedProviders()}>
+                {(p) => {
+                  // role is reactive: re-evaluated when props.selection changes.
+                  const role = () => roleFor(p.uuid);
+                  const isDeleting = () => props.deletingUuid === p.uuid;
+                  return (
+                    <li class="pc__provider-row-wrapper" data-status={isDeleting() ? "deleting" : p.status}>
+                      <div class="pc__provider-row-main">
+                        <ProviderRow
+                          name={p.name}
+                          template={p.template_id}
+                          hasKey={p.hasKey}
+                          role={role()}
+                          enabled={p.enabled}
+                          active={props.selectedUuid === p.uuid}
+                          disabled={isDeleting()}
+                          labels={rowLabelsFor(p.name)}
+                          onToggle={(enabled) => props.onToggle(p.uuid, enabled)}
+                          onEdit={() => props.onEdit(p.uuid)}
+                          onDelete={() => props.onDelete(p.uuid)}
+                        />
+                        {/* Role-action icon buttons (ProviderRow has no slot).
+                            Role-assign buttons (set-primary / add-parallel /
+                            set-fallback / remove-parallel) are hidden for
+                            disabled providers — a disabled provider cannot hold
+                            a role. Reorder + duplicate remain available. */}
+                        <div class="pc__role-actions">
+                          <Show when={p.enabled}>
+                            <Show when={role().kind !== "primary"}>
+                              <button
+                                type="button"
+                                class="pc__icon-btn"
+                                aria-label={t().setPrimary}
+                                title={t().setPrimary}
+                                disabled={isDeleting()}
+                                onClick={() => props.onSetPrimary(p.uuid)}
+                              >
+                                <Star size={14} />
+                              </button>
+                            </Show>
+                            <Show when={role().kind === "parallel"}>
+                              <button
+                                type="button"
+                                class="pc__icon-btn"
+                                aria-label={t().removeParallel}
+                                title={t().removeParallel}
+                                disabled={isDeleting()}
+                                onClick={() => props.onRemoveParallel(p.uuid)}
+                              >
+                                <Layers size={14} />
+                              </button>
+                            </Show>
+                            <Show when={role().kind !== "parallel" && role().kind !== "primary"}>
+                              <button
+                                type="button"
+                                class="pc__icon-btn"
+                                aria-label={t().addParallel}
+                                title={t().addParallel}
+                                disabled={isDeleting()}
+                                onClick={(e) =>
+                                  props.onAddParallel(
+                                    p.uuid,
+                                    e.currentTarget as unknown as HTMLElement,
+                                  )
+                                }
+                              >
+                                <Layers size={14} />
+                              </button>
+                            </Show>
+                            <Show when={role().kind !== "fallback" && role().kind !== "primary"}>
+                              <button
+                                type="button"
+                                class="pc__icon-btn"
+                                aria-label={t().setFallback}
+                                title={t().setFallback}
+                                disabled={isDeleting()}
+                                onClick={() => props.onSetFallback(p.uuid)}
+                              >
+                                <CornerDownLeft size={14} />
+                              </button>
+                            </Show>
+                          </Show>
+                          {/* Duplicate */}
+                          <button
+                            type="button"
+                            class="pc__icon-btn"
+                            aria-label={t().duplicate}
+                            title={t().duplicate}
+                            disabled={isDeleting()}
+                            onClick={() => props.onDuplicate(p.uuid)}
+                          >
+                            <Copy size={14} />
+                          </button>
+                          {/* Reorder */}
+                          <button
+                            type="button"
+                            class="pc__icon-btn"
+                            aria-label={t().moveUp}
+                            title={t().moveUp}
+                            disabled={isDeleting()}
+                            onClick={() => props.onMoveUp(p.uuid)}
+                          >
+                            <ArrowUp size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            class="pc__icon-btn"
+                            aria-label={t().moveDown}
+                            title={t().moveDown}
+                            disabled={isDeleting()}
+                            onClick={() => props.onMoveDown(p.uuid)}
+                          >
+                            <ArrowDown size={14} />
+                          </button>
+                        </div>
+                      </div>
+                      {/* Role badge row (cold-loaded + session mirror). On read
+                          failure all roles render as "none" (fail-closed). */}
+                      <Show when={role().kind !== "none"}>
+                        <div class="pc__role-badge-row">
+                          <Show when={role().kind === "primary"}>
+                            <StatusBadge variant="success">{t().role.primary}</StatusBadge>
+                          </Show>
+                          <Show when={role().kind === "parallel"}>
+                            <StatusBadge variant="info">
+                              {t().role.parallel} {(role() as { kind: "parallel"; index: number }).index}
+                            </StatusBadge>
+                          </Show>
+                          <Show when={role().kind === "fallback"}>
+                            <StatusBadge variant="neutral">{t().role.fallback}</StatusBadge>
+                          </Show>
+                        </div>
+                      </Show>
+                    </li>
+                  );
+                }}
+              </For>
+            </ul>
+          </Show>
+
+          {/* Preset grid (always visible — add provider). */}
+          <div class="pc__preset-grid">
+            <For each={props.presets}>
+              {(preset) => (
+                <button
+                  type="button"
+                  class="pc__preset"
+                  onClick={() => props.onAddPreset(preset)}
+                >
+                  <Plus size={12} />
+                  <span>{preset.name ?? "Ollama"}</span>
+                </button>
+              )}
+            </For>
+          </div>
+        </aside>
+
+        {/* Detail panel */}
+        <section class="pc__detail" aria-label={t().detailLabel}>
+          <Show
+            when={props.detail}
+            fallback={
+              <EmptyState icon={<Server size={32} />} title={t().selectPrimary} />
+            }
+          >
+            {(d) => {
+              const uuid = d().provider.uuid;
+              const canListModels = () => d().provider.capabilities.model_list;
+              const selectOptions = createMemo<SelectOption[]>(() => {
+                const opts = d().modelOptions;
+                if (opts && opts.length > 0) {
+                  return opts.map((m) => ({ value: m.id, label: m.label, disabled: false }));
+                }
+                // Manual entry fallback: current model as the only option.
+                return [{ value: d().modelDraft || "—", label: d().modelDraft || "—", disabled: false }];
+              });
+              return (
+                <div class="pc__detail-content">
+                  {/* R2-E: save-conflict banner. Surfaces when an optimistic-lock
+                      CAS rejected this save (`stale_version`). The user's draft
+                      is preserved (not overwritten); Reload re-fetches fresh data
+                      so they can reconcile against the other writer's version. */}
+                  <Show when={d().saveConflict}>
+                    <div class="pc__retry" role="alert">
+                      <span class="pc__load-failed">{t().saveConflict}</span>
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={() => props.onResolveSaveConflict(uuid)}
+                      >
+                        {t().reload}
+                      </Button>
+                    </div>
+                  </Show>
+                  {/* Name (editable — backend supports `name` patches). */}
+                  <TextField
+                    label={t().name}
+                    value={d().nameDraft}
+                    errorText={d().nameError ?? undefined}
+                    disabled={d().saveState === "saving"}
+                    onInput={(e) => {
+                      props.onNameInput(uuid, e.currentTarget.value);
+                    }}
+                  />
+
+                  {/* Endpoint */}
+                  <TextField
+                    label={t().endpoint.label}
+                    value={d().endpointDraft}
+                    placeholder={t().endpoint.placeholder}
+                    errorText={d().endpointError ?? undefined}
+                    disabled={d().saveState === "saving"}
+                    onInput={(e) =>
+                      props.onEndpointInput(uuid, e.currentTarget.value)
+                    }
+                  />
+
+                  {/* Model: dropdown + Fetch models only when the provider
+                      advertises model_list; otherwise a manual-entry input.
+                      A fetch error also falls back to the manual input. */}
+                  <Show
+                    when={d().modelFetch !== "error" && canListModels()}
+                    fallback={
+                      <TextField
+                        label={t().models}
+                        value={d().modelDraft}
+                        placeholder={t().manualModelPlaceholder}
+                        disabled={d().saveState === "saving"}
+                        onInput={(e) =>
+                          props.onModelInput(uuid, e.currentTarget.value)
+                        }
+                      />
+                    }
+                  >
+                    <div class="pc__model-row">
+                      <Select
+                        label={t().models}
+                        value={d().modelDraft || null}
+                        options={selectOptions()}
+                        loading={d().modelFetch === "loading"}
+                        loadingLabel={t().loadingModels}
+                        disabled={d().saveState === "saving"}
+                        onChange={(v) =>
+                          props.onModelChange(uuid, v)
+                        }
+                      />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => props.onFetchModels(uuid)}
+                      >
+                        {t().fetchModels}
+                      </Button>
+                    </div>
+                  </Show>
+
+                  <div class="pc__save-row">
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      loading={d().saveState === "saving"}
+                      onClick={() => props.onSaveProfile(uuid)}
+                    >
+                      {t().saveProfile}
+                    </Button>
+                    <Show when={d().saveState === "saved"}>
+                      <span class="pc__saved-note">{t().profileSaved}</span>
+                    </Show>
+                  </div>
+
+                  {/* Key section */}
+                  <div class="pc__key-section">
+                    <Show
+                      when={d().provider.hasKey}
+                      fallback={
+                        <>
+                          <TextField
+                            label={t().apiKey}
+                            type="password"
+                            value={d().keyText}
+                            placeholder={t().apiKeyPlaceholder}
+                            errorText={d().keyError ?? undefined}
+                            disabled={d().saveState === "saving"}
+                            onInput={(e) => {
+                              props.onKeyInput(uuid, e.currentTarget.value);
+                            }}
+                          />
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            disabled={d().provider.needs_key && d().keyText.length === 0}
+                            loading={d().saveState === "saving"}
+                            onClick={() => props.onSaveKey(uuid)}
+                          >
+                            {t().saveKey}
+                          </Button>
+                        </>
+                      }
+                    >
+                      <span class="pc__key-saved-badge">
+                        {t().keySaved}
+                      </span>
+                    </Show>
+                  </div>
+
+                  {/* Connection test */}
+                  <div class="pc__conn-section">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      loading={d().conn === "testing"}
+                      onClick={() => props.onTestConnection(uuid)}
+                    >
+                      {t().testConnection}
+                    </Button>
+                    <Show when={d().conn && d().conn !== "testing" && d().conn !== "idle"}>
+                      <StatusBadge
+                        variant={
+                          d().conn !== "testing" && d().conn !== "idle" && (d().conn as ConnectionResult).ok
+                            ? "success"
+                            : "danger"
+                        }
+                      >
+                        {d().conn !== "testing" && d().conn !== "idle" && (d().conn as ConnectionResult).ok
+                          ? t().connectionOk
+                          : t().connectionFailed}
+                      </StatusBadge>
+                      <span class="pc__conn-message">
+                        {(d().conn as ConnectionResult).message}
+                        <Show when={typeof (d().conn as ConnectionResult).latency_ms === "number"}>
+                          <span class="pc__conn-latency">
+                            {" · "}{(d().conn as ConnectionResult).latency_ms}ms
+                          </span>
+                        </Show>
+                      </span>
+                    </Show>
+                  </div>
+
+                  {/* Balance — R3a limitation: muted TODO note, no fetch. */}
+                  <div class="pc__balance-section">
+                    <span class="pc__balance-title">{t().balance.title}</span>
+                    <span class="pc__balance-note">
+                      {/* TODO(r3b): balance/quota IPC not yet implemented. */}
+                      {t().balance.unsupportedNote}
+                    </span>
+                  </div>
+                </div>
+              );
+            }}
+          </Show>
+        </section>
+      </div>
+
+      {/* Delete Confirm */}
+      <Confirm
+        open={!!props.deleteConfirmUuid}
+        onOpenChange={(o) => {
+          if (!o) props.onCancelDelete();
+        }}
+        title={t().deleteConfirmTitle}
+        message={t().deleteConfirmMsg}
+        confirmLabel={t().delete}
+        cancelLabel={t().cancel}
+        variant="destructive"
+        onConfirm={() => props.onConfirmDelete()}
+        onCancel={() => props.onCancelDelete()}
+        triggerRef={props.deleteTriggerRef}
+      />
+
+      {/* Delete-error Retry banner: surfaced after a failed delete. Lives in the
+          main layout (NOT inside the Kobalte Dialog) because the Dialog sets
+          body pointer-events:none during its close transition, which would
+          swallow clicks on an in-dialog Retry button. */}
+      <Show when={props.deleteError}>
+        <div class="pc__delete-error-banner" role="alert">
+          <span class="pc__delete-error-msg">{t().saveFailed}</span>
+          <Button variant="secondary" size="sm" onClick={() => props.onRetryDelete()}>
+            {t().retry}
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => props.onDismissDeleteError()}>
+            {t().cancel}
+          </Button>
+        </div>
+      </Show>
+
+      {/* Consent Confirm */}
+      <Confirm
+        open={props.consentOpen}
+        onOpenChange={(o) => !o && props.onCancelConsent()}
+        title={t().consent.title}
+        message={t().consent.message}
+        confirmLabel={t().consent.confirm}
+        cancelLabel={t().consent.cancel}
+        onConfirm={() => props.onConfirmConsent()}
+        onCancel={() => props.onCancelConsent()}
+        triggerRef={props.consentTriggerRef}
+      >
+        <ul class="pc__consent-recipients">
+          <For each={props.consentRecipients}>
+            {(r) => (
+              <li>
+                <strong>{r.name}</strong> <span class="pc__consent-kind">{r.localLabel}</span>
+              </li>
+            )}
+          </For>
+        </ul>
+      </Confirm>
+
+      {/* Toasts */}
+      <div class="pc__toasts" role="region" aria-label="notifications">
+        <For each={props.toasts}>
+          {(toast) => (
+            <Toast
+              variant={toast.variant}
+              message={toast.message}
+              onDismiss={() => props.onDismissToast(toast.id)}
+              dismissLabel={t().toastDismiss}
+            />
+          )}
+        </For>
+      </div>
+    </div>
+  );
+}
 
 const ProviderCenter: Component = () => {
   const locale = detectLocale();
@@ -152,13 +741,11 @@ const ProviderCenter: Component = () => {
   const [pendingParallelUuid, setPendingParallelUuid] = createSignal<string | null>(null);
   const [consentActualScope, setConsentActualScope] = createSignal<string | null>(null);
   const consentTriggerRef: { current?: HTMLElement } = {};
-  const [toasts, setToasts] = createSignal<
-    { id: number; variant: "info" | "success" | "warning" | "destructive"; message: string }[]
-  >([]);
+  const [toasts, setToasts] = createSignal<ToastEntry[]>([]);
 
   let toastId = 0;
   const pushToast = (
-    variant: "info" | "success" | "warning" | "destructive",
+    variant: ToastVariant,
     message: string,
   ) => {
     const id = ++toastId;
@@ -199,35 +786,9 @@ const ProviderCenter: Component = () => {
     void refresh();
   });
 
-  // --- Derived role for a provider (session mirror) ---
-  const roleFor = (uuid: string): ProviderRole => {
-    const sel = selection();
-    if (sel.primaryUuid === uuid) return { kind: "primary" };
-    const idx = sel.parallelUuids.indexOf(uuid);
-    if (idx >= 0) return { kind: "parallel", index: idx + 1 };
-    if (sel.fallbackUuid === uuid) return { kind: "fallback" };
-    return { kind: "none" };
-  };
-
-  const sortedProviders = createMemo(() =>
-    [...providers()].sort((a, b) => a.sort_order - b.sort_order),
-  );
   const selectedProvider = createMemo(() =>
     providers().find((p) => p.uuid === selectedUuid()),
   );
-
-  // --- Row labels for ProviderRow (per-provider: {name} interpolated) ---
-  const rowLabelsFor = (name: string): ProviderRowLabels => ({
-    edit: t.cardEdit.replace("{name}", name),
-    delete: t.cardDelete.replace("{name}", name),
-    enabled: t.enabled,
-    statusText: {
-      active: t.role.primary,
-      available: t.role.none,
-      "key-missing": t.keyMissing,
-      disabled: t.disabled,
-    },
-  });
 
   // --- Mutations ---
 
@@ -588,9 +1149,24 @@ const ProviderCenter: Component = () => {
     });
   };
 
+  /** Delete trigger: capture the trigger button (by aria-label) for focus
+   *  restore, then open the Confirm. */
+  const handleDelete = (uuid: string) => {
+    const p = providers().find((x) => x.uuid === uuid);
+    if (!p) return;
+    const label = t.cardDelete.replace("{name}", p.name);
+    const btn = document.querySelector<HTMLButtonElement>(
+      `button[aria-label="${cssEscape(label)}"]`,
+    );
+    deleteTriggerRef.current = btn ?? undefined;
+    setDeleteError(false);
+    setDeleteFailedUuid(null);
+    setDeleteConfirmUuid(uuid);
+  };
+
   /** Reorder: optimistic local swap → IPC → revert + toast on error. */
   const moveProvider = async (uuid: string, dir: "up" | "down") => {
-    const ordered = sortedProviders();
+    const ordered = [...providers()].sort((a, b) => a.sort_order - b.sort_order);
     const idx = ordered.findIndex((p) => p.uuid === uuid);
     if (idx < 0) return;
     const swap = dir === "up" ? idx - 1 : idx + 1;
@@ -612,8 +1188,39 @@ const ProviderCenter: Component = () => {
     }
   };
 
-  // --- Render helpers ---
-  const consentRecipients = createMemo(() => {
+  // --- Detail state memo (gathered for the View) ---
+  const detail = createMemo<ProviderDetailState | null>(() => {
+    const p = selectedProvider();
+    if (!p) return null;
+    const uuid = p.uuid;
+    const draftEndpoint = endpointDraft()[uuid] ?? p.endpoint;
+    const draftModel = modelDraftByUuid()[uuid] ?? p.model ?? "";
+    const draftName = nameDraftByUuid()[uuid] ?? p.name;
+    // Reactive endpoint validation (only for drafts that differ from stored).
+    let endpointError: string | undefined;
+    if (draftEndpoint !== p.endpoint) {
+      const check = validateEndpoint(draftEndpoint);
+      if (!check.ok) endpointError = t.endpoint.errors[check.code];
+    }
+    return {
+      provider: p,
+      nameDraft: draftName,
+      endpointDraft: draftEndpoint,
+      modelDraft: draftModel,
+      keyText: keyInputByUuid()[uuid] ?? "",
+      nameError: nameErrorByUuid()[uuid],
+      keyError: keyErrorByUuid()[uuid],
+      endpointError,
+      saveState: saveByUuid()[uuid] ?? "idle",
+      conn: connByUuid()[uuid] ?? "idle",
+      modelOptions: modelOptionsByUuid()[uuid] ?? [],
+      modelFetch: modelFetchByUuid()[uuid] ?? "idle",
+      saveConflict: saveConflictUuid() === uuid,
+    };
+  });
+
+  // --- Consent recipients for the dialog ---
+  const consentRecipients = createMemo<ConsentRecipient[]>(() => {
     const sel = pendingParallelUuid()
       ? {
           ...selection(),
@@ -633,541 +1240,83 @@ const ProviderCenter: Component = () => {
   });
 
   return (
-    <div class="pc__body" role="region" aria-label={t.providerListLabel}>
-      <Show when={loadError()}>
-        <InlineError>{t.saveFailed}</InlineError>
-        <div class="pc__retry">
-          <Button variant="primary" size="sm" onClick={() => void refresh()}>
-            {t.reload}
-          </Button>
-        </div>
-      </Show>
-
-      {/* Cold-load failure: selection read failed → fail-closed. Role mutations
-          are disabled (see handler guards) until a successful retry. */}
-      <Show when={selectionError()}>
-        <div class="pc__retry" role="alert">
-          <span class="pc__load-failed">{t.loadFailed}</span>
-          <Button variant="secondary" size="sm" onClick={() => void refresh()}>
-            {t.retry}
-          </Button>
-        </div>
-      </Show>
-
-      <div class="pc__layout">
-        {/* Sidebar: provider list */}
-        <aside class="pc__sidebar" aria-label={t.providerListLabel}>
-          <div class="pc__sidebar-header">
-            <h2 class="pc__sidebar-title">{t.addProvider}</h2>
-          </div>
-
-          <Show
-            when={providers().length > 0}
-            fallback={
-              <EmptyState
-                icon={<Server size={32} />}
-                title={t.empty.title}
-                description={t.empty.description}
-              />
-            }
-          >
-            <ul class="pc__provider-list" role="list">
-              <For each={sortedProviders()}>
-                {(p) => {
-                  // role is a reactive accessor: re-evaluated when selection()
-                  // changes, so role-action visibility + badges update in place.
-                  const role = () => roleFor(p.uuid);
-                  const isDeleting = () => deletingUuid() === p.uuid;
-                  return (
-                    <li class="pc__provider-row-wrapper" data-status={isDeleting() ? "deleting" : p.status}>
-                      <div class="pc__provider-row-main">
-                        <ProviderRow
-                          name={p.name}
-                          template={p.template_id}
-                          hasKey={p.hasKey}
-                          role={role()}
-                          enabled={p.enabled}
-                          active={selectedUuid() === p.uuid}
-                          disabled={isDeleting()}
-                          labels={rowLabelsFor(p.name)}
-                          onToggle={(enabled) => void handleToggle(p.uuid, enabled)}
-                          onEdit={() => setSelectedUuid(p.uuid)}
-                          onDelete={() => {
-                            // Capture the delete trigger button so the Confirm's
-                            // onCloseAutoFocus can restore focus to it on cancel.
-                            // ProviderRow.onDelete carries no event/element, so
-                            // resolve the button by its deterministic aria-label
-                            // ("Delete {name}"). document.activeElement is
-                            // unreliable here — fireEvent.click in jsdom does not
-                            // move focus to the button, and a real click may have
-                            // already blurred it by the time the handler runs.
-                            const label = t.cardDelete.replace("{name}", p.name);
-                            const btn = document.querySelector<HTMLButtonElement>(
-                              `button[aria-label="${cssEscape(label)}"]`,
-                            );
-                            deleteTriggerRef.current = btn ?? undefined;
-                            setDeleteError(false);
-                            setDeleteFailedUuid(null);
-                            setDeleteConfirmUuid(p.uuid);
-                          }}
-                        />
-                        {/* Role-action icon buttons (ProviderRow has no slot).
-                            Role-assign buttons (set-primary / add-parallel /
-                            set-fallback / remove-parallel) are hidden for
-                            disabled providers — a disabled provider cannot hold
-                            a role. Reorder + duplicate remain available. */}
-                        <div class="pc__role-actions">
-                          <Show when={p.enabled}>
-                            <Show when={role().kind !== "primary"}>
-                              <button
-                                type="button"
-                                class="pc__icon-btn"
-                                aria-label={t.setPrimary}
-                                title={t.setPrimary}
-                                disabled={isDeleting()}
-                                onClick={() => void handleSetPrimary(p.uuid)}
-                              >
-                                <Star size={14} />
-                              </button>
-                            </Show>
-                            <Show when={role().kind === "parallel"}>
-                              <button
-                                type="button"
-                                class="pc__icon-btn"
-                                aria-label={t.removeParallel}
-                                title={t.removeParallel}
-                                disabled={isDeleting()}
-                                onClick={() => void handleRemoveParallel(p.uuid)}
-                              >
-                                <Layers size={14} />
-                              </button>
-                            </Show>
-                            <Show when={role().kind !== "parallel" && role().kind !== "primary"}>
-                              <button
-                                type="button"
-                                class="pc__icon-btn"
-                                aria-label={t.addParallel}
-                                title={t.addParallel}
-                                disabled={isDeleting()}
-                                onClick={(e) =>
-                                  handleAddParallel(
-                                    p.uuid,
-                                    e.currentTarget as unknown as HTMLElement,
-                                  )
-                                }
-                              >
-                                <Layers size={14} />
-                              </button>
-                            </Show>
-                            <Show when={role().kind !== "fallback" && role().kind !== "primary"}>
-                              <button
-                                type="button"
-                                class="pc__icon-btn"
-                                aria-label={t.setFallback}
-                                title={t.setFallback}
-                                disabled={isDeleting()}
-                                onClick={() => void handleSetFallback(p.uuid)}
-                              >
-                                <CornerDownLeft size={14} />
-                              </button>
-                            </Show>
-                          </Show>
-                          {/* Duplicate */}
-                          <button
-                            type="button"
-                            class="pc__icon-btn"
-                            aria-label={t.duplicate}
-                            title={t.duplicate}
-                            disabled={isDeleting()}
-                            onClick={() => void handleDuplicate(p.uuid)}
-                          >
-                            <Copy size={14} />
-                          </button>
-                          {/* Reorder */}
-                          <button
-                            type="button"
-                            class="pc__icon-btn"
-                            aria-label={t.moveUp}
-                            title={t.moveUp}
-                            disabled={isDeleting()}
-                            onClick={() => void moveProvider(p.uuid, "up")}
-                          >
-                            <ArrowUp size={14} />
-                          </button>
-                          <button
-                            type="button"
-                            class="pc__icon-btn"
-                            aria-label={t.moveDown}
-                            title={t.moveDown}
-                            disabled={isDeleting()}
-                            onClick={() => void moveProvider(p.uuid, "down")}
-                          >
-                            <ArrowDown size={14} />
-                          </button>
-                        </div>
-                      </div>
-                      {/* Role badge row (cold-loaded + session mirror). On read
-                          failure all roles render as "none" (fail-closed). */}
-                      <Show when={role().kind !== "none"}>
-                        <div class="pc__role-badge-row">
-                          <Show when={role().kind === "primary"}>
-                            <StatusBadge variant="success">{t.role.primary}</StatusBadge>
-                          </Show>
-                          <Show when={role().kind === "parallel"}>
-                            <StatusBadge variant="info">
-                              {t.role.parallel} {(role() as { kind: "parallel"; index: number }).index}
-                            </StatusBadge>
-                          </Show>
-                          <Show when={role().kind === "fallback"}>
-                            <StatusBadge variant="neutral">{t.role.fallback}</StatusBadge>
-                          </Show>
-                        </div>
-                      </Show>
-                    </li>
-                  );
-                }}
-              </For>
-            </ul>
-          </Show>
-
-          {/* Preset grid (always visible — add provider). */}
-          <div class="pc__preset-grid">
-            <For each={PRESETS}>
-              {(preset) => (
-                <button
-                  type="button"
-                  class="pc__preset"
-                  onClick={() => void handleAddPreset(preset)}
-                >
-                  <Plus size={12} />
-                  <span>{preset.name ?? "Ollama"}</span>
-                </button>
-              )}
-            </For>
-          </div>
-        </aside>
-
-        {/* Detail panel */}
-        <section class="pc__detail" aria-label={t.detailLabel}>
-          <Show
-            when={selectedProvider()}
-            fallback={
-              <EmptyState icon={<Server size={32} />} title={t.selectPrimary} />
-            }
-          >
-            {(p) => {
-              const uuid = p().uuid;
-              const draftEndpoint = createMemo(() => endpointDraft()[uuid] ?? p().endpoint);
-              const draftModel = createMemo(() => modelDraftByUuid()[uuid] ?? p().model ?? "");
-              const draftName = createMemo(() => nameDraftByUuid()[uuid] ?? p().name);
-              const nameError = createMemo(() => nameErrorByUuid()[uuid]);
-              const epError = createMemo(() => {
-                // Reactive: validate the draft as it changes (not just on save).
-                const draft = draftEndpoint();
-                // Don't show an error before the user has touched the field
-                // (the stored endpoint is always valid). Only validate drafts
-                // that differ from the stored value.
-                if (draft === p().endpoint) return undefined;
-                const check = validateEndpoint(draft);
-                if (!check.ok) return t.endpoint.errors[check.code];
-                return undefined;
-              });
-              const conn = createMemo(() => connByUuid()[uuid]);
-              const saveState = createMemo(() => saveByUuid()[uuid] ?? "idle");
-              const keyText = createMemo(() => keyInputByUuid()[uuid] ?? "");
-              const keyError = createMemo(() => keyErrorByUuid()[uuid]);
-              const options = createMemo(() => modelOptionsByUuid()[uuid]);
-              const modelFetch = createMemo(() => modelFetchByUuid()[uuid] ?? "idle");
-              // Only providers that advertise model_list can fetch a dropdown;
-              // others get the manual-entry input directly.
-              const canListModels = createMemo(() => p().capabilities.model_list);
-              const selectOptions = createMemo<SelectOption[]>(() => {
-                const opts = options();
-                if (opts && opts.length > 0) {
-                  return opts.map((m) => ({ value: m.id, label: m.label, disabled: false }));
-                }
-                // Manual entry fallback: current model as the only option.
-                return [{ value: draftModel() || "—", label: draftModel() || "—", disabled: false }];
-              });
-              return (
-                <div class="pc__detail-content">
-                  {/* R2-E: save-conflict banner. Surfaces when an optimistic-lock
-                      CAS rejected this save (`stale_version`). The user's draft
-                      is preserved (not overwritten); Reload re-fetches fresh data
-                      so they can reconcile against the other writer's version. */}
-                  <Show when={saveConflictUuid() === uuid}>
-                    <div class="pc__retry" role="alert">
-                      <span class="pc__load-failed">{t.saveConflict}</span>
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        onClick={() => {
-                          setSaveConflictUuid(null);
-                          void refresh();
-                        }}
-                      >
-                        {t.reload}
-                      </Button>
-                    </div>
-                  </Show>
-                  {/* Name (editable — backend supports `name` patches). */}
-                  <TextField
-                    label={t.name}
-                    value={draftName()}
-                    errorText={nameError() ?? undefined}
-                    disabled={saveState() === "saving"}
-                    onInput={(e) => {
-                      setNameDraftByUuid((prev) => ({
-                        ...prev,
-                        [uuid]: e.currentTarget.value,
-                      }));
-                      // Clear any stale conflict error as soon as the user
-                      // edits the name again.
-                      if (nameError()) {
-                        setNameErrorByUuid((prev) => {
-                          const n = { ...prev };
-                          delete n[uuid];
-                          return n;
-                        });
-                      }
-                    }}
-                  />
-
-                  {/* Endpoint */}
-                  <TextField
-                    label={t.endpoint.label}
-                    value={draftEndpoint()}
-                    placeholder={t.endpoint.placeholder}
-                    errorText={epError() ?? undefined}
-                    disabled={saveState() === "saving"}
-                    onInput={(e) =>
-                      setEndpointDraft((prev) => ({
-                        ...prev,
-                        [uuid]: e.currentTarget.value,
-                      }))
-                    }
-                  />
-
-                  {/* Model: dropdown + Fetch models only when the provider
-                      advertises model_list; otherwise a manual-entry input.
-                      A fetch error also falls back to the manual input. */}
-                  <Show
-                    when={modelFetch() !== "error" && canListModels()}
-                    fallback={
-                      <TextField
-                        label={t.models}
-                        value={draftModel()}
-                        placeholder={t.manualModelPlaceholder}
-                        disabled={saveState() === "saving"}
-                        onInput={(e) =>
-                          setModelDraftByUuid((prev) => ({
-                            ...prev,
-                            [uuid]: e.currentTarget.value,
-                          }))
-                        }
-                      />
-                    }
-                  >
-                    <div class="pc__model-row">
-                      <Select
-                        label={t.models}
-                        value={draftModel() || null}
-                        options={selectOptions()}
-                        loading={modelFetch() === "loading"}
-                        loadingLabel={t.loadingModels}
-                        disabled={saveState() === "saving"}
-                        onChange={(v) =>
-                          setModelDraftByUuid((prev) => ({ ...prev, [uuid]: v }))
-                        }
-                      />
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => void handleFetchModels(uuid)}
-                      >
-                        {t.fetchModels}
-                      </Button>
-                    </div>
-                  </Show>
-
-                  <div class="pc__save-row">
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      loading={saveState() === "saving"}
-                      onClick={() => void handleSaveProfile(uuid)}
-                    >
-                      {t.saveProfile}
-                    </Button>
-                    <Show when={saveState() === "saved"}>
-                      <span class="pc__saved-note">{t.profileSaved}</span>
-                    </Show>
-                  </div>
-
-                  {/* Key section */}
-                  <div class="pc__key-section">
-                    <Show
-                      when={p().hasKey}
-                      fallback={
-                        <>
-                          <TextField
-                            label={t.apiKey}
-                            type="password"
-                            value={keyText()}
-                            placeholder={t.apiKeyPlaceholder}
-                            errorText={keyError() ?? undefined}
-                            disabled={saveState() === "saving"}
-                            onInput={(e) => {
-                              setKeyInputByUuid((prev) => ({
-                                ...prev,
-                                [uuid]: e.currentTarget.value,
-                              }));
-                              // Clear any stale inline error as soon as the
-                              // user edits the key again.
-                              if (keyError()) {
-                                setKeyErrorByUuid((prev) => {
-                                  const n = { ...prev };
-                                  delete n[uuid];
-                                  return n;
-                                });
-                              }
-                            }}
-                          />
-                          <Button
-                            variant="primary"
-                            size="sm"
-                            disabled={p().needs_key && keyText().length === 0}
-                            loading={saveState() === "saving"}
-                            onClick={() => void handleSaveKey(uuid)}
-                          >
-                            {t.saveKey}
-                          </Button>
-                        </>
-                      }
-                    >
-                      <span class="pc__key-saved-badge">
-                        {t.keySaved}
-                      </span>
-                    </Show>
-                  </div>
-
-                  {/* Connection test */}
-                  <div class="pc__conn-section">
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      loading={conn() === "testing"}
-                      onClick={() => void handleTestConnection(uuid)}
-                    >
-                      {t.testConnection}
-                    </Button>
-                    <Show when={conn() && conn() !== "testing"}>
-                      <StatusBadge
-                        variant={
-                          conn() && conn() !== "testing" && (conn() as ConnectionResult).ok
-                            ? "success"
-                            : "danger"
-                        }
-                      >
-                        {conn() && conn() !== "testing" && (conn() as ConnectionResult).ok
-                          ? t.connectionOk
-                          : t.connectionFailed}
-                      </StatusBadge>
-                      <span class="pc__conn-message">
-                        {(conn() as ConnectionResult).message}
-                        <Show when={typeof (conn() as ConnectionResult).latency_ms === "number"}>
-                          <span class="pc__conn-latency">
-                            {" · "}{(conn() as ConnectionResult).latency_ms}ms
-                          </span>
-                        </Show>
-                      </span>
-                    </Show>
-                  </div>
-
-                  {/* Balance — R3a limitation: muted TODO note, no fetch. */}
-                  <div class="pc__balance-section">
-                    <span class="pc__balance-title">{t.balance.title}</span>
-                    <span class="pc__balance-note">
-                      {/* TODO(r3b): balance/quota IPC not yet implemented. */}
-                      {t.balance.unsupportedNote}
-                    </span>
-                  </div>
-                </div>
-              );
-            }}
-          </Show>
-        </section>
-      </div>
-
-      {/* Delete Confirm */}
-      <Confirm
-        open={!!deleteConfirmUuid()}
-        onOpenChange={(o) => {
-          if (!o) cancelDelete();
-        }}
-        title={t.deleteConfirmTitle}
-        message={t.deleteConfirmMsg}
-        confirmLabel={t.delete}
-        cancelLabel={t.cancel}
-        variant="destructive"
-        onConfirm={() => void confirmDelete()}
-        onCancel={() => cancelDelete()}
-        triggerRef={deleteTriggerRef}
-      />
-
-      {/* Delete-error Retry banner: surfaced after a failed delete. Lives in the
-          main layout (NOT inside the Kobalte Dialog) because the Dialog sets
-          body pointer-events:none during its close transition, which would
-          swallow clicks on an in-dialog Retry button. */}
-      <Show when={deleteError()}>
-        <div class="pc__delete-error-banner" role="alert">
-          <span class="pc__delete-error-msg">{t.saveFailed}</span>
-          <Button variant="secondary" size="sm" onClick={retryDelete}>
-            {t.retry}
-          </Button>
-          <Button variant="ghost" size="sm" onClick={dismissDeleteError}>
-            {t.cancel}
-          </Button>
-        </div>
-      </Show>
-
-      {/* Consent Confirm */}
-      <Confirm
-        open={consentOpen()}
-        onOpenChange={(o) => !o && cancelConsent()}
-        title={t.consent.title}
-        message={t.consent.message}
-        confirmLabel={t.consent.confirm}
-        cancelLabel={t.consent.cancel}
-        onConfirm={() => void confirmConsent()}
-        onCancel={() => cancelConsent()}
-        triggerRef={consentTriggerRef}
-      >
-        <ul class="pc__consent-recipients">
-          <For each={consentRecipients()}>
-            {(r) => (
-              <li>
-                <strong>{r.name}</strong> <span class="pc__consent-kind">{r.localLabel}</span>
-              </li>
-            )}
-          </For>
-        </ul>
-      </Confirm>
-
-      {/* Toasts */}
-      <div class="pc__toasts" role="region" aria-label="notifications">
-        <For each={toasts()}>
-          {(toast) => (
-            <Toast
-              variant={toast.variant}
-              message={toast.message}
-              onDismiss={() => dismissToast(toast.id)}
-              dismissLabel={t.toastDismiss}
-            />
-          )}
-        </For>
-      </div>
-    </div>
+    <ProviderCenterView
+      t={t}
+      providers={providers()}
+      selection={selection()}
+      selectedUuid={selectedUuid()}
+      loadError={loadError()}
+      selectionError={selectionError()}
+      selectionLoading={selectionLoading()}
+      deletingUuid={deletingUuid()}
+      presets={PRESETS}
+      detail={detail()}
+      deleteConfirmUuid={deleteConfirmUuid()}
+      deleteError={deleteError()}
+      deleteFailedUuid={deleteFailedUuid()}
+      consentOpen={consentOpen()}
+      consentRecipients={consentRecipients()}
+      toasts={toasts()}
+      deleteTriggerRef={deleteTriggerRef}
+      consentTriggerRef={consentTriggerRef}
+      onToggle={(uuid, enabled) => void handleToggle(uuid, enabled)}
+      onEdit={(uuid) => setSelectedUuid(uuid)}
+      onDelete={(uuid) => handleDelete(uuid)}
+      onSetPrimary={(uuid) => void handleSetPrimary(uuid)}
+      onAddParallel={(uuid, triggerEl) => handleAddParallel(uuid, triggerEl)}
+      onRemoveParallel={(uuid) => void handleRemoveParallel(uuid)}
+      onSetFallback={(uuid) => void handleSetFallback(uuid)}
+      onDuplicate={(uuid) => void handleDuplicate(uuid)}
+      onMoveUp={(uuid) => void moveProvider(uuid, "up")}
+      onMoveDown={(uuid) => void moveProvider(uuid, "down")}
+      onAddPreset={(preset) => void handleAddPreset(preset)}
+      onNameInput={(uuid, value) =>
+        setNameDraftByUuid((prev) => {
+          if (nameErrorByUuid()[uuid]) {
+            const ne = { ...prev };
+            delete ne[uuid];
+            return { ...ne, [uuid]: value };
+          }
+          return { ...prev, [uuid]: value };
+        })
+      }
+      onEndpointInput={(uuid, value) =>
+        setEndpointDraft((prev) => ({ ...prev, [uuid]: value }))
+      }
+      onModelInput={(uuid, value) =>
+        setModelDraftByUuid((prev) => ({ ...prev, [uuid]: value }))
+      }
+      onModelChange={(uuid, value) =>
+        setModelDraftByUuid((prev) => ({ ...prev, [uuid]: value }))
+      }
+      onKeyInput={(uuid, value) => {
+        setKeyInputByUuid((prev) => ({ ...prev, [uuid]: value }));
+        if (keyErrorByUuid()[uuid]) {
+          setKeyErrorByUuid((prev) => {
+            const n = { ...prev };
+            delete n[uuid];
+            return n;
+          });
+        }
+      }}
+      onSaveProfile={(uuid) => void handleSaveProfile(uuid)}
+      onSaveKey={(uuid) => void handleSaveKey(uuid)}
+      onFetchModels={(uuid) => void handleFetchModels(uuid)}
+      onTestConnection={(uuid) => void handleTestConnection(uuid)}
+      onResolveSaveConflict={(_uuid) => {
+        setSaveConflictUuid(null);
+        void refresh();
+      }}
+      onReloadFromError={() => void refresh()}
+      onRetrySelectionLoad={() => void refresh()}
+      onConfirmDelete={() => void confirmDelete()}
+      onCancelDelete={() => cancelDelete()}
+      onRetryDelete={() => retryDelete()}
+      onDismissDeleteError={() => dismissDeleteError()}
+      onConfirmConsent={() => void confirmConsent()}
+      onCancelConsent={() => cancelConsent()}
+      onDismissToast={(id) => dismissToast(id)}
+    />
   );
 };
 

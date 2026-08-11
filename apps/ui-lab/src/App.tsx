@@ -189,7 +189,6 @@ const App: Component = () => {
 
   const t = createMemo(() => strings[locale()]);
   const selT = createMemo(() => t().selection);
-  const provT = createMemo(() => t().provider);
 
   // Window size follows MASTER §8.2 + S0 §4.1:
   //  - multi-engine states → expanded 600×400
@@ -398,8 +397,6 @@ const App: Component = () => {
                 >
                   <SelectionPopup
                     state={selState()}
-                    locale={locale()}
-                    t={selT()}
                   />
                 </div>
                 <span class="lab__frame-meta">
@@ -429,8 +426,6 @@ const App: Component = () => {
               >
                 <ProviderCenter
                   state={provState()}
-                  locale={locale()}
-                  t={provT()}
                 />
               </div>
               <span class="lab__frame-meta">
