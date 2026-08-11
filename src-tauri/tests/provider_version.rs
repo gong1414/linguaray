@@ -817,8 +817,10 @@ fn full_pipeline_v1_providers_no_version_with_missing_singleton() {
 
 /// Build a DB whose `_schema_migrations` reports Complete (`schema_version=2`,
 /// `migration_complete=1`) but whose `providers.version` column is shaped per
-/// `version_decl` — or omitted entirely when `version_decl` is empty. Used by
-/// the P1-2 Complete-preflight tests to prove `run_migration` fails closed
+/// `version_decl` — or omitted entirely when `version_decl` is empty. All 8
+/// required tables are created (so a correct `version_decl` passes the full
+/// `validate_v2_schema` check, not just the providers.version sub-check). Used
+/// by the P1-2 Complete-preflight tests to prove `run_migration` fails closed
 /// instead of trusting a "Complete" singleton whose tables are actually corrupt.
 fn fresh_complete_db_with_version_decl(version_decl: &str) -> (tempfile::TempDir, Database) {
     let dir = tempdir().unwrap();
@@ -831,17 +833,8 @@ fn fresh_complete_db_with_version_decl(version_decl: &str) -> (tempfile::TempDir
     } else {
         format!(", {version_decl}")
     };
-    let create = format!(
-        "CREATE TABLE _schema_migrations (
-            id INTEGER PRIMARY KEY CHECK (id = 1),
-            schema_version INTEGER NOT NULL,
-            migration_complete INTEGER NOT NULL DEFAULT 0,
-            migration_checkpoint TEXT,
-            migrated_at INTEGER
-         );
-         INSERT INTO _schema_migrations (id, schema_version, migration_complete)
-         VALUES (1, 2, 1);
-         CREATE TABLE providers (
+    let providers_create = format!(
+        "CREATE TABLE providers (
             uuid TEXT PRIMARY KEY,
             template_id TEXT NOT NULL,
             name TEXT NOT NULL,
@@ -858,7 +851,19 @@ fn fresh_complete_db_with_version_decl(version_decl: &str) -> (tempfile::TempDir
          );"
     );
     db.with_conn(|conn| {
-        conn.execute_batch(&create)?;
+        let tx = conn.transaction()?;
+        // Create all 8 tables with the production DDL first (correct shape),
+        // seed singletons, then swap providers out for the custom-decl variant.
+        schema::create_all_tables(&tx)?;
+        schema::seed_singletons(&tx)?;
+        tx.execute_batch("DROP TABLE providers;")?;
+        tx.execute_batch(&providers_create)?;
+        // Mark Complete (seed_singletons wrote schema_version=2, complete=0).
+        tx.execute(
+            "UPDATE _schema_migrations SET schema_version=2, migration_complete=1 WHERE id=1",
+            [],
+        )?;
+        tx.commit()?;
         Ok(())
     })
     .unwrap();
@@ -936,6 +941,83 @@ fn complete_db_with_correct_version_column_passes_preflight() {
     assert_eq!(mc, 1, "unchanged: still complete");
 }
 
+// ─── P1-2: direct validate_v2_schema unit tests (all 8 tables) ─────────────
+
+/// Positive: a fresh DB created via `create_all_tables` + `seed_singletons`
+/// passes `validate_v2_schema` — all 8 tables exist with their key columns and
+/// `providers.version` has the correct shape.
+#[test]
+fn validate_v2_schema_ok_on_fresh_db() {
+    let (_dir, db) = fresh_db();
+    db.with_conn(|conn| schema::validate_v2_schema(conn))
+        .expect("fresh DB with all 8 tables should validate");
+}
+
+/// Missing `preferences` table → `validate_v2_schema` fails closed with Integrity.
+#[test]
+fn validate_v2_schema_fails_when_preferences_table_missing() {
+    let (_dir, db) = fresh_db();
+    db.with_conn(|conn| {
+        conn.execute_batch("DROP TABLE preferences;")?;
+        Ok(())
+    })
+    .unwrap();
+    let res = db.with_conn(|conn| schema::validate_v2_schema(conn));
+    assert!(
+        matches!(res, Err(DbError::Integrity(_))),
+        "missing preferences table → Integrity; got {res:?}"
+    );
+}
+
+/// Missing `history_results` table → `validate_v2_schema` fails closed.
+#[test]
+fn validate_v2_schema_fails_when_history_results_table_missing() {
+    let (_dir, db) = fresh_db();
+    db.with_conn(|conn| {
+        conn.execute_batch("DROP TABLE history_results;")?;
+        Ok(())
+    })
+    .unwrap();
+    let res = db.with_conn(|conn| schema::validate_v2_schema(conn));
+    assert!(
+        matches!(res, Err(DbError::Integrity(_))),
+        "missing history_results table → Integrity; got {res:?}"
+    );
+}
+
+/// `providers` missing the `name` column → `validate_v2_schema` fails closed.
+#[test]
+fn validate_v2_schema_fails_when_providers_name_column_missing() {
+    let (_dir, db) = fresh_db();
+    db.with_conn(|conn| {
+        conn.execute_batch("ALTER TABLE providers DROP COLUMN name;")?;
+        Ok(())
+    })
+    .unwrap();
+    let res = db.with_conn(|conn| schema::validate_v2_schema(conn));
+    assert!(
+        matches!(res, Err(DbError::Integrity(_))),
+        "providers missing name column → Integrity; got {res:?}"
+    );
+}
+
+/// `preferences` missing the `primary_uuid` column → `validate_v2_schema` fails
+/// closed (the active-selection singleton would be unreadable).
+#[test]
+fn validate_v2_schema_fails_when_preferences_primary_uuid_missing() {
+    let (_dir, db) = fresh_db();
+    db.with_conn(|conn| {
+        conn.execute_batch("ALTER TABLE preferences DROP COLUMN primary_uuid;")?;
+        Ok(())
+    })
+    .unwrap();
+    let res = db.with_conn(|conn| schema::validate_v2_schema(conn));
+    assert!(
+        matches!(res, Err(DbError::Integrity(_))),
+        "preferences missing primary_uuid column → Integrity; got {res:?}"
+    );
+}
+
 // ─── P2-1: CAS barrier — concurrent writers on the same version via update() ─
 
 /// Two threads sharing the same `Arc<Database>` rendezvous at a `Barrier`, then
@@ -995,6 +1077,40 @@ fn concurrent_same_version_only_one_wins_via_update() {
         .count();
     assert_eq!(written, 1, "exactly one Written; got {results:?}");
     assert_eq!(stale, 1, "exactly one StaleVersion; got {results:?}");
+    // P2-2: the StaleVersion outcome must carry the row's REAL version (2, the
+    // one bump that landed), not a default — so the frontend can surface it.
+    for r in &results {
+        if let Ok(UpdateOutcome::StaleVersion { actual_version }) = r {
+            assert_eq!(
+                *actual_version, 2,
+                "stale version must report actual_version=2; got {results:?}"
+            );
+        }
+    }
+    // P2-2: the final on-disk name must be the Written winner's name (the stale
+    // writer's name never persisted), proving the CAS barrier's ordering effect.
+    let winner_name = results.iter().find_map(|r| {
+        if let Ok(UpdateOutcome::Written(p)) = r {
+            Some(p.name.clone())
+        } else {
+            None
+        }
+    });
+    assert!(winner_name.is_some(), "there must be a Written winner; got {results:?}");
+    let final_name: String = db
+        .with_conn(|conn| {
+            Ok(conn.query_row(
+                "SELECT name FROM providers WHERE uuid=?1",
+                rusqlite::params![&provider_uuid],
+                |r| r.get(0),
+            )?)
+        })
+        .unwrap();
+    assert_eq!(
+        final_name,
+        winner_name.unwrap(),
+        "final DB name must be the Written winner's name; got {final_name}"
+    );
     // Final on-disk version is 2 (one successful bump).
     let final_version: i64 = db
         .with_conn(|conn| {
