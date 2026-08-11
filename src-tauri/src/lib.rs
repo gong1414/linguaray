@@ -1598,13 +1598,17 @@ pub fn db_set_active_primary(
 /// `tray.lock().finish_switch(rev, success)` (rev-16-3 revision-tagged; a stale
 /// `rev != switch_revision` is ignored). The `rev` is captured via
 /// `begin_switch()` BEFORE the DB call so a concurrent switch's late result
-/// cannot clobber this one. Does NOT touch the translation `GenerationToken`
+/// cannot clobber this one. R2-B (P1-3 residual): the revision is now allocated
+/// by the SYNC menu callback (`handle_tray_menu_event`) BEFORE `spawn_blocking`
+/// so revision order = click order regardless of OS thread scheduling; the
+/// pre-allocated `rev` is passed in here (the core no longer calls
+/// `begin_switch()` itself). Does NOT touch the translation `GenerationToken`
 /// (rev-15 P1-3) and does NOT `.await` anything (SYNC).
 pub fn handle_switch_provider_core(
     app_state: &Arc<AppState>,
     uuid: &str,
+    rev: u64,
 ) -> Result<(), String> {
-    let rev = app_state.tray.lock().begin_switch();
     let result = set_active_primary_core(app_state.clone(), uuid.to_string(), rev);
     let success = result.is_ok();
     app_state.tray.lock().finish_switch(rev, success);
@@ -1636,8 +1640,9 @@ pub fn handle_switch_provider(
     app: &tauri::AppHandle,
     app_state: &Arc<AppState>,
     uuid: &str,
+    rev: u64,
 ) -> Result<(), String> {
-    let result = handle_switch_provider_core(app_state, uuid);
+    let result = handle_switch_provider_core(app_state, uuid, rev);
     let app_clone = app.clone();
     let result_for_refresh = result.clone();
     tauri::async_runtime::spawn(async move {
@@ -2874,10 +2879,15 @@ fn handle_tray_menu_event(app: &tauri::AppHandle, event: MenuEvent) {
         // the tray. On failure the write tx rolled back (old primary preserved);
         // handle_switch_provider surfaces the error in the tray tooltip.
         let app_state = app.state::<Arc<AppState>>().inner().clone();
+        // R2-B (P1-3 residual): allocate the switch revision in the SYNC menu
+        // callback BEFORE spawn_blocking, so revision order = click order
+        // regardless of OS thread scheduling. The pre-allocated `rev` is passed
+        // into the spawned closure (the core no longer calls begin_switch itself).
+        let rev = app_state.tray.lock().begin_switch();
         let app_clone = app.clone();
         let uuid_owned = uuid.to_string();
         tauri::async_runtime::spawn_blocking(move || {
-            let _ = handle_switch_provider(&app_clone, &app_state, &uuid_owned);
+            let _ = handle_switch_provider(&app_clone, &app_state, &uuid_owned, rev);
         });
         return;
     }

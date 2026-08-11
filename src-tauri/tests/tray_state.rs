@@ -581,7 +581,10 @@ fn switch_handler_does_not_call_gen_next() {
     let g1 = token.next();
     assert!(token.is_latest(g1));
 
-    let result = linguaray_lib::handle_switch_provider_core(&app_state, &uuid);
+    // R2-B: the revision is now allocated by the SYNC caller (mirroring the menu
+    // callback) and passed into the core; the core no longer calls begin_switch.
+    let rev = app_state.tray.lock().begin_switch();
+    let result = linguaray_lib::handle_switch_provider_core(&app_state, &uuid, rev);
 
     assert!(
         token.is_latest(g1),
@@ -611,7 +614,9 @@ fn switch_handler_does_not_call_gen_next() {
     // surfaces the error in the tray.
     let token2 = GenerationToken::new();
     let g2 = token2.next();
-    let fail_result = linguaray_lib::handle_switch_provider_core(&app_state, "nonexistent-uuid");
+    let fail_rev = app_state.tray.lock().begin_switch();
+    let fail_result =
+        linguaray_lib::handle_switch_provider_core(&app_state, "nonexistent-uuid", fail_rev);
     assert!(fail_result.is_err(), "switch to an unknown uuid fails");
     assert!(token2.is_latest(g2), "the failed switch also does NOT bump the token");
     let selection_after_fail = db_read
