@@ -696,3 +696,75 @@ fn full_pipeline_recreates_missing_schema_migrations_row() {
     assert_eq!(sv, schema::SCHEMA_VERSION as i64, "singleton row recreated at v2");
     assert_eq!(mc, 1, "migration marked complete");
 }
+
+// ─── P2: CAS barrier — concurrent writers on the same version ─────────────
+
+/// Two threads sharing the same `Arc<Database>` both read `version=1`, rendezvous
+/// at a `Barrier`, then both race a CAS `UPDATE ... WHERE uuid=? AND version=?`
+/// with `expected_version=1`. The `Database` Mutex serializes the two writes, so
+/// exactly one UPDATE matches (bumps 1→2, affected=1) and the other finds the
+/// row already at 2 (affected=0 = StaleVersion). This proves the
+/// Mutex + CAS combination guarantees exactly-one-writer even under thread
+/// contention — the optimistic lock holds when two real writers race.
+#[test]
+fn concurrent_same_version_only_one_succeeds() {
+    use std::sync::Arc;
+    use std::sync::Barrier;
+    use std::thread;
+
+    let (_dir, db, p) = fresh_with_one();
+    let provider_uuid = p.uuid.clone();
+    assert_eq!(p.version, 1, "freshly created provider starts at version 1");
+    let db = Arc::new(db);
+    let barrier = Arc::new(Barrier::new(2));
+    let mut handles = vec![];
+    for _ in 0..2 {
+        let db_clone = Arc::clone(&db);
+        let barrier_clone = Arc::clone(&barrier);
+        let uuid = provider_uuid.clone();
+        handles.push(thread::spawn(move || {
+            // Both read the current version (1) BEFORE either writes.
+            let current_version = db_clone
+                .with_conn(|conn| {
+                    Ok(conn.query_row(
+                        "SELECT version FROM providers WHERE uuid=?1",
+                        rusqlite::params![&uuid],
+                        |r| r.get::<_, i64>(0),
+                    )?)
+                })
+                .unwrap();
+            // Rendezvous: both threads have read version=1 before either writes.
+            barrier_clone.wait();
+            // Now both race the CAS with expected_version = current_version.
+            // The Database Mutex serializes these two UPDATEs.
+            db_clone
+                .with_conn(|conn| {
+                    let n = conn.execute(
+                        "UPDATE providers SET version=version+1 \
+                         WHERE uuid=?1 AND version=?2",
+                        rusqlite::params![&uuid, current_version],
+                    )?;
+                    Ok::<_, DbError>(n)
+                })
+                .unwrap()
+        }));
+    }
+    let results: Vec<usize> = handles.into_iter().map(|h| h.join().unwrap()).collect();
+    // Exactly one CAS succeeds (affected=1); the other is rejected (affected=0)
+    // because the first writer bumped the version under the Mutex.
+    let successes = results.iter().filter(|&&n| n == 1).count();
+    let rejected = results.iter().filter(|&&n| n == 0).count();
+    assert_eq!(successes, 1, "exactly one CAS should succeed; got {results:?}");
+    assert_eq!(rejected, 1, "exactly one CAS should be rejected; got {results:?}");
+    // Final on-disk version is 2 (one successful bump).
+    let final_version: i64 = db
+        .with_conn(|conn| {
+            Ok(conn.query_row(
+                "SELECT version FROM providers WHERE uuid=?1",
+                rusqlite::params![&provider_uuid],
+                |r| r.get(0),
+            )?)
+        })
+        .unwrap();
+    assert_eq!(final_version, 2, "exactly one bump landed; got version {final_version}");
+}
