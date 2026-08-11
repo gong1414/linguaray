@@ -17,7 +17,7 @@
 .lr-text-area__input {
   width: 100%;
   background: var(--color-canvas);
-  border: 1px solid var(--color-border-strong);
+  border: 1px solid var(--color-border-control);
   border-radius: var(--radius-sm);
   padding: var(--space-sm) var(--space-md);
   font-family: var(--font-sans);
