@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, fireEvent, cleanup } from "@solidjs/testing-library";
+import { render, fireEvent, cleanup, waitFor } from "@solidjs/testing-library";
 import Popup from "../src/Popup";
 
 // Stub Tauri event + window APIs at the module the controller imports.
@@ -274,6 +274,45 @@ describe("Popup (Surface 01)", () => {
       source_text: "hi",
     });
     expect(await findByText("你好")).toBeTruthy();
+    cleanup();
+  });
+
+  it("R2-D: engine label updates from Unknown to the real name once provider_list resolves", async () => {
+    const { invoke } = await import("@tauri-apps/api/core");
+    // provider_list returns a DEFERRED promise: it resolves only when we call
+    // resolveProviderList, simulating a slow provider_list arriving AFTER a
+    // result card has already rendered with an unresolved engine label.
+    let resolveProviderList!: (v: { uuid: string; name: string }[]) => void;
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "provider_list") {
+        return new Promise<{ uuid: string; name: string }[]>((resolve) => {
+          resolveProviderList = resolve;
+        });
+      }
+      return { outcomes: [], actual_engine: undefined };
+    });
+
+    const { findByText, queryByText } = render(() => <Popup />);
+    // Flush onMount microtasks so the listeners are registered and the deferred
+    // provider_list invoke has been reached (and is now pending).
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith("provider_list"));
+
+    // A popup-state result arrives BEFORE provider_list resolves: the engine
+    // label cannot be resolved yet, so it falls back to "Unknown".
+    await emitEvent("popup-state", {
+      status: "result",
+      text: "你好",
+      engine: "provider/u1",
+      source_text: "hello",
+    });
+    expect(await findByText("你好")).toBeTruthy();
+    expect(await findByText("Unknown")).toBeTruthy();
+
+    // provider_list now resolves and populates the name map. The already-rendered
+    // card MUST re-render (R2-D: nameMap is reactive) and show the real name.
+    resolveProviderList([{ uuid: "u1", name: "My OpenAI" }]);
+    expect(await findByText("My OpenAI")).toBeTruthy();
+    expect(queryByText("Unknown")).toBeNull();
     cleanup();
   });
 

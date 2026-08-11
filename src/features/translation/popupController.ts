@@ -25,6 +25,15 @@ export function createPopupController() {
   /** uuid → friendly provider name. Loaded once on mount from provider_list. */
   const nameMap = new Map<string, string>();
   /**
+   * P1-9/R2-D: nameMap version counter. provider_list may resolve AFTER a
+   * popup-state result has already rendered an engine label. A plain Map gives
+   * Solid no way to know it changed, so the already-rendered label sticks at
+   * "Unknown". Bumping this signal after populating the map re-runs any
+   * computation that read it (engineLabel), letting the card update to the
+   * real provider name without a new backend event.
+   */
+  const [nameMapVersion, setNameMapVersion] = createSignal(0);
+  /**
    * P1-3: last saved SOURCE text (original selection), for Retry. A signal (not
    * a plain `let`) so `hasSource()` is reactive — the loading shell mounts once
    * on popup open (initial loading state), so a later loading event that carries
@@ -85,6 +94,9 @@ export function createPopupController() {
       const profiles = await invoke<{ uuid: string; name: string }[]>("provider_list");
       if (cancelled) return;
       for (const p of profiles) nameMap.set(p.uuid, p.name);
+      // R2-D: bump the version so any already-rendered engine label (computed
+      // before the map was populated) re-runs and resolves the real name.
+      setNameMapVersion((v) => v + 1);
     } catch {
       // Best-effort: leave the map empty; labels fall back below.
     }
@@ -97,8 +109,12 @@ export function createPopupController() {
     for (const u of unlisteners) u();
   });
 
-  /** B3: resolve a raw engine id (uuid or `provider/<uuid>`) to a friendly name. */
+  /** B3: resolve a raw engine id (uuid or `provider/<uuid>`) to a friendly name.
+   *  R2-D: reads nameMapVersion() first to establish a reactive dependency, so
+   *  a label rendered before provider_list resolves re-runs once the map is
+   *  populated. */
   const engineLabel = (raw: string): string => {
+    nameMapVersion(); // establish reactive dependency on the name map
     if (nameMap.has(raw)) return nameMap.get(raw)!;
     if (raw.startsWith("provider/")) {
       const uuid = raw.slice("provider/".length);
