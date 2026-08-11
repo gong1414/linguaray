@@ -419,6 +419,114 @@ describe("ProviderCenter (Surface 05)", () => {
     );
   });
 
+  it("stale_version Reload clears the draft on success so the form shows remote values (R3-P1-4)", async () => {
+    let refreshed = false;
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () =>
+        refreshed
+          ? [
+              profile({
+                uuid: "u1",
+                name: "TestProvider",
+                endpoint: "https://remote.example.com",
+                version: 2,
+                secret_ref: "provider/u1",
+              }),
+            ]
+          : [
+              profile({
+                uuid: "u1",
+                name: "TestProvider",
+                endpoint: "https://api.openai.com",
+                version: 1,
+                secret_ref: "provider/u1",
+              }),
+            ],
+      key_status: () => ({ "provider/u1": true }),
+      provider_update: () => {
+        throw Object.assign(new Error("stale"), {
+          error: "stale_version",
+          actual_version: 2,
+        });
+      },
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("TestProvider")).toBeTruthy());
+    fireEvent.click(screen.getByLabelText("Edit TestProvider"));
+    await flush();
+
+    // Type a draft endpoint (differs from both the stored + remote values).
+    const endpointInput = screen.getByLabelText("Endpoint") as HTMLInputElement;
+    fireEvent.input(endpointInput, { target: { value: "https://new.example.com" } });
+    await flush();
+
+    // Save → stale_version → conflict banner; draft preserved.
+    fireEvent.click(screen.getByText("Save profile"));
+    await waitFor(() =>
+      expect(screen.getAllByText("This provider was modified elsewhere").length).toBeGreaterThanOrEqual(1),
+    );
+    expect(endpointInput.value).toBe("https://new.example.com");
+
+    // Reload: the next provider_list returns the remote (v2) data.
+    refreshed = true;
+    fireEvent.click(screen.getByText("Reload"));
+    await flush();
+    // Banner is gone after a successful reload.
+    await waitFor(() =>
+      expect(screen.queryByText("This provider was modified elsewhere")).toBeNull(),
+    );
+    // The draft was cleared — the field now shows the fresh REMOTE endpoint,
+    // NOT the user's stale "https://new.example.com" draft.
+    await waitFor(() =>
+      expect((screen.getByLabelText("Endpoint") as HTMLInputElement).value).toBe("https://remote.example.com"),
+    );
+  });
+
+  it("stale_version Reload keeps the banner + drafts when refresh fails (R3-P1-4)", async () => {
+    let reloadShouldFail = false;
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => {
+        if (reloadShouldFail) throw new Error("db locked");
+        return [profile({ uuid: "u1", name: "TestProvider", version: 1, secret_ref: "provider/u1" })];
+      },
+      key_status: () => ({ "provider/u1": true }),
+      provider_update: () => {
+        throw Object.assign(new Error("stale"), {
+          error: "stale_version",
+          actual_version: 2,
+        });
+      },
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("TestProvider")).toBeTruthy());
+    fireEvent.click(screen.getByLabelText("Edit TestProvider"));
+    await flush();
+
+    // Type a draft endpoint.
+    const endpointInput = screen.getByLabelText("Endpoint") as HTMLInputElement;
+    fireEvent.input(endpointInput, { target: { value: "https://new.example.com" } });
+    await flush();
+
+    // Save → stale_version → conflict banner.
+    fireEvent.click(screen.getByText("Save profile"));
+    await waitFor(() =>
+      expect(screen.getAllByText("This provider was modified elsewhere").length).toBeGreaterThanOrEqual(1),
+    );
+
+    // Make the refresh fail, then click Reload (only one Reload button exists
+    // at click time — loadError is still false).
+    reloadShouldFail = true;
+    fireEvent.click(screen.getByText("Reload"));
+    await flush();
+    await flush();
+    // Banner STAYS (refresh failed — do not clear it).
+    expect(screen.getAllByText("This provider was modified elsewhere").length).toBeGreaterThanOrEqual(1);
+    // Draft STAYS (not cleared on failure).
+    expect((screen.getByLabelText("Endpoint") as HTMLInputElement).value).toBe("https://new.example.com");
+  });
+
   it("key missing: shows key input + Save key; saving calls provider_set_key", async () => {
     const keyCalls: unknown[] = [];
     routeInvoke({

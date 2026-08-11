@@ -758,7 +758,11 @@ const ProviderCenter: Component = () => {
   // BOTH the provider list AND the stored active selection must resolve before
   // roles are applied. If either rejects, no `providerSetActive` is allowed
   // (handlers short-circuit on `selectionError()`/`selectionLoading()`).
-  const refresh = async () => {
+  /** Re-fetch the provider list + stored selection. Returns `true` on success,
+   *  `false` on failure (the error is already surfaced via loadError + a toast;
+   *  callers that need to react to failure — e.g. the save-conflict Reload —
+   *  branch on the boolean instead of try/catch, since refresh never rejects). */
+  const refresh = async (): Promise<boolean> => {
     setSelectionLoading(true);
     setSelectionError(false);
     try {
@@ -773,10 +777,12 @@ const ProviderCenter: Component = () => {
         fallbackUuid: active.fallback,
       });
       setLoadError(false);
+      return true;
     } catch (e) {
       setLoadError(true);
       setSelectionError(true);
       pushToast("destructive", t.saveFailed);
+      return false;
     } finally {
       setSelectionLoading(false);
     }
@@ -1314,8 +1320,32 @@ const ProviderCenter: Component = () => {
       onFetchModels={(uuid) => void handleFetchModels(uuid)}
       onTestConnection={(uuid) => void handleTestConnection(uuid)}
       onResolveSaveConflict={(_uuid) => {
-        setSaveConflictUuid(null);
-        void refresh();
+        // R3-P1-4: Reload semantics. Do NOT clear the banner synchronously —
+        // await refresh first. On success, clear this provider's drafts so the
+        // form reverts to the fresh remote values (the user's stale draft would
+        // otherwise persist over the just-reloaded data), then clear the banner.
+        // On failure, keep BOTH the banner and the drafts (refresh already
+        // surfaced the error via loadError + a toast); the user can retry.
+        void (async () => {
+          const ok = await refresh();
+          if (!ok) return;
+          setNameDraftByUuid((prev) => {
+            const next = { ...prev };
+            delete next[_uuid];
+            return next;
+          });
+          setEndpointDraft((prev) => {
+            const next = { ...prev };
+            delete next[_uuid];
+            return next;
+          });
+          setModelDraftByUuid((prev) => {
+            const next = { ...prev };
+            delete next[_uuid];
+            return next;
+          });
+          setSaveConflictUuid(null);
+        })();
       }}
       onReloadFromError={() => void refresh()}
       onRetrySelectionLoad={() => void refresh()}
