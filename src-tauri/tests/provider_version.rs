@@ -11,7 +11,7 @@
 //! idempotently and every existing row lands at version 1.
 
 use linguaray_lib::db::migration::{
-    run_migration_with_identity, FailpointCell,
+    run_migration_with_identity, FailpointCell, MigrationError,
 };
 use linguaray_lib::db::providers::{self, ProviderPatch, UpdateOutcome};
 use linguaray_lib::db::schema;
@@ -203,6 +203,57 @@ fn fresh_v1_db() -> (tempfile::TempDir, Database) {
              );
              INSERT INTO _schema_migrations (id, schema_version, migration_complete)
              VALUES (1, 1, 1);
+             CREATE TABLE providers (
+                uuid TEXT PRIMARY KEY,
+                template_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                protocol TEXT NOT NULL,
+                endpoint TEXT NOT NULL,
+                model TEXT,
+                enabled INTEGER NOT NULL DEFAULT 1,
+                sort_order INTEGER NOT NULL DEFAULT 0,
+                is_local INTEGER NOT NULL DEFAULT 0,
+                needs_key INTEGER NOT NULL DEFAULT 0,
+                secret_ref TEXT NOT NULL UNIQUE,
+                capabilities TEXT NOT NULL DEFAULT '{}',
+                status TEXT NOT NULL DEFAULT 'active'
+             );",
+        )?;
+        // Seed one pre-v2 row (no version column to populate).
+        conn.execute(
+            "INSERT INTO providers (uuid, template_id, name, protocol, endpoint, secret_ref) \
+             VALUES ('legacy-uuid', 'openai', 'Legacy OpenAI', 'openai_chat', \
+             'https://api.openai.com', 'openai')",
+            [],
+        )?;
+        Ok(())
+    })
+    .unwrap();
+    (dir, db)
+}
+
+/// Build a DB shaped like a v1 install whose `_schema_migrations` SINGLETON ROW
+/// is MISSING (the table exists but `id=1` was never inserted — or was deleted),
+/// AND whose `providers` table predates the `version` column. This is the exact
+/// shape that exposed the Phase 2c skip bug: `seed_singletons` writes
+/// `schema_version=2` in Phase 2, the old `stored < SCHEMA_VERSION` gate then
+/// read `2 < 2` → false and skipped `migrate_v1_to_v2`, so the `providers` table
+/// never received the column even though the app believed it was v2.
+fn fresh_v1_db_missing_singleton() -> (tempfile::TempDir, Database) {
+    let dir = tempdir().unwrap();
+    let db_path = dir.path().join("v1_no_singleton.db");
+    let db = Database::open(&db_path).unwrap();
+    db.with_conn(|conn| {
+        conn.execute_batch(
+            "CREATE TABLE _schema_migrations (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                schema_version INTEGER NOT NULL,
+                migration_complete INTEGER NOT NULL DEFAULT 0,
+                migration_checkpoint TEXT,
+                migrated_at INTEGER
+             );
+             -- Deliberately do NOT insert the singleton row (id=1 is missing):
+             -- this is the precondition that made the old Phase 2c gate skip.
              CREATE TABLE providers (
                 uuid TEXT PRIMARY KEY,
                 template_id TEXT NOT NULL,
@@ -697,17 +748,205 @@ fn full_pipeline_recreates_missing_schema_migrations_row() {
     assert_eq!(mc, 1, "migration marked complete");
 }
 
-// ─── P2: CAS barrier — concurrent writers on the same version ─────────────
-
-/// Two threads sharing the same `Arc<Database>` both read `version=1`, rendezvous
-/// at a `Barrier`, then both race a CAS `UPDATE ... WHERE uuid=? AND version=?`
-/// with `expected_version=1`. The `Database` Mutex serializes the two writes, so
-/// exactly one UPDATE matches (bumps 1→2, affected=1) and the other finds the
-/// row already at 2 (affected=0 = StaleVersion). This proves the
-/// Mutex + CAS combination guarantees exactly-one-writer even under thread
-/// contention — the optimistic lock holds when two real writers race.
+/// REAL v1 bug fixture: `_schema_migrations` table exists but the singleton ROW
+/// (`id=1`) is MISSING, AND `providers` has NO `version` column. Before the
+/// P1-1 fix, the Phase 2c `stored < SCHEMA_VERSION` gate read `2 < 2` → false
+/// (seed_singletons had just written schema_version=2) and skipped
+/// `migrate_v1_to_v2`, leaving the providers table without the version column
+/// while the app believed it was v2. With the unconditional Phase 2c call, the
+/// full pipeline must ALTER the column in, seed every existing row to version 1,
+/// and converge to a complete v2 DB where list + CAS update work.
 #[test]
-fn concurrent_same_version_only_one_succeeds() {
+fn full_pipeline_v1_providers_no_version_with_missing_singleton() {
+    let (dir, db) = fresh_v1_db_missing_singleton();
+    let keystore_dir = dir.path().join("keystore");
+    let settings_path = dir.path().join("settings.json");
+    let fp = FailpointCell::none();
+
+    run_migration_with_identity(&db, &keystore_dir, &settings_path, &fp, PIPE_ID)
+        .expect("full pipeline should add the version column + complete on a missing-singleton v1 DB");
+
+    db.with_conn(|conn| {
+        // The version column now exists; the pre-existing v1 row defaulted to 1.
+        let (ver, name): (i64, String) = conn.query_row(
+            "SELECT version, name FROM providers WHERE uuid='legacy-uuid'",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )?;
+        assert_eq!(ver, 1, "existing v1 row seeds to version 1 after migration");
+        assert_eq!(name, "Legacy OpenAI");
+
+        // schema_version recorded as 2 + migration_complete=1.
+        let (sv, mc): (i64, i64) = conn.query_row(
+            "SELECT schema_version, migration_complete FROM _schema_migrations WHERE id=1",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )?;
+        assert_eq!(sv, 2, "schema_version bumped to 2");
+        assert_eq!(mc, 1, "migration marked complete");
+        Ok(())
+    })
+    .unwrap();
+
+    // The optimistic lock is live end-to-end: list works against the migrated
+    // column, and a CAS update with expected_version=1 succeeds (bumps to 2).
+    let listed = db.with_conn(|conn| providers::list(conn)).unwrap();
+    assert_eq!(listed.len(), 1, "list sees the migrated row");
+    assert_eq!(listed[0].version, 1);
+
+    let patch = ProviderPatch {
+        name: Some("Pipeline Renamed".into()),
+        endpoint: None,
+        model: None,
+        enabled: None,
+        sort_order: None,
+        expected_version: 1,
+    };
+    let updated = match db
+        .with_conn(|conn| providers::update(conn, "legacy-uuid", &patch))
+        .unwrap()
+    {
+        UpdateOutcome::Written(p) => p,
+        other => panic!("expected Written after missing-singleton migration, got {other:?}"),
+    };
+    assert_eq!(updated.version, 2, "CAS bumps the migrated row 1 → 2");
+    assert_eq!(updated.name, "Pipeline Renamed");
+}
+
+// ─── P1-2: Complete-preflight structural validation ──────────────────────
+
+/// Build a DB whose `_schema_migrations` reports Complete (`schema_version=2`,
+/// `migration_complete=1`) but whose `providers.version` column is shaped per
+/// `version_decl` — or omitted entirely when `version_decl` is empty. Used by
+/// the P1-2 Complete-preflight tests to prove `run_migration` fails closed
+/// instead of trusting a "Complete" singleton whose tables are actually corrupt.
+fn fresh_complete_db_with_version_decl(version_decl: &str) -> (tempfile::TempDir, Database) {
+    let dir = tempdir().unwrap();
+    let db_path = dir.path().join("complete_version.db");
+    let db = Database::open(&db_path).unwrap();
+    // When version_decl is empty, the providers table omits the version column
+    // entirely (the trailing comma after `status` is dropped too).
+    let version_clause = if version_decl.is_empty() {
+        String::new()
+    } else {
+        format!(", {version_decl}")
+    };
+    let create = format!(
+        "CREATE TABLE _schema_migrations (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            schema_version INTEGER NOT NULL,
+            migration_complete INTEGER NOT NULL DEFAULT 0,
+            migration_checkpoint TEXT,
+            migrated_at INTEGER
+         );
+         INSERT INTO _schema_migrations (id, schema_version, migration_complete)
+         VALUES (1, 2, 1);
+         CREATE TABLE providers (
+            uuid TEXT PRIMARY KEY,
+            template_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            protocol TEXT NOT NULL,
+            endpoint TEXT NOT NULL,
+            model TEXT,
+            enabled INTEGER NOT NULL DEFAULT 1,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            is_local INTEGER NOT NULL DEFAULT 0,
+            needs_key INTEGER NOT NULL DEFAULT 0,
+            secret_ref TEXT NOT NULL UNIQUE,
+            capabilities TEXT NOT NULL DEFAULT '{{}}',
+            status TEXT NOT NULL DEFAULT 'active'{version_clause}
+         );"
+    );
+    db.with_conn(|conn| {
+        conn.execute_batch(&create)?;
+        Ok(())
+    })
+    .unwrap();
+    (dir, db)
+}
+
+/// Helper: drive the full pipeline against a Complete DB and assert it errors.
+/// The Complete preflight short-circuits before Phase 1, so no keystore/settings
+/// are needed — the failure happens at the structural validation step.
+fn run_complete_pipeline_expects_integrity(dir: &tempfile::TempDir, db: &Database) {
+    let keystore_dir = dir.path().join("keystore");
+    let settings_path = dir.path().join("settings.json");
+    let fp = FailpointCell::none();
+    let res = run_migration_with_identity(db, &keystore_dir, &settings_path, &fp, PIPE_ID);
+    match res {
+        Err(MigrationError::Db(DbError::Integrity(_))) => { /* expected */ }
+        other => panic!(
+            "expected MigrationError::Db(Integrity) from Complete-preflight validation, got {other:?}"
+        ),
+    }
+}
+
+/// A "Complete" DB whose providers table is missing the `version` column must
+/// fail the Complete preflight — the singleton alone is not proof the tables
+/// match schema_version=2.
+#[test]
+fn complete_db_with_missing_version_column_fails_preflight() {
+    let (dir, db) = fresh_complete_db_with_version_decl("");
+    run_complete_pipeline_expects_integrity(&dir, &db);
+}
+
+/// A "Complete" DB with a `version TEXT` column (wrong type) fails the preflight.
+#[test]
+fn complete_db_with_text_version_column_fails_preflight() {
+    let (dir, db) = fresh_complete_db_with_version_decl("version TEXT");
+    run_complete_pipeline_expects_integrity(&dir, &db);
+}
+
+/// A "Complete" DB with a nullable `version INTEGER` column (no NOT NULL) fails.
+#[test]
+fn complete_db_with_nullable_version_column_fails_preflight() {
+    let (dir, db) = fresh_complete_db_with_version_decl("version INTEGER");
+    run_complete_pipeline_expects_integrity(&dir, &db);
+}
+
+/// A "Complete" DB with `version INTEGER NOT NULL DEFAULT 0` (wrong default)
+/// fails the preflight.
+#[test]
+fn complete_db_with_wrong_default_version_column_fails_preflight() {
+    let (dir, db) =
+        fresh_complete_db_with_version_decl("version INTEGER NOT NULL DEFAULT 0");
+    run_complete_pipeline_expects_integrity(&dir, &db);
+}
+
+/// A genuinely-correct "Complete" v2 DB (version column present + correct shape)
+/// passes the preflight and the pipeline is a no-op Ok.
+#[test]
+fn complete_db_with_correct_version_column_passes_preflight() {
+    let (dir, db) =
+        fresh_complete_db_with_version_decl("version INTEGER NOT NULL DEFAULT 1");
+    let keystore_dir = dir.path().join("keystore");
+    let settings_path = dir.path().join("settings.json");
+    let fp = FailpointCell::none();
+    run_migration_with_identity(&db, &keystore_dir, &settings_path, &fp, PIPE_ID)
+        .expect("correct Complete DB should pass preflight validation");
+    let mc: i64 = db
+        .with_conn(|conn| {
+            Ok(conn.query_row(
+                "SELECT migration_complete FROM _schema_migrations WHERE id=1",
+                [],
+                |r| r.get(0),
+            )?)
+        })
+        .unwrap();
+    assert_eq!(mc, 1, "unchanged: still complete");
+}
+
+// ─── P2-1: CAS barrier — concurrent writers on the same version via update() ─
+
+/// Two threads sharing the same `Arc<Database>` rendezvous at a `Barrier`, then
+/// both race the PRODUCTION `providers::update()` with `expected_version=1`. The
+/// `Database` Mutex serializes the two read-modify-write transactions, so the
+/// first writer's CAS matches (bumps 1→2 → `Written`) and the second finds the
+/// row already at 2 (`StaleVersion { actual_version: 2 }`). This proves the
+/// optimistic lock holds end-to-end through the production update path under
+/// real thread contention — exactly one `Written`, exactly one `StaleVersion`.
+#[test]
+fn concurrent_same_version_only_one_wins_via_update() {
     use std::sync::Arc;
     use std::sync::Barrier;
     use std::thread;
@@ -718,44 +957,44 @@ fn concurrent_same_version_only_one_succeeds() {
     let db = Arc::new(db);
     let barrier = Arc::new(Barrier::new(2));
     let mut handles = vec![];
-    for _ in 0..2 {
+    for i in 0..2 {
         let db_clone = Arc::clone(&db);
         let barrier_clone = Arc::clone(&barrier);
         let uuid = provider_uuid.clone();
+        let new_name = format!("Updater-{i}");
         handles.push(thread::spawn(move || {
-            // Both read the current version (1) BEFORE either writes.
-            let current_version = db_clone
-                .with_conn(|conn| {
-                    Ok(conn.query_row(
-                        "SELECT version FROM providers WHERE uuid=?1",
-                        rusqlite::params![&uuid],
-                        |r| r.get::<_, i64>(0),
-                    )?)
-                })
-                .unwrap();
-            // Rendezvous: both threads have read version=1 before either writes.
+            // Rendezvous so both writers race with the same expected_version=1.
             barrier_clone.wait();
-            // Now both race the CAS with expected_version = current_version.
-            // The Database Mutex serializes these two UPDATEs.
-            db_clone
-                .with_conn(|conn| {
-                    let n = conn.execute(
-                        "UPDATE providers SET version=version+1 \
-                         WHERE uuid=?1 AND version=?2",
-                        rusqlite::params![&uuid, current_version],
-                    )?;
-                    Ok::<_, DbError>(n)
+            // Each thread drives the PRODUCTION update path (read-modify-write +
+            // CAS inside one Mutex-held transaction). The first to acquire the
+            // Mutex bumps 1→2 (Written); the second reads 2, its CAS with
+            // expected_version=1 matches 0 rows → StaleVersion.
+            db_clone.with_conn(|conn| {
+                providers::update(conn, &uuid, &ProviderPatch {
+                    name: Some(new_name),
+                    endpoint: None,
+                    model: None,
+                    enabled: None,
+                    sort_order: None,
+                    expected_version: 1,
                 })
-                .unwrap()
+            })
         }));
     }
-    let results: Vec<usize> = handles.into_iter().map(|h| h.join().unwrap()).collect();
-    // Exactly one CAS succeeds (affected=1); the other is rejected (affected=0)
-    // because the first writer bumped the version under the Mutex.
-    let successes = results.iter().filter(|&&n| n == 1).count();
-    let rejected = results.iter().filter(|&&n| n == 0).count();
-    assert_eq!(successes, 1, "exactly one CAS should succeed; got {results:?}");
-    assert_eq!(rejected, 1, "exactly one CAS should be rejected; got {results:?}");
+    let results: Vec<Result<UpdateOutcome, DbError>> =
+        handles.into_iter().map(|h| h.join().unwrap()).collect();
+    // Exactly one Written (CAS matched, bumped 1→2); exactly one StaleVersion
+    // (the row had moved to 2 under the Mutex before the second CAS).
+    let written = results
+        .iter()
+        .filter(|r| matches!(r, Ok(UpdateOutcome::Written(_))))
+        .count();
+    let stale = results
+        .iter()
+        .filter(|r| matches!(r, Ok(UpdateOutcome::StaleVersion { .. })))
+        .count();
+    assert_eq!(written, 1, "exactly one Written; got {results:?}");
+    assert_eq!(stale, 1, "exactly one StaleVersion; got {results:?}");
     // Final on-disk version is 2 (one successful bump).
     let final_version: i64 = db
         .with_conn(|conn| {

@@ -366,3 +366,29 @@ pub fn migrate_v1_to_v2(conn: &Connection) -> Result<(), DbError> {
     )?;
     Ok(())
 }
+
+/// P1-2: Validate the v2 schema structure. Called on every startup, even for
+/// "Complete" DBs, so a corrupted `providers` table (e.g. a manually dropped or
+/// altered `version` column) is detected instead of silently trusted.
+///
+/// Fail-closed: returns [`DbError::Integrity`] if the `version` column is
+/// missing OR has a shape incompatible with the optimistic lock (must be
+/// `INTEGER NOT NULL DEFAULT 1`). Reuses [`table_columns`] +
+/// [`version_column_is_correct`] so this path and [`migrate_v1_to_v2`] agree on
+/// what "correct" means.
+pub fn validate_v2_schema(conn: &Connection) -> Result<(), DbError> {
+    let columns = table_columns(conn, "providers")?;
+    let version_col = columns.iter().find(|c| c.name == "version");
+    match version_col {
+        Some(col) if version_column_is_correct(col) => Ok(()),
+        Some(col) => Err(DbError::Integrity(format!(
+            "providers.version has an incompatible shape: \
+             type={}, notnull={}, default={:?}; \
+             expected INTEGER NOT NULL DEFAULT 1",
+            col.col_type, col.notnull, col.dflt
+        ))),
+        None => Err(DbError::Integrity(
+            "providers.version column is missing in a v2-complete database".into(),
+        )),
+    }
+}
