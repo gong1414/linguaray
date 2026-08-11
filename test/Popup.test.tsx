@@ -98,7 +98,7 @@ describe("Popup (Surface 01)", () => {
   it("hides the window on Escape", async () => {
     const { getCurrentWindow } = await import("@tauri-apps/api/window");
     const { container } = render(() => <Popup />);
-    fireEvent.keyDown(container.querySelector("main") ?? document.body, { key: "Escape" });
+    fireEvent.keyDown(container.querySelector(".popup-shell") ?? document.body, { key: "Escape" });
     expect(vi.mocked(getCurrentWindow().hide)).toHaveBeenCalled();
     cleanup();
   });

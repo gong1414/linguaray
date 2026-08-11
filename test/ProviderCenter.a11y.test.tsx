@@ -86,6 +86,10 @@ describe("ProviderCenter — accessibility (axe)", () => {
     document.documentElement.dataset.theme = "dark";
     render(() => <ProviderCenter />);
     await waitFor(() => expect(screen.getByText("AlphaProvider")).toBeTruthy());
+    // R7-P1-3: assert at least one Chinese accessible name exists (the sidebar
+    // region aria-label is "服务商列表" in zh).
+    const sidebar = document.querySelector(".pc__sidebar");
+    expect(sidebar?.getAttribute("aria-label")).toMatch(/[\u4e00-\u9fff]/);
     await assertNoAxeViolations({ disableRules: ["color-contrast"] });
   });
 

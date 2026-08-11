@@ -59,18 +59,82 @@ afterEach(async () => {
 });
 
 describe("Popup — production interaction contracts", () => {
-  it("stale Retry completion does not overwrite a newer popup state", async () => {
+  it("R7-P1-2: stale Retry reject does not overwrite a newer popup state", async () => {
     const { invoke } = await import("@tauri-apps/api/core");
     const invokeMock = vi.mocked(invoke);
 
-    // translate_selection_ipc hangs forever (never resolves) so the stale Retry
-    // remains "in flight" while a newer event arrives.
+    // translate_selection_ipc returns a deferred promise we control so we can
+    // reject it AFTER a newer event arrives.
+    let rejectRetry!: (e: Error) => void;
     invokeMock.mockImplementation(async (cmd: string) => {
-      if (cmd === "translate_selection_ipc") return new Promise(() => {});
+      if (cmd === "translate_selection_ipc") {
+        return new Promise((_res, rej) => {
+          rejectRetry = rej;
+        });
+      }
       return { outcomes: [], actual_engine: undefined };
     });
 
-    const { getByText, queryByRole } = render(() => <Popup />);
+    const { getByText, queryByText, queryByRole } = render(() => <Popup />);
+
+    // Initial success result with a saved source.
+    await emitEvent("popup-state", {
+      status: "result",
+      text: "First result",
+      engine: "deepseek/u1",
+      source_text: "hello",
+    });
+    await waitFor(() => expect(getByText("First result")).toBeTruthy());
+
+    // Click Retry → translate_selection_ipc fires (deferred — pending).
+    const retryBtn = await waitFor(() => getByText(/Retry|重试/));
+    fireEvent.click(retryBtn);
+    await waitFor(() =>
+      expect(invokeMock).toHaveBeenCalledWith("translate_selection_ipc", {
+        text: "hello",
+      }),
+    );
+
+    // A NEWER popup-state arrives (e.g. user selected new text → backend
+    // emitted a fresh result). This bumps the state generation, making the
+    // in-flight Retry stale.
+    await emitEvent("popup-state", {
+      status: "result",
+      text: "Newer result",
+      engine: "deepseek/u1",
+      source_text: "world",
+    });
+    await waitFor(() => expect(getByText("Newer result")).toBeTruthy());
+
+    // Now the stale Retry's IPC rejects. The generation guard (myGen !==
+    // stateGeneration) prevents the catch block from overwriting the newer
+    // state with an error.
+    rejectRetry(new Error("IPC timeout"));
+    await new Promise((r) => setTimeout(r, 50));
+
+    // The popup STILL shows the newer result (not an error).
+    expect(getByText("Newer result")).toBeTruthy();
+    expect(queryByText("IPC timeout")).toBeNull();
+    expect(queryByRole("alert")).toBeNull();
+  });
+
+  it("R7-P1-2: stale Retry resolve does not overwrite a newer popup state", async () => {
+    const { invoke } = await import("@tauri-apps/api/core");
+    const invokeMock = vi.mocked(invoke);
+
+    // translate_selection_ipc returns a deferred promise we control so we can
+    // resolve it AFTER a newer event arrives.
+    let resolveRetry!: (v: unknown) => void;
+    invokeMock.mockImplementation(async (cmd: string) => {
+      if (cmd === "translate_selection_ipc") {
+        return new Promise((res) => {
+          resolveRetry = res;
+        });
+      }
+      return { outcomes: [], actual_engine: undefined };
+    });
+
+    const { getByText } = render(() => <Popup />);
 
     // Initial success result.
     await emitEvent("popup-state", {
@@ -81,19 +145,11 @@ describe("Popup — production interaction contracts", () => {
     });
     await waitFor(() => expect(getByText("First result")).toBeTruthy());
 
-    // Click Retry → translate_selection_ipc fires (hangs). The popup enters
-    // loading state.
+    // Click Retry → translate_selection_ipc fires (deferred — pending).
     const retryBtn = await waitFor(() => getByText(/Retry|重试/));
     fireEvent.click(retryBtn);
-    await waitFor(() =>
-      expect(invokeMock).toHaveBeenCalledWith("translate_selection_ipc", {
-        text: "hello",
-      }),
-    );
 
-    // A NEWER popup-state arrives (e.g. user selected new text → backend
-    // emitted a fresh result). This must REPLACE the loading state, not be
-    // overwritten by the stale Retry's eventual completion.
+    // A NEWER popup-state arrives → bumps generation → Retry is now stale.
     await emitEvent("popup-state", {
       status: "result",
       text: "Newer result",
@@ -101,11 +157,14 @@ describe("Popup — production interaction contracts", () => {
       source_text: "world",
     });
     await waitFor(() => expect(getByText("Newer result")).toBeTruthy());
-    // The loading state is gone (no spinner region with aria-busy).
-    const region = getByText("Newer result").closest("[role='region']");
-    expect(region?.getAttribute("aria-busy")).toBeFalsy();
-    // No error alert.
-    expect(queryByRole("alert")).toBeNull();
+
+    // Resolve the stale Retry. The generation guard prevents it from touching
+    // state (the newer event already set it). No loading or stale state.
+    resolveRetry({ outcomes: [], actual_engine: undefined });
+    await new Promise((r) => setTimeout(r, 50));
+
+    // The popup STILL shows the newer result (not reverted to loading/stale).
+    expect(getByText("Newer result")).toBeTruthy();
   });
 
   it("pin/unpin sets aria-pressed correctly", async () => {
