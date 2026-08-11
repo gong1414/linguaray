@@ -527,6 +527,94 @@ describe("ProviderCenter (Surface 05)", () => {
     expect((screen.getByLabelText("Endpoint") as HTMLInputElement).value).toBe("https://new.example.com");
   });
 
+  it("stale_version Reload clears stale save state, next save uses refreshed expected_version (R4-P2-2)", async () => {
+    let refreshed = false;
+    let updateShouldStale = true;
+    const patches: { expected_version?: number }[] = [];
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () =>
+        [
+          profile(
+            refreshed
+              ? { uuid: "u1", name: "TestProvider", endpoint: "https://api.openai.com", version: 2, secret_ref: "provider/u1" }
+              : { uuid: "u1", name: "TestProvider", endpoint: "https://api.openai.com", version: 1, secret_ref: "provider/u1" },
+          ),
+          // A second provider whose name we will borrow to trigger a name-conflict
+          // error on u1 (purely client-side; never hits IPC).
+          profile({ uuid: "u2", name: "TakenName", sort_order: 1, secret_ref: "provider/u2" }),
+        ],
+      key_status: () => ({ "provider/u1": true, "provider/u2": true }),
+      provider_update: (args) => {
+        const patch = (args as { patch?: { expected_version?: number } }).patch;
+        if (patch) patches.push(patch);
+        if (updateShouldStale) {
+          throw Object.assign(new Error("stale"), {
+            error: "stale_version",
+            actual_version: 2,
+          });
+        }
+        // After Reload the refreshed row is version 2; the next save echoes 2 and succeeds.
+        return profile({ uuid: "u1", name: "TestProvider", endpoint: "https://api.openai.com", version: 3 });
+      },
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("TestProvider")).toBeTruthy());
+    fireEvent.click(screen.getByLabelText("Edit TestProvider"));
+    await flush();
+
+    // Type u1's name to collide with u2 → Save → name-conflict error (no IPC).
+    const nameInput = screen.getByLabelText("Name") as HTMLInputElement;
+    fireEvent.input(nameInput, { target: { value: "TakenName" } });
+    await flush();
+    fireEvent.click(screen.getByText("Save profile"));
+    await waitFor(() =>
+      expect(screen.getAllByText("Another provider already uses this name").length).toBeGreaterThanOrEqual(1),
+    );
+    expect(patches.length).toBe(0);
+
+    // Now edit the endpoint + revert the name so the save reaches IPC, and make
+    // the backend reject with stale_version → conflict banner + failed saveState.
+    fireEvent.input(nameInput, { target: { value: "TestProvider" } });
+    const endpointInput = screen.getByLabelText("Endpoint") as HTMLInputElement;
+    fireEvent.input(endpointInput, { target: { value: "https://new.example.com" } });
+    await flush();
+    fireEvent.click(screen.getByText("Save profile"));
+    await waitFor(() =>
+      expect(screen.getAllByText("This provider was modified elsewhere").length).toBeGreaterThanOrEqual(1),
+    );
+    expect(patches.length).toBe(1);
+    expect(patches[0].expected_version).toBe(1);
+
+    // Reload: the next provider_list returns the remote (v2) data. The stale
+    // name error + failed saveState must be cleared (R4-P2-2), the draft reverts
+    // to the remote endpoint, and the banner disappears.
+    refreshed = true;
+    updateShouldStale = false;
+    fireEvent.click(screen.getByText("Reload"));
+    await flush();
+    await waitFor(() =>
+      expect(screen.queryByText("This provider was modified elsewhere")).toBeNull(),
+    );
+    // Stale name-conflict error is gone.
+    expect(screen.queryByText("Another provider already uses this name")).toBeNull();
+    // Draft cleared → field shows the remote endpoint again.
+    await waitFor(() =>
+      expect((screen.getByLabelText("Endpoint") as HTMLInputElement).value).toBe("https://api.openai.com"),
+    );
+
+    // Save again — now with the REFRESHED expected_version (2). It must succeed
+    // (no stale banner) and surface the "Profile saved" note, proving the stale
+    // saveState was reset and the version echo refreshed.
+    fireEvent.click(screen.getByText("Save profile"));
+    await waitFor(() => expect(patches.length).toBe(2));
+    expect(patches[1].expected_version).toBe(2);
+    await waitFor(() =>
+      expect(screen.getAllByText("Profile saved").length).toBeGreaterThanOrEqual(1),
+    );
+    expect(screen.queryByText("This provider was modified elsewhere")).toBeNull();
+  });
+
   it("key missing: shows key input + Save key; saving calls provider_set_key", async () => {
     const keyCalls: unknown[] = [];
     routeInvoke({

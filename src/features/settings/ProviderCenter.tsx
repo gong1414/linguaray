@@ -1344,6 +1344,21 @@ const ProviderCenter: Component = () => {
             delete next[_uuid];
             return next;
           });
+          // R4-P2-2: also clear any stale name-conflict error + save state left
+          // over from the rejected save. Without this, a name error from the
+          // stale write would persist over the freshly-reloaded row, and the
+          // failed saveState would block the next save (which echoes the
+          // refreshed expected_version and should succeed).
+          setNameErrorByUuid((prev) => {
+            const next = { ...prev };
+            delete next[_uuid];
+            return next;
+          });
+          setSaveByUuid((prev) => {
+            const next = { ...prev };
+            delete next[_uuid];
+            return next;
+          });
           setSaveConflictUuid(null);
         })();
       }}
