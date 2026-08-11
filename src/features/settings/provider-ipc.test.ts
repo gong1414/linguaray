@@ -49,6 +49,7 @@ const profile = (over: Partial<ProviderProfile> = {}): ProviderProfile => ({
   secret_ref: "provider/u1",
   capabilities: { balance: false, quota: false, model_list: false },
   status: "active",
+  version: 1,
   ...over,
 });
 
@@ -101,10 +102,10 @@ describe("provider command wrappers", () => {
 
   it("providerUpdate invokes with { uuid, patch }", async () => {
     invokeMock.mockResolvedValue(profile());
-    await providerUpdate("u1", { endpoint: "https://new.example.com" });
+    await providerUpdate("u1", { endpoint: "https://new.example.com", expected_version: 1 });
     expect(invokeMock).toHaveBeenCalledWith("provider_update", {
       uuid: "u1",
-      patch: { endpoint: "https://new.example.com" },
+      patch: { endpoint: "https://new.example.com", expected_version: 1 },
     });
   });
 

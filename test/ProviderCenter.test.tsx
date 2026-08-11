@@ -38,6 +38,7 @@ const profile = (over: Partial<ProviderProfile> = {}): ProviderProfile => ({
   secret_ref: "provider/u1",
   capabilities: { balance: false, quota: false, model_list: true },
   status: "active",
+  version: 1,
   ...over,
 });
 
@@ -320,6 +321,102 @@ describe("ProviderCenter (Surface 05)", () => {
     );
     // provider_update was NOT called (aborted before the IPC round-trip).
     expect(updates.length).toBe(0);
+  });
+
+  it("save profile sends expected_version from the loaded profile (R2-E)", async () => {
+    const updates: unknown[] = [];
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => [profile({ uuid: "u1", name: "TestProvider", version: 7, secret_ref: "provider/u1" })],
+      key_status: () => ({ "provider/u1": true }),
+      provider_update: (args) => {
+        updates.push(args);
+        return profile({ uuid: "u1", name: "TestProvider", endpoint: "https://new.example.com", version: 8 });
+      },
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("TestProvider")).toBeTruthy());
+    fireEvent.click(screen.getByLabelText("Edit TestProvider"));
+    await flush();
+
+    const endpointInput = screen.getByLabelText("Endpoint") as HTMLInputElement;
+    fireEvent.input(endpointInput, { target: { value: "https://new.example.com" } });
+    await flush();
+
+    fireEvent.click(screen.getByText("Save profile"));
+    await waitFor(() => expect(updates.length).toBeGreaterThanOrEqual(1));
+    // The patch echoes back the loaded profile's version as expected_version.
+    expect((updates[0] as { patch: { expected_version?: number } }).patch.expected_version).toBe(7);
+  });
+
+  it("stale_version rejection shows save-conflict banner and preserves the draft (R2-E)", async () => {
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => [profile({ uuid: "u1", name: "TestProvider", version: 1, secret_ref: "provider/u1" })],
+      key_status: () => ({ "provider/u1": true }),
+      provider_update: () => {
+        // Optimistic-lock mismatch: someone else wrote first (row now at v2).
+        const err = Object.assign(new Error("stale"), {
+          error: "stale_version",
+          actual_version: 2,
+        });
+        throw err;
+      },
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("TestProvider")).toBeTruthy());
+    fireEvent.click(screen.getByLabelText("Edit TestProvider"));
+    await flush();
+
+    const endpointInput = screen.getByLabelText("Endpoint") as HTMLInputElement;
+    fireEvent.input(endpointInput, { target: { value: "https://new.example.com" } });
+    await flush();
+
+    fireEvent.click(screen.getByText("Save profile"));
+    await waitFor(() =>
+      expect(screen.getAllByText("This provider was modified elsewhere").length).toBeGreaterThanOrEqual(1),
+    );
+    // The user's draft is PRESERVED (not overwritten by the failed save).
+    expect((screen.getByLabelText("Endpoint") as HTMLInputElement).value).toBe("https://new.example.com");
+  });
+
+  it("stale_version banner Reload re-fetches fresh data and clears the banner", async () => {
+    let listVersion = 1;
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => [
+        profile({ uuid: "u1", name: "TestProvider", version: listVersion, secret_ref: "provider/u1" }),
+      ],
+      key_status: () => ({ "provider/u1": true }),
+      provider_update: () => {
+        const err = Object.assign(new Error("stale"), {
+          error: "stale_version",
+          actual_version: 2,
+        });
+        throw err;
+      },
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("TestProvider")).toBeTruthy());
+    fireEvent.click(screen.getByLabelText("Edit TestProvider"));
+    await flush();
+
+    const endpointInput = screen.getByLabelText("Endpoint") as HTMLInputElement;
+    fireEvent.input(endpointInput, { target: { value: "https://new.example.com" } });
+    await flush();
+    fireEvent.click(screen.getByText("Save profile"));
+    await waitFor(() =>
+      expect(screen.getAllByText("This provider was modified elsewhere").length).toBeGreaterThanOrEqual(1),
+    );
+
+    // Clicking Reload re-fetches (bump the list version so a refresh returns v2).
+    listVersion = 2;
+    fireEvent.click(screen.getByText("Reload"));
+    await flush();
+    // Banner is gone after reload.
+    await waitFor(() =>
+      expect(screen.queryByText("This provider was modified elsewhere")).toBeNull(),
+    );
   });
 
   it("key missing: shows key input + Save key; saving calls provider_set_key", async () => {
