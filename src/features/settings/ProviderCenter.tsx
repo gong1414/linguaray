@@ -1287,7 +1287,17 @@ const ProviderCenter: Component = () => {
         setModelDraftByUuid((prev) => ({ ...prev, [uuid]: value }))
       }
       onModelChange={(uuid, value) =>
-        setModelDraftByUuid((prev) => ({ ...prev, [uuid]: value }))
+        // Idempotent: return the SAME `prev` reference when the value is
+        // unchanged. The Kobalte Select re-emits `onChange` with the current
+        // value whenever the model `value`/`options` prop changes reference
+        // (which happens on every `detail` memo recompute, since `selectOptions`
+        // returns a fresh array). Without this guard the write always produced a
+        // new Record → `detail` recompute → Select value-ref change → onChange
+        // → infinite update loop (R2-H). Solid's setter short-circuits when the
+        // updater returns the identical reference, breaking the cycle.
+        setModelDraftByUuid((prev) =>
+          prev[uuid] === value ? prev : { ...prev, [uuid]: value },
+        )
       }
       onKeyInput={(uuid, value) => {
         setKeyInputByUuid((prev) => ({ ...prev, [uuid]: value }));
