@@ -139,6 +139,10 @@ export type ProviderCenterViewProps = {
   selectionError: boolean;
   selectionLoading: boolean;
   deletingUuid: string | null;
+  // R5-P1-1: provider whose save-conflict Reload is in-flight. While set, the
+  // detail-panel fields for that UUID are disabled (prevents the user from
+  // typing drafts that the in-flight refresh would unconditionally discard).
+  reloadingUuid: string | null;
   presets: Preset[];
   detail: ProviderDetailState | null;
   // dialogs + toasts
@@ -422,7 +426,17 @@ export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element 
             }
           >
             {(d) => {
-              const uuid = d().provider.uuid;
+              // R5-P1-1: reactive uuid accessor — d() is reactive so this always
+              // reflects the CURRENTLY-selected provider, even after the user
+              // navigates from one provider to another without the detail panel
+              // unmounting. A captured const would go stale and route Save/Reload
+              // to the wrong provider.
+              const uuid = () => d().provider.uuid;
+              // R5-P1-1: while THIS provider's save-conflict Reload is in-flight,
+              // every editable field + Save/Reload is disabled (a draft typed
+              // during the await refresh() would be unconditionally discarded on
+              // success). Other providers' fields are unaffected.
+              const isReloading = () => props.reloadingUuid === uuid();
               const canListModels = () => d().provider.capabilities.model_list;
               const selectOptions = createMemo<SelectOption[]>(() => {
                 const opts = d().modelOptions;
@@ -444,7 +458,9 @@ export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element 
                       <Button
                         variant="primary"
                         size="sm"
-                        onClick={() => props.onResolveSaveConflict(uuid)}
+                        loading={isReloading()}
+                        disabled={isReloading()}
+                        onClick={() => props.onResolveSaveConflict(uuid())}
                       >
                         {t().reload}
                       </Button>
@@ -455,9 +471,9 @@ export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element 
                     label={t().name}
                     value={d().nameDraft}
                     errorText={d().nameError ?? undefined}
-                    disabled={d().saveState === "saving"}
+                    disabled={d().saveState === "saving" || isReloading()}
                     onInput={(e) => {
-                      props.onNameInput(uuid, e.currentTarget.value);
+                      props.onNameInput(uuid(), e.currentTarget.value);
                     }}
                   />
 
@@ -467,9 +483,9 @@ export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element 
                     value={d().endpointDraft}
                     placeholder={t().endpoint.placeholder}
                     errorText={d().endpointError ?? undefined}
-                    disabled={d().saveState === "saving"}
+                    disabled={d().saveState === "saving" || isReloading()}
                     onInput={(e) =>
-                      props.onEndpointInput(uuid, e.currentTarget.value)
+                      props.onEndpointInput(uuid(), e.currentTarget.value)
                     }
                   />
 
@@ -483,9 +499,9 @@ export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element 
                         label={t().models}
                         value={d().modelDraft}
                         placeholder={t().manualModelPlaceholder}
-                        disabled={d().saveState === "saving"}
+                        disabled={d().saveState === "saving" || isReloading()}
                         onInput={(e) =>
-                          props.onModelInput(uuid, e.currentTarget.value)
+                          props.onModelInput(uuid(), e.currentTarget.value)
                         }
                       />
                     }
@@ -497,15 +513,15 @@ export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element 
                         options={selectOptions()}
                         loading={d().modelFetch === "loading"}
                         loadingLabel={t().loadingModels}
-                        disabled={d().saveState === "saving"}
+                        disabled={d().saveState === "saving" || isReloading()}
                         onChange={(v) =>
-                          props.onModelChange(uuid, v)
+                          props.onModelChange(uuid(), v)
                         }
                       />
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => props.onFetchModels(uuid)}
+                        onClick={() => props.onFetchModels(uuid())}
                       >
                         {t().fetchModels}
                       </Button>
@@ -517,7 +533,8 @@ export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element 
                       variant="primary"
                       size="sm"
                       loading={d().saveState === "saving"}
-                      onClick={() => props.onSaveProfile(uuid)}
+                      disabled={isReloading()}
+                      onClick={() => props.onSaveProfile(uuid())}
                     >
                       {t().saveProfile}
                     </Button>
@@ -540,7 +557,7 @@ export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element 
                             errorText={d().keyError ?? undefined}
                             disabled={d().saveState === "saving"}
                             onInput={(e) => {
-                              props.onKeyInput(uuid, e.currentTarget.value);
+                              props.onKeyInput(uuid(), e.currentTarget.value);
                             }}
                           />
                           <Button
@@ -548,7 +565,7 @@ export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element 
                             size="sm"
                             disabled={d().provider.needs_key && d().keyText.length === 0}
                             loading={d().saveState === "saving"}
-                            onClick={() => props.onSaveKey(uuid)}
+                            onClick={() => props.onSaveKey(uuid())}
                           >
                             {t().saveKey}
                           </Button>
@@ -567,7 +584,7 @@ export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element 
                       variant="secondary"
                       size="sm"
                       loading={d().conn === "testing"}
-                      onClick={() => props.onTestConnection(uuid)}
+                      onClick={() => props.onTestConnection(uuid())}
                     >
                       {t().testConnection}
                     </Button>
@@ -737,6 +754,11 @@ const ProviderCenter: Component = () => {
   // Reload that re-fetches fresh data; the user's in-progress draft is PRESERVED
   // so they can reconcile manually instead of losing their edits.
   const [saveConflictUuid, setSaveConflictUuid] = createSignal<string | null>(null);
+  // R5-P1-1: provider whose save-conflict Reload is in-flight. While set, the
+  // detail-panel fields for that UUID are disabled (prevents the user from
+  // typing drafts that the in-flight refresh would unconditionally discard on
+  // success) and a second Reload click is blocked (re-entrancy guard).
+  const [reloadingUuid, setReloadingUuid] = createSignal<string | null>(null);
   const [consentOpen, setConsentOpen] = createSignal(false);
   const [pendingParallelUuid, setPendingParallelUuid] = createSignal<string | null>(null);
   const [consentActualScope, setConsentActualScope] = createSignal<string | null>(null);
@@ -1255,6 +1277,7 @@ const ProviderCenter: Component = () => {
       selectionError={selectionError()}
       selectionLoading={selectionLoading()}
       deletingUuid={deletingUuid()}
+      reloadingUuid={reloadingUuid()}
       presets={PRESETS}
       detail={detail()}
       deleteConfirmUuid={deleteConfirmUuid()}
@@ -1319,29 +1342,38 @@ const ProviderCenter: Component = () => {
       onSaveKey={(uuid) => void handleSaveKey(uuid)}
       onFetchModels={(uuid) => void handleFetchModels(uuid)}
       onTestConnection={(uuid) => void handleTestConnection(uuid)}
-      onResolveSaveConflict={(_uuid) => {
-        // R3-P1-4: Reload semantics. Do NOT clear the banner synchronously —
-        // await refresh first. On success, clear this provider's drafts so the
-        // form reverts to the fresh remote values (the user's stale draft would
-        // otherwise persist over the just-reloaded data), then clear the banner.
-        // On failure, keep BOTH the banner and the drafts (refresh already
-        // surfaced the error via loadError + a toast); the user can retry.
+      onResolveSaveConflict={(uuid) => {
+        // R5-P1-1: Reload race-condition fix. Set reloadingUuid BEFORE the await
+        // so (a) a second Reload click is a no-op (re-entrancy guard) and (b) the
+        // detail-panel fields for this UUID are disabled while refresh is
+        // in-flight (a draft typed during the await would be unconditionally
+        // discarded on success). On failure, restore editability but keep the
+        // banner + drafts (refresh already surfaced the error). On success,
+        // clear this UUID's drafts/errors and the conflict banner ONLY if the
+        // conflict is still for THIS uuid — a different provider's conflict may
+        // have appeared during the reload and must survive.
+        if (reloadingUuid()) return; // prevent double-click re-entry
+        setReloadingUuid(uuid);
         void (async () => {
           const ok = await refresh();
-          if (!ok) return;
+          if (!ok) {
+            // Reload failed: keep banner + drafts + errors. Restore editability.
+            setReloadingUuid(null);
+            return;
+          }
           setNameDraftByUuid((prev) => {
             const next = { ...prev };
-            delete next[_uuid];
+            delete next[uuid];
             return next;
           });
           setEndpointDraft((prev) => {
             const next = { ...prev };
-            delete next[_uuid];
+            delete next[uuid];
             return next;
           });
           setModelDraftByUuid((prev) => {
             const next = { ...prev };
-            delete next[_uuid];
+            delete next[uuid];
             return next;
           });
           // R4-P2-2: also clear any stale name-conflict error + save state left
@@ -1351,15 +1383,19 @@ const ProviderCenter: Component = () => {
           // refreshed expected_version and should succeed).
           setNameErrorByUuid((prev) => {
             const next = { ...prev };
-            delete next[_uuid];
+            delete next[uuid];
             return next;
           });
           setSaveByUuid((prev) => {
             const next = { ...prev };
-            delete next[_uuid];
+            delete next[uuid];
             return next;
           });
-          setSaveConflictUuid(null);
+          // R5-P1-1: conditional conflict clear — only if the conflict is still
+          // for THIS uuid. A different provider's conflict may have appeared
+          // during the reload and must NOT be clobbered.
+          setSaveConflictUuid((prev) => (prev === uuid ? null : prev));
+          setReloadingUuid(null);
         })();
       }}
       onReloadFromError={() => void refresh()}
