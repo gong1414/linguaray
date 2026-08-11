@@ -1226,24 +1226,45 @@ async fn provider_create(
     Ok(result)
 }
 
-/// Apply a partial patch to a provider. An endpoint change is validated and may
-/// invalidate the parallel consent (see `db_providers::update`).
+/// Apply a partial patch to a provider with optimistic-lock (CAS) semantics
+/// (R2-E). An endpoint change is validated and may invalidate the parallel
+/// consent (see `db_providers::update`). The patch's `expected_version` must
+/// match the row's current `version`; a mismatch rejects with a structured
+/// `{"error":"stale_version","actual_version":N}` so the UI can show a
+/// save-conflict banner instead of clobbering the other writer's change.
 #[tauri::command]
 async fn provider_update(
     state: tauri::State<'_, Arc<AppState>>,
     app_handle: tauri::AppHandle,
     uuid: String,
     patch: ProviderPatch,
-) -> Result<ProviderProfile, String> {
+) -> Result<ProviderProfile, ProviderCommandError> {
     let app_state = state.inner().clone();
-    let result = tauri::async_runtime::spawn_blocking(move || {
+    let result = tauri::async_runtime::spawn_blocking(move || -> Result<ProviderProfile, ProviderCommandError> {
         // Acquire the gate FIRST (see provider_list).
         let _gate = app_state.data_gate.read();
-        let db = require_ready_gated(&app_state, &_gate)?;
-        db.with_conn(|conn| db_providers::update(conn, &uuid, &patch)).map_err(|e| e.to_string())
+        let db = require_ready_gated(&app_state, &_gate).map_err(ProviderCommandError::from)?;
+        // The typed `UpdateOutcome` carries the stale/not-found signals out of
+        // the `with_conn` closure (whose error type is fixed to `DbError`), then
+        // we map them to structured `ProviderCommandError` variants here — same
+        // pattern as `ConfirmActiveOutcome` (no string-prefix parsing).
+        let outcome = db.with_conn(|conn| db_providers::update(conn, &uuid, &patch));
+        outcome
+            .map(|o| match o {
+                db_providers::UpdateOutcome::Written(p) => Ok(p),
+                db_providers::UpdateOutcome::StaleVersion { actual_version } => {
+                    Err(ProviderCommandError::StaleVersion { actual_version })
+                }
+                db_providers::UpdateOutcome::NotFound => Err(ProviderCommandError::Validation {
+                    message: "provider not found".into(),
+                }),
+            })
+            .map_err(ProviderCommandError::from)?
     })
     .await
-    .map_err(|e| e.to_string())??;
+    .map_err(|e| ProviderCommandError::Db {
+        message: format!("{e:?}"),
+    })??;
     refresh_tray_if_available(&app_handle).await;
     Ok(result)
 }
@@ -1955,10 +1976,15 @@ pub enum SetActiveResult {
 /// Replaces free-form `String` errors so the frontend can pattern-match
 /// instead of parsing string prefixes.
 /// Wire shape for StaleScope: `{"error":"stale_scope","actual_scope":"..."}`
+/// Wire shape for StaleVersion (R2-E): `{"error":"stale_version","actual_version":N}`
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 #[serde(tag = "error", rename_all = "snake_case")]
 pub enum ProviderCommandError {
     StaleScope { actual_scope: String },
+    /// Optimistic-lock mismatch (R2-E): the provider row was modified elsewhere
+    /// since the frontend last read it. Carries the row's actual version so the
+    /// UI can prompt a reload.
+    StaleVersion { actual_version: i64 },
     /// Generic database or validation error.
     Db { message: String },
     /// Provider not found, invalid selection, etc.
@@ -1970,6 +1996,9 @@ impl std::fmt::Display for ProviderCommandError {
         match self {
             Self::StaleScope { actual_scope } => {
                 write!(f, "stale scope: {actual_scope}")
+            }
+            Self::StaleVersion { actual_version } => {
+                write!(f, "stale version: row is at version {actual_version}")
             }
             Self::Db { message } => write!(f, "{message}"),
             Self::Validation { message } => write!(f, "{message}"),

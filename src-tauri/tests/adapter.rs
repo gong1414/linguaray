@@ -20,6 +20,7 @@ fn profile(uuid: &str, protocol: Protocol, endpoint: &str, secret_ref: &str) -> 
         secret_ref: secret_ref.into(),
         capabilities: ProviderCapabilities::default(),
         status: "active".into(),
+        version: 1,
     }
 }
 
