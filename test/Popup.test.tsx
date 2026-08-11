@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, fireEvent, cleanup, waitFor } from "@solidjs/testing-library";
 import Popup from "../src/Popup";
 
@@ -40,6 +40,18 @@ async function emitEvent(name: string, payload: unknown) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+});
+
+afterEach(async () => {
+  // R2-H: vi.clearAllMocks() only clears call history, NOT the implementation.
+  // Without this restore, a per-test mockImplementation (e.g. the R2-D deferred
+  // provider_list promise, or the B2/P1-9 hanging provider_list) leaks into
+  // subsequent tests and hangs their onMount provider_list call.
+  const { invoke } = await import("@tauri-apps/api/core");
+  vi.mocked(invoke).mockImplementation(async () => ({
+    outcomes: [],
+    actual_engine: undefined,
+  }));
 });
 
 describe("Popup (Surface 01)", () => {
