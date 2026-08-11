@@ -548,12 +548,21 @@ impl TrayStateController {
         if new_state == self.current_state {
             return;
         }
+        // Leaving Active: take() drops the PulseWorker → Drop → stop() →
+        // stop_tx.send(()) + join. The worker is DEAD before the new-state
+        // render runs (channel-quit barrier, NOT an epoch check). R2-G (P2):
+        // the worker MUST be dropped BEFORE rendering the new state.
         if self.current_state == TrayVisualState::ActiveTranslation {
-            // Leaving Active: take() drops the PulseWorker → Drop → stop() →
-            // stop_tx.send(()) + join. The worker is DEAD before the new-state
-            // render runs (channel-quit barrier, NOT an epoch check).
             self.pulse_worker.take();
         }
+        // Set state + render the initial frame. R2-G (P2): render runs BEFORE
+        // the worker is started so the initial Dimmed frame is guaranteed to be
+        // on screen before the worker's first tick can toggle it (no render/tick
+        // race). render() reads current_state, so set it first.
+        self.current_state = new_state;
+        self.render();
+        // Entering Active: start the worker AFTER the initial render so the
+        // first Dimmed frame is already set before any tick fires.
         if new_state == TrayVisualState::ActiveTranslation {
             self.pulse_worker = Some(PulseWorker::start(
                 self.renderer.clone(),
@@ -562,8 +571,6 @@ impl TrayStateController {
             ));
             self.worker_start_count = self.worker_start_count.saturating_add(1);
         }
-        self.current_state = new_state;
-        self.render();
     }
 
     /// rev-15: the SINGLE sync entry point that writes icon + tooltip based on
