@@ -916,4 +916,101 @@ describe("ProviderCenter — production interaction contracts", () => {
     expect(hintEl).toBeTruthy();
     expect(hintEl!.textContent).toContain("Save changes before testing");
   });
+
+  // ─── R9-fix: review-driven fixes ──────────────────────────────────────────
+
+  it("R9-fix: Fetch Models button has aria-describedby when unsaved drafts exist", async () => {
+    // The Fetch button mirrors the Test button's accessibility pattern: when
+    // unsaved drafts exist it is disabled, its aria-describedby points to a
+    // save-first hint span, and screen readers announce the reason.
+    const listable = (over: Partial<ProviderProfile> = {}): ProviderProfile =>
+      profile({
+        uuid: "u1",
+        name: "Alpha",
+        capabilities: { balance: false, quota: false, model_list: true },
+        ...over,
+      });
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => [listable()],
+      key_status: () => ({ "provider/u1": true }),
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("Alpha")).toBeTruthy());
+
+    fireEvent.click(screen.getByLabelText("Edit Alpha"));
+    await flush();
+    const fetchBtn = () =>
+      screen.getByText("Fetch models").closest("button") as HTMLButtonElement;
+    // Before edit: no hint, no aria-describedby.
+    expect(fetchBtn().getAttribute("aria-describedby")).toBeFalsy();
+
+    // Edit endpoint (no save) → unsaved drafts exist → hint appears.
+    const ep = screen.getByLabelText("Endpoint") as HTMLInputElement;
+    fireEvent.input(ep, { target: { value: "https://new.example.com" } });
+    await flush();
+    await waitFor(() =>
+      expect(screen.getByText("Save changes before fetching models")).toBeTruthy(),
+    );
+
+    // The Fetch button's aria-describedby points to the hint span's id.
+    const describedBy = fetchBtn().getAttribute("aria-describedby");
+    expect(describedBy).toBeTruthy();
+    const hintEl = document.getElementById(describedBy!);
+    expect(hintEl).toBeTruthy();
+    expect(hintEl!.textContent).toContain("Save changes before fetching models");
+  });
+
+  it("R9-fix: refreshCore replacing provider config bumps epoch — pending Test discarded", async () => {
+    // refreshCore diffs old vs new providers per-UUID. When a list refresh
+    // replaces a provider with new config (version/endpoint/model changed —
+    // e.g. an external change), it bumps that provider's configEpoch. A Test
+    // that was started against the old config and is still pending must be
+    // discarded when it resolves — otherwise it would write a stale "Connected"
+    // for a config the user no longer sees.
+    let configChanged = false;
+    let resolveTest!: (r: { ok: boolean; message: string }) => void;
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () =>
+        configChanged
+          ? [profile({ uuid: "u1", name: "Alpha", endpoint: "https://new.example.com", version: 2 })]
+          : [profile({ uuid: "u1", name: "Alpha", endpoint: "https://old.example.com", version: 1 })],
+      key_status: () => ({ "provider/u1": true }),
+      provider_test_connection: () =>
+        new Promise((res) => {
+          resolveTest = res as (r: { ok: boolean; message: string }) => void;
+        }),
+      // handleAddPreset calls refreshCore internally — use it to trigger a
+      // refresh that returns u1 with the new config.
+      provider_create: () => profile({ uuid: "u2", name: "OpenAI" }),
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("Alpha")).toBeTruthy());
+
+    fireEvent.click(screen.getByLabelText("Edit Alpha"));
+    await flush();
+    // Start Test against version=1, old endpoint — stays pending (deferred).
+    fireEvent.click(screen.getByText("Test"));
+    await flush();
+
+    // Simulate an external config change: provider_list now returns u1 with
+    // version=2 + new endpoint. Trigger refreshCore (via a preset create, which
+    // calls refreshCore internally) — it diffs old vs new and bumps the epoch.
+    configChanged = true;
+    fireEvent.click(screen.getByText("OpenAI").closest("button")!);
+    await flush();
+    // Let the refresh settle (success toast surfaces).
+    await waitFor(() =>
+      expect(screen.getAllByText("Profile saved").length).toBeGreaterThanOrEqual(1),
+    );
+
+    // Resolve the stale Test (started against version=1). Its result MUST be
+    // discarded — refreshCore bumped the configEpoch for u1.
+    resolveTest({ ok: true, message: "old reachable" });
+    await flush();
+    await flush();
+    expect(screen.queryByText("old reachable")).toBeNull();
+    expect(screen.queryByText("Connected")).toBeNull();
+  });
 });

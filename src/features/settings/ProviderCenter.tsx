@@ -552,13 +552,24 @@ export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element 
                         }
                       />
                       <Button
+                        id={`fetch-models-btn-${uuid()}`}
                         variant="ghost"
                         size="sm"
                         disabled={locked() || hasUnsavedDrafts()}
+                        aria-describedby={hasUnsavedDrafts() ? `fetch-hint-${uuid()}` : undefined}
                         onClick={() => props.onFetchModels(uuid())}
                       >
                         {t().fetchModels}
                       </Button>
+                      {/* R9-fix: same aria-describedby pattern as the Test button.
+                          Fetch reads the BACKEND's stored config, so fetching with
+                          unsaved edits would return models for a config the user
+                          no longer sees — the hint explains why Fetch is disabled. */}
+                      <Show when={hasUnsavedDrafts()}>
+                        <span id={`fetch-hint-${uuid()}`} class="pc__save-first-hint">
+                          {t().saveFirstToFetch}
+                        </span>
+                      </Show>
                     </div>
                   </Show>
 
@@ -910,7 +921,25 @@ const ProviderCenter: Component = () => {
         loadProviders(),
         providerGetActiveSelection(),
       ]);
+      // R9-fix: capture the old list BEFORE setProviders so we can diff old vs
+      // new per-UUID. If a provider's config changed (version/endpoint/model)
+      // — or it was deleted entirely — bump its configEpoch. This invalidates
+      // any pending Test/Fetch started against the old config: without it, a
+      // list refresh that replaced a provider with new config would let a
+      // pending Test/Fetch write stale results next to the updated row.
+      const oldList = providers();
       setProviders(list);
+      for (const oldP of oldList) {
+        const newP = list.find((p) => p.uuid === oldP.uuid);
+        if (
+          !newP ||
+          newP.version !== oldP.version ||
+          newP.endpoint !== oldP.endpoint ||
+          (newP.model ?? "") !== (oldP.model ?? "")
+        ) {
+          bumpConfigEpoch(oldP.uuid);
+        }
+      }
       setSelection({
         primaryUuid: active.primary,
         parallelUuids: active.parallel,
@@ -1345,9 +1374,8 @@ const ProviderCenter: Component = () => {
         // was deleted on the backend; only the list refresh can fail. On
         // failure the provider list is in an unknown state, so the DOM-dependent
         // focus restoration (querySelector for the next row's Edit button) is
-        // UNSAFE — skip it. refreshCore already set loadError + pushed its own
-        // error toast; add the accurate "saved but reload failed" warning so
-        // the user knows the delete went through and Reload will reconcile.
+        // UNSAFE — skip it. refreshCore already set loadError; the warning toast
+        // below is the sole user-facing signal for this failure.
         const ok = await refreshCore();
         if (!ok) {
           pushToast("warning", t.mutationSuccessReloadFailed);
