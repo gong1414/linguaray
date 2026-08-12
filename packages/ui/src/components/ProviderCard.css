@@ -60,7 +60,7 @@
   height: 20px;
   border-radius: var(--radius-sm);
   background: var(--color-bg-hover);
-  color: var(--color-fg-muted);
+  color: var(--color-text-secondary);
   font-size: var(--text-xs);
   line-height: 1;
 }
@@ -115,7 +115,7 @@
 
 /* R12: keyless provider (needs_key=false) — muted/neutral, no icon. */
 .lr-provider-card__key-status--not-required {
-  color: var(--color-fg-muted);
+  color: var(--color-text-secondary);
 }
 
 .lr-provider-card__actions {

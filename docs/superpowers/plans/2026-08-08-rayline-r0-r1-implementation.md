@@ -1595,6 +1595,15 @@ describe("HistoryRow", () => {
 - `providerPresentation.ts` 导出 `providerStatusBadge(role, hasKey, enabled)` 返回**本地化无关**的 `{ code: string; variant: StatusBadgeVariant }`（不返回硬编码英文）。
 - ProviderCard 和 ProviderRow 都导入 providerTypes + providerPresentation。
 
+> **历史快照（R0–R1），由 R11/R12 取代**：以下 `providerPresentation.ts` /
+> `ProviderRow.test.tsx` / `ProviderRow.tsx` 代码块为 R0–R1 原始签名——3 参数
+> `providerStatus(role, hasKey, enabled)`、`ProviderRowProps` 无 `needsKey`、
+> `providerKeyStatus` 尚未抽出。R11 将 `providerStatus` 改为 4 参数
+> `(role, hasKey, enabled, needsKey)` 并新增 2 参数 `providerKeyStatus(hasKey, needsKey)`
+> 返回三态 `"saved" | "missing" | "not-required"`；R12 给 `ProviderRowProps`/
+> `ProviderCardProps` 增加 `needsKey`。**现行签名以源码
+> `packages/ui/src/components/providerPresentation.ts` 为准**，下方代码块仅作历史记录。
+
 ```typescript
 // providerTypes.ts
 export type ProviderRole =

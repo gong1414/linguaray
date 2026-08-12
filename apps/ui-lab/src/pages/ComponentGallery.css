@@ -26,6 +26,11 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
   gap: var(--space-md);
+  /* R12.1: prevent a taller section (e.g. provider-row/provider-card with a
+     keyless variant) from stretching its grid-row neighbors (e.g. history-row)
+     to the same height. Default `align-items: stretch` caused unrelated
+     baseline diffs whenever a neighbor's height changed. */
+  align-items: start;
 }
 
 .gallery__section {

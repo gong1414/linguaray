@@ -19,7 +19,7 @@ const COMPONENT_IDS = [
   "button", "icon-button", "segmented-control", "shortcut-chip",
   "text-field", "select", "switch",
   "status-badge", "inline-error", "toast", "confirm", "empty-state",
-  "translation-card", "result-card", "provider-row", "history-row",
+  "translation-card", "result-card", "provider-row", "provider-card", "history-row",
   "sidebar-item", "spinner", "window-chrome", "overflow-cjk",
 ];
 
