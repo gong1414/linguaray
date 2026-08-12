@@ -289,6 +289,7 @@ export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element 
                           name={p.name}
                           template={p.template_id}
                           hasKey={p.hasKey}
+                          needsKey={p.needs_key}
                           role={role()}
                           enabled={p.enabled}
                           active={props.selectedUuid === p.uuid}
@@ -589,38 +590,50 @@ export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element 
                     </Show>
                   </div>
 
-                  {/* Key section */}
+                  {/* Key section — R11 three-state.
+                      needs_key=false → "No key required" text (no input/button).
+                      needs_key=true + hasKey → "Key saved" badge.
+                      needs_key=true + no key → key input + Save button. */}
                   <div class="pc__key-section">
                     <Show
-                      when={d().provider.hasKey}
+                      when={d().provider.needs_key}
                       fallback={
-                        <>
-                          <TextField
-                            label={t().apiKey}
-                            type="password"
-                            value={d().keyText}
-                            placeholder={t().apiKeyPlaceholder}
-                            errorText={d().keyError ?? undefined}
-                            disabled={d().saveState === "saving" || locked()}
-                            onInput={(e) => {
-                              props.onKeyInput(uuid(), e.currentTarget.value);
-                            }}
-                          />
-                          <Button
-                            variant="primary"
-                            size="sm"
-                            disabled={(d().provider.needs_key && d().keyText.length === 0) || locked()}
-                            loading={d().saveState === "saving"}
-                            onClick={() => props.onSaveKey(uuid())}
-                          >
-                            {t().saveKey}
-                          </Button>
-                        </>
+                        <span class="pc__key-not-required">
+                          {t().noKeyRequired}
+                        </span>
                       }
                     >
-                      <span class="pc__key-saved-badge">
-                        {t().keySaved}
-                      </span>
+                      <Show
+                        when={d().provider.hasKey}
+                        fallback={
+                          <>
+                            <TextField
+                              label={t().apiKey}
+                              type="password"
+                              value={d().keyText}
+                              placeholder={t().apiKeyPlaceholder}
+                              errorText={d().keyError ?? undefined}
+                              disabled={d().saveState === "saving" || locked()}
+                              onInput={(e) => {
+                                props.onKeyInput(uuid(), e.currentTarget.value);
+                              }}
+                            />
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              disabled={d().keyText.trim().length === 0 || locked()}
+                              loading={d().saveState === "saving"}
+                              onClick={() => props.onSaveKey(uuid())}
+                            >
+                              {t().saveKey}
+                            </Button>
+                          </>
+                        }
+                      >
+                        <span class="pc__key-saved-badge">
+                          {t().keySaved}
+                        </span>
+                      </Show>
                     </Show>
                   </div>
 
@@ -1274,6 +1287,19 @@ const ProviderCenter: Component = () => {
    * re-read from the input after submit — the input stays cleared.
    */
   const handleSaveKey = async (uuid: string) => {
+    const provider = providers().find((p) => p.uuid === uuid);
+    if (!provider) return;
+    // R11 (P1): fail-closed — a keyless provider (needs_key=false) must never
+    // save a key. The detail Key section hides the input for needs_key=false,
+    // so this guard is defense-in-depth: a programmatic call could otherwise
+    // write a dangling secret the provider will never read (and the backend now
+    // rejects it too — see provider_set_key / set_key_blocking).
+    if (!provider.needs_key) return;
+    // R11 (P1): fail-closed — an empty/whitespace key must never reach the
+    // backend. The Save button is disabled while the input is empty, but guard
+    // anyway so a race or a programmatic call cannot send an empty key.
+    const pendingKey = keyInputByUuid()[uuid];
+    if (typeof pendingKey !== "string" || pendingKey.trim().length === 0) return;
     // R9: bump configEpoch at the START (before the await) — the key is
     // changing, so any in-flight Test/Fetch started with the old key must be
     // invalidated. The key is never re-readable, so this bump must happen

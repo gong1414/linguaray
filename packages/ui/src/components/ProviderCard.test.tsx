@@ -11,6 +11,7 @@ describe("ProviderCard", () => {
       <ProviderCard
         profile={profile}
         hasKey={true}
+        needsKey={true}
         role={{ kind: "none" }}
         enabled={true}
         onToggle={() => {}}
@@ -28,6 +29,7 @@ describe("ProviderCard", () => {
       <ProviderCard
         profile={profile}
         hasKey={false}
+        needsKey={true}
         role={{ kind: "none" }}
         enabled={true}
         onToggle={() => {}}
@@ -43,6 +45,7 @@ describe("ProviderCard", () => {
       <ProviderCard
         profile={profile}
         hasKey={true}
+        needsKey={true}
         role={{ kind: "primary" }}
         enabled={true}
         onToggle={() => {}}
@@ -60,6 +63,7 @@ describe("ProviderCard", () => {
       <ProviderCard
         profile={profile}
         hasKey={true}
+        needsKey={true}
         role={{ kind: "parallel", index: 2 }}
         enabled={true}
         onToggle={() => {}}
@@ -75,6 +79,7 @@ describe("ProviderCard", () => {
       <ProviderCard
         profile={profile}
         hasKey={true}
+        needsKey={true}
         role={{ kind: "none" }}
         enabled={true}
         onToggle={() => {}}
@@ -94,6 +99,7 @@ describe("ProviderCard", () => {
       <ProviderCard
         profile={profile}
         hasKey={true}
+        needsKey={true}
         role={{ kind: "primary" }}
         enabled={true}
         onToggle={() => {}}

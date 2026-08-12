@@ -1824,4 +1824,282 @@ describe("ProviderCenter (Surface 05)", () => {
     resolveReload();
     await flush();
   });
+
+  // ─── R11: needs_key=false three-state key status ─────────────────────────
+
+  it("R11: needs_key=false → no key input/Save button, no 'Key missing', shows 'No key required' (en)", async () => {
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => [
+        profile({
+          uuid: "u1",
+          name: "MyOllama",
+          template_id: "ollama",
+          needs_key: false,
+          endpoint: "http://localhost:11434",
+          secret_ref: "provider/u1",
+        }),
+      ],
+      key_status: () => ({}), // no key — irrelevant for a keyless provider
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("MyOllama")).toBeTruthy());
+    fireEvent.click(screen.getByLabelText("Edit MyOllama"));
+    await flush();
+
+    // No API key TextField, no Save key button, no "Key missing" text.
+    expect(screen.queryByLabelText("API key")).toBeNull();
+    expect(screen.queryByText("Save key")).toBeNull();
+    expect(screen.queryByText("Key missing")).toBeNull();
+    // The "No key required" text renders instead.
+    expect(screen.getByText("No key required")).toBeTruthy();
+  });
+
+  it("R11: needs_key=false → '无需密钥' visible under zh locale", async () => {
+    localeMock.current = "zh";
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => [
+        profile({
+          uuid: "u1",
+          name: "我的Ollama",
+          template_id: "ollama",
+          needs_key: false,
+          endpoint: "http://localhost:11434",
+          secret_ref: "provider/u1",
+        }),
+      ],
+      key_status: () => ({}),
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("我的Ollama")).toBeTruthy());
+    fireEvent.click(screen.getByLabelText("编辑我的Ollama"));
+    await flush();
+
+    expect(screen.getByText("无需密钥")).toBeTruthy();
+    expect(screen.queryByText("缺少密钥")).toBeNull();
+  });
+
+  it("R11: needs_key=true + hasKey=false → key input shown, empty Save disabled, 'Key missing' shown", async () => {
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => [profile({ uuid: "u1", name: "TestProvider", secret_ref: "provider/u1" })],
+      key_status: () => ({}), // no key
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("TestProvider")).toBeTruthy());
+    fireEvent.click(screen.getByLabelText("Edit TestProvider"));
+    await flush();
+
+    // Key input + Save key button present; button disabled while empty.
+    const keyInput = screen.getByLabelText("API key") as HTMLInputElement;
+    expect(keyInput).toBeTruthy();
+    const saveKeyBtn = screen.getByText("Save key").closest("button") as HTMLButtonElement;
+    expect(saveKeyBtn.disabled).toBe(true);
+    // The row status shows "Key missing" (needs_key=true + no key).
+    expect(screen.getAllByText("Key missing").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("R11: needs_key=true + hasKey=true → 'Key saved' badge, no key input", async () => {
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => [profile({ uuid: "u1", name: "TestProvider", secret_ref: "provider/u1" })],
+      key_status: () => ({ "provider/u1": true }),
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("TestProvider")).toBeTruthy());
+    fireEvent.click(screen.getByLabelText("Edit TestProvider"));
+    await flush();
+
+    // The "Key saved" badge renders; no key input + no Save key button.
+    expect(screen.getByText("Key saved")).toBeTruthy();
+    expect(screen.queryByLabelText("API key")).toBeNull();
+    expect(screen.queryByText("Save key")).toBeNull();
+  });
+
+  it("R11 handler defense: needs_key=false never invokes provider_set_key", async () => {
+    const setKeyCalls: unknown[] = [];
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => [
+        profile({
+          uuid: "u1",
+          name: "MyOllama",
+          template_id: "ollama",
+          needs_key: false,
+          endpoint: "http://localhost:11434",
+          secret_ref: "provider/u1",
+        }),
+      ],
+      key_status: () => ({}),
+      provider_set_key: (args) => {
+        setKeyCalls.push(args);
+      },
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("MyOllama")).toBeTruthy());
+    fireEvent.click(screen.getByLabelText("Edit MyOllama"));
+    await flush();
+    await flush();
+    // The Key section renders "No key required" — there is no input + no Save
+    // button to click, so provider_set_key is architecturally unreachable.
+    expect(screen.getByText("No key required")).toBeTruthy();
+    expect(screen.queryByText("Save key")).toBeNull();
+    // Hard assertion: no provider_set_key IPC ever fired.
+    expect(setKeyCalls.length).toBe(0);
+    expect(invokeMock.mock.calls.some((c) => c[0] === "provider_set_key")).toBe(false);
+  });
+
+  it("R11 handler defense: empty key never invokes provider_set_key (Save disabled)", async () => {
+    const setKeyCalls: unknown[] = [];
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => [profile({ uuid: "u1", name: "TestProvider", secret_ref: "provider/u1" })],
+      key_status: () => ({}),
+      provider_set_key: (args) => {
+        setKeyCalls.push(args);
+      },
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("TestProvider")).toBeTruthy());
+    fireEvent.click(screen.getByLabelText("Edit TestProvider"));
+    await flush();
+
+    // The Save key button is disabled while the key input is empty — clicking
+    // a disabled button is a no-op, so handleSaveKey never runs.
+    const saveKeyBtn = screen.getByText("Save key").closest("button") as HTMLButtonElement;
+    expect(saveKeyBtn.disabled).toBe(true);
+    fireEvent.click(saveKeyBtn);
+    await flush();
+    await flush();
+    expect(setKeyCalls.length).toBe(0);
+    expect(invokeMock.mock.calls.some((c) => c[0] === "provider_set_key")).toBe(false);
+
+    // Sanity: typing a key enables the button → clicking now DOES fire the IPC.
+    const keyInput = screen.getByLabelText("API key") as HTMLInputElement;
+    fireEvent.input(keyInput, { target: { value: "sk-test" } });
+    await flush();
+    expect(saveKeyBtn.disabled).toBe(false);
+    fireEvent.click(saveKeyBtn);
+    await whenCalledWith("provider_set_key");
+    expect(setKeyCalls.length).toBeGreaterThanOrEqual(1);
+  });
+
+  // ─── R11 regression (non-blocking): configEpoch invalidates stale completions
+
+  it("R11 regression: toggle IPC failure rolls back enabled, old Test completion NOT written (epoch bumped)", async () => {
+    // A pending Test is started against the old config; a toggle (that fails)
+    // bumps the configEpoch mid-flight, so resolving the stale Test does NOT
+    // write its result. The provider's enabled flag visually rolls back.
+    let resolveTest:
+      | ((r: { ok: boolean; message: string; latency_ms?: number | null }) => void)
+      | null = null;
+    let toggleShouldFail = false;
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => [profile({ uuid: "u1", name: "TestProvider", secret_ref: "provider/u1" })],
+      key_status: () => ({ "provider/u1": true }),
+      provider_test_connection: () =>
+        new Promise((res) => {
+          // Hold the Test completion pending until we resolve it.
+          resolveTest = res as (r: {
+            ok: boolean;
+            message: string;
+            latency_ms?: number | null;
+          }) => void;
+        }),
+      provider_toggle: () => {
+        if (toggleShouldFail) throw new Error("net");
+      },
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("TestProvider")).toBeTruthy());
+    fireEvent.click(screen.getByLabelText("Edit TestProvider"));
+    await flush();
+
+    // Start a Test (pending). The "testing" state shows.
+    fireEvent.click(screen.getByText("Test"));
+    await whenCalledWith("provider_test_connection");
+
+    // While the Test is pending, click toggle → it fails. The configEpoch is
+    // bumped at the START of handleToggle (before the await), so the pending
+    // Test's captured epoch is now stale.
+    toggleShouldFail = true;
+    const switches = screen.getAllByRole("switch");
+    fireEvent.click(switches[0]);
+    await flush();
+
+    // Resolve the old Test with an "ok" result.
+    expect(resolveTest).not.toBeNull();
+    resolveTest!({ ok: true, message: "reachable" });
+    await flush();
+    await flush();
+
+    // The stale "ok" completion was discarded by the epoch guard — no
+    // "Connected" indicator is rendered (the Test result was NOT written).
+    expect(screen.queryByText("Connected")).toBeNull();
+  });
+
+  it("R11 regression: delete → recreate same UUID → old Test completion NOT written (epoch bumped)", async () => {
+    // A Test started for u1 is held pending. u1 is deleted then recreated (same
+    // UUID, new profile). applyProviderList bumps the epoch for u1 on BOTH the
+    // delete and the create refresh, so resolving the old Test does NOT write.
+    let resolveTest:
+      | ((r: { ok: boolean; message: string; latency_ms?: number | null }) => void)
+      | null = null;
+    let phase: "init" | "deleted" | "recreated" = "init";
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => {
+        if (phase === "init") {
+          return [profile({ uuid: "u1", name: "TestProvider", secret_ref: "provider/u1" })];
+        }
+        // After delete → empty; after recreate → a fresh row at version 1.
+        return [profile({ uuid: "u1", name: "TestProvider", version: 1, secret_ref: "provider/u1" })];
+      },
+      key_status: () => ({ "provider/u1": true }),
+      provider_test_connection: () =>
+        new Promise((res) => {
+          resolveTest = res as (r: {
+            ok: boolean;
+            message: string;
+            latency_ms?: number | null;
+          }) => void;
+        }),
+      provider_delete: () => {
+        phase = "deleted";
+      },
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("TestProvider")).toBeTruthy());
+    fireEvent.click(screen.getByLabelText("Edit TestProvider"));
+    await flush();
+
+    // Start a Test (pending).
+    fireEvent.click(screen.getByText("Test"));
+    await whenCalledWith("provider_test_connection");
+
+    // Delete u1 (opens Confirm → confirm). The post-delete refresh bumps u1's
+    // epoch via applyProviderList.
+    fireEvent.click(screen.getByLabelText("Delete TestProvider"));
+    await waitFor(() => expect(screen.getByText("Delete provider?")).toBeTruthy());
+    fireEvent.click(screen.getByText("Delete"));
+    await waitFor(() => expect(invokeMock).toHaveBeenCalledWith("provider_delete", expect.anything()));
+
+    // Recreate u1 (same UUID). The post-create refresh bumps u1's epoch again.
+    phase = "recreated";
+    fireEvent.click(screen.getByText("Ollama"));
+    await flush();
+
+    // Resolve the old Test (started against the pre-delete profile).
+    expect(resolveTest).not.toBeNull();
+    resolveTest!({ ok: true, message: "reachable" });
+    await flush();
+    await flush();
+
+    // The stale "ok" completion was discarded — no "Connected" written for the
+    // old request. (The detail panel may have closed after delete; either way
+    // the stale result did not surface.)
+    expect(screen.queryByText("Connected")).toBeNull();
+  });
 });

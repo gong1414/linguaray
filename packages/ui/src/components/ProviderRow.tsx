@@ -18,6 +18,10 @@ export type ProviderRowProps = {
   name: string;
   template: string;
   hasKey: boolean;
+  /** R11: whether this provider type requires an API key. A keyless provider
+   *  (`needs_key=false`) renders the neutral "available" status and never shows
+   *  "key-missing", even when `hasKey` is false. */
+  needsKey: boolean;
   role: ProviderRole;
   enabled: boolean;
   active?: boolean;
@@ -31,7 +35,7 @@ export type ProviderRowProps = {
 };
 
 const ProviderRow: Component<ProviderRowProps> = (props) => {
-  const status = () => providerStatus(props.role, props.hasKey, props.enabled);
+  const status = () => providerStatus(props.role, props.hasKey, props.enabled, props.needsKey);
   return (
     <div
       class="provider-row"

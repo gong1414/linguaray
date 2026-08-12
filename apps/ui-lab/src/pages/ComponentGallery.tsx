@@ -279,6 +279,7 @@ export const ComponentGallery: Component<Props> = (props) => {
             name="OpenAI"
             template="gpt-4o"
             hasKey={true}
+            needsKey={true}
             role={{ kind: "primary" }}
             enabled={true}
             labels={t().providerRow.labels}
