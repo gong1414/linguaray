@@ -1235,9 +1235,9 @@ describe("ProviderCenter (Surface 05)", () => {
         throw new Error("db locked");
       },
     });
-    const { findByText } = render(() => <ProviderCenter />);
-    // Cold-load failure surfaced via the localized loadFailed banner.
-    expect(await findByText(/加载失败|load failed/i)).toBeTruthy();
+    const { findAllByText } = render(() => <ProviderCenter />);
+    // Cold-load failure surfaced via the localized loadFailed banner(s).
+    expect((await findAllByText(/加载失败|load failed/i)).length).toBeGreaterThan(0);
     // Fail-closed: no provider_set_active should have been attempted.
     expect(invokeMock.mock.calls.some((c) => c[0] === "provider_set_active")).toBe(false);
   });

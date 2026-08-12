@@ -164,11 +164,15 @@ type ProviderCopy = {
   saveProfile: string;
   saving: string;
   saveFailed: string;
+  /** R10: toast for a top-level list reload failure (cold-load, Retry Reload,
+   *  save-conflict Reload). Semantically distinct from `saveFailed` (a write
+   *  failure) — these are READ failures. */
+  reloadFailed: string;
   /** R8-P2-2: the mutation (create/duplicate/delete) succeeded on the backend,
-   *  but the post-mutation list refresh failed. The destructive `saveFailed`
-   *  toast from refreshCore already surfaced the reload failure; this warning
-   *  adds the accurate context that the write itself went through, so the user
-   *  knows to click Reload rather than re-issue the mutation. */
+   *  but the post-mutation list refresh failed. refreshCore surfaces the error
+   *  via the loadError banner (InlineError); this warning adds the accurate
+   *  context that the write itself went through, so the user knows to click
+   *  Reload rather than re-issue the mutation. */
   mutationSuccessReloadFailed: string;
   /** R2-E: save-conflict banner — the provider was modified elsewhere and the
    *  optimistic-lock CAS rejected this save. Paired with a Reload button. */
@@ -301,6 +305,7 @@ const EN: SettingsCopy = {
     saveProfile: "Save profile",
     saving: "Saving…",
     saveFailed: "Failed to save: network error",
+    reloadFailed: "Reload failed",
     mutationSuccessReloadFailed: "Saved, but the list could not be refreshed. Click Reload to retry.",
     saveConflict: "This provider was modified elsewhere",
     keyAlreadyExists: "A provider with this name already exists",
@@ -435,6 +440,7 @@ const ZH: SettingsCopy = {
     saveProfile: "保存配置",
     saving: "保存中…",
     saveFailed: "保存失败：网络错误",
+    reloadFailed: "重新加载失败",
     mutationSuccessReloadFailed: "已保存，但列表刷新失败。点击重新加载重试。",
     saveConflict: "此服务商已在别处修改",
     keyAlreadyExists: "该名称的服务商已存在",
