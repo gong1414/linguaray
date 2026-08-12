@@ -24,6 +24,7 @@ export type ProviderCardLabels = {
   fallback: string;
   keySaved: string;
   keyMissing: string;
+  noKeyRequired: string; // R12: keyless provider (needs_key=false)
   enabled: string;
   disabled: string;
   edit: string; // aria-label template, {name} substituted
@@ -36,6 +37,7 @@ export const defaultProviderCardLabels: ProviderCardLabels = {
   fallback: "Fallback",
   keySaved: "Key saved",
   keyMissing: "Key missing",
+  noKeyRequired: "No key required",
   enabled: "Enabled",
   disabled: "Disabled",
   edit: "Edit {name}",
@@ -81,8 +83,9 @@ const ProviderCard: Component<ProviderCardProps> = (props) => {
   // Key status is independent of enabled/disabled — a disabled provider can still
   // have a missing key that must be visible. Using providerKeyStatus avoids the
   // priority issue where providerStatus returns "disabled" before "key-missing".
-  // R11: a keyless provider (needs_key=false) is "not-required", never "missing".
-  const keyMissing = () => providerKeyStatus(props.hasKey, props.needsKey) === "missing";
+  // R11/R12: a keyless provider (needs_key=false) is "not-required", never
+  // "missing" — even when hasKey is stale/dirty (fail-closed).
+  const keyStatus = () => providerKeyStatus(props.hasKey, props.needsKey);
 
   const editLabel = () => labels().edit.replace("{name}", props.profile.name);
   const deleteLabel = () => labels().delete.replace("{name}", props.profile.name);
@@ -128,22 +131,29 @@ const ProviderCard: Component<ProviderCardProps> = (props) => {
             </div>
           </Show>
 
-          {/* Key status — driven by the shared providerStatus model so the
-              indicator matches ProviderRow's StatusBadge. */}
-          <Show
-            when={!keyMissing()}
-            fallback={
-              <span class="lr-provider-card__key-status lr-provider-card__key-status--missing">
-                <AlertTriangle size={12} aria-hidden="true" />
-                {labels().keyMissing}
-              </span>
-            }
-          >
+          {/* Key status — three-state (R12). Driven by providerKeyStatus so the
+              indicator matches ProviderRow's StatusBadge and the detail panel.
+              not-required: keyless provider (needs_key=false) — no icon, muted.
+              missing: needs a key but has none — warning + AlertTriangle.
+              saved: has a key — success + Check. */}
+          <FlowSwitch fallback={
             <span class="lr-provider-card__key-status lr-provider-card__key-status--saved">
               <Check size={12} aria-hidden="true" />
               {labels().keySaved}
             </span>
-          </Show>
+          }>
+            <Match when={keyStatus() === "not-required"}>
+              <span class="lr-provider-card__key-status lr-provider-card__key-status--not-required">
+                {labels().noKeyRequired}
+              </span>
+            </Match>
+            <Match when={keyStatus() === "missing"}>
+              <span class="lr-provider-card__key-status lr-provider-card__key-status--missing">
+                <AlertTriangle size={12} aria-hidden="true" />
+                {labels().keyMissing}
+              </span>
+            </Match>
+          </FlowSwitch>
         </div>
       </div>
 

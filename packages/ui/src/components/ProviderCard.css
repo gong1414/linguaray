@@ -113,6 +113,11 @@
   color: var(--color-warning-fg);
 }
 
+/* R12: keyless provider (needs_key=false) — muted/neutral, no icon. */
+.lr-provider-card__key-status--not-required {
+  color: var(--color-fg-muted);
+}
+
 .lr-provider-card__actions {
   display: flex;
   align-items: center;

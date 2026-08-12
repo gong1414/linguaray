@@ -222,6 +222,13 @@
   font-size: var(--text-sm, 0.85rem);
 }
 
+/* R12: keyless provider (needs_key=false) — muted/neutral "No key required"
+ * text, no input/button. Uses semantic tokens (no hardcoded hex). */
+.pc__key-not-required {
+  font-size: var(--text-sm, 0.85rem);
+  color: var(--color-fg-muted, #64748b);
+}
+
 .pc__conn-section {
   display: flex;
   align-items: center;
