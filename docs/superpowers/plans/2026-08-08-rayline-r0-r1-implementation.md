@@ -1628,6 +1628,15 @@ export function providerStatus(
 }
 ```
 
+> **R11 签名更新**（2026-08-10）：上述签名在 R11 中增加了 `needsKey: boolean` 参数：
+> - `providerStatus(role, hasKey, enabled, needsKey)` — `!needsKey` 时提前返回
+>   `{ code: "available", variant: "neutral" }`（keyless provider 绝不显示 key-missing）。
+> - `providerKeyStatus(hasKey, needsKey)` — 新增函数（R1-10 时 ProviderCard 内联使用，
+>   R11 抽出到 providerPresentation），返回三态 `"saved" | "missing" | "not-required"`；
+>   `!needsKey` 时返回 `"not-required"`。
+> - `providerStatusBadge` 最终定名为 `providerStatus`（R1-10 实现）。
+> 详见 2026-08-10 计划文档 R11 appendix。
+
 ```typescript
 // ProviderRow.test.tsx
 import { describe, it, expect, vi } from "vitest";
