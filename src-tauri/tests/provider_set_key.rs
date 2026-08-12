@@ -16,15 +16,31 @@ use linguaray_lib::db::providers;
 use linguaray_lib::db::readiness::DataReadiness;
 use linguaray_lib::db::schema;
 use linguaray_lib::db::Database;
+use linguaray_lib::keystore::Keystore;
 use linguaray_lib::set_key_blocking;
-use linguaray_lib::tray_state::{Locale, RecordingRenderer, TrayStateController};
+use linguaray_lib::tray_state::{Locale, TrayRenderer, TrayStateController};
 use std::sync::Arc;
 use tempfile::TempDir;
 
+/// R12-P2-4: a minimal local stub implementing `TrayRenderer`. Unlike
+/// `RecordingRenderer` (which is `#[cfg(any(test, feature =
+/// "xproc-test-helper"))]`-gated in the library), this stub compiles with
+/// default features so `cargo test --test provider_set_key --no-run` and
+/// `cargo build` both succeed without `--features xproc-test-helper`.
+struct StubRenderer;
+
+impl TrayRenderer for StubRenderer {
+    fn set_icon_normal(&self) {}
+    fn set_icon_dimmed(&self) {}
+    fn set_icon_error_dot(&self) {}
+    fn set_tooltip(&self, _text: &str) {}
+}
+
 /// Build a `TrayStateController` for the test AppState (the `tray` field is
-/// required by the struct). Mirrors the recovery-test helper.
+/// required by the struct). Uses the local `StubRenderer` so this test file
+/// compiles with default features (R12-P2-4).
 fn test_tray() -> TrayStateController {
-    TrayStateController::with_renderer(Arc::new(RecordingRenderer::default()), Locale::En)
+    TrayStateController::with_renderer(Arc::new(StubRenderer), Locale::En)
 }
 
 struct Harness {
@@ -177,4 +193,33 @@ fn r11_set_key_rejects_non_active_provider() {
         "expected non-active status error, got: {err}"
     );
     assert_eq!(h.keystore_file_count(), 0);
+}
+
+// ─── R12-P2-5: key value preservation (trim is validation-only) ────────────
+
+/// `set_key_blocking` must store the EXACT key value the user provided —
+/// surrounding whitespace is used only for the empty-check validation, never
+/// to modify the stored value. This guards against a regression where trim
+/// leaks into the keystore write, silently corrupting user credentials.
+#[test]
+fn r12_set_key_preserves_surrounding_whitespace() {
+    let h = Harness::new_ready();
+    let p = h.create("openai", "OpenAI", "https://api.openai.com/v1/chat/completions");
+    // A key with surrounding spaces — passes the trim-based empty check but
+    // must be stored verbatim.
+    let raw_key = "  sk-value  ";
+    set_key_blocking(&h.app, &p.uuid, raw_key)
+        .expect("a non-empty key (after trim) must be accepted");
+
+    // Read back through the Keystore (the same path the runtime uses).
+    let ks = Keystore::new(h.keystore_dir.clone()).unwrap();
+    let stored = ks
+        .get_key(&p.secret_ref)
+        .expect("keystore read must succeed")
+        .expect("the key must exist after set_key");
+
+    assert_eq!(
+        stored, raw_key,
+        "the stored key must be exactly the input (untrimmed)"
+    );
 }

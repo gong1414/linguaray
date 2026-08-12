@@ -180,25 +180,39 @@ describe("ProviderCenter (Surface 05)", () => {
     render(() => <ProviderCenter />);
     await waitFor(() => expect(screen.getByText("MyOpenAI")).toBeTruthy());
 
-    // The Switch is a checkbox with role="switch".
+    // R12-P2-2: assert initial switch state — u1 is enabled (checked=true).
     const switches = screen.getAllByRole("switch");
     expect(switches.length).toBeGreaterThanOrEqual(1);
+    expect(switches[0].getAttribute("aria-checked")).toBe("true");
+
+    // Toggle off — succeeds (toggleShouldFail is still false).
     fireEvent.click(switches[0]);
     await whenCalledWith("provider_toggle");
 
-    // Now make a second render fail → expect a destructive toast on revert.
+    // Now make a second render fail → expect rollback + destructive toast.
     toggleShouldFail = true;
     cleanup();
-    const { container } = render(() => <ProviderCenter />);
+    render(() => <ProviderCenter />);
     await waitFor(() => expect(screen.getByText("MyOpenAI")).toBeTruthy());
-    fireEvent.click(screen.getAllByRole("switch")[0]);
+
+    // Fresh render: switch starts checked (provider_list returns enabled).
+    const freshSwitch = screen.getAllByRole("switch")[0];
+    expect(freshSwitch.getAttribute("aria-checked")).toBe("true");
+
+    // Toggle off — fails this time → rollback + toast.
+    fireEvent.click(freshSwitch);
     await waitFor(() =>
       expect(invokeMock).toHaveBeenCalledWith("provider_toggle", expect.anything()),
     );
-    // Rollback: switch reverts to on (provider_list still returns enabled).
-    await flush();
-    // No throw from the test itself means rollback path exercised.
-    expect(container).toBeTruthy();
+
+    // R12-P2-2: the catch ran → destructive toast is visible (proves rollback).
+    await waitFor(() =>
+      expect(screen.getByText("Failed to save: network error")).toBeTruthy(),
+    );
+    // R12-P2-2: the switch reverted to checked=true after rollback.
+    await waitFor(() =>
+      expect(freshSwitch.getAttribute("aria-checked")).toBe("true"),
+    );
   });
 
   it("edit: selecting a row opens detail with endpoint + model fields", async () => {
@@ -2054,7 +2068,11 @@ describe("ProviderCenter (Surface 05)", () => {
         if (phase === "init") {
           return [profile({ uuid: "u1", name: "TestProvider", secret_ref: "provider/u1" })];
         }
-        // After delete → empty; after recreate → a fresh row at version 1.
+        // R12-P2-3: after delete → ACTUALLY empty (was previously non-empty).
+        if (phase === "deleted") {
+          return [];
+        }
+        // phase === "recreated" → a fresh row at version 1.
         return [profile({ uuid: "u1", name: "TestProvider", version: 1, secret_ref: "provider/u1" })];
       },
       key_status: () => ({ "provider/u1": true }),
@@ -2068,6 +2086,10 @@ describe("ProviderCenter (Surface 05)", () => {
         }),
       provider_delete: () => {
         phase = "deleted";
+      },
+      // R12-P2-3: mock create so the post-create refresh fires (epoch bump).
+      provider_create: () => {
+        phase = "recreated";
       },
     });
     render(() => <ProviderCenter />);
@@ -2086,10 +2108,25 @@ describe("ProviderCenter (Surface 05)", () => {
     fireEvent.click(screen.getByText("Delete"));
     await waitFor(() => expect(invokeMock).toHaveBeenCalledWith("provider_delete", expect.anything()));
 
-    // Recreate u1 (same UUID). The post-create refresh bumps u1's epoch again.
-    phase = "recreated";
+    // R12-P2-3: wait for the old u1 to disappear from the DOM after delete
+    // (provider_list now returns [] on the "deleted" phase).
+    await waitFor(() => expect(screen.queryByText("TestProvider")).toBeNull());
+
+    // R12-P2-3: the exclusive mutex may still be draining its finally block
+    // (exclusiveBusy → false). Wait for the Ollama preset button to become
+    // enabled before clicking, otherwise the disabled button silently no-ops.
+    await waitFor(() => {
+      const ollamaBtn = screen.getByText("Ollama").closest("button");
+      expect(ollamaBtn?.disabled).toBe(false);
+    });
+
+    // Recreate u1 (same UUID). provider_create sets phase="recreated"; the
+    // post-create refresh bumps u1's epoch again.
     fireEvent.click(screen.getByText("Ollama"));
-    await flush();
+    await whenCalledWith("provider_create");
+
+    // R12-P2-3: wait for the new u1 to appear in the DOM after recreate.
+    await waitFor(() => expect(screen.getByText("TestProvider")).toBeTruthy());
 
     // Resolve the old Test (started against the pre-delete profile).
     expect(resolveTest).not.toBeNull();
