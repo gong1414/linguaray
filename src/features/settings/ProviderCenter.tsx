@@ -29,6 +29,7 @@ import {
   createMemo,
   onMount,
   onCleanup,
+  untrack,
   type Component,
   type JSX,
 } from "solid-js";
@@ -553,7 +554,7 @@ export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element 
                       <Button
                         variant="ghost"
                         size="sm"
-                        disabled={locked()}
+                        disabled={locked() || hasUnsavedDrafts()}
                         onClick={() => props.onFetchModels(uuid())}
                       >
                         {t().fetchModels}
@@ -618,16 +619,20 @@ export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element 
                         blocks the Test button and surfaces `saveFirstToTest` so
                         the user saves before probing. */}
                     <Button
+                      id={`test-conn-btn-${uuid()}`}
                       variant="secondary"
                       size="sm"
                       loading={d().conn === "testing"}
                       disabled={locked() || hasUnsavedDrafts()}
+                      aria-describedby={hasUnsavedDrafts() ? `save-first-hint-${uuid()}` : undefined}
                       onClick={() => props.onTestConnection(uuid())}
                     >
                       {t().testConnection}
                     </Button>
                     <Show when={hasUnsavedDrafts()}>
-                      <span class="pc__save-first-hint">{t().saveFirstToTest}</span>
+                      <span id={`save-first-hint-${uuid()}`} class="pc__save-first-hint">
+                        {t().saveFirstToTest}
+                      </span>
                     </Show>
                     <Show when={d().conn && d().conn !== "testing" && d().conn !== "idle"}>
                       <StatusBadge
@@ -792,6 +797,24 @@ const ProviderCenter: Component = () => {
   // resolved after a newer Fetch, OR after a save bumped the config version) is
   // discarded. Paired with the config-version guard in handleFetchModels.
   const [modelRequestIdByUuid, setModelRequestIdByUuid] = createSignal<Record<string, number>>({});
+  // R9: unified configEpoch — a single monotonic counter per UUID. Bumped on
+  // ANY config-relevant change (draft edit, model select, key save, provider
+  // update, delete). Test/Fetch capture the epoch at start; on completion they
+  // discard if the epoch changed. This replaces the per-field version/endpoint/
+  // model guards from R8, which could not catch draft edits or key saves (those
+  // don't change `providers()` committed state). The epoch is monotonic — it
+  // catches changes even if the draft reverts to the original value.
+  const [configEpochByUuid, setConfigEpochByUuid] = createSignal<Record<string, number>>({});
+
+  /** Bump the config epoch for a UUID and clear stale conn/model state. Called
+   *  on ANY config-relevant change so in-flight Test/Fetch completions are
+   *  discarded by the epoch guard, and the UI does not show stale results. */
+  const bumpConfigEpoch = (uuid: string) => {
+    setConfigEpochByUuid((prev) => ({ ...prev, [uuid]: (prev[uuid] ?? 0) + 1 }));
+    setConnByUuid((prev) => { const n = { ...prev }; delete n[uuid]; return n; });
+    setModelOptionsByUuid((prev) => { const n = { ...prev }; delete n[uuid]; return n; });
+    setModelFetchByUuid((prev) => { const n = { ...prev }; delete n[uuid]; return n; });
+  };
 
   // --- Dialogs + toasts ---
   const [deleteConfirmUuid, setDeleteConfirmUuid] = createSignal<string | null>(null);
@@ -868,10 +891,12 @@ const ProviderCenter: Component = () => {
   // roles are applied. If either rejects, no `providerSetActive` is allowed
   // (handlers short-circuit on `selectionError()`/`selectionLoading()`).
   /** Raw re-fetch of the provider list + stored selection (NO mutex management).
-   *  Returns `true` on success, `false` on failure (the error is already
-   *  surfaced via loadError + a toast; callers that need to react to failure —
-   *  e.g. the save-conflict Reload — branch on the boolean instead of try/catch,
-   *  since refreshCore never rejects).
+   *  Returns `true` on success, `false` on failure. The error is surfaced via
+   *  loadError + selectionError signals (which render the banners); callers
+   *  that need a toast branch on the boolean. refreshCore does NOT push toasts
+   *  itself (R9: previously it pushed a destructive `saveFailed` toast, which
+   *  contradicted mutation handlers that also pushed `mutationSuccessReloadFailed`
+   *  on the same failure — the user saw both).
    *
    *  R7-P1-1: callers that are ALREADY inside `runExclusive` (mutation handlers
    *  that need a post-mutation re-fetch) call this directly. The public
@@ -896,7 +921,6 @@ const ProviderCenter: Component = () => {
     } catch {
       setLoadError(true);
       setSelectionError(true);
-      pushToast("destructive", t.saveFailed);
       return false;
     } finally {
       setSelectionLoading(false);
@@ -910,7 +934,10 @@ const ProviderCenter: Component = () => {
   const refresh = (): Promise<boolean> => runExclusive(() => refreshCore());
 
   onMount(() => {
-    void refresh();
+    // R9: refreshCore no longer pushes a toast — surface cold-load failure here.
+    void refresh().then((ok) => {
+      if (!ok) pushToast("destructive", t.saveFailed);
+    });
   });
 
   const selectedProvider = createMemo(() =>
@@ -1167,15 +1194,12 @@ const ProviderCenter: Component = () => {
         setSaveByUuid((prev) => ({ ...prev, [uuid]: "saved" }));
         // A successful save clears any prior conflict banner for this provider.
         setSaveConflictUuid((prev) => (prev === uuid ? null : prev));
-        // R8-P1/P2-1: the save bumped the config version, so any in-flight or
-        // completed connection-test / model-fetch result is now for a stale
-        // config. Drop the cached results + counters so a pending completion
-        // (whose await resolves after this save) is discarded by the version
-        // guard, and the UI does not show a stale badge/model list next to the
-        // freshly-saved row.
-        setConnByUuid((prev) => { const n = { ...prev }; delete n[uuid]; return n; });
-        setModelOptionsByUuid((prev) => { const n = { ...prev }; delete n[uuid]; return n; });
-        setModelFetchByUuid((prev) => { const n = { ...prev }; delete n[uuid]; return n; });
+        // R9: the save bumped the config version, so any in-flight or completed
+        // connection-test / model-fetch result is now for a stale config.
+        // bumpConfigEpoch invalidates pending completions via the epoch guard
+        // and clears the cached results so the UI does not show a stale badge
+        // or model list next to the freshly-saved row.
+        bumpConfigEpoch(uuid);
         pushToast("success", t.profileSaved);
       } catch (e) {
         // R2-E: a structured stale_version rejection = save conflict. Keep the
@@ -1199,6 +1223,11 @@ const ProviderCenter: Component = () => {
    * re-read from the input after submit — the input stays cleared.
    */
   const handleSaveKey = async (uuid: string) => {
+    // R9: bump configEpoch at the START (before the await) — the key is
+    // changing, so any in-flight Test/Fetch started with the old key must be
+    // invalidated. The key is never re-readable, so this bump must happen
+    // before the await to guarantee it precedes any pending completion.
+    bumpConfigEpoch(uuid);
     await runExclusive(async () => {
       const key = keyInputByUuid()[uuid];
       // Clear IMMEDIATELY — never readable back, never in DOM after submit.
@@ -1236,37 +1265,31 @@ const ProviderCenter: Component = () => {
   };
 
   const handleFetchModels = async (uuid: string) => {
-    // R8-P2-1: `providerGetModels` reads the BACKEND's stored config. Capture
-    // the config signature at fetch start so a completion that lands after the
-    // config changed (a save bumped the version, or the endpoint/model drifted)
-    // is discarded instead of writing a model list for a config the user no
-    // longer sees.
+    // R9: `providerGetModels` reads the BACKEND's stored config. Capture the
+    // configEpoch at fetch start so a completion that lands after ANY
+    // config-relevant change (draft edit, model select, key save, provider
+    // update) is discarded instead of writing a model list for a config the
+    // user no longer sees.
     const provider = providers().find((p) => p.uuid === uuid);
     if (!provider) return;
-    const configVersion = provider.version;
-    const configEndpoint = provider.endpoint;
-    const configModel = provider.model ?? "";
-    // R8-P2-1: bump the request counter so a stale completion (from an earlier
-    // Fetch whose await resolved after a newer Fetch started) is discarded.
+    const epoch = configEpochByUuid()[uuid] ?? 0;
+    // Bump the request counter so a stale completion (from an earlier Fetch
+    // whose await resolved after a newer Fetch started) is discarded.
     const requestId = (modelRequestIdByUuid()[uuid] ?? 0) + 1;
     setModelRequestIdByUuid((prev) => ({ ...prev, [uuid]: requestId }));
     setModelFetchByUuid((prev) => ({ ...prev, [uuid]: "loading" }));
     try {
       const models = await providerGetModels(uuid);
-      // Guard 1: a newer Fetch superseded this one.
+      // Guard 1: config changed since fetch start (epoch bumped). Both sides
+      // use `?? 0` so an unset epoch (undefined) compares equal to itself.
+      if ((configEpochByUuid()[uuid] ?? 0) !== epoch) return;
+      // Guard 2: a newer Fetch superseded this one.
       if (modelRequestIdByUuid()[uuid] !== requestId) return;
-      // Guard 2: provider still exists + config unchanged since fetch start.
-      const current = providers().find((p) => p.uuid === uuid);
-      if (!current) return;
-      if (current.version !== configVersion) return;
-      if (current.endpoint !== configEndpoint) return;
-      if ((current.model ?? "") !== configModel) return;
       setModelOptionsByUuid((prev) => ({ ...prev, [uuid]: models }));
       setModelFetchByUuid((prev) => ({ ...prev, [uuid]: "idle" }));
     } catch {
+      if ((configEpochByUuid()[uuid] ?? 0) !== epoch) return;
       if (modelRequestIdByUuid()[uuid] !== requestId) return;
-      const current = providers().find((p) => p.uuid === uuid);
-      if (!current || current.version !== configVersion) return;
       setModelFetchByUuid((prev) => ({ ...prev, [uuid]: "error" }));
       // Surface the failure so the user knows why no dropdown appeared.
       pushToast("warning", t.modelFetchError);
@@ -1274,37 +1297,31 @@ const ProviderCenter: Component = () => {
   };
 
   const handleTestConnection = async (uuid: string) => {
-    // R8-P1: `providerTestConnection` probes the BACKEND's stored config, NOT
-    // the user's unsaved drafts. Capture the config signature at test start so
-    // a completion that lands AFTER the config changed (a save bumped the
-    // version, or the endpoint/model drifted) is discarded — otherwise a stale
-    // "Connected" from the old endpoint would mislead the user into trusting a
+    // R9: `providerTestConnection` probes the BACKEND's stored config, NOT the
+    // user's unsaved drafts. Capture the configEpoch at test start so a
+    // completion that lands AFTER any config-relevant change (draft edit, model
+    // select, key save, provider update) is discarded — otherwise a stale
+    // "Connected" from the old config would mislead the user into trusting a
     // config they already replaced.
     const provider = providers().find((p) => p.uuid === uuid);
     if (!provider) return;
-    const configVersion = provider.version;
-    const configEndpoint = provider.endpoint;
-    const configModel = provider.model ?? "";
-    // R6-P1-3: bump the request counter so a stale completion (from an earlier
-    // Test click whose await resolved after a newer Test) is discarded.
+    const epoch = configEpochByUuid()[uuid] ?? 0;
+    // Bump the request counter so a stale completion (from an earlier Test
+    // click whose await resolved after a newer Test) is discarded.
     const requestId = (connRequestIdByUuid()[uuid] ?? 0) + 1;
     setConnRequestIdByUuid((prev) => ({ ...prev, [uuid]: requestId }));
     setConnByUuid((prev) => ({ ...prev, [uuid]: "testing" }));
     try {
       const result = await providerTestConnection(uuid);
-      // Guard 1: a newer Test superseded this one.
+      // Guard 1: config changed since test start (epoch bumped). Both sides
+      // use `?? 0` so an unset epoch (undefined) compares equal to itself.
+      if ((configEpochByUuid()[uuid] ?? 0) !== epoch) return;
+      // Guard 2: a newer Test superseded this one.
       if (connRequestIdByUuid()[uuid] !== requestId) return;
-      // Guard 2: provider still exists + config unchanged since test start.
-      const current = providers().find((p) => p.uuid === uuid);
-      if (!current) return;
-      if (current.version !== configVersion) return;
-      if (current.endpoint !== configEndpoint) return;
-      if ((current.model ?? "") !== configModel) return;
       setConnByUuid((prev) => ({ ...prev, [uuid]: result }));
     } catch {
+      if ((configEpochByUuid()[uuid] ?? 0) !== epoch) return;
       if (connRequestIdByUuid()[uuid] !== requestId) return;
-      const current = providers().find((p) => p.uuid === uuid);
-      if (!current || current.version !== configVersion) return;
       setConnByUuid((prev) => ({
         ...prev,
         [uuid]: { ok: false, message: t.connectionFailed },
@@ -1315,6 +1332,8 @@ const ProviderCenter: Component = () => {
   const confirmDelete = async () => {
     const uuid = deleteConfirmUuid() ?? deleteFailedUuid();
     if (!uuid) return;
+    // R9: invalidate any in-flight Test/Fetch for the deleted UUID.
+    bumpConfigEpoch(uuid);
     await runExclusive(async () => {
       setDeletingUuid(uuid);
       try {
@@ -1540,36 +1559,43 @@ const ProviderCenter: Component = () => {
       }
       onEndpointInput={(uuid, value) => {
         setEndpointDraft((prev) => ({ ...prev, [uuid]: value }));
-        // R8-P1/P2-1: an endpoint draft means the displayed config no longer
-        // matches what was last tested / fetched against. Drop the cached
-        // connection + model results so a stale "Connected" badge or model list
-        // is not shown next to the edited endpoint. (A pending completion is
-        // still discarded by the version guard once the draft is saved.)
-        setConnByUuid((prev) => { const n = { ...prev }; delete n[uuid]; return n; });
-        setModelOptionsByUuid((prev) => { const n = { ...prev }; delete n[uuid]; return n; });
-        setModelFetchByUuid((prev) => { const n = { ...prev }; delete n[uuid]; return n; });
+        // R9: an endpoint draft means the displayed config no longer matches
+        // what was last tested / fetched against. bumpConfigEpoch invalidates
+        // any in-flight Test/Fetch (whose completion would be stale) and clears
+        // the cached results so a stale "Connected" badge or model list is not
+        // shown next to the edited endpoint.
+        bumpConfigEpoch(uuid);
       }}
       onModelInput={(uuid, value) => {
         setModelDraftByUuid((prev) => ({ ...prev, [uuid]: value }));
-        // R8-P1/P2-1: same rationale as onEndpointInput — a model draft
-        // invalidates the last-tested / last-fetched config signature.
-        setConnByUuid((prev) => { const n = { ...prev }; delete n[uuid]; return n; });
-        setModelOptionsByUuid((prev) => { const n = { ...prev }; delete n[uuid]; return n; });
-        setModelFetchByUuid((prev) => { const n = { ...prev }; delete n[uuid]; return n; });
+        // R9: same rationale as onEndpointInput — a model draft invalidates
+        // the last-tested / last-fetched config.
+        bumpConfigEpoch(uuid);
       }}
-      onModelChange={(uuid, value) =>
-        // Idempotent: return the SAME `prev` reference when the value is
-        // unchanged. The Kobalte Select re-emits `onChange` with the current
+      onModelChange={(uuid, value) => {
+        // Idempotent: the Kobalte Select re-emits `onChange` with the current
         // value whenever the model `value`/`options` prop changes reference
         // (which happens on every `detail` memo recompute, since `selectOptions`
         // returns a fresh array). Without this guard the write always produced a
         // new Record → `detail` recompute → Select value-ref change → onChange
-        // → infinite update loop (R2-H). Solid's setter short-circuits when the
-        // updater returns the identical reference, breaking the cycle.
-        setModelDraftByUuid((prev) =>
-          prev[uuid] === value ? prev : { ...prev, [uuid]: value },
-        )
-      }
+        // → infinite update loop (R2-H).
+        //
+        // R9: when the value IS different, bumpConfigEpoch invalidates any
+        // in-flight Test/Fetch and clears the stale model list. The effective
+        // model (draft ?? stored) is compared so that the Select's initial
+        // onChange re-emission (when the draft is undefined but the value
+        // matches the stored model) does NOT trigger a spurious epoch bump.
+        // `untrack` prevents reactive dependencies if Kobalte calls onChange
+        // inside a createEffect.
+        const effectiveModel = untrack(() => {
+          const draft = modelDraftByUuid()[uuid];
+          if (draft !== undefined) return draft;
+          return providers().find((p) => p.uuid === uuid)?.model ?? "";
+        });
+        if (effectiveModel === value) return;
+        setModelDraftByUuid((prev) => ({ ...prev, [uuid]: value }));
+        bumpConfigEpoch(uuid);
+      }}
       onKeyInput={(uuid, value) => {
         setKeyInputByUuid((prev) => ({ ...prev, [uuid]: value }));
         if (keyErrorByUuid()[uuid]) {
@@ -1602,7 +1628,9 @@ const ProviderCenter: Component = () => {
         void runExclusive(async () => {
           const ok = await refreshCore();
           if (!ok) {
-            // Reload failed: keep banner + drafts + errors. Restore editability.
+            // R9: refreshCore no longer pushes a toast — surface the reload
+            // failure here. Keep banner + drafts + errors. Restore editability.
+            pushToast("destructive", t.saveFailed);
             setReloadingUuid(null);
             return;
           }
@@ -1643,7 +1671,12 @@ const ProviderCenter: Component = () => {
           setReloadingUuid(null);
         });
       }}
-      onReloadFromError={() => void refresh()}
+      onReloadFromError={() => {
+        // R9: refreshCore no longer pushes a toast — surface failure here.
+        void refresh().then((ok) => {
+          if (!ok) pushToast("destructive", t.saveFailed);
+        });
+      }}
       onRetrySelectionLoad={() => void refresh()}
       onConfirmDelete={() => void confirmDelete()}
       onCancelDelete={() => cancelDelete()}
