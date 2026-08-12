@@ -150,6 +150,10 @@ type ProviderCopy = {
    *  unsaved edits would probe a config the user no longer sees — block it and
    *  tell them to save first. */
   saveFirstToTest: string;
+  /** R9: hint shown next to a disabled Fetch Models button when unsaved drafts
+   *  exist. Same rationale as `saveFirstToTest` — Fetch reads the BACKEND's
+   *  stored config. */
+  saveFirstToFetch: string;
   keySaved: string;
   profileSaved: string;
   keyMissing: string;
@@ -286,6 +290,7 @@ const EN: SettingsCopy = {
     connectionOk: "Connected",
     connectionFailed: "Connection failed",
     saveFirstToTest: "Save changes before testing",
+    saveFirstToFetch: "Save changes before fetching models",
     keySaved: "Key saved",
     profileSaved: "Profile saved",
     keyMissing: "Key missing",
@@ -419,6 +424,7 @@ const ZH: SettingsCopy = {
     connectionOk: "已连接",
     connectionFailed: "连接失败",
     saveFirstToTest: "请先保存更改再测试",
+    saveFirstToFetch: "请先保存更改再获取模型",
     keySaved: "密钥已保存",
     profileSaved: "配置已保存",
     keyMissing: "缺少密钥",

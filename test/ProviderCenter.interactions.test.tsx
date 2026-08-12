@@ -554,4 +554,366 @@ describe("ProviderCenter — production interaction contracts", () => {
     await waitFor(() => expect(screen.getByText("Alpha")).toBeTruthy());
     await waitFor(() => expect(screen.getByText("Beta")).toBeTruthy());
   });
+
+  // ─── R9: Unified configEpoch invalidation ─────────────────────────────────
+  //
+  // R8 used per-field version/endpoint/model guards from `providers()` (the
+  // COMMITTED state). Draft edits change signals (endpointDraft / modelDraft)
+  // but NOT `providers()`, so the guards passed and stale results were written
+  // back. R9 replaces those guards with a single monotonic `configEpochByUuid`
+  // counter bumped on ANY config-relevant change (draft edit, model select, key
+  // save, provider update). Test/Fetch capture the epoch at start; on
+  // completion (resolve OR reject) they discard if the epoch changed.
+
+  it("R9-configEpoch: pending Test → edit endpoint draft (no save) → resolve → NOT written back", async () => {
+    // Draft edits bump the configEpoch, invalidating any in-flight Test started
+    // against the old config — even without a save (which was the R8 gap: R8
+    // only caught a SAVE that bumped the version).
+    let resolveTest!: (r: { ok: boolean; message: string }) => void;
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => [profile({ uuid: "u1", name: "Alpha" })],
+      key_status: () => ({ "provider/u1": true }),
+      provider_test_connection: () =>
+        new Promise((res) => {
+          resolveTest = res as (r: { ok: boolean; message: string }) => void;
+        }),
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("Alpha")).toBeTruthy());
+
+    fireEvent.click(screen.getByLabelText("Edit Alpha"));
+    await flush();
+    // Start Test — stays pending (deferred).
+    fireEvent.click(screen.getByText("Test"));
+    await flush();
+
+    // Edit endpoint draft (NO save) → bumps configEpoch → invalidates Test.
+    const ep = screen.getByLabelText("Endpoint") as HTMLInputElement;
+    fireEvent.input(ep, { target: { value: "https://new.example.com" } });
+    await flush();
+
+    // Resolve the stale Test — its result MUST be discarded.
+    resolveTest({ ok: true, message: "old reachable" });
+    await flush();
+    await flush();
+    expect(screen.queryByText("old reachable")).toBeNull();
+    expect(screen.queryByText("Connected")).toBeNull();
+  });
+
+  it("R9-configEpoch: pending Fetch → edit endpoint draft → resolve → NOT written back", async () => {
+    const listable = (over: Partial<ProviderProfile> = {}): ProviderProfile =>
+      profile({
+        uuid: "u1",
+        name: "Alpha",
+        capabilities: { balance: false, quota: false, model_list: true },
+        ...over,
+      });
+    let resolveFetch!: (m: { id: string; label: string }[]) => void;
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => [listable()],
+      key_status: () => ({ "provider/u1": true }),
+      provider_get_models: () =>
+        new Promise((res) => {
+          resolveFetch = res as (m: { id: string; label: string }[]) => void;
+        }),
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("Alpha")).toBeTruthy());
+
+    const triggerValue = () =>
+      (document.querySelector(".lr-select__value") as HTMLElement | null)?.textContent ?? "";
+
+    fireEvent.click(screen.getByLabelText("Edit Alpha"));
+    await flush();
+    await waitFor(() => expect(triggerValue()).toBe("gpt-4o-mini"));
+    // Start Fetch — stays pending (deferred).
+    fireEvent.click(screen.getByText("Fetch models"));
+    await flush();
+
+    // Edit endpoint draft (NO save) → bumps configEpoch → invalidates Fetch.
+    const ep = screen.getByLabelText("Endpoint") as HTMLInputElement;
+    fireEvent.input(ep, { target: { value: "https://new.example.com" } });
+    await flush();
+
+    // Resolve the stale Fetch — its models MUST be discarded.
+    resolveFetch([{ id: "stale-model", label: "Stale Model" }]);
+    await flush();
+    await flush();
+    expect(screen.queryByText("Stale Model")).toBeNull();
+    // Trigger still shows modelDraft (stale list did not replace fallback).
+    expect(triggerValue()).toBe("gpt-4o-mini");
+  });
+
+  it("R9-configEpoch: Select onModelChange invalidates pending Test", async () => {
+    // The Kobalte Select's onChange (onModelChange) previously did nothing.
+    // R9 bumps configEpoch on model Select change, invalidating in-flight Test.
+    const listable = (over: Partial<ProviderProfile> = {}): ProviderProfile =>
+      profile({
+        uuid: "u1",
+        name: "Alpha",
+        capabilities: { balance: false, quota: false, model_list: true },
+        ...over,
+      });
+    let resolveTest!: (r: { ok: boolean; message: string }) => void;
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => [listable()],
+      key_status: () => ({ "provider/u1": true }),
+      provider_test_connection: () =>
+        new Promise((res) => {
+          resolveTest = res as (r: { ok: boolean; message: string }) => void;
+        }),
+      provider_get_models: () => [
+        { id: "gpt-4o-mini", label: "gpt-4o-mini" },
+        { id: "gpt-4o", label: "gpt-4o" },
+      ],
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("Alpha")).toBeTruthy());
+
+    fireEvent.click(screen.getByLabelText("Edit Alpha"));
+    await flush();
+    // Fetch models so the Select has options.
+    fireEvent.click(screen.getByText("Fetch models"));
+    await flush();
+
+    // Start Test — stays pending (deferred).
+    fireEvent.click(screen.getByText("Test"));
+    await flush();
+
+    // Change model via Select → bumps configEpoch → invalidates pending Test.
+    // Open the Select dropdown via keyboard (ArrowDown), then click the option.
+    const trigger = document.querySelector(".lr-select__trigger") as HTMLElement;
+    trigger.focus();
+    fireEvent.keyDown(trigger, { key: "ArrowDown" });
+    await flush();
+    // Wait for the dropdown option to appear in the Portal, then click it.
+    const option = await waitFor(() => screen.getByRole("option", { name: "gpt-4o" }));
+    fireEvent.click(option);
+    await flush();
+
+    // Resolve the stale Test — its result MUST be discarded.
+    resolveTest({ ok: true, message: "old reachable" });
+    await flush();
+    await flush();
+    expect(screen.queryByText("old reachable")).toBeNull();
+    expect(screen.queryByText("Connected")).toBeNull();
+  });
+
+  it("R9-configEpoch: pending Test → save new Key → old completion NOT written", async () => {
+    // handleSaveKey bumps configEpoch at the START (before the await), so a
+    // pending Test started with the old key is invalidated.
+    let resolveTest!: (r: { ok: boolean; message: string }) => void;
+    let u1HasKey = false;
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => [profile({ uuid: "u1", name: "Alpha" })],
+      key_status: () => ({ "provider/u1": u1HasKey }),
+      provider_test_connection: () =>
+        new Promise((res) => {
+          resolveTest = res as (r: { ok: boolean; message: string }) => void;
+        }),
+      provider_set_key: () => {
+        u1HasKey = true;
+      },
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("Alpha")).toBeTruthy());
+
+    fireEvent.click(screen.getByLabelText("Edit Alpha"));
+    await flush();
+    // Start Test — stays pending (deferred).
+    fireEvent.click(screen.getByText("Test"));
+    await flush();
+
+    // Save a new API key → bumps configEpoch → invalidates pending Test.
+    const keyInput = screen.getByLabelText("API key") as HTMLInputElement;
+    fireEvent.input(keyInput, { target: { value: "sk-new-secret" } });
+    await flush();
+    fireEvent.click(screen.getByText("Save key"));
+    await flush();
+    await waitFor(() =>
+      expect(screen.getAllByText("Key saved").length).toBeGreaterThanOrEqual(1),
+    );
+
+    // Resolve the stale Test — its result MUST be discarded.
+    resolveTest({ ok: true, message: "old reachable" });
+    await flush();
+    await flush();
+    expect(screen.queryByText("old reachable")).toBeNull();
+    expect(screen.queryByText("Connected")).toBeNull();
+  });
+
+  it("R9-configEpoch: Fetch Models disabled when unsaved config drafts exist", async () => {
+    // Same gate as the Test button: `providerGetModels` reads the BACKEND's
+    // stored config, so fetching with unsaved edits would return models for a
+    // config the user no longer sees.
+    const listable = (over: Partial<ProviderProfile> = {}): ProviderProfile =>
+      profile({
+        uuid: "u1",
+        name: "Alpha",
+        capabilities: { balance: false, quota: false, model_list: true },
+        ...over,
+      });
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => [listable()],
+      key_status: () => ({ "provider/u1": true }),
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("Alpha")).toBeTruthy());
+
+    fireEvent.click(screen.getByLabelText("Edit Alpha"));
+    await flush();
+    // Before edit: Fetch is enabled.
+    expect(
+      (screen.getByText("Fetch models").closest("button") as HTMLButtonElement).disabled,
+    ).toBe(false);
+
+    // Edit endpoint (no save) → unsaved drafts exist.
+    const ep = screen.getByLabelText("Endpoint") as HTMLInputElement;
+    fireEvent.input(ep, { target: { value: "https://new.example.com" } });
+    await flush();
+
+    // Fetch Models is now disabled.
+    await waitFor(() =>
+      expect(
+        (screen.getByText("Fetch models").closest("button") as HTMLButtonElement).disabled,
+      ).toBe(true),
+    );
+  });
+
+  it("R9-configEpoch: stale model list cleared after model Select change (open Select, verify cleared)", async () => {
+    // The Kobalte Select's onChange (onModelChange) previously did nothing —
+    // a fetched model list was NOT cleared when the user picked a different
+    // model. R9's bumpConfigEpoch clears the stale model options on ANY
+    // config-relevant change, including model Select.
+    const listable = (over: Partial<ProviderProfile> = {}): ProviderProfile =>
+      profile({
+        uuid: "u1",
+        name: "Alpha",
+        capabilities: { balance: false, quota: false, model_list: true },
+        ...over,
+      });
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => [listable()],
+      key_status: () => ({ "provider/u1": true }),
+      provider_get_models: () => [
+        { id: "gpt-4o-mini", label: "gpt-4o-mini" },
+        { id: "gpt-4o", label: "gpt-4o" },
+      ],
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("Alpha")).toBeTruthy());
+
+    const trigger = () => document.querySelector(".lr-select__trigger") as HTMLElement;
+    const openDropdown = async () => {
+      trigger().focus();
+      fireEvent.keyDown(trigger(), { key: "ArrowDown" });
+      await flush();
+    };
+
+    fireEvent.click(screen.getByLabelText("Edit Alpha"));
+    await flush();
+    // Fetch models → dropdown has gpt-4o-mini + gpt-4o.
+    fireEvent.click(screen.getByText("Fetch models"));
+    await flush();
+    // Open the Select to verify the fetched options are present.
+    await openDropdown();
+    await waitFor(() => expect(screen.getByRole("option", { name: "gpt-4o-mini" })).toBeTruthy());
+    expect(screen.getByRole("option", { name: "gpt-4o" })).toBeTruthy();
+
+    // Select a different model (gpt-4o) → onModelChange bumps configEpoch →
+    // clears the stale model list.
+    fireEvent.click(screen.getByRole("option", { name: "gpt-4o" }));
+    await flush();
+
+    // Re-open the Select — the stale "gpt-4o-mini" option must be gone (only
+    // the fallback for the current modelDraft remains).
+    await openDropdown();
+    await flush();
+    expect(screen.queryByRole("option", { name: "gpt-4o-mini" })).toBeNull();
+  });
+
+  it("R9-configEpoch: mutation success + refreshCore failure → only warning toast, no saveFailed", async () => {
+    // refreshCore previously pushed a destructive `saveFailed` toast internally.
+    // Mutation handlers that check the boolean ALSO pushed
+    // `mutationSuccessReloadFailed`, so the user saw BOTH contradictory toasts.
+    // R9 removes the toast from refreshCore — callers surface failure via the
+    // boolean return.
+    let created = false;
+    let refreshShouldFail = false;
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => {
+        if (refreshShouldFail) throw new Error("reload failed");
+        return created ? [profile({ uuid: "u1", name: "Alpha" })] : [];
+      },
+      provider_create: () => {
+        created = true;
+        return profile({ uuid: "u1", name: "Alpha" });
+      },
+      provider_get_active_selection: () => {
+        if (refreshShouldFail) throw new Error("reload failed");
+        return { primary: null, parallel: [], fallback: null };
+      },
+    });
+    render(() => <ProviderCenter />);
+    // Wait for the initial (empty) load to settle.
+    await waitFor(() => {
+      const presetBtn = screen.getByText("OpenAI").closest("button") as HTMLButtonElement;
+      expect(presetBtn.disabled).toBe(false);
+    });
+
+    // Make the post-create refresh fail.
+    refreshShouldFail = true;
+    fireEvent.click(screen.getByText("OpenAI").closest("button")!);
+    await flush();
+
+    // The warning toast surfaces (mutation succeeded, reload failed).
+    await waitFor(() =>
+      expect(
+        screen.getByText("Saved, but the list could not be refreshed. Click Reload to retry."),
+      ).toBeTruthy(),
+    );
+    // The destructive saveFailed toast must NOT have been pushed by refreshCore.
+    // The loadError banner (InlineError) still shows saveFailed text ONCE; a
+    // second occurrence means the destructive toast was also pushed.
+    expect(screen.getAllByText("Failed to save: network error").length).toBe(1);
+  });
+
+  it("R9-configEpoch: aria-describedby associates Test button with hint span", async () => {
+    // When unsaved drafts exist, the Test button's aria-describedby points to
+    // the save-first hint span, so screen readers announce the reason the
+    // button is disabled.
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => [profile({ uuid: "u1", name: "Alpha" })],
+      key_status: () => ({ "provider/u1": true }),
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("Alpha")).toBeTruthy());
+
+    fireEvent.click(screen.getByLabelText("Edit Alpha"));
+    await flush();
+    // Before edit: no hint, no aria-describedby.
+    const testBtn = () => screen.getByText("Test").closest("button") as HTMLButtonElement;
+    expect(testBtn().getAttribute("aria-describedby")).toBeFalsy();
+
+    // Edit endpoint (no save) → unsaved drafts exist → hint appears.
+    const ep = screen.getByLabelText("Endpoint") as HTMLInputElement;
+    fireEvent.input(ep, { target: { value: "https://new.example.com" } });
+    await flush();
+    await waitFor(() => expect(screen.getByText("Save changes before testing")).toBeTruthy());
+
+    // The Test button's aria-describedby points to the hint span's id.
+    const describedBy = testBtn().getAttribute("aria-describedby");
+    expect(describedBy).toBeTruthy();
+    const hintEl = document.getElementById(describedBy!);
+    expect(hintEl).toBeTruthy();
+    expect(hintEl!.textContent).toContain("Save changes before testing");
+  });
 });
