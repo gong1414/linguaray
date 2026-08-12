@@ -7,8 +7,8 @@ const EXPECTED_COMPONENT_IDS = [
   "button", "icon-button", "segmented-control", "shortcut-chip",
   "text-field", "select", "switch",
   "status-badge", "inline-error", "toast", "confirm", "empty-state",
-  "translation-card", "result-card", "provider-row", "history-row",
-  "sidebar-item", "spinner", "window-chrome", "overflow-cjk",
+  "translation-card", "result-card", "provider-row", "provider-card",
+  "history-row", "sidebar-item", "spinner", "window-chrome", "overflow-cjk",
 ];
 
 describe("ComponentGallery", () => {
@@ -16,14 +16,14 @@ describe("ComponentGallery", () => {
   // tests so axe does not see accumulated DOM from prior renders.
   afterEach(() => cleanup());
 
-  it("renders exactly 20 design components with data-component-id", () => {
+  it("renders exactly 21 design components with data-component-id", () => {
     const { container } = render(() => <ComponentGallery locale="en" theme="light" />);
     for (const id of EXPECTED_COMPONENT_IDS) {
       const el = container.querySelector(`[data-component-id="${id}"]`);
       expect(el, `must have [data-component-id="${id}"]`).not.toBeNull();
     }
     const all = container.querySelectorAll("[data-component-id]");
-    expect(all.length, "exactly 20 components").toBe(20);
+    expect(all.length, "exactly 21 components").toBe(21);
   });
 
   it("renders zh labels in zh locale", () => {

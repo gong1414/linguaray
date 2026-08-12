@@ -16,6 +16,7 @@ import {
   TranslationCard,
   ResultCard,
   ProviderRow,
+  ProviderCard,
   HistoryRow,
   SidebarItem,
   WindowChrome,
@@ -303,7 +304,36 @@ export const ComponentGallery: Component<Props> = (props) => {
           />
         </section>
 
-        {/* 16. HistoryRow */}
+        {/* 16. ProviderCard — R12.1: keyless variant (needsKey=false) shows
+            "No key required", never "Key missing" or "Key saved". A
+            needsKey=true + hasKey=true card is shown alongside for comparison.
+            Labels default to defaultProviderCardLabels (English, matches the
+            gallery's en locale). */}
+        <section class="gallery__section" data-component-id="provider-card">
+          <h2 class="gallery__section-title">Provider Card</h2>
+          <ProviderCard
+            profile={{ name: "Ollama", template: "llama3", status: "active" }}
+            hasKey={false}
+            needsKey={false}
+            role={{ kind: "none" }}
+            enabled={true}
+            onToggle={() => {}}
+            onEdit={() => {}}
+            onDelete={() => {}}
+          />
+          <ProviderCard
+            profile={{ name: "OpenAI", template: "gpt-4o", status: "active" }}
+            hasKey={true}
+            needsKey={true}
+            role={{ kind: "primary" }}
+            enabled={true}
+            onToggle={() => {}}
+            onEdit={() => {}}
+            onDelete={() => {}}
+          />
+        </section>
+
+        {/* 17. HistoryRow */}
         <section class="gallery__section" data-component-id="history-row">
           <h2 class="gallery__section-title">{t().historyRow.title}</h2>
           <HistoryRow
@@ -320,7 +350,7 @@ export const ComponentGallery: Component<Props> = (props) => {
           />
         </section>
 
-        {/* 17. SidebarItem */}
+        {/* 18. SidebarItem */}
         <section class="gallery__section" data-component-id="sidebar-item">
           <h2 class="gallery__section-title">{t().sidebarItem.title}</h2>
           <div class="gallery__row-cluster">
@@ -337,7 +367,7 @@ export const ComponentGallery: Component<Props> = (props) => {
           </div>
         </section>
 
-        {/* 18. Spinner — exercised under both full and reduced motion
+        {/* 19. Spinner — exercised under both full and reduced motion
             (reduced-motion overlay forces the text fallback via
             Spinner.css [data-motion="reduced"]). */}
         <section class="gallery__section" data-component-id="spinner">
@@ -352,7 +382,7 @@ export const ComponentGallery: Component<Props> = (props) => {
           </div>
         </section>
 
-        {/* 19. WindowChrome */}
+        {/* 20. WindowChrome */}
         <section class="gallery__section" data-component-id="window-chrome">
           <h2 class="gallery__section-title">{t().windowChrome.title}</h2>
           <WindowChrome
@@ -365,7 +395,7 @@ export const ComponentGallery: Component<Props> = (props) => {
           </WindowChrome>
         </section>
 
-        {/* 20. Overflow · long CJK text — verifies Button/TextField/StatusBadge
+        {/* 21. Overflow · long CJK text — verifies Button/TextField/StatusBadge
             do not break layout when given unbroken long Chinese strings. */}
         <section class="gallery__section" data-component-id="overflow-cjk">
           <h2 class="gallery__section-title">{t().overflow.title}</h2>

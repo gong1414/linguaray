@@ -223,10 +223,12 @@
 }
 
 /* R12: keyless provider (needs_key=false) — muted/neutral "No key required"
- * text, no input/button. Uses semantic tokens (no hardcoded hex). */
+ * text, no input/button. R12.1: use the formal semantic token directly
+ * (the old `--color-fg-muted` alias + its tertiary-value fallback were a
+ * mismatch — the alias resolves to --color-text-secondary, not tertiary). */
 .pc__key-not-required {
   font-size: var(--text-sm, 0.85rem);
-  color: var(--color-fg-muted, #64748b);
+  color: var(--color-text-secondary);
 }
 
 .pc__conn-section {
