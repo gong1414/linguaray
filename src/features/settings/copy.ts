@@ -157,6 +157,10 @@ type ProviderCopy = {
   keySaved: string;
   profileSaved: string;
   keyMissing: string;
+  /** R11: shown in the detail Key section when `needs_key=false` — the provider
+   *  type does not use an API key (e.g. a local Ollama preset), so no key input
+   *  or Save button is rendered. */
+  noKeyRequired: string;
   enterKey: string;
   apiKey: string;
   apiKeyPlaceholder: string;
@@ -298,6 +302,7 @@ const EN: SettingsCopy = {
     keySaved: "Key saved",
     profileSaved: "Profile saved",
     keyMissing: "Key missing",
+    noKeyRequired: "No key required",
     enterKey: "Enter key",
     apiKey: "API key",
     apiKeyPlaceholder: "sk-…",
@@ -433,6 +438,7 @@ const ZH: SettingsCopy = {
     keySaved: "密钥已保存",
     profileSaved: "配置已保存",
     keyMissing: "缺少密钥",
+    noKeyRequired: "无需密钥",
     enterKey: "输入密钥",
     apiKey: "API 密钥",
     apiKeyPlaceholder: "sk-…",

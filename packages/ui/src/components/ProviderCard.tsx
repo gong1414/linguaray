@@ -45,6 +45,9 @@ export const defaultProviderCardLabels: ProviderCardLabels = {
 export type ProviderCardProps = {
   profile: ProviderProfile;
   hasKey: boolean;
+  /** R11: whether this provider type requires an API key. A keyless provider
+   *  never shows the "key missing" indicator (it is "not-required"). */
+  needsKey: boolean;
   role: ProviderRole;
   enabled: boolean;
   onToggle: (enabled: boolean) => void;
@@ -78,7 +81,8 @@ const ProviderCard: Component<ProviderCardProps> = (props) => {
   // Key status is independent of enabled/disabled — a disabled provider can still
   // have a missing key that must be visible. Using providerKeyStatus avoids the
   // priority issue where providerStatus returns "disabled" before "key-missing".
-  const keyMissing = () => providerKeyStatus(props.hasKey) === "missing";
+  // R11: a keyless provider (needs_key=false) is "not-required", never "missing".
+  const keyMissing = () => providerKeyStatus(props.hasKey, props.needsKey) === "missing";
 
   const editLabel = () => labels().edit.replace("{name}", props.profile.name);
   const deleteLabel = () => labels().delete.replace("{name}", props.profile.name);
