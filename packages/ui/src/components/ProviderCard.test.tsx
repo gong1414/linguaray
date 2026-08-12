@@ -111,4 +111,82 @@ describe("ProviderCard", () => {
       disableRules: ["color-contrast", "landmark-one-main", "page-has-heading-one", "region"],
     });
   });
+
+  // ─── R12: three-state key status — not-required branch ────────────────────
+
+  it("keyless provider (needsKey=false, hasKey=false) shows 'No key required'", () => {
+    const { getByText, queryByText } = render(() => (
+      <ProviderCard
+        profile={profile}
+        hasKey={false}
+        needsKey={false}
+        role={{ kind: "none" }}
+        enabled={true}
+        onToggle={() => {}}
+        onEdit={() => {}}
+        onDelete={() => {}}
+      />
+    ));
+    expect(getByText("No key required")).toBeTruthy();
+    expect(queryByText("Key saved")).toBeNull();
+    expect(queryByText("Key missing")).toBeNull();
+  });
+
+  it("keyless provider with dirty hasKey=true STILL shows 'No key required' (fail-closed)", () => {
+    const { getByText, queryByText } = render(() => (
+      <ProviderCard
+        profile={profile}
+        hasKey={true}
+        needsKey={false}
+        role={{ kind: "none" }}
+        enabled={true}
+        onToggle={() => {}}
+        onEdit={() => {}}
+        onDelete={() => {}}
+      />
+    ));
+    // Even if hasKey is stale/dirty, needsKey=false wins → not-required.
+    expect(getByText("No key required")).toBeTruthy();
+    expect(queryByText("Key saved")).toBeNull();
+  });
+
+  it("keyless provider renders not-required key-status class", () => {
+    const { container } = render(() => (
+      <ProviderCard
+        profile={profile}
+        hasKey={false}
+        needsKey={false}
+        role={{ kind: "none" }}
+        enabled={true}
+        onToggle={() => {}}
+        onEdit={() => {}}
+        onDelete={() => {}}
+      />
+    ));
+    const notRequired = container.querySelector(
+      ".lr-provider-card__key-status--not-required",
+    );
+    expect(notRequired).not.toBeNull();
+    // No saved or missing badge should be present.
+    expect(container.querySelector(".lr-provider-card__key-status--saved")).toBeNull();
+    expect(container.querySelector(".lr-provider-card__key-status--missing")).toBeNull();
+  });
+
+  it("keyless provider card has no axe violations", async () => {
+    render(() => (
+      <ProviderCard
+        profile={profile}
+        hasKey={false}
+        needsKey={false}
+        role={{ kind: "primary" }}
+        enabled={true}
+        onToggle={() => {}}
+        onEdit={() => {}}
+        onDelete={() => {}}
+      />
+    ));
+    await assertNoAxeViolations({
+      disableRules: ["color-contrast", "landmark-one-main", "page-has-heading-one", "region"],
+    });
+  });
 });

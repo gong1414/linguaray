@@ -287,6 +287,20 @@ export const ComponentGallery: Component<Props> = (props) => {
             onEdit={() => {}}
             onDelete={() => {}}
           />
+          {/* R12: keyless variant (needsKey=false) — neutral "Available" status,
+              never "Key missing". */}
+          <ProviderRow
+            name="Ollama"
+            template="llama3"
+            hasKey={false}
+            needsKey={false}
+            role={{ kind: "none" }}
+            enabled={true}
+            labels={t().providerRow.labels}
+            onToggle={() => {}}
+            onEdit={() => {}}
+            onDelete={() => {}}
+          />
         </section>
 
         {/* 16. HistoryRow */}
