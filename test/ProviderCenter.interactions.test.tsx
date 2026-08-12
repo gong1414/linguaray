@@ -880,9 +880,10 @@ describe("ProviderCenter — production interaction contracts", () => {
       ).toBeTruthy(),
     );
     // The destructive saveFailed toast must NOT have been pushed by refreshCore.
-    // The loadError banner (InlineError) still shows saveFailed text ONCE; a
-    // second occurrence means the destructive toast was also pushed.
-    expect(screen.getAllByText("Failed to save: network error").length).toBe(1);
+    // R10: the loadError banner (InlineError) now shows `loadFailed` ("Provider
+    // load failed"), NOT `saveFailed`. So `saveFailed` must appear ZERO times —
+    // if it appeared, that would mean refreshCore pushed a destructive toast.
+    expect(screen.queryAllByText("Failed to save: network error").length).toBe(0);
   });
 
   it("R9-configEpoch: aria-describedby associates Test button with hint span", async () => {
@@ -1012,5 +1013,470 @@ describe("ProviderCenter — production interaction contracts", () => {
     await flush();
     expect(screen.queryByText("old reachable")).toBeNull();
     expect(screen.queryByText("Connected")).toBeNull();
+  });
+
+  // ─── R10: config-invalidation gap fixes ───────────────────────────────────
+  //
+  // R9 left four gaps where a pending Test/Fetch completion could still write a
+  // stale result after a config-relevant change:
+  //  P1-1: key DRAFT (onKeyInput) didn't bump the epoch + hasUnsavedDrafts
+  //        didn't check keyText, so typing a new key didn't invalidate a
+  //        pending Test/Fetch.
+  //  P1-2: toggle (handleToggle) changed `enabled` but didn't bump the epoch.
+  //  P1-3: handleSaveKey called setProviders(list) directly, bypassing the
+  //        refreshCore diff; and even refreshCore's diff was too narrow
+  //        (version/endpoint/model only — missed enabled/hasKey/protocol).
+  //        Fixed by a unified applyProviderList that bumps the epoch for ALL
+  //        old UUIDs on every list replacement.
+  //  P1-4: stale_version catch didn't bump the epoch, so a pending Test started
+  //        before the rejected save could still complete and write its result.
+
+  it("R10: pending Test → input Key draft → resolve → NOT written (P1-1)", async () => {
+    // onKeyInput must bump the configEpoch so a pending Test started against the
+    // old (keyless) config is discarded when the user types a new API key.
+    let resolveTest!: (r: { ok: boolean; message: string }) => void;
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => [profile({ uuid: "u1", name: "Alpha" })],
+      key_status: () => ({}), // keyless → key input is shown
+      provider_test_connection: () =>
+        new Promise((res) => {
+          resolveTest = res as (r: { ok: boolean; message: string }) => void;
+        }),
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("Alpha")).toBeTruthy());
+
+    fireEvent.click(screen.getByLabelText("Edit Alpha"));
+    await flush();
+    // Start Test — stays pending (deferred).
+    fireEvent.click(screen.getByText("Test"));
+    await flush();
+
+    // Type a new API key draft (NO save) → bumps configEpoch → invalidates Test.
+    const keyInput = screen.getByLabelText("API key") as HTMLInputElement;
+    fireEvent.input(keyInput, { target: { value: "sk-new-secret" } });
+    await flush();
+
+    // Resolve the stale Test — its result MUST be discarded.
+    resolveTest({ ok: true, message: "old reachable" });
+    await flush();
+    await flush();
+    expect(screen.queryByText("old reachable")).toBeNull();
+    expect(screen.queryByText("Connected")).toBeNull();
+  });
+
+  it("R10: pending Test → input Key draft → reject → no failure result (P1-1)", async () => {
+    // The epoch guard must also cover the REJECT path: a Test that rejects after
+    // a key draft must NOT write a failure badge.
+    let rejectTest!: (e: Error) => void;
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => [profile({ uuid: "u1", name: "Alpha" })],
+      key_status: () => ({}),
+      provider_test_connection: () =>
+        new Promise((_, rej) => {
+          rejectTest = rej;
+        }),
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("Alpha")).toBeTruthy());
+
+    fireEvent.click(screen.getByLabelText("Edit Alpha"));
+    await flush();
+    fireEvent.click(screen.getByText("Test"));
+    await flush();
+
+    const keyInput = screen.getByLabelText("API key") as HTMLInputElement;
+    fireEvent.input(keyInput, { target: { value: "sk-new-secret" } });
+    await flush();
+
+    // Reject the stale Test — the failure MUST be discarded.
+    rejectTest(new Error("network"));
+    await flush();
+    await flush();
+    expect(screen.queryByText("Connection failed")).toBeNull();
+  });
+
+  it("R10: pending Fetch → input Key draft → resolve → NOT written (P1-1)", async () => {
+    // A key draft must also invalidate a pending Fetch Models.
+    const listable = (): ProviderProfile =>
+      profile({
+        uuid: "u1",
+        name: "Alpha",
+        capabilities: { balance: false, quota: false, model_list: true },
+      });
+    let resolveFetch!: (m: { id: string; label: string }[]) => void;
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => [listable()],
+      key_status: () => ({}), // keyless → key input shown
+      provider_get_models: () =>
+        new Promise((res) => {
+          resolveFetch = res as (m: { id: string; label: string }[]) => void;
+        }),
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("Alpha")).toBeTruthy());
+
+    const triggerValue = () =>
+      (document.querySelector(".lr-select__value") as HTMLElement | null)?.textContent ?? "";
+
+    fireEvent.click(screen.getByLabelText("Edit Alpha"));
+    await flush();
+    await waitFor(() => expect(triggerValue()).toBe("gpt-4o-mini"));
+    fireEvent.click(screen.getByText("Fetch models"));
+    await flush();
+
+    // Type a key draft → bumps configEpoch → invalidates pending Fetch.
+    const keyInput = screen.getByLabelText("API key") as HTMLInputElement;
+    fireEvent.input(keyInput, { target: { value: "sk-new-secret" } });
+    await flush();
+
+    // Resolve stale Fetch — its models MUST be discarded.
+    resolveFetch([{ id: "stale-model", label: "Stale Model" }]);
+    await flush();
+    await flush();
+    expect(screen.queryByText("Stale Model")).toBeNull();
+    expect(triggerValue()).toBe("gpt-4o-mini");
+  });
+
+  it("R10: pending Test → toggle disabled → completion → NOT written (P1-2)", async () => {
+    // handleToggle must bump the configEpoch BEFORE the optimistic setProviders
+    // so a pending Test (which probed the enabled config) is invalidated.
+    let resolveTest!: (r: { ok: boolean; message: string }) => void;
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => [profile({ uuid: "u1", name: "Alpha", enabled: true })],
+      key_status: () => ({ "provider/u1": true }),
+      provider_test_connection: () =>
+        new Promise((res) => {
+          resolveTest = res as (r: { ok: boolean; message: string }) => void;
+        }),
+      provider_toggle: () => undefined,
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("Alpha")).toBeTruthy());
+
+    fireEvent.click(screen.getByLabelText("Edit Alpha"));
+    await flush();
+    // Start Test — stays pending (deferred).
+    fireEvent.click(screen.getByText("Test"));
+    await flush();
+
+    // Toggle u1 disabled → bumps configEpoch → invalidates pending Test.
+    fireEvent.click(screen.getByRole("switch"));
+    await flush();
+
+    // Resolve the stale Test — its result MUST be discarded.
+    resolveTest({ ok: true, message: "old reachable" });
+    await flush();
+    await flush();
+    expect(screen.queryByText("old reachable")).toBeNull();
+    expect(screen.queryByText("Connected")).toBeNull();
+  });
+
+  it("R10: pending u2 Test → u1 Save Key (applyProviderList) → u2 completion NOT written (P1-3)", async () => {
+    // applyProviderList bumps the epoch for ALL old UUIDs — not just the changed
+    // one. So saving u1's key (which triggers a list refresh via
+    // applyProviderList) must also invalidate a pending Test on u2.
+    let u1HasKey = false;
+    let resolveU2Test!: (r: { ok: boolean; message: string }) => void;
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      key_status: () => ({ "provider/u1": u1HasKey }),
+      provider_test_connection: (args) => {
+        const a = args as { uuid: string };
+        if (a.uuid === "u2") {
+          return new Promise((res) => {
+            resolveU2Test = res as (r: { ok: boolean; message: string }) => void;
+          });
+        }
+        return { ok: true, message: "u1 ok" };
+      },
+      provider_set_key: () => {
+        u1HasKey = true;
+      },
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("Alpha")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Beta")).toBeTruthy());
+
+    // Select u2 and start a Test — stays pending (deferred).
+    fireEvent.click(screen.getByLabelText("Edit Beta"));
+    await flush();
+    fireEvent.click(screen.getByText("Test"));
+    await flush();
+
+    // Switch to u1 and save a key → handleSaveKey calls loadProviders +
+    // applyProviderList, which bumps the epoch for ALL old UUIDs (u1 AND u2).
+    fireEvent.click(screen.getByLabelText("Edit Alpha"));
+    await flush();
+    const keyInput = screen.getByLabelText("API key") as HTMLInputElement;
+    fireEvent.input(keyInput, { target: { value: "sk-alpha-secret" } });
+    await flush();
+    fireEvent.click(screen.getByText("Save key"));
+    await flush();
+    await waitFor(() =>
+      expect(screen.getAllByText("Key saved").length).toBeGreaterThanOrEqual(1),
+    );
+
+    // Resolve u2's stale Test (started before u1's key save).
+    resolveU2Test({ ok: true, message: "u2 old reachable" });
+    await flush();
+    await flush();
+
+    // Switch BACK to u2 and verify the stale result is NOT shown on its panel.
+    // applyProviderList bumped u2's epoch → the completion was discarded and
+    // connByUuid[u2] was cleared. Without the fix, the stale result would be
+    // visible here.
+    fireEvent.click(screen.getByLabelText("Edit Beta"));
+    await flush();
+    await flush();
+    expect(screen.queryByText("u2 old reachable")).toBeNull();
+    expect(screen.queryByText("Connected")).toBeNull();
+  });
+
+  it("R10: pending Test → Save rejects stale_version → completion NOT written (P1-4)", async () => {
+    // The stale_version catch must bump the configEpoch so a pending Test started
+    // before the rejected save is invalidated when it completes.
+    let resolveTest!: (r: { ok: boolean; message: string }) => void;
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => [profile({ uuid: "u1", name: "Alpha", version: 1 })],
+      key_status: () => ({ "provider/u1": true }),
+      provider_test_connection: () =>
+        new Promise((res) => {
+          resolveTest = res as (r: { ok: boolean; message: string }) => void;
+        }),
+      provider_update: () => {
+        throw { error: "stale_version" };
+      },
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("Alpha")).toBeTruthy());
+
+    fireEvent.click(screen.getByLabelText("Edit Alpha"));
+    await flush();
+    // Start Test — stays pending (deferred).
+    fireEvent.click(screen.getByText("Test"));
+    await flush();
+
+    // Save Profile WITHOUT editing any draft (editing endpoint/model would bump
+    // the epoch via R9 and mask the stale_version gap). The save still sends the
+    // current values + expected_version to the backend, which rejects with
+    // stale_version. The catch must bump the configEpoch.
+    fireEvent.click(screen.getByText("Save profile"));
+    await flush();
+    // Save-conflict banner surfaces.
+    await waitFor(() =>
+      expect(screen.getByText("This provider was modified elsewhere")).toBeTruthy(),
+    );
+
+    // Resolve the stale Test — its result MUST be discarded.
+    resolveTest({ ok: true, message: "old reachable" });
+    await flush();
+    await flush();
+    expect(screen.queryByText("old reachable")).toBeNull();
+    expect(screen.queryByText("Connected")).toBeNull();
+  });
+
+  it("R10: refresh changes only enabled → pending Test completion NOT written (P1-3)", async () => {
+    // applyProviderList bumps the epoch for ALL old UUIDs on every list refresh,
+    // even when the narrow field-level diff (version/endpoint/model) sees no
+    // change. A provider whose `enabled` flipped (same version) must still
+    // invalidate a pending Test.
+    let externalChange = false;
+    let resolveTest!: (r: { ok: boolean; message: string }) => void;
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () =>
+        externalChange
+          ? [profile({ uuid: "u1", name: "Alpha", enabled: false, version: 1 })]
+          : [profile({ uuid: "u1", name: "Alpha", enabled: true, version: 1 })],
+      key_status: () => ({ "provider/u1": true }),
+      provider_test_connection: () =>
+        new Promise((res) => {
+          resolveTest = res as (r: { ok: boolean; message: string }) => void;
+        }),
+      // handleAddPreset calls refreshCore internally — use it to trigger a
+      // refresh that returns u1 with enabled=false (same version/endpoint/model).
+      provider_create: () => profile({ uuid: "u2", name: "OpenAI" }),
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("Alpha")).toBeTruthy());
+
+    fireEvent.click(screen.getByLabelText("Edit Alpha"));
+    await flush();
+    // Start Test against enabled=true — stays pending (deferred).
+    fireEvent.click(screen.getByText("Test"));
+    await flush();
+
+    // Simulate an external change: provider_list now returns u1 with
+    // enabled=false (same version/endpoint/model). Trigger refreshCore via a
+    // preset create — applyProviderList bumps u1's epoch regardless.
+    externalChange = true;
+    fireEvent.click(screen.getByText("OpenAI").closest("button")!);
+    await flush();
+    await waitFor(() =>
+      expect(screen.getAllByText("Profile saved").length).toBeGreaterThanOrEqual(1),
+    );
+
+    // Resolve the stale Test — its result MUST be discarded.
+    resolveTest({ ok: true, message: "old reachable" });
+    await flush();
+    await flush();
+    expect(screen.queryByText("old reachable")).toBeNull();
+    expect(screen.queryByText("Connected")).toBeNull();
+  });
+
+  it("R10: unsaved key draft → Test AND Fetch disabled + accessible hint (P1-1 + P2)", async () => {
+    // hasUnsavedDrafts must include keyText so typing a key draft disables Test
+    // and Fetch + surfaces the accessible hint spans (role="status").
+    const listable = (): ProviderProfile =>
+      profile({
+        uuid: "u1",
+        name: "Alpha",
+        capabilities: { balance: false, quota: false, model_list: true },
+      });
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => [listable()],
+      key_status: () => ({}), // keyless → key input shown
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("Alpha")).toBeTruthy());
+
+    fireEvent.click(screen.getByLabelText("Edit Alpha"));
+    await flush();
+    const testBtn = () => screen.getByText("Test").closest("button") as HTMLButtonElement;
+    const fetchBtn = () =>
+      screen.getByText("Fetch models").closest("button") as HTMLButtonElement;
+    // Before key draft: both enabled.
+    expect(testBtn().disabled).toBe(false);
+    expect(fetchBtn().disabled).toBe(false);
+
+    // Type a key draft → unsaved drafts exist → both disabled + hints shown.
+    const keyInput = screen.getByLabelText("API key") as HTMLInputElement;
+    fireEvent.input(keyInput, { target: { value: "sk-new-secret" } });
+    await flush();
+
+    await waitFor(() => expect(testBtn().disabled).toBe(true));
+    await waitFor(() => expect(fetchBtn().disabled).toBe(true));
+
+    // Test hint: visible + in a live region (role="status") for screen readers.
+    const testHint = screen.getByText("Save changes before testing");
+    expect(testHint.closest("[role='status']")).toBeTruthy();
+    // Fetch hint: same accessible pattern.
+    const fetchHint = screen.getByText("Save changes before fetching models");
+    expect(fetchHint.closest("[role='status']")).toBeTruthy();
+  });
+
+  it("R10: pending Fetch → input Key draft → resolve → Select dropdown old models NOT present (P1-1)", async () => {
+    // A key draft invalidates a pending Fetch AND clears the cached model list.
+    // Verified by opening the Select dropdown and asserting the stale models are
+    // NOT present as role="option".
+    const listable = (): ProviderProfile =>
+      profile({
+        uuid: "u1",
+        name: "Alpha",
+        capabilities: { balance: false, quota: false, model_list: true },
+      });
+    let resolveFetch!: (m: { id: string; label: string }[]) => void;
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => [listable()],
+      key_status: () => ({}),
+      provider_get_models: () =>
+        new Promise((res) => {
+          resolveFetch = res as (m: { id: string; label: string }[]) => void;
+        }),
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("Alpha")).toBeTruthy());
+
+    const trigger = () => document.querySelector(".lr-select__trigger") as HTMLElement;
+    const openDropdown = async () => {
+      trigger().focus();
+      fireEvent.keyDown(trigger(), { key: "ArrowDown" });
+      await flush();
+    };
+
+    fireEvent.click(screen.getByLabelText("Edit Alpha"));
+    await flush();
+    // Start Fetch — stays pending (deferred).
+    fireEvent.click(screen.getByText("Fetch models"));
+    await flush();
+
+    // Type a key draft → bumps configEpoch → clears cached model options.
+    const keyInput = screen.getByLabelText("API key") as HTMLInputElement;
+    fireEvent.input(keyInput, { target: { value: "sk-new-secret" } });
+    await flush();
+
+    // Resolve the stale Fetch — its models MUST be discarded.
+    resolveFetch([
+      { id: "stale-1", label: "Stale Model A" },
+      { id: "stale-2", label: "Stale Model B" },
+    ]);
+    await flush();
+    await flush();
+
+    // Open the Select dropdown — the stale models must NOT be present.
+    await openDropdown();
+    await flush();
+    expect(screen.queryByRole("option", { name: "Stale Model A" })).toBeNull();
+    expect(screen.queryByRole("option", { name: "Stale Model B" })).toBeNull();
+  });
+
+  it("R10: key draft → Test reject + Fetch reject → neither writes (epoch reject path)", async () => {
+    // Regression: the epoch guard must cover BOTH the Test reject path and the
+    // Fetch reject path. A key draft invalidates both; their rejections must NOT
+    // write a failure result or fetch error.
+    const listable = (): ProviderProfile =>
+      profile({
+        uuid: "u1",
+        name: "Alpha",
+        capabilities: { balance: false, quota: false, model_list: true },
+      });
+    let rejectTest!: (e: Error) => void;
+    let rejectFetch!: (e: Error) => void;
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => [listable()],
+      key_status: () => ({}),
+      provider_test_connection: () =>
+        new Promise((_, rej) => {
+          rejectTest = rej;
+        }),
+      provider_get_models: () =>
+        new Promise((_, rej) => {
+          rejectFetch = rej;
+        }),
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("Alpha")).toBeTruthy());
+
+    fireEvent.click(screen.getByLabelText("Edit Alpha"));
+    await flush();
+    // Start both Test and Fetch — both deferred (will reject).
+    fireEvent.click(screen.getByText("Test"));
+    await flush();
+    fireEvent.click(screen.getByText("Fetch models"));
+    await flush();
+
+    // Type a key draft → bumps configEpoch → invalidates both.
+    const keyInput = screen.getByLabelText("API key") as HTMLInputElement;
+    fireEvent.input(keyInput, { target: { value: "sk-new-secret" } });
+    await flush();
+
+    // Reject both — neither must write its failure.
+    rejectTest(new Error("network"));
+    rejectFetch(new Error("network"));
+    await flush();
+    await flush();
+    // Test reject: no failure badge.
+    expect(screen.queryByText("Connection failed")).toBeNull();
+    // Fetch reject: no fetch-error toast.
+    expect(screen.queryByText("Failed to fetch models — enter manually")).toBeNull();
   });
 });

@@ -237,7 +237,7 @@ export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element 
   return (
     <div class="pc__body" role="region" aria-label={t().providerListLabel}>
       <Show when={props.loadError}>
-        <InlineError>{t().saveFailed}</InlineError>
+        <InlineError>{t().loadFailed}</InlineError>
         <div class="pc__retry">
           <Button variant="primary" size="sm" disabled={locked()} onClick={() => props.onReloadFromError()}>
             {t().reload}
@@ -467,7 +467,8 @@ export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element 
                 return (
                   d().nameDraft !== p.name ||
                   d().endpointDraft !== p.endpoint ||
-                  d().modelDraft !== (p.model ?? "")
+                  d().modelDraft !== (p.model ?? "") ||
+                  d().keyText.length > 0
                 );
               };
               const selectOptions = createMemo<SelectOption[]>(() => {
@@ -566,7 +567,7 @@ export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element 
                           unsaved edits would return models for a config the user
                           no longer sees — the hint explains why Fetch is disabled. */}
                       <Show when={hasUnsavedDrafts()}>
-                        <span id={`fetch-hint-${uuid()}`} class="pc__save-first-hint">
+                        <span id={`fetch-hint-${uuid()}`} class="pc__save-first-hint" role="status">
                           {t().saveFirstToFetch}
                         </span>
                       </Show>
@@ -641,7 +642,7 @@ export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element 
                       {t().testConnection}
                     </Button>
                     <Show when={hasUnsavedDrafts()}>
-                      <span id={`save-first-hint-${uuid()}`} class="pc__save-first-hint">
+                      <span id={`save-first-hint-${uuid()}`} class="pc__save-first-hint" role="status">
                         {t().saveFirstToTest}
                       </span>
                     </Show>
@@ -827,6 +828,32 @@ const ProviderCenter: Component = () => {
     setModelFetchByUuid((prev) => { const n = { ...prev }; delete n[uuid]; return n; });
   };
 
+  /** Unified list-replacement entry point (R10). Bumps the config epoch for ALL
+   *  old UUIDs (conservative — any field may have changed on the backend) and
+   *  cleans up per-UUID request counters for deleted UUIDs. Every full-list
+   *  refresh from the backend MUST go through this — never call
+   *  `setProviders(list)` directly for a backend list.
+   *
+   *  The old refreshCore diff only checked version/endpoint/model, missing
+   *  enabled/hasKey/protocol/capabilities. Bumping ALL old UUIDs eliminates
+   *  field-by-field comparison gaps entirely. configEpochByUuid is intentionally
+   *  NOT deleted for removed UUIDs — the bumped value must remain so the epoch
+   *  guard in in-flight Test/Fetch sees a changed epoch and discards the stale
+   *  completion. bumpConfigEpoch already clears conn/modelOptions/modelFetch. */
+  const applyProviderList = (newList: ProviderProfileFE[]) => {
+    const oldList = providers();
+    for (const p of oldList) {
+      bumpConfigEpoch(p.uuid);
+    }
+    for (const old of oldList) {
+      if (!newList.some((p) => p.uuid === old.uuid)) {
+        setConnRequestIdByUuid((prev) => { const n = { ...prev }; delete n[old.uuid]; return n; });
+        setModelRequestIdByUuid((prev) => { const n = { ...prev }; delete n[old.uuid]; return n; });
+      }
+    }
+    setProviders(newList);
+  };
+
   // --- Dialogs + toasts ---
   const [deleteConfirmUuid, setDeleteConfirmUuid] = createSignal<string | null>(null);
   const deleteTriggerRef: { current?: HTMLElement } = {};
@@ -921,25 +948,10 @@ const ProviderCenter: Component = () => {
         loadProviders(),
         providerGetActiveSelection(),
       ]);
-      // R9-fix: capture the old list BEFORE setProviders so we can diff old vs
-      // new per-UUID. If a provider's config changed (version/endpoint/model)
-      // — or it was deleted entirely — bump its configEpoch. This invalidates
-      // any pending Test/Fetch started against the old config: without it, a
-      // list refresh that replaced a provider with new config would let a
-      // pending Test/Fetch write stale results next to the updated row.
-      const oldList = providers();
-      setProviders(list);
-      for (const oldP of oldList) {
-        const newP = list.find((p) => p.uuid === oldP.uuid);
-        if (
-          !newP ||
-          newP.version !== oldP.version ||
-          newP.endpoint !== oldP.endpoint ||
-          (newP.model ?? "") !== (oldP.model ?? "")
-        ) {
-          bumpConfigEpoch(oldP.uuid);
-        }
-      }
+      // R10: unified applyProviderList bumps the epoch for ALL old UUIDs
+      // (conservative) and cleans up deleted UUIDs — replacing the narrow
+      // version/endpoint/model diff that missed enabled/hasKey/protocol changes.
+      applyProviderList(list);
       setSelection({
         primaryUuid: active.primary,
         parallelUuids: active.parallel,
@@ -963,9 +975,9 @@ const ProviderCenter: Component = () => {
   const refresh = (): Promise<boolean> => runExclusive(() => refreshCore());
 
   onMount(() => {
-    // R9: refreshCore no longer pushes a toast — surface cold-load failure here.
+    // R10: reloadFailed for cold-load failure (a READ failure, not a save).
     void refresh().then((ok) => {
-      if (!ok) pushToast("destructive", t.saveFailed);
+      if (!ok) pushToast("destructive", t.reloadFailed);
     });
   });
 
@@ -978,6 +990,11 @@ const ProviderCenter: Component = () => {
   /** Toggle: optimistic flip → IPC → revert + toast on error. */
   const handleToggle = async (uuid: string, enabled: boolean) => {
     await runExclusive(async () => {
+      // R10: toggle changes `enabled` — bump the configEpoch BEFORE the optimistic
+      // setProviders so a pending Test/Fetch (probing the old enabled state) is
+      // invalidated. bumpConfigEpoch also clears stale conn/model state. On
+      // rollback the epoch is NOT rolled back (monotonic — correct).
+      bumpConfigEpoch(uuid);
       const prev = providers();
       const next = prev.map((p) => (p.uuid === uuid ? { ...p, enabled } : p));
       setProviders(next);
@@ -1142,9 +1159,10 @@ const ProviderCenter: Component = () => {
       const name = preset.name ?? "Ollama";
       try {
         await providerCreate(preset.templateId, name, preset.endpoint, preset.model ?? undefined);
-        // R8-P2-2: refreshCore never rejects — it surfaces its own error toast
-        // and returns false. Branch on the boolean so a successful create whose
-        // list-refresh failed does NOT also show a misleading success toast.
+        // R8-P2-2: refreshCore never rejects — it surfaces the error via the
+        // loadError banner and returns false. Branch on the boolean so a
+        // successful create whose list-refresh failed does NOT also show a
+        // misleading success toast.
         const ok = await refreshCore();
         if (ok) {
           pushToast("success", t.profileSaved);
@@ -1236,6 +1254,10 @@ const ProviderCenter: Component = () => {
         // with a Reload button so they can pull fresh data and reconcile.
         const err = e as { error?: string };
         if (err?.error === "stale_version") {
+          // R10: the remote config changed — bump the configEpoch so any pending
+          // Test/Fetch started before this rejected save is invalidated when it
+          // completes.
+          bumpConfigEpoch(uuid);
           setSaveByUuid((prev) => ({ ...prev, [uuid]: "failed" }));
           setSaveConflictUuid(uuid);
         } else {
@@ -1274,9 +1296,12 @@ const ProviderCenter: Component = () => {
       try {
         await providerSetKey(uuid, key);
         setSaveByUuid((prev) => ({ ...prev, [uuid]: "saved" }));
-        // Re-fetch to update hasKey.
+        // Re-fetch to update hasKey. R10: route through applyProviderList (NOT
+        // a bare setProviders) so the epoch is bumped for ALL old UUIDs — this
+        // invalidates any pending Test/Fetch for any provider whose config may
+        // have changed in the refresh (e.g. this key save flipping hasKey).
         const list = await loadProviders();
-        setProviders(list);
+        applyProviderList(list);
         pushToast("success", t.keySaved);
       } catch (e) {
         setSaveByUuid((prev) => ({ ...prev, [uuid]: "failed" }));
@@ -1626,6 +1651,11 @@ const ProviderCenter: Component = () => {
       }}
       onKeyInput={(uuid, value) => {
         setKeyInputByUuid((prev) => ({ ...prev, [uuid]: value }));
+        // R10: a non-empty key draft is an unsaved config change — bump the
+        // configEpoch so any in-flight Test/Fetch started against the old
+        // (keyless or old-key) config is invalidated, and clear stale conn/model
+        // results. An empty value (cleared draft) does NOT bump — no change.
+        if (value.length > 0) bumpConfigEpoch(uuid);
         if (keyErrorByUuid()[uuid]) {
           setKeyErrorByUuid((prev) => {
             const n = { ...prev };
@@ -1656,9 +1686,9 @@ const ProviderCenter: Component = () => {
         void runExclusive(async () => {
           const ok = await refreshCore();
           if (!ok) {
-            // R9: refreshCore no longer pushes a toast — surface the reload
-            // failure here. Keep banner + drafts + errors. Restore editability.
-            pushToast("destructive", t.saveFailed);
+            // R10: reloadFailed for the save-conflict Reload failure (a READ
+            // failure). Keep banner + drafts + errors. Restore editability.
+            pushToast("destructive", t.reloadFailed);
             setReloadingUuid(null);
             return;
           }
@@ -1700,9 +1730,9 @@ const ProviderCenter: Component = () => {
         });
       }}
       onReloadFromError={() => {
-        // R9: refreshCore no longer pushes a toast — surface failure here.
+        // R10: reloadFailed for the top-level Reload failure (a READ failure).
         void refresh().then((ok) => {
-          if (!ok) pushToast("destructive", t.saveFailed);
+          if (!ok) pushToast("destructive", t.reloadFailed);
         });
       }}
       onRetrySelectionLoad={() => void refresh()}
