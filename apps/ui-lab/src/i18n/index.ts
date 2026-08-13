@@ -265,6 +265,7 @@ export type GalleryStrings = {
   translationCard: { title: string; source: string; loading: string; result: string };
   resultCard: { title: string; success: string; failure: string; copy: string; pin: string };
   providerRow: { title: string; labels: { edit: string; delete: string; enabled: string; statusText: Record<"active" | "available" | "key-missing" | "disabled", string> } };
+  providerCard: { title: string };
   historyRow: { title: string; source: string; preview: string; time: string; addFav: string; removeFav: string };
   sidebarItem: { title: string; settings: string; history: string };
   windowChrome: { title: string; title2: string; body: string; labels: { minimize: string; close: string } };
@@ -292,6 +293,7 @@ export const galleryStrings: Record<Locale, GalleryStrings> = {
     translationCard: { title: "Translation Card", source: "The quick brown fox", loading: "Translating…", result: "敏捷的棕色狐狸" },
     resultCard: { title: "Result Card", success: "敏捷的棕色狐狸", failure: "Translation failed", copy: "Copy", pin: "Pin" },
     providerRow: { title: "Provider Row", labels: { edit: "Edit", delete: "Delete", enabled: "Enabled", statusText: { active: "Active", available: "Available", "key-missing": "Key missing", disabled: "Disabled" } } },
+    providerCard: { title: "Provider Card" },
     historyRow: { title: "History Row", source: "The quick brown fox", preview: "敏捷的棕色狐狸", time: "2 min ago", addFav: "Add to favorites", removeFav: "Remove from favorites" },
     sidebarItem: { title: "Sidebar Item", settings: "Settings", history: "History" },
     windowChrome: { title: "Window Chrome", title2: "LinguaRay", body: "Window content area", labels: { minimize: "Minimize", close: "Close" } },
@@ -317,6 +319,7 @@ export const galleryStrings: Record<Locale, GalleryStrings> = {
     translationCard: { title: "翻译卡片", source: "The quick brown fox", loading: "正在翻译…", result: "敏捷的棕色狐狸" },
     resultCard: { title: "结果卡片", success: "敏捷的棕色狐狸", failure: "翻译失败", copy: "复制", pin: "固定" },
     providerRow: { title: "服务商行", labels: { edit: "编辑", delete: "删除", enabled: "已启用", statusText: { active: "活跃", available: "可用", "key-missing": "缺少密钥", disabled: "已禁用" } } },
+    providerCard: { title: "服务商卡片" },
     historyRow: { title: "历史行", source: "The quick brown fox", preview: "敏捷的棕色狐狸", time: "2 分钟前", addFav: "添加到收藏", removeFav: "从收藏移除" },
     sidebarItem: { title: "侧栏项", settings: "设置", history: "历史" },
     windowChrome: { title: "窗口边框", title2: "LinguaRay", body: "窗口内容区域", labels: { minimize: "最小化", close: "关闭" } },
