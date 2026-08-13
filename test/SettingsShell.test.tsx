@@ -94,17 +94,12 @@ describe("SettingsShell", () => {
     }
   });
 
-  it("Shortcuts and Privacy are aria-disabled placeholders (NOT native disabled)", () => {
-    // rev-9: disabled nav items announce via aria-disabled but MUST stay
-    // focusable (in the tab order) so keyboard + SR users can discover them.
+  it("Shortcuts and Privacy are enabled R3b destinations", () => {
     const { getByText } = render(() => <SettingsShell>body</SettingsShell>);
     const shortcuts = getByText("Shortcuts").closest("button") as HTMLButtonElement;
     const privacy = getByText("Privacy").closest("button") as HTMLButtonElement;
-    expect(shortcuts.getAttribute("aria-disabled")).toBe("true");
-    expect(privacy.getAttribute("aria-disabled")).toBe("true");
-    // Native disabled would drop them from the tab order — forbidden.
-    expect(shortcuts.hasAttribute("disabled")).toBe(false);
-    expect(privacy.hasAttribute("disabled")).toBe(false);
+    expect(shortcuts.getAttribute("aria-disabled")).not.toBe("true");
+    expect(privacy.getAttribute("aria-disabled")).not.toBe("true");
   });
 
   it("rail mode (matchMedia wide=false) keeps an accessible name on every nav item", () => {
@@ -119,26 +114,11 @@ describe("SettingsShell", () => {
     }
   });
 
-  it("disabled nav items are aria-disabled AND focusable (NOT native disabled)", () => {
+  it("has no disabled placeholder nav items after R3b routes go live", () => {
     installMatchMedia(true);
     const { container } = render(() => <SettingsShell>body</SettingsShell>);
     const disabledBtns = container.querySelectorAll('button[aria-disabled="true"]');
-    expect(disabledBtns.length).toBe(2); // Shortcuts + Privacy
-    for (const btn of Array.from(disabledBtns)) {
-      expect(btn.hasAttribute("disabled"), "aria-disabled items must not be native-disabled").toBe(false);
-      // tabindex defaults to 0 for buttons; an explicit "-1" would remove focus.
-      expect(btn.getAttribute("tabindex"), "aria-disabled items must remain in tab order").not.toBe("-1");
-    }
-  });
-
-  it("disabled placeholder nav item announces the real placeholderHint copy (Coming in R3b)", () => {
-    const { container } = render(() => <SettingsShell>body</SettingsShell>);
-    const disabledBtns = container.querySelectorAll('button[aria-disabled="true"]');
-    const labels = Array.from(disabledBtns).map((b) => b.getAttribute("aria-label") ?? "");
-    // Every disabled item's aria-label appends the placeholder hint.
-    for (const label of labels) {
-      expect(label).toContain("Coming in R3b");
-    }
+    expect(disabledBtns.length).toBe(0);
   });
 
   it("controlled activePage prop reactively updates data-page + sidebar highlight (rev-9-2)", () => {

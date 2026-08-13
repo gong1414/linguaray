@@ -26,6 +26,8 @@ beforeEach(() => {
     if (cmd === "provider_list") return [];
     if (cmd === "key_status") return ({});
     if (cmd === "keystore_health") return "";
+    if (cmd === "shortcut_list") return { revision: 1, entries: [] };
+    if (cmd === "history_privacy_status") return { enabled: false, retention_days: 30, record_count: 0 };
     return undefined;
   });
 });
@@ -52,6 +54,15 @@ describe("App mount (R3a)", () => {
     // banner, but the surface is mounted). Assert aria-current moved.
     const ksBtn = screen.getByText("Keystore Recovery").closest("button")!;
     expect(ksBtn.getAttribute("aria-current")).toBe("page");
+  });
+
+  it("mounts the live Shortcuts and Privacy destinations", async () => {
+    render(() => <App />);
+    await waitFor(() => expect(screen.getByText("LinguaRay")).toBeTruthy());
+    fireEvent.click(screen.getByText("Shortcuts").closest("button")!);
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Keyboard Shortcuts" })).toBeTruthy());
+    fireEvent.click(screen.getByText("Privacy").closest("button")!);
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Privacy & Data" })).toBeTruthy());
   });
 
   it("no legacy elements remain", async () => {

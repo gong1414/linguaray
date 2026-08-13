@@ -11,6 +11,8 @@ import { test, expect } from "@playwright/test";
  * Surfaces covered:
  *  - Provider Center (empty + populated fixtures)
  *  - Keystore Recovery (healthy + corrupt fixtures)
+ *  - Privacy & Data history controls (enabled + disabled fixtures)
+ *  - Keyboard Shortcuts (default / recording / conflict / registration failure)
  *  - Selection Popup (loading / single / multi / partial / error-network)
  *  - Input Window (idle / multi / partial / error)
  *
@@ -33,6 +35,12 @@ const SETTINGS_SURFACES = [
   { nav: "provider-center", fixture: "empty", label: "provider-center-empty" },
   { nav: "keystore", fixture: "healthy", label: "keystore-recovery-healthy" },
   { nav: "keystore", fixture: "corrupt", label: "keystore-recovery-corrupt" },
+  { nav: "privacy", fixture: "enabled", label: "privacy-history-enabled" },
+  { nav: "privacy", fixture: "disabled", label: "privacy-history-disabled" },
+  { nav: "shortcuts", fixture: "default", label: "shortcuts-default" },
+  { nav: "shortcuts", fixture: "recording", label: "shortcuts-recording" },
+  { nav: "shortcuts", fixture: "conflict", label: "shortcuts-conflict" },
+  { nav: "shortcuts", fixture: "failure", label: "shortcuts-registration-failed" },
 ] as const;
 
 const POPUP_SURFACES = [
@@ -61,9 +69,10 @@ for (const width of WIDTHS) {
         await page.evaluate((tt) => {
           document.documentElement.setAttribute("data-theme", tt);
         }, theme);
-        await page.waitForSelector("[data-testid='lab-root'], .pc__body, .keystore-recovery", {
-          timeout: 10_000,
-        });
+        await page.waitForSelector(
+          "[data-testid='lab-root'], .pc__body, .keystore-recovery, .privacy-data, .shortcuts",
+          { timeout: 10_000 },
+        );
         await expect(page).toHaveScreenshot(`${s.label}-${width}-${theme}.png`, {
           maxDiffPixelRatio: 0.01,
           fullPage: true,

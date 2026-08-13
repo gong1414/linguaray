@@ -9,11 +9,19 @@
   margin: 0;
   padding: var(--space-xs) var(--space-sm);
   border-radius: var(--radius-sm);
-  background: var(--color-status-danger-soft);
-  color: var(--color-status-danger-fg);
   font-family: var(--font-sans);
   font-size: var(--text-sm);
   line-height: var(--text-sm--line-height);
+}
+
+.inline-error--danger {
+  background: var(--color-status-danger-soft);
+  color: var(--color-status-danger-fg);
+}
+
+.inline-error--warning {
+  background: var(--color-status-warning-soft);
+  color: var(--color-status-warning-fg);
 }
 
 .inline-error__icon {
