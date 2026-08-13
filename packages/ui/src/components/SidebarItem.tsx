@@ -8,6 +8,10 @@ export type SidebarItemProps = {
   badge?: string;
   onClick?: () => void;
   disabled?: boolean;
+  /** Accessible label. Defaults to `label`; pass a combined string for disabled
+   *  items so a screen reader announces BOTH the label and the placeholder hint
+   *  (e.g. "Shortcuts — Coming in R3b"). */
+  ariaLabel?: string;
 };
 
 const SidebarItem: Component<SidebarItemProps> = (props) => {
@@ -15,10 +19,17 @@ const SidebarItem: Component<SidebarItemProps> = (props) => {
     <button
       type="button"
       class="sidebar-item"
-      classList={{ "sidebar-item--active": !!props.active }}
+      classList={{ "sidebar-item--active": !!props.active, "sidebar-item--disabled": !!props.disabled }}
       aria-current={props.active ? "page" : undefined}
-      disabled={props.disabled}
-      onClick={() => props.onClick?.()}
+      aria-label={props.ariaLabel ?? props.label}
+      aria-disabled={props.disabled || undefined}
+      onClick={() => {
+        // Disabled placeholders announce via aria-disabled but stay focusable
+        // (NOT native disabled) so keyboard + SR users can discover them. Gate
+        // the click here so an Enter/Space on a disabled item is a no-op.
+        if (props.disabled) return;
+        props.onClick?.();
+      }}
     >
       <span class="sidebar-item__icon" aria-hidden="true">{props.icon}</span>
       <span class="sidebar-item__label">{props.label}</span>

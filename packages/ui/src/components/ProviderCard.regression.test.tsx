@@ -10,7 +10,7 @@ describe("ProviderCard role/key badge regression", () => {
   it("primary role renders primary role badge", () => {
     const role: ProviderRole = { kind: "primary" };
     const { container } = render(() => (
-      <ProviderCard profile={profile} role={role} hasKey={true} enabled={true}
+      <ProviderCard profile={profile} role={role} hasKey={true} needsKey={true} enabled={true}
         onEdit={noop} onDelete={noop} onToggle={noop} />
     ));
     const badge = container.querySelector(".lr-provider-card__role-badge--primary");
@@ -21,7 +21,7 @@ describe("ProviderCard role/key badge regression", () => {
   it("parallel role renders parallel role badge with index", () => {
     const role: ProviderRole = { kind: "parallel", index: 2 };
     const { container } = render(() => (
-      <ProviderCard profile={profile} role={role} hasKey={true} enabled={true}
+      <ProviderCard profile={profile} role={role} hasKey={true} needsKey={true} enabled={true}
         onEdit={noop} onDelete={noop} onToggle={noop} />
     ));
     const badge = container.querySelector(".lr-provider-card__role-badge--parallel");
@@ -32,7 +32,7 @@ describe("ProviderCard role/key badge regression", () => {
   it("key saved status renders when hasKey=true", () => {
     const role: ProviderRole = { kind: "none" };
     const { container } = render(() => (
-      <ProviderCard profile={profile} role={role} hasKey={true} enabled={true}
+      <ProviderCard profile={profile} role={role} hasKey={true} needsKey={true} enabled={true}
         onEdit={noop} onDelete={noop} onToggle={noop} />
     ));
     const keyStatus = container.querySelector(".lr-provider-card__key-status--saved");
@@ -42,7 +42,7 @@ describe("ProviderCard role/key badge regression", () => {
   it("key missing status renders when hasKey=false", () => {
     const role: ProviderRole = { kind: "none" };
     const { container } = render(() => (
-      <ProviderCard profile={profile} role={role} hasKey={false} enabled={true}
+      <ProviderCard profile={profile} role={role} hasKey={false} needsKey={true} enabled={true}
         onEdit={noop} onDelete={noop} onToggle={noop} />
     ));
     const keyStatus = container.querySelector(".lr-provider-card__key-status--missing");
@@ -52,7 +52,7 @@ describe("ProviderCard role/key badge regression", () => {
   it("disabled + missing key shows key-missing (not key-saved)", () => {
     const role: ProviderRole = { kind: "none" };
     const { container } = render(() => (
-      <ProviderCard profile={profile} role={role} hasKey={false} enabled={false}
+      <ProviderCard profile={profile} role={role} hasKey={false} needsKey={true} enabled={false}
         onEdit={noop} onDelete={noop} onToggle={noop} />
     ));
     const missing = container.querySelector(".lr-provider-card__key-status--missing");

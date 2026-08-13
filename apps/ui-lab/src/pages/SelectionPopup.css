@@ -1,123 +1,14 @@
-/* Selection Popup lab content. The shell supplies the sized frame; this styles
- * the popup body, error card, and side-by-side result layout.
+/* Selection Popup lab host. The production PopupView (imported from
+ * @app/Popup) renders the real surface via its own `popup-shell` layout
+ * (see src/Popup.css). This host only provides a height-fill + a selector hook
+ * (`data-testid="lab-root"`) for the visual spec. Internal padding, flex, card
+ * chrome, and compact-mode sizing all come from PopupView — the lab no longer
+ * owns a second popup implementation.
  *
- * MASTER §8.2: single = 400×300, expanded = 600×400. Cards side-by-side, min
- * 200px each; 3+ cards scroll horizontally inside the clamped window.
+ * MASTER §8.2: single = 400×300, expanded = 600×400, loading = 200×40. The
+ * sized frame is supplied by App.tsx (lab__frame); this host fills it.
  */
-
 .sel-popup__body {
-  display: flex;
-  flex-direction: column;
   height: 100%;
   min-height: 0;
-  background: var(--color-bg-elevated);
-  border-radius: var(--radius-lg);
-  padding: var(--space-lg);
-  box-shadow: var(--shadow-md);
-}
-
-/* Pinned bar: S0 §4.1 requires Pinned to support copy/retry/TTS/favorite. */
-.sel-popup__pinned-bar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  margin-bottom: var(--space-md);
-  flex: 0 0 auto;
-}
-
-/* Compact mode: loading renders inside a compact ~200×40 native window (the
-   lab frame itself is sized to 200×40 by App). The body fills that frame. */
-.sel-popup__body--compact {
-  height: 100%;
-  width: 100%;
-  padding: var(--space-sm) var(--space-md);
-  justify-content: center;
-}
-
-/* Loading: compact pill "• Translating…" centered in the small window */
-/* Loading: spinner (the shared Spinner component) + label. */
-.sel-popup__loading {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-sm);
-  font-size: var(--text-sm);
-  line-height: var(--text-sm--line-height);
-  color: var(--color-fg);
-}
-
-/* Settings-opened toast */
-.sel-popup__toast {
-  font-size: var(--text-sm);
-  line-height: var(--text-sm--line-height);
-  color: var(--color-success-fg);
-  background: var(--color-bg-hover);
-  padding: var(--space-sm) var(--space-md);
-  border-radius: var(--radius-sm);
-  align-self: flex-start;
-}
-
-/* Error card */
-.sel-popup__error-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-md);
-  flex: 1 1 auto;
-  min-height: 0;
-  text-align: center;
-  padding: var(--space-xl);
-}
-
-.sel-popup__error-icon {
-  color: var(--color-destructive-fg);
-  flex: 0 0 auto;
-}
-
-.sel-popup__error-text {
-  font-size: var(--text-base);
-  line-height: var(--text-base--line-height);
-  color: var(--color-destructive-fg);
-}
-
-.sel-popup__error-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-}
-
-/* Results: side-by-side for multi. */
-.sel-popup__results {
-  display: flex;
-  flex-direction: row;
-  gap: var(--space-md);
-  flex: 1 1 auto;
-  min-height: 0;
-  height: 100%;
-}
-
-/* Exactly 2 results: two EQUAL flexible columns filling the width.
-   min-width 200px preserves MASTER §8.2 floor; flex:1 1 0 makes them share
-   the container evenly instead of leaving a blank third of the frame. */
-.sel-popup__results--dual .lr-result-card {
-  flex: 1 1 0;
-  min-width: 200px;
-  max-height: 100%;
-}
-
-/* 3+ results: fixed min-width cards, horizontal scroll when overflowing. */
-.sel-popup__results--scroll {
-  overflow-x: auto;
-  overflow-y: hidden;
-}
-.sel-popup__results--scroll .lr-result-card {
-  flex: 0 0 200px;
-  max-height: 100%;
-}
-
-/* Single (non-multi): card fills available width. */
-.sel-popup__results:not(.sel-popup__results--dual):not(
-    .sel-popup__results--scroll
-  ) .lr-result-card:only-child {
-  flex: 1 1 auto;
 }

@@ -16,6 +16,9 @@ export type { SpinnerProps } from "./components/Spinner";
 export { default as TextField } from "./components/TextField";
 export type { TextFieldProps, TextFieldSize } from "./components/TextField";
 
+export { default as TextArea } from "./components/TextArea";
+export type { TextAreaProps } from "./components/TextArea";
+
 export { default as ResultCard } from "./components/ResultCard";
 export type {
   ResultCardProps,

@@ -19,6 +19,7 @@
 | Connection failed | 红色 X + 错误消息 | Status badge (destructive) + Inline error |
 | Key saved | provider 卡片上 "✓" badge | Status badge (success) |
 | Key missing | 警告 badge；"输入密钥"提示 | Status badge (warning) + Button |
+| No key required (R11) | `needs_key=false` provider：neutral badge，无 key 输入/保存按钮，显示"无需密钥" | Status badge (neutral) + Text (muted) |
 | Duplicate | 新卡片带"(copy)"后缀 | ProviderCard |
 | Saving | 保存按钮上 spinner；输入禁用 | Button (loading) + inputs (disabled) |
 | Save failed | 错误 toast："保存失败：{reason}" | Toast (destructive) |
@@ -49,6 +50,7 @@
 | `provider.action.save` | Save | 保存 |
 | `provider.key.saved` | Key saved | 密钥已保存 |
 | `provider.key.missing` | Enter key | 输入密钥 |
+| `provider.key.notRequired` (R11) | No key required | 无需密钥 |
 | `provider.connection.ok` | Connected ({latency} ms) | 已连接（{latency} ms） |
 | `provider.connection.failed` | Connection failed | 连接失败 |
 | `provider.delete.confirm` | Delete {name}? History references are preserved. | 删除 {name}？历史引用会保留。 |
@@ -59,6 +61,28 @@
 | `provider.balance.rateLimited` | Rate limited — try later | 已限流 — 稍后重试 |
 | `provider.balance.error` | Error fetching balance | 获取余额出错 |
 | `provider.endpoint.invalid` | Must be HTTPS (or localhost) | 必须 HTTPS（或 localhost） |
+
+## R11：密钥状态三态模型（needs_key 感知）
+
+`needs_key=false` 的 provider（如本地 Ollama 预设）不使用 API 密钥。此前这类
+provider 在 `hasKey=false` 时错误显示 "Key missing"（警告 badge + 密钥输入），
+误导用户为不需要密钥的 provider 输入密钥。R11 将密钥状态建模为三态：
+
+| 状态 | 条件 | 行 / 详情面板表现 |
+|---|---|---|
+| `saved` | `needs_key=true` + 已有密钥 | 行：根据 role 显示 active/available；详情：密钥已保存 badge |
+| `missing` | `needs_key=true` + 无密钥 | 行：警告 badge "Key missing"；详情：密钥输入 + 保存按钮 |
+| `not-required` | `needs_key=false` | 行：neutral badge（**绝不**显示 key-missing）；详情：显示"无需密钥"文本，**不渲染**密钥输入/保存按钮 |
+
+设计要点：
+- `providerStatus` 与 `providerKeyStatus` 均新增 `needsKey` 参数；`!needsKey`
+  一律返回 available/neutral（行）或 "not-required"（密钥状态）。
+- 详情面板 Key 区外层 `Show` 以 `needs_key` 为门控：为 false 时仅渲染
+  "No key required" 文本，隐藏所有密钥输入与保存按钮。
+- `handleSaveKey` fail-closed：对 `!needs_key` 或空密钥直接 return，绝不发起
+  `provider_set_key` IPC（UI 已不可达，此为纵深防御）。
+- 后端 `provider_set_key` / `set_key_blocking` 同样拒绝 `needs_key=false` 与空
+  密钥，避免遗留 provider 永不读取的悬空密钥。
 
 ## 组件组合
 

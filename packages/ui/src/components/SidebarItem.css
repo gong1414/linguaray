@@ -27,13 +27,17 @@
   border-left: 3px solid var(--color-brand-default);
 }
 
-.sidebar-item:disabled,
-.sidebar-item[disabled] {
+/* Disabled placeholders announce via aria-disabled but stay focusable (NOT
+ * native disabled) so keyboard + SR users can reach them. Visual + cursor
+ * styling keys off the --disabled modifier / [aria-disabled] attribute. */
+.sidebar-item--disabled,
+.sidebar-item[aria-disabled="true"] {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.sidebar-item:disabled:hover {
+.sidebar-item--disabled:hover,
+.sidebar-item[aria-disabled="true"]:hover {
   background: transparent;
   color: var(--color-text-secondary);
 }

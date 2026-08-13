@@ -258,10 +258,14 @@ fn invalid_migration_complete_value_is_rejected() {
     let dir2 = tempdir().unwrap();
     let db2 = Database::open(&dir2.path().join("t2.db")).unwrap();
     db2.with_conn(|conn| {
-        conn.execute_batch(
+        // schema_version = CURRENT so the version guards fall through to the
+        // migration_complete validation (a stale schema_version would short-
+        // circuit to Incomplete before the bad value is checked).
+        let sv = schema::SCHEMA_VERSION as i64;
+        conn.execute_batch(&format!(
             "CREATE TABLE _schema_migrations (id INTEGER PRIMARY KEY, schema_version INTEGER, migration_complete INTEGER);
-             INSERT INTO _schema_migrations (id, schema_version, migration_complete) VALUES (1, 1, 5);"
-        )?;
+             INSERT INTO _schema_migrations (id, schema_version, migration_complete) VALUES (1, {sv}, 5);"
+        ))?;
         let result = schema::migration_state_if_exists(conn);
         match result {
             Err(DbError::Integrity(_)) => Ok(()),

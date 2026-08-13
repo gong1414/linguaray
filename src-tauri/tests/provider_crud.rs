@@ -7,7 +7,7 @@
 
 use linguaray_lib::db::providers::{
     self, CandidateSource, ProviderPatch, ProviderProfile, ProviderStatus, Protocol,
-    RawSettings, TRADITIONAL_TEMPLATES,
+    RawSettings, TRADITIONAL_TEMPLATES, UpdateOutcome,
 };
 use linguaray_lib::db::schema;
 use linguaray_lib::db::{Database, DbError};
@@ -43,6 +43,15 @@ fn fresh_with_one_openai() -> (tempfile::TempDir, Database, ProviderProfile) {
         })
         .unwrap();
     (dir, db, p)
+}
+
+/// R2-E helper: unwrap an `UpdateOutcome::Written`, panicking on any other
+/// variant so a stale/not-found result fails the test loudly.
+fn expect_written(outcome: UpdateOutcome) -> ProviderProfile {
+    match outcome {
+        UpdateOutcome::Written(p) => p,
+        other => panic!("expected UpdateOutcome::Written, got {other:?}"),
+    }
 }
 
 // ─── Create + list ────────────────────────────────────────────────────────
@@ -117,16 +126,17 @@ fn update_valid_patch_changes_fields() {
         enabled: Some(false),
         sort_order: Some(5),
         endpoint: None,
+        expected_version: 1,
     };
-    let updated = db
-        .with_conn(|conn| providers::update(conn, &p.uuid, &patch))
-        .unwrap();
+    let updated = expect_written(db.with_conn(|conn| providers::update(conn, &p.uuid, &patch)).unwrap());
     assert_eq!(updated.name, "Renamed");
     assert_eq!(updated.model.as_deref(), Some("gpt-4o"));
     assert!(!updated.enabled);
     assert_eq!(updated.sort_order, 5);
     // endpoint untouched.
     assert_eq!(updated.endpoint, p.endpoint);
+    // R2-E: a successful update bumps the optimistic-lock version.
+    assert_eq!(updated.version, 2);
 }
 
 #[test]
@@ -139,10 +149,9 @@ fn update_recomputes_is_local_on_endpoint_change() {
         model: None,
         enabled: None,
         sort_order: None,
+        expected_version: 1,
     };
-    let updated = db
-        .with_conn(|conn| providers::update(conn, &p.uuid, &patch))
-        .unwrap();
+    let updated = expect_written(db.with_conn(|conn| providers::update(conn, &p.uuid, &patch)).unwrap());
     assert!(updated.is_local, "localhost endpoint flips is_local to true");
     assert!(!p.is_local, "originally remote");
 }
@@ -165,6 +174,7 @@ fn update_invalid_endpoint_rejected() {
         model: None,
         enabled: None,
         sort_order: None,
+        expected_version: 1,
     };
     let err = db
         .with_conn(|conn| providers::update(conn, &p.uuid, &patch))
@@ -181,11 +191,14 @@ fn update_unknown_uuid_not_found() {
         model: None,
         enabled: None,
         sort_order: None,
+        expected_version: 1,
     };
-    let err = db
+    // R2-E: a missing row is a typed NotFound OUTCOME (not a DbError) so the
+    // command layer can map it to a structured Validation error.
+    let outcome = db
         .with_conn(|conn| providers::update(conn, "no-such-uuid", &patch))
-        .unwrap_err();
-    assert!(matches!(err, DbError::NotFound(_)), "got {err:?}");
+        .unwrap();
+    assert!(matches!(outcome, UpdateOutcome::NotFound), "got {outcome:?}");
 }
 
 #[test]
@@ -209,8 +222,9 @@ fn update_same_origin_preserves_consent() {
         model: None,
         enabled: None,
         sort_order: None,
+        expected_version: 1,
     };
-    db.with_conn(|conn| providers::update(conn, &p.uuid, &patch)).unwrap();
+    expect_written(db.with_conn(|conn| providers::update(conn, &p.uuid, &patch)).unwrap());
 
     db.with_conn(|conn| {
         let (ver, scope): (Option<i64>, Option<String>) = conn.query_row(
@@ -251,8 +265,9 @@ fn update_different_origin_invalidates_consent() {
         model: None,
         enabled: None,
         sort_order: None,
+        expected_version: 1,
     };
-    db.with_conn(|conn| providers::update(conn, &p.uuid, &patch)).unwrap();
+    expect_written(db.with_conn(|conn| providers::update(conn, &p.uuid, &patch)).unwrap());
 
     db.with_conn(|conn| {
         let (ver, scope): (Option<i64>, Option<String>) = conn.query_row(
@@ -290,8 +305,9 @@ fn update_different_origin_not_in_slot_keeps_consent() {
         model: None,
         enabled: None,
         sort_order: None,
+        expected_version: 1,
     };
-    db.with_conn(|conn| providers::update(conn, &p.uuid, &patch)).unwrap();
+    expect_written(db.with_conn(|conn| providers::update(conn, &p.uuid, &patch)).unwrap());
 
     db.with_conn(|conn| {
         let ver: Option<i64> = conn.query_row(
@@ -628,6 +644,7 @@ fn active_profile(uuid: &str, template_id: &str, enabled: bool) -> ProviderProfi
         secret_ref: format!("provider/{uuid}"),
         capabilities: providers::ProviderCapabilities::default(),
         status: ProviderStatus::Active.as_str().into(),
+        version: 1,
     }
 }
 
@@ -1053,6 +1070,7 @@ fn update_endpoint_change_with_corrupt_parallel_uuids_errors() {
         model: None,
         enabled: None,
         sort_order: None,
+        expected_version: 1,
     };
     let err = db
         .with_conn(|conn| providers::update(conn, &p.uuid, &patch))

@@ -1,0 +1,106 @@
+/* SettingsShell — WindowChrome sidebar nav + content slot.
+ * Layout only, token-based. Sidebar collapses from full-label to icon-rail
+ * below 700px via the [data-layout] attribute the component sets on the root. */
+
+.settings-shell {
+  /* The WindowChrome sidebar aside is `flex: 0 0 auto`. We drive its width
+   * from here so the rail collapse reflows the whole frame. The two widths
+   * are local custom properties derived from the spacing scale. */
+  --settings-sidebar-full: calc(var(--space-md) * 12 + var(--space-xs) * 4);
+  --settings-sidebar-rail: calc(var(--space-md) * 3 + var(--space-sm));
+}
+
+/* Sidebar nav fills the WindowChrome sidebar aside. */
+.settings-shell__nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  width: 100%;
+  padding: var(--space-sm);
+  box-sizing: border-box;
+}
+
+/* Drive the WindowChrome sidebar aside width from the active layout. */
+.settings-shell[data-layout="full"] .window-chrome__sidebar {
+  flex-basis: var(--settings-sidebar-full);
+  width: var(--settings-sidebar-full);
+}
+.settings-shell[data-layout="rail"] .window-chrome__sidebar {
+  flex-basis: var(--settings-sidebar-rail);
+  width: var(--settings-sidebar-rail);
+}
+
+/* In rail mode, hide the visible label text. The label text stays in the DOM
+ * so the accessible name + Tooltip content survive the visual collapse. */
+.settings-shell[data-layout="rail"] .sidebar-item__label {
+  display: none;
+}
+
+/* Content slot padding. */
+.settings-shell__content {
+  height: 100%;
+  padding: var(--space-md);
+  box-sizing: border-box;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+/* macOS Accessibility permission banner. Warning token surface; the banner
+ * stacks above the section content and stays reachable (role=alert + buttons
+ * in the tab order). */
+.settings-shell__a11y-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  background: var(--color-warning-fill);
+  color: var(--color-warning-fg);
+}
+
+.settings-shell__a11y-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  min-width: 0;
+  flex: 1 1 16rem;
+}
+
+.settings-shell__a11y-title {
+  font-weight: var(--text-md--weight);
+}
+
+.settings-shell__a11y-hint {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+.settings-shell__a11y-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  flex: 0 0 auto;
+}
+
+.settings-shell__a11y-action {
+  font: inherit;
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-md);
+  border: 1px solid currentColor;
+  background: transparent;
+  color: var(--color-warning-fg);
+  cursor: pointer;
+}
+
+.settings-shell__a11y-action:hover {
+  background: var(--color-surface-hover);
+}
+
+.settings-shell__a11y-action:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}

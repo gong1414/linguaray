@@ -507,8 +507,16 @@ fn run_migration_core<K: KeystoreIo>(
     // ── PREFLIGHT ────────────────────────────────────────────────────────
     let state = db.with_conn(|conn| migration_state_if_exists(conn))?;
     if state == MigrationState::Complete {
-        // Already complete: just confirm the keystore is healthy and bail.
+        // Already complete: confirm the keystore is healthy, then validate the
+        // ACTUAL schema structure before trusting the singleton. The
+        // `_schema_migrations` row may report schema_version=2 +
+        // migration_complete=1 while the `providers` table is corrupt (e.g. the
+        // `version` column manually dropped/altered). The schema_version
+        // singleton alone is NOT proof the tables match it — fail closed here so
+        // a corrupted "Complete" DB surfaces a clear error instead of letting
+        // every CAS update silently malfunction.
         preflight_keystore(ks, keystore_dir)?;
+        db.with_conn(|conn| schema::validate_v2_schema(conn))?;
         return Ok(());
     }
     if state == MigrationState::Incompatible {
@@ -546,6 +554,24 @@ fn run_migration_core<K: KeystoreIo>(
         Ok(())
     })?;
     fp.maybe_fail(Failpoint::AfterSchema)?;
+
+    // ── PHASE 2c: v1→v2 schema migration (R2-E optimistic-lock column) ───
+    // Always call migrate_v1_to_v2 — it's idempotent AND fail-closed, so an
+    // unconditional call is safe. Checking the ACTUAL table structure (not just
+    // `_schema_migrations.schema_version`) is necessary because seed_singletons
+    // in Phase 2 may have just written schema_version=2 for a DB whose `providers`
+    // table predates the version column (the missing-singleton-row case). On such
+    // a DB the previous `stored < SCHEMA_VERSION` gate evaluated `2 < 2` → false
+    // and SKIPPED the migration, leaving the app believing it was v2 while the
+    // column was still absent — a silent corruption. migrate_v1_to_v2 probes
+    // PRAGMA table_info itself, so for an already-correct column this is a no-op;
+    // for a missing one it ALTERs; for a wrong-shaped one it fails closed.
+    db.with_conn(|conn| {
+        let tx = conn.transaction()?;
+        schema::migrate_v1_to_v2(&tx)?;
+        tx.commit()?;
+        Ok(())
+    })?;
 
     // ── PHASE 2b: Seed preferences from settings (short tx) ──────────────
     db.with_conn(|conn| {

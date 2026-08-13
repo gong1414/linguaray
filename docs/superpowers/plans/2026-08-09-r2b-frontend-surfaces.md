@@ -2149,3 +2149,22 @@ Expected: empty (only `Cargo.toml` and `lib.rs` changed under `src-tauri/`, per 
 - **No placeholders:** every code step contains complete, runnable code. The two intentional hooks (TTS in Popup actions, vocabulary favorite IPC) are explicitly marked as no-op hooks with comments — they are not "TODO" stubs but defined empty handlers so the action buttons exist and are keyboard-operable.
 - **Type consistency:** `TranslationState`, `TranslationState.kind`, `ResultEntry`, `ErrorKind`, `CopyKey`, `SessionResultFE`, `PopupStatePayload`, `PopupMultiPayload`, `TranslationOutcomeFE` are defined once in Task 1 and referenced identically in Tasks 3, 4, 6. `OpRegistry`/`useGenerationToken` defined in Task 2, consumed in Task 3. `decodePopupState`/`decodePopupMultiResult`/`decodeSessionResult`/`decodeOutcomes`/`classifyError` defined in Task 1, consumed in Tasks 3 + 4. `labStateToTranslationState` defined in Task 6 consumes `TranslationState` from Task 1.
 - **Backend-decode-not-redefine:** the decoder field names (`ok`, `text?`, `engine?`, `error?`, `uuid`, `status`, `outcomes`, `actual_engine`) match `popup.rs` `TranslationOutcomeSerialized` + `PopupMultiPayload` + `Payload` exactly.
+
+---
+
+## Rev-4 Retroactive Status (2026-08-09)
+
+Appended by the R2/R3a contract audit (docs/superpowers/plans/2026-08-09-r2-r3-contract-audit-fixes.md).
+Historical RED states are preserved as-written; this table records the actual
+shipped state and where gaps are closed. Each "Shipped?" claim was verified
+against the current source tree (file/function grep) at append time.
+
+| Original task | Shipped? | Gap closed in (audit task) |
+|---|---|---|
+| Task 0: Production test harness + `@linguaray/ui` wiring | yes — `src/index.tsx` imports `@linguaray/ui/styles`; `@linguaray/ui` workspace dep in `package.json`; vitest harness under `test/` | A1 (theme bootstrap `src/theme.ts`), D2 (`test:src`/`test:all` scripts) |
+| Task 1: Frontend translation-state model + decoders | yes — `src/features/translation/decode.ts` defines `decodePopupMultiResult` + state model; `decode.test.ts` covers branches | B3 (decoder consumes friendly engine names) |
+| Task 2: CAS operation registry (production port) | yes — `src/features/translation/op-registry.ts` (CAS + `cancelAll` + generation-token) | A2 (generation-token staleness guard) |
+| Task 3: Selection Popup rebuild (Surface 01) | yes — `src/Popup.tsx` + `src/Popup.css`; multi-success/partial/empty branches; native sizing + work-area clamping | A3 (native sizing/clamping via PopupAnchor), B3 (no `secret_ref`), B4 (Copy/Retry/settings-nav actions) |
+| Task 4: Input Window rebuild (Surface 02) | yes — `src/InputPanel.tsx`; autosave/restore/clear/focus/disabled-while-loading | B1 (multi-engine rendering + friendly labels), B2 (`--space-lg` token + autosave contract) |
+| Task 5: Tray Menu (Surface 04) | yes — `src-tauri/src/tray_state.rs` (`TrayStateController`); translate-selection/clipboard/switch-provider/settings/quit; OCR/History disabled "Coming later" | A4 (tray-action listener + Switch Provider submenu), A5 (Error red-dot + Active pulse; Update badge deferred R5/R6) |
+| Task 6: ui-lab prototype alignment | yes — `apps/ui-lab/` package present (Playwright config + pages; parity with production surfaces) | D5 (Playwright visual baselines 600/699/700/800 × light/dark) |

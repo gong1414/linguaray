@@ -1595,6 +1595,15 @@ describe("HistoryRow", () => {
 - `providerPresentation.ts` 导出 `providerStatusBadge(role, hasKey, enabled)` 返回**本地化无关**的 `{ code: string; variant: StatusBadgeVariant }`（不返回硬编码英文）。
 - ProviderCard 和 ProviderRow 都导入 providerTypes + providerPresentation。
 
+> **历史快照（R0–R1），由 R11/R12 取代**：以下 `providerPresentation.ts` /
+> `ProviderRow.test.tsx` / `ProviderRow.tsx` 代码块为 R0–R1 原始签名——3 参数
+> `providerStatus(role, hasKey, enabled)`、`ProviderRowProps` 无 `needsKey`、
+> `providerKeyStatus` 尚未抽出。R11 将 `providerStatus` 改为 4 参数
+> `(role, hasKey, enabled, needsKey)` 并新增 2 参数 `providerKeyStatus(hasKey, needsKey)`
+> 返回三态 `"saved" | "missing" | "not-required"`；R12 给 `ProviderRowProps`/
+> `ProviderCardProps` 增加 `needsKey`。**现行签名以源码
+> `packages/ui/src/components/providerPresentation.ts` 为准**，下方代码块仅作历史记录。
+
 ```typescript
 // providerTypes.ts
 export type ProviderRole =
@@ -1627,6 +1636,15 @@ export function providerStatus(
   return { code: "active", variant: "success" };
 }
 ```
+
+> **R11 签名更新**（2026-08-10）：上述签名在 R11 中增加了 `needsKey: boolean` 参数：
+> - `providerStatus(role, hasKey, enabled, needsKey)` — `!needsKey` 时提前返回
+>   `{ code: "available", variant: "neutral" }`（keyless provider 绝不显示 key-missing）。
+> - `providerKeyStatus(hasKey, needsKey)` — 新增函数（R1-10 时 ProviderCard 内联使用，
+>   R11 抽出到 providerPresentation），返回三态 `"saved" | "missing" | "not-required"`；
+>   `!needsKey` 时返回 `"not-required"`。
+> - `providerStatusBadge` 最终定名为 `providerStatus`（R1-10 实现）。
+> 详见 2026-08-10 计划文档 R11 appendix。
 
 ```typescript
 // ProviderRow.test.tsx

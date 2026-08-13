@@ -11,9 +11,16 @@ import {
 import { strings, galleryStrings, type Locale, type SelectionState, type ProviderState } from "./i18n";
 import SelectionPopup from "./pages/SelectionPopup";
 import ProviderCenter from "./pages/ProviderCenter";
+import InputPanel from "./pages/InputPanel";
+import KeystoreRecovery from "./pages/KeystoreRecovery";
 import { ComponentGallery } from "./pages/ComponentGallery";
 import { SidebarItem, Confirm } from "@linguaray/ui";
 import { Settings } from "lucide-solid";
+// D1 (P1-4): import the REAL production SettingsShell so the keyboard e2e
+// exercises the actual shell + SidebarItem nav, not an isolated stand-in.
+import SettingsShell, {
+  type SettingsSection,
+} from "@app/features/settings/SettingsShell";
 import "./App.css";
 
 type Theme = "light" | "dark";
@@ -44,7 +51,8 @@ type NavKey =
   | "updater"
   | "component-gallery"
   | "sidebar-isolated"
-  | "confirm-isolated";
+  | "confirm-isolated"
+  | "settings-keyboard";
 
 // Complete S0 §4.1 state matrix.
 const SELECTION_STATES: SelectionState[] = [
@@ -93,7 +101,7 @@ const NAV_ITEMS: {
 ];
 
 // Implemented surfaces.
-const IMPLEMENTED: NavKey[] = ["selection-popup", "provider-center", "component-gallery", "sidebar-isolated"];
+const IMPLEMENTED: NavKey[] = ["selection-popup", "input-window", "provider-center", "keystore", "component-gallery", "sidebar-isolated", "confirm-isolated", "settings-keyboard"];
 
 const PROVIDER_STATES: ProviderState[] = [
   "empty",
@@ -127,8 +135,15 @@ const App: Component = () => {
   const params = new URLSearchParams(
     typeof window !== "undefined" ? window.location.search : "",
   );
-  const validNav = (NAV_ITEMS.map((i) => i.key) as NavKey[]);
-  const initialNav = validNav.includes(params.get("nav") as NavKey)
+  // D1 (P1-4): validNav spans both NAV_ITEMS (visible nav) AND IMPLEMENTED,
+  // so the hidden `settings-keyboard` fixture route (in IMPLEMENTED but NOT in
+  // NAV_ITEMS) deep-links correctly. Without this, ?nav=settings-keyboard falls
+  // back to "selection-popup" and the fixture never renders.
+  const validNav = new Set<NavKey>([
+    ...(NAV_ITEMS.map((i) => i.key) as NavKey[]),
+    ...IMPLEMENTED,
+  ]);
+  const initialNav = validNav.has(params.get("nav") as NavKey)
     ? (params.get("nav") as NavKey)
     : "selection-popup";
   const initialTheme =
@@ -140,13 +155,40 @@ const App: Component = () => {
   const [theme, setTheme] = createSignal<Theme>(initialTheme);
   const [motion, setMotion] = createSignal<Motion>("full");
   const [nav, setNav] = createSignal<NavKey>(initialNav);
-  const [selState, setSelState] = createSignal<SelectionState>("success-single");
-  const [provState, setProvState] = createSignal<ProviderState>("empty");
+  // C1: seed selState from ?state= so the surfaces visual spec can deep-link
+  // each popup state (loading/success-single/success-multi/partial/error-network).
+  // Previously hardcoded to "success-single", which made 4 of 5 popup baselines
+  // duplicates of the single-success shot. Mirrors the initialNav param-read.
+  const initialSel = SELECTION_STATES.includes(params.get("state") as SelectionState)
+    ? (params.get("state") as SelectionState)
+    : "success-single";
+  const [selState, setSelState] = createSignal<SelectionState>(initialSel);
+  const [provState, setProvState] = createSignal<ProviderState>(
+    // rev-6-8: ProviderState has NO "configured" value. The populated variant
+    // seeds "key-saved" (a real ProviderState); the empty variant seeds "empty".
+    params.get("fixture") === "populated" ? "key-saved" : "empty",
+  );
+  const [keystoreState, setKeystoreState] = createSignal<"healthy" | "corrupt">(
+    params.get("fixture") === "corrupt" ? "corrupt" : "healthy",
+  );
+  const [inputState, setInputState] = createSignal<"idle" | "multi" | "partial" | "error">(
+    params.get("state") === "multi"
+      ? "multi"
+      : params.get("state") === "partial"
+        ? "partial"
+        : params.get("state") === "error"
+          ? "error"
+          : "idle",
+  );
   const [settingsSize, setSettingsSize] = createSignal<"min" | "default" | "narrow-699" | "boundary-700">("default");
+  // D1 (P1-4): controlled active-section for the real SettingsShell fixture.
+  // The shell is rendered in controlled mode (activePage/onNavigate) so the
+  // keyboard e2e can assert data-page transitions driven by real Tab/Enter.
+  const [settingsKeyboardPage, setSettingsKeyboardPage] =
+    createSignal<SettingsSection>("provider-center");
 
   const t = createMemo(() => strings[locale()]);
   const selT = createMemo(() => t().selection);
-  const provT = createMemo(() => t().provider);
 
   // Window size follows MASTER §8.2 + S0 §4.1:
   //  - multi-engine states → expanded 600×400
@@ -212,6 +254,33 @@ const App: Component = () => {
           onCancel={() => {}}
         />
       </div>
+    );
+  }
+
+  // settings-keyboard: bare fixture for Playwright keyboard e2e (P1-4) —
+  // renders ONLY the REAL production SettingsShell (from @app), with no lab
+  // header/nav/state-bar, so the first Tab lands directly on the shell's own
+  // sidebar nav. The shell runs in controlled mode (activePage/onNavigate) so
+  // the test asserts data-page transitions from real Tab/Enter keypresses.
+  // A hidden fixture route: NOT in NAV_ITEMS (so it never appears in the lab
+  // nav list), but recognized via the IMPLEMENTED-aware validNav set above.
+  // Routed as an isolated early-return (matching sidebar-isolated /
+  // confirm-isolated) rather than a <Match> inside the lab shell, because the
+  // lab shell's header/nav inject ~16 focusable tab stops before the sidebar,
+  // which the spec's cap-12 Tab loop cannot traverse.
+  if (nav() === "settings-keyboard") {
+    return (
+      <SettingsShell
+        activePage={settingsKeyboardPage()}
+        onNavigate={setSettingsKeyboardPage}
+      >
+        <div
+          class="settings-shell__fixture-body"
+          data-testid="settings-fixture-body"
+        >
+          {t().nav.providerCenter}
+        </div>
+      </SettingsShell>
     );
   }
 
@@ -328,8 +397,6 @@ const App: Component = () => {
                 >
                   <SelectionPopup
                     state={selState()}
-                    locale={locale()}
-                    t={selT()}
                   />
                 </div>
                 <span class="lab__frame-meta">
@@ -359,8 +426,6 @@ const App: Component = () => {
               >
                 <ProviderCenter
                   state={provState()}
-                  locale={locale()}
-                  t={provT()}
                 />
               </div>
               <span class="lab__frame-meta">
@@ -374,6 +439,14 @@ const App: Component = () => {
 
             <Match when={nav() === "component-gallery"}>
               <ComponentGallery locale={locale()} theme={theme()} />
+            </Match>
+
+            <Match when={nav() === "input-window"}>
+              <InputPanel state={inputState()} />
+            </Match>
+
+            <Match when={nav() === "keystore"}>
+              <KeystoreRecovery state={keystoreState()} />
             </Match>
 
             <Match when={!IMPLEMENTED.includes(nav())}>
@@ -435,6 +508,42 @@ const App: Component = () => {
                 : settingsSize() === "boundary-700" ? t().provider.frameBoundary700
                 : t().provider.frameDefault}
             </button>
+          </div>
+        </Show>
+
+        <Show when={nav() === "input-window"}>
+          <div class="lab__state-bar" role="group" aria-label={t().controls.state}>
+            <span class="lab__state-label">{t().controls.state}</span>
+            <For each={["idle", "multi", "partial", "error"] as const}>
+              {(s) => (
+                <button
+                  type="button"
+                  class="lab__state-chip lr-focusable"
+                  aria-pressed={inputState() === s ? "true" : "false"}
+                  onClick={() => setInputState(s)}
+                >
+                  {s}
+                </button>
+              )}
+            </For>
+          </div>
+        </Show>
+
+        <Show when={nav() === "keystore"}>
+          <div class="lab__state-bar" role="group" aria-label={t().controls.state}>
+            <span class="lab__state-label">{t().controls.state}</span>
+            <For each={["healthy", "corrupt"] as const}>
+              {(s) => (
+                <button
+                  type="button"
+                  class="lab__state-chip lr-focusable"
+                  aria-pressed={keystoreState() === s ? "true" : "false"}
+                  onClick={() => setKeystoreState(s)}
+                >
+                  {s}
+                </button>
+              )}
+            </For>
           </div>
         </Show>
       </main>

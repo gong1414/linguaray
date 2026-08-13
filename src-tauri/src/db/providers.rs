@@ -127,10 +127,20 @@ pub struct ProviderProfile {
     pub capabilities: ProviderCapabilities,
     /// `"active" | "deleting" | "deleted"`.
     pub status: String,
+    /// Optimistic-lock version (R2-E). Starts at 1 on create/insert and is
+    /// bumped by every successful [`update`]. The frontend echoes back the
+    /// last-read value as `ProviderPatch::expected_version`; a mismatch
+    /// (someone else wrote first) yields [`UpdateOutcome::StaleVersion`].
+    pub version: i64,
 }
 
 /// Patch body for [`update`]. `#[serde(deny_unknown_fields)]` so the API layer
 /// rejects typo'd field names instead of silently dropping them.
+///
+/// `expected_version` is REQUIRED (R2-E optimistic lock): it must equal the
+/// row's current `version` for the CAS UPDATE to match. There is no bypass —
+/// the frontend always sends the last-read version, and a mismatch surfaces as
+/// [`UpdateOutcome::StaleVersion`].
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProviderPatch {
@@ -139,6 +149,7 @@ pub struct ProviderPatch {
     pub model: Option<String>,
     pub enabled: Option<bool>,
     pub sort_order: Option<i32>,
+    pub expected_version: i64,
 }
 
 // ─── Row ↔ value helpers ──────────────────────────────────────────────────
@@ -177,12 +188,13 @@ fn row_to_profile(r: &rusqlite::Row<'_>) -> rusqlite::Result<ProviderProfile> {
         secret_ref: r.get("secret_ref")?,
         capabilities,
         status: r.get("status")?,
+        version: r.get("version")?,
     })
 }
 
 /// Column list shared by every SELECT (so `row_to_profile` can read by name).
 const SELECT_COLS: &str = "uuid, template_id, name, protocol, endpoint, model, \
-     enabled, sort_order, is_local, needs_key, secret_ref, capabilities, status";
+     enabled, sort_order, is_local, needs_key, secret_ref, capabilities, status, version";
 
 // ─── Capabilities JSON helper ─────────────────────────────────────────────
 
@@ -413,6 +425,7 @@ pub fn create(
         secret_ref,
         capabilities: ProviderCapabilities::default(),
         status: ProviderStatus::Active.as_str().to_string(),
+        version: 1,
     };
     insert_or_ignore(&tx, &profile)?;
     tx.commit()?;
@@ -432,21 +445,54 @@ fn next_sort_order(conn: &Connection) -> Result<i32, DbError> {
     Ok((max + 1) as i32)
 }
 
-/// Apply a partial patch. Endpoint (if `Some`) is validated via
-/// [`crate::providers::validate_endpoint`]; `is_local` is recomputed from the
-/// resulting endpoint. Returns the updated row.
+/// Outcome of an optimistic-lock ([`update`]) CAS attempt (R2-E). Carries the
+/// success/stale/not-found signal out of the `with_conn` closure (whose error
+/// type is fixed to `DbError`) so the command layer can surface a structured
+/// error without string parsing — the same pattern as `ConfirmActiveOutcome`.
+#[derive(Debug)]
+pub enum UpdateOutcome {
+    /// The CAS matched; carries the re-read profile (with the bumped version).
+    Written(ProviderProfile),
+    /// The row exists but its `version` didn't match `expected_version` (someone
+    /// else wrote first). Carries the row's actual version so the UI can tell
+    /// the user to reload.
+    StaleVersion { actual_version: i64 },
+    /// No row with that UUID.
+    NotFound,
+}
+
+/// Apply a partial patch with optimistic-lock (CAS) semantics (R2-E).
+///
+/// `patch.expected_version` MUST equal the row's current `version` for the
+/// UPDATE to match; a mismatch yields [`UpdateOutcome::StaleVersion`] (the row
+/// exists but was modified elsewhere) so the UI can prompt a reload. A missing
+/// row yields [`UpdateOutcome::NotFound`].
+///
+/// Endpoint (if `Some`) is validated via [`crate::providers::validate_endpoint`];
+/// `is_local` is recomputed from the resulting endpoint. The CAS UPDATE, the
+/// consent-invalidation side effects, and the version bump all commit in ONE
+/// transaction — a stale attempt rolls back every side effect (no partial write,
+/// no TOCTOU window between the read-modify and the CAS).
 pub fn update(
     conn: &mut Connection,
     uuid: &str,
     patch: &ProviderPatch,
-) -> Result<ProviderProfile, DbError> {
+) -> Result<UpdateOutcome, DbError> {
     if let Some(ep) = &patch.endpoint {
         crate::providers::validate_endpoint(ep).map_err(DbError::Integrity)?;
     }
 
     let tx = conn.transaction()?;
-    // Read-modify-write inside the tx so the patch composes atomically.
-    let existing = get(&tx, uuid)?;
+    // Read-modify-write inside the tx so the patch composes atomically. The
+    // later CAS UPDATE (`WHERE uuid=? AND version=?`) is the authoritative
+    // concurrency guard; this read only supplies the merge base. A NotFound
+    // here maps to the outcome (not an error) so the command layer can surface
+    // it as a structured Validation error.
+    let existing = match get(&tx, uuid) {
+        Ok(p) => p,
+        Err(DbError::NotFound(_)) => return Ok(UpdateOutcome::NotFound),
+        Err(e) => return Err(e),
+    };
 
     // Capture the old origin BEFORE we move existing.endpoint below — the
     // consent check compares origins, not the full URL.
@@ -482,15 +528,42 @@ pub fn update(
         invalidate_consent(&tx)?;
     }
 
-    tx.execute(
+    // CAS UPDATE: the `version=?` predicate is the optimistic lock. If the row's
+    // version moved (another writer committed first), this matches 0 rows. All
+    // consent-invalidation writes above live in the SAME tx, so a 0-row match
+    // rolls them back on drop — a stale attempt has NO side effects.
+    let affected = tx.execute(
         "UPDATE providers SET name=?1, endpoint=?2, model=?3, enabled=?4, \
-         sort_order=?5, is_local=?6 WHERE uuid=?7",
-        params![name, endpoint, model, enabled as i64, sort_order, is_local as i64, uuid],
+         sort_order=?5, is_local=?6, version=version+1 \
+         WHERE uuid=?7 AND version=?8",
+        params![
+            name,
+            endpoint,
+            model,
+            enabled as i64,
+            sort_order,
+            is_local as i64,
+            uuid,
+            patch.expected_version,
+        ],
     )?;
 
-    let updated = get(&tx, uuid)?;
-    tx.commit()?;
-    Ok(updated)
+    if affected == 1 {
+        // CAS matched — re-read the row (now with version+1) and commit.
+        let updated = get(&tx, uuid)?;
+        tx.commit()?;
+        Ok(UpdateOutcome::Written(updated))
+    } else {
+        // 0 rows: the version didn't match (we just read the row in this tx, so
+        // it still exists). Re-query the live version to report it. The tx is
+        // dropped WITHOUT commit, so the consent writes above are rolled back.
+        let actual_version: i64 = tx.query_row(
+            "SELECT version FROM providers WHERE uuid=?1",
+            params![uuid],
+            |r| r.get(0),
+        )?;
+        Ok(UpdateOutcome::StaleVersion { actual_version })
+    }
 }
 
 /// Duplicate a provider. New UUIDv4, new `secret_ref`, `enabled=true`. The
@@ -529,6 +602,7 @@ pub fn duplicate(
         secret_ref: new_secret_ref,
         capabilities: src.capabilities,
         status: ProviderStatus::Active.as_str().to_string(),
+        version: 1,
     };
     insert_or_ignore(&tx, &profile)?;
     tx.commit()?;
@@ -645,7 +719,7 @@ pub fn finalize_delete(conn: &mut Connection, uuid: &str) -> Result<(), DbError>
 
 /// 当前 (primary, parallel, fallback) 选择快照，从 `preferences` singleton 读出。
 /// 用于 `translate_session` 决定要并行调用哪些引擎。
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize)]
 pub struct ActiveSelection {
     /// primary_uuid；NULL/空 → None。
     pub primary: Option<String>,
@@ -1196,6 +1270,7 @@ pub fn build_profile(source: &CandidateSource) -> Result<ProviderProfile, DbErro
                     secret_ref,
                     capabilities: ProviderCapabilities::default(),
                     status: ProviderStatus::Active.as_str().to_string(),
+                    version: 1,
                 });
             }
             // 2. Traditional catalog match?
@@ -1216,6 +1291,7 @@ pub fn build_profile(source: &CandidateSource) -> Result<ProviderProfile, DbErro
                     secret_ref,
                     capabilities: ProviderCapabilities::default(),
                     status: ProviderStatus::Active.as_str().to_string(),
+                    version: 1,
                 });
             }
             // 3. Unknown → repair profile.
@@ -1230,11 +1306,12 @@ pub fn build_profile(source: &CandidateSource) -> Result<ProviderProfile, DbErro
                 enabled: false,
                 sort_order: 999,
                 is_local: false,
-                needs_key: true,
-                secret_ref: id.clone(),
-                capabilities: ProviderCapabilities::default(),
-                status: ProviderStatus::Active.as_str().to_string(),
-            })
+                    needs_key: true,
+                    secret_ref: id.clone(),
+                    capabilities: ProviderCapabilities::default(),
+                    status: ProviderStatus::Active.as_str().to_string(),
+                    version: 1,
+                })
         }
         CandidateSource::ProviderKey(sr) => {
             // Parse "provider/<uuid>"; if it parses, keep the UUID. Otherwise derive
@@ -1256,6 +1333,7 @@ pub fn build_profile(source: &CandidateSource) -> Result<ProviderProfile, DbErro
                 secret_ref: sr.clone(),
                 capabilities: ProviderCapabilities::default(),
                 status: ProviderStatus::Active.as_str().to_string(),
+                version: 1,
             })
         }
     }
@@ -1531,6 +1609,7 @@ mod tests {
             secret_ref: "openai".into(),
             capabilities: ProviderCapabilities::default(),
             status: "active".into(),
+            version: 1,
         };
         let providers = vec![p];
         let err = validate_active_selection("u1", &["u1".into()], None, &providers).unwrap_err();
@@ -1553,6 +1632,7 @@ mod tests {
             secret_ref: "openai".into(),
             capabilities: ProviderCapabilities::default(),
             status: "active".into(),
+            version: 1,
         };
         let providers = vec![p.clone()];
         let err = validate_active_selection("u1", &[], None, &providers).unwrap_err();
@@ -1582,6 +1662,7 @@ mod tests {
             secret_ref: "provider/u1".into(),
             capabilities: ProviderCapabilities::default(),
             status: "active".into(),
+            version: 1,
         };
         let _ = &mut p;
         let providers = vec![p];
@@ -1604,6 +1685,7 @@ mod tests {
             secret_ref: format!("provider/{uuid}"),
             capabilities: ProviderCapabilities::default(),
             status: "active".into(),
+            version: 1,
         }
     }
 

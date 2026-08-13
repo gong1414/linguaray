@@ -28,13 +28,13 @@ pub mod settings;
 pub mod wire;
 pub mod db;
 pub mod fs_acl;
+pub mod tray_state;
 pub mod uuid_util;
 
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use tauri::menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem};
-use tauri::tray::{MouseButton, TrayIconBuilder, TrayIconEvent};
+use tauri::menu::MenuEvent;
 use tauri::Emitter;
 use tauri::Manager;
 use tauri_plugin_global_shortcut::{Builder as GlobalShortcutBuilder, GlobalShortcutExt, ShortcutState};
@@ -45,6 +45,10 @@ use crate::db::providers::{self as db_providers, ActiveSelection, ProviderPatch,
 use crate::db::readiness::DataReadiness;
 use crate::db::Database;
 use crate::service::{translate_parallel, translate_with_fallback_ref, TranslationOutcome};
+
+// Re-export so integration tests can reference the error enum as
+// `linguaray_lib::Error` (mirrors `service::TranslationOutcome` usage).
+pub use crate::error::Error;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TranslateRequest {
@@ -103,6 +107,10 @@ pub struct AppState {
     pub db_path: PathBuf,
     pub keystore_dir: PathBuf,
     pub settings_path: Option<PathBuf>,
+    /// rev-13/rev-14 (Task A5): the tray visual-state controller. SYNC
+    /// `parking_lot::Mutex` (NOT `tokio::sync::Mutex`) so `TranslationGuard::drop`
+    /// runs `finish_translation` synchronously on the calling thread.
+    pub tray: Arc<parking_lot::Mutex<tray_state::TrayStateController>>,
 }
 
 /// Gating check for provider commands that ALREADY hold the `data_gate` guard.
@@ -341,14 +349,33 @@ async fn translate_clipboard(
         return Err("clipboard empty".into());
     }
     let (x, y) = cursor::position();
-    let _ = popup::show_at(&app, x, y);
+    // B4: switch to the source-aware emitters so clipboard-origin results carry
+    // `source_text` (P1-3: Retry needs the original text). Mirrors
+    // capture_and_translate: build_popup_anchor + gen check + loading_with_source.
+    let anchor = match build_popup_anchor(&app, x as f64, y as f64) {
+        Some(a) => a,
+        None => return Ok(()),
+    };
+    if !state.gen.is_latest(gen) {
+        return Ok(());
+    }
+    let _ = popup::loading_with_source(&app, &anchor, Some(&text));
     let s = settings::load(&app);
+
+    // Task A5: the tray Active-pulse begins here (after the clipboard preflight).
+    // TranslationGuard::new calls begin_translation(gen); its Drop calls
+    // finish_translation(gen, succeeded) on every return path. On a success branch
+    // we call guard.mark_success(); on an error branch we call
+    // record_translation_error(gen) before the guard drops.
+    let mut _tray_guard = tray_state::TranslationGuard::new(&app_state.tray, gen);
 
     let client = match session_client(&state) {
         Ok(c) => c.clone(),
         Err(msg) => {
             if state.gen.is_latest(gen) {
-                let _ = popup::error(&app, &msg);
+                app_state.tray.lock().record_translation_error(gen);
+                let _ = popup::set_popup_mode(&app, popup::PopupMode::Error, &anchor);
+                let _ = popup::error_with_source(&app, &msg, &text);
             }
             return Ok(());
         }
@@ -357,7 +384,9 @@ async fn translate_clipboard(
         Ok(k) => k,
         Err(msg) => {
             if state.gen.is_latest(gen) {
-                let _ = popup::error(&app, &msg);
+                app_state.tray.lock().record_translation_error(gen);
+                let _ = popup::set_popup_mode(&app, popup::PopupMode::Error, &anchor);
+                let _ = popup::error_with_source(&app, &msg, &text);
             }
             return Ok(());
         }
@@ -374,13 +403,17 @@ async fn translate_clipboard(
         Ok(Ok(db)) => db,
         Ok(Err(msg)) => {
             if state.gen.is_latest(gen) {
-                let _ = popup::error(&app, &msg);
+                app_state.tray.lock().record_translation_error(gen);
+                let _ = popup::set_popup_mode(&app, popup::PopupMode::Error, &anchor);
+                let _ = popup::error_with_source(&app, &msg, &text);
             }
             return Ok(());
         }
         Err(e) => {
             if state.gen.is_latest(gen) {
-                let _ = popup::error(&app, &format!("join error: {e}"));
+                app_state.tray.lock().record_translation_error(gen);
+                let _ = popup::set_popup_mode(&app, popup::PopupMode::Error, &anchor);
+                let _ = popup::error_with_source(&app, &format!("join error: {e}"), &text);
             }
             return Ok(());
         }
@@ -398,18 +431,26 @@ async fn translate_clipboard(
     }
     match session_result {
         Ok(r) => match decide_clipboard_popup(&r) {
-            ClipboardPopupDecision::SingleSuccess { text, engine } => {
-                let _ = popup::result(&app, &text, &engine);
+            ClipboardPopupDecision::SingleSuccess { text: t, engine } => {
+                _tray_guard.mark_success();
+                let _ = popup::set_popup_mode(&app, popup::PopupMode::Single, &anchor);
+                let _ = popup::result_with_source(&app, &t, &engine, &text);
             }
             ClipboardPopupDecision::Multi => {
-                let _ = popup::multi_result(&app, &r.outcomes);
+                _tray_guard.mark_success();
+                let _ = popup::set_popup_mode(&app, popup::PopupMode::Multi, &anchor);
+                let _ = popup::multi_result_with_source(&app, &r.outcomes, &text);
             }
             ClipboardPopupDecision::Error(msg) => {
-                let _ = popup::error(&app, &msg);
+                app_state.tray.lock().record_translation_error(gen);
+                let _ = popup::set_popup_mode(&app, popup::PopupMode::Error, &anchor);
+                let _ = popup::error_with_source(&app, &msg, &text);
             }
         },
         Err(msg) => {
-            let _ = popup::error(&app, &msg);
+            app_state.tray.lock().record_translation_error(gen);
+            let _ = popup::set_popup_mode(&app, popup::PopupMode::Error, &anchor);
+            let _ = popup::error_with_source(&app, &msg, &text);
         }
     }
     Ok(())
@@ -437,7 +478,7 @@ pub struct TranslateSessionResult {
 /// translate_clipboard 根据翻译结果决定发哪种 popup 事件的纯函数决策。
 /// 抽出来便于测试（translate_clipboard 本身依赖 Tauri runtime 不可单测）。
 #[derive(Debug)]
-enum ClipboardPopupDecision {
+pub enum ClipboardPopupDecision {
     /// 单引擎成功 → 走老 popup-state 事件（向后兼容）。
     SingleSuccess { text: String, engine: String },
     /// 并行（含部分成功）→ 走 popup-multi-result 事件。
@@ -446,7 +487,7 @@ enum ClipboardPopupDecision {
     Error(String),
 }
 
-fn decide_clipboard_popup(result: &TranslateSessionResult) -> ClipboardPopupDecision {
+pub fn decide_clipboard_popup(result: &TranslateSessionResult) -> ClipboardPopupDecision {
     if result.outcomes.is_empty() {
         return ClipboardPopupDecision::Error("translation produced no outcomes".into());
     }
@@ -480,6 +521,17 @@ fn decide_clipboard_popup(result: &TranslateSessionResult) -> ClipboardPopupDeci
     ClipboardPopupDecision::Multi
 }
 
+/// Central sentinel resolver: the frontend passes `to: ""` to mean "use the
+/// stored target language". Exposed so the hotkey contract is locked by an
+/// integration test.
+pub fn resolve_target_language(to: &str, settings_target: &str) -> String {
+    if to.is_empty() {
+        settings_target.to_string()
+    } else {
+        to.to_string()
+    }
+}
+
 /// 翻译会话核心逻辑（纯函数，无 Tauri State 依赖）。
 ///
 /// 被两个入口共享：
@@ -498,11 +550,15 @@ async fn run_translate_session(
     from: &str,
     to: &str,
 ) -> Result<TranslateSessionResult, String> {
+    // P1-C: resolve the "" sentinel CENTRALLY so on_hotkey, translate_session,
+    // translate_selection_ipc, and the tray all agree.
+    let settings_target = settings::load(app).target_language;
+    let to = resolve_target_language(to, &settings_target);
     // 读 fallback_engine（§G opt-in，默认 None）。
     let fallback_box = settings::load(app).fallback_engine.as_deref().and_then(engines::find);
     let fallback: Option<Arc<dyn engines::TraditionalEngine>> =
         fallback_box.map(Arc::<dyn engines::TraditionalEngine>::from);
-    run_translate_session_with_fallback(db, client, keystore, text, from, to, fallback).await
+    run_translate_session_with_fallback(db, client, keystore, text, from, &to, fallback).await
 }
 
 /// 测试入口：不读 settings，fallback 直接传 None（聚焦核心路径）。
@@ -635,6 +691,62 @@ async fn translate_session(
     .await
     .map_err(|e| e.to_string())??;
     run_translate_session(&db, &client, keystore, &app, &req.text, &req.from, &req.to).await
+}
+
+/// A4 (P1-5): translate the live OS selection (fresh capture) OR a
+/// caller-supplied SOURCE text (Retry). Distinct from `translate_clipboard`
+/// which reads the clipboard — this NEVER reads the clipboard. The tray
+/// `translate-selection` action and the popup Retry both route here.
+///
+/// `text = Some(t)` (Retry): skip capture, use the saved SOURCE text.
+/// `text = None` (tray): capture the selection fresh under the selection lock.
+///
+/// Returns `Result<(), ()>` because the popup state is emitted via events —
+/// there is no useful payload to return to the caller. Allocation of the
+/// generation token + the capture+translate pipeline run on the async runtime
+/// so the IPC call does not block on capture_selection (which simulates Cmd+C).
+#[tauri::command]
+async fn translate_selection_ipc(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, Arc<Session>>,
+    app_state: tauri::State<'_, Arc<AppState>>,
+    text: Option<String>,
+) -> Result<(), ()> {
+    let state = state.inner().clone();
+    let app_state = app_state.inner().clone();
+    let gen = state.gen.next();
+    tauri::async_runtime::spawn(async move {
+        // The cursor read + capture_selection happen together under ONE lock
+        // inside capture_and_translate (None coords → helper reads cursor under
+        // the lock). For the Retry path (supplied text), the popup is re-shown
+        // at the current cursor, so None coords are correct there too.
+        capture_and_translate(&app, &state, &app_state, text, None, None, gen).await;
+    });
+    Ok(())
+}
+
+/// A4 (P1-5): show the main (settings) window and emit a `navigate` event so
+/// the App mount sets the shell's active page. The popup/input CTAs and the
+/// tray `settings` action both route here so the main window surfaces + jumps
+/// to the right section in one call. `section = None` defaults to the provider
+/// center.
+#[tauri::command]
+async fn open_settings_window(
+    app: tauri::AppHandle,
+    section: Option<String>,
+) -> Result<(), String> {
+    let page = section.unwrap_or_else(|| "provider-center".to_string());
+    let app2 = app.clone();
+    tauri::async_runtime::spawn(async move {
+        if let Some(w) = app2.get_webview_window("main") {
+            let _ = w.show();
+            let _ = w.set_focus();
+            let _ = w.emit("navigate", page);
+        }
+    })
+    .await
+    .map_err(|e| format!("join error: {e}"))?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -1091,42 +1203,70 @@ async fn provider_list(
 #[tauri::command]
 async fn provider_create(
     state: tauri::State<'_, Arc<AppState>>,
+    app_handle: tauri::AppHandle,
     template_id: String,
     name: String,
     endpoint: String,
     model: Option<String>,
 ) -> Result<ProviderProfile, String> {
-    let app = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || {
+    let app_state = state.inner().clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
         // Acquire the gate FIRST (see provider_list).
-        let _gate = app.data_gate.read();
-        let db = require_ready_gated(&app, &_gate)?;
+        let _gate = app_state.data_gate.read();
+        let db = require_ready_gated(&app_state, &_gate)?;
         db.with_conn(|conn| {
             db_providers::create(conn, &template_id, &name, &endpoint, model.as_deref())
         })
         .map_err(|e| e.to_string())
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())??;
+    // rev-8-8: refresh the tray AFTER the write commits. Best-effort.
+    refresh_tray_if_available(&app_handle).await;
+    Ok(result)
 }
 
-/// Apply a partial patch to a provider. An endpoint change is validated and may
-/// invalidate the parallel consent (see `db_providers::update`).
+/// Apply a partial patch to a provider with optimistic-lock (CAS) semantics
+/// (R2-E). An endpoint change is validated and may invalidate the parallel
+/// consent (see `db_providers::update`). The patch's `expected_version` must
+/// match the row's current `version`; a mismatch rejects with a structured
+/// `{"error":"stale_version","actual_version":N}` so the UI can show a
+/// save-conflict banner instead of clobbering the other writer's change.
 #[tauri::command]
 async fn provider_update(
     state: tauri::State<'_, Arc<AppState>>,
+    app_handle: tauri::AppHandle,
     uuid: String,
     patch: ProviderPatch,
-) -> Result<ProviderProfile, String> {
-    let app = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || {
+) -> Result<ProviderProfile, ProviderCommandError> {
+    let app_state = state.inner().clone();
+    let result = tauri::async_runtime::spawn_blocking(move || -> Result<ProviderProfile, ProviderCommandError> {
         // Acquire the gate FIRST (see provider_list).
-        let _gate = app.data_gate.read();
-        let db = require_ready_gated(&app, &_gate)?;
-        db.with_conn(|conn| db_providers::update(conn, &uuid, &patch)).map_err(|e| e.to_string())
+        let _gate = app_state.data_gate.read();
+        let db = require_ready_gated(&app_state, &_gate).map_err(ProviderCommandError::from)?;
+        // The typed `UpdateOutcome` carries the stale/not-found signals out of
+        // the `with_conn` closure (whose error type is fixed to `DbError`), then
+        // we map them to structured `ProviderCommandError` variants here — same
+        // pattern as `ConfirmActiveOutcome` (no string-prefix parsing).
+        let outcome = db.with_conn(|conn| db_providers::update(conn, &uuid, &patch));
+        outcome
+            .map(|o| match o {
+                db_providers::UpdateOutcome::Written(p) => Ok(p),
+                db_providers::UpdateOutcome::StaleVersion { actual_version } => {
+                    Err(ProviderCommandError::StaleVersion { actual_version })
+                }
+                db_providers::UpdateOutcome::NotFound => Err(ProviderCommandError::Validation {
+                    message: "provider not found".into(),
+                }),
+            })
+            .map_err(ProviderCommandError::from)?
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| ProviderCommandError::Db {
+        message: format!("{e:?}"),
+    })??;
+    refresh_tray_if_available(&app_handle).await;
+    Ok(result)
 }
 
 /// Duplicate a provider. New UUID, new `secret_ref`, keyless (the original key
@@ -1134,17 +1274,20 @@ async fn provider_update(
 #[tauri::command]
 async fn provider_duplicate(
     state: tauri::State<'_, Arc<AppState>>,
+    app_handle: tauri::AppHandle,
     uuid: String,
 ) -> Result<ProviderProfile, String> {
-    let app = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || {
+    let app_state = state.inner().clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
         // Acquire the gate FIRST (see provider_list).
-        let _gate = app.data_gate.read();
-        let db = require_ready_gated(&app, &_gate)?;
+        let _gate = app_state.data_gate.read();
+        let db = require_ready_gated(&app_state, &_gate)?;
         db.with_conn(|conn| db_providers::duplicate(conn, &uuid)).map_err(|e| e.to_string())
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())??;
+    refresh_tray_if_available(&app_handle).await;
+    Ok(result)
 }
 
 /// Begin the 3-step delete (mark `deleting`, evict from slots), purge the key
@@ -1155,18 +1298,19 @@ async fn provider_duplicate(
 #[tauri::command]
 async fn provider_delete(
     state: tauri::State<'_, Arc<AppState>>,
+    app_handle: tauri::AppHandle,
     uuid: String,
 ) -> Result<(), String> {
-    let app = state.inner().clone();
-    let keystore_dir = app.keystore_dir.clone();
+    let app_state = state.inner().clone();
+    let keystore_dir = app_state.keystore_dir.clone();
     tauri::async_runtime::spawn_blocking(move || -> Result<(), String> {
         // Write guard: a delete mutates selection slots + status; no reader/other
         // writer may interleave. Held for all 3 steps (the DB Mutex + keystore
         // flock are still released between steps inside their own calls).
         // Acquire the gate FIRST (see provider_list) so the readiness check +
         // Arc clone are atomic w.r.t. the DB swap.
-        let _gate = app.data_gate.write();
-        let db = require_ready_gated_write(&app, &_gate)?;
+        let _gate = app_state.data_gate.write();
+        let db = require_ready_gated_write(&app_state, &_gate)?;
 
         // Step 1: begin_delete under the DB Mutex → returns the secret_ref. The
         // DB guard (with_conn closure) is released before the keystore step.
@@ -1186,7 +1330,9 @@ async fn provider_delete(
         Ok(())
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())??;
+    refresh_tray_if_available(&app_handle).await;
+    Ok(())
 }
 
 /// Re-assign `sort_order` to the given UUID order. The list MUST be exactly the
@@ -1194,17 +1340,20 @@ async fn provider_delete(
 #[tauri::command]
 async fn provider_reorder(
     state: tauri::State<'_, Arc<AppState>>,
+    app_handle: tauri::AppHandle,
     uuids: Vec<String>,
 ) -> Result<(), String> {
-    let app = state.inner().clone();
+    let app_state = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         // Acquire the gate FIRST (see provider_list).
-        let _gate = app.data_gate.write();
-        let db = require_ready_gated_write(&app, &_gate)?;
+        let _gate = app_state.data_gate.write();
+        let db = require_ready_gated_write(&app_state, &_gate)?;
         db.with_conn(|conn| db_providers::reorder(conn, &uuids)).map_err(|e| e.to_string())
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())??;
+    refresh_tray_if_available(&app_handle).await;
+    Ok(())
 }
 
 /// Flip `enabled`. Disabling also evicts the row from selection slots and
@@ -1212,64 +1361,106 @@ async fn provider_reorder(
 #[tauri::command]
 async fn provider_toggle(
     state: tauri::State<'_, Arc<AppState>>,
+    app_handle: tauri::AppHandle,
     uuid: String,
     enabled: bool,
 ) -> Result<(), String> {
-    let app = state.inner().clone();
+    let app_state = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         // Acquire the gate FIRST (see provider_list).
-        let _gate = app.data_gate.write();
-        let db = require_ready_gated_write(&app, &_gate)?;
+        let _gate = app_state.data_gate.write();
+        let db = require_ready_gated_write(&app_state, &_gate)?;
         db.with_conn(|conn| db_providers::toggle(conn, &uuid, enabled)).map_err(|e| e.to_string())
     })
     .await
-    .map_err(|e| e.to_string())?
-    .map(|_| ())
+    .map_err(|e| e.to_string())??;
+    refresh_tray_if_available(&app_handle).await;
+    Ok(())
 }
 
 /// Set/clear a provider's API key in the keystore. The provider row's
 /// `secret_ref` names the key. Cross-store (DB read → keystore write) but the
 /// two locks are never held at once: the DB read releases before the keystore
 /// RMW begins (lock-order rule). Both steps run on one blocking thread.
+///
+/// R11: the command fast-fails on empty keys before spawning a thread, then
+/// delegates to the synchronous, testable [`set_key_blocking`] core.
 #[tauri::command]
 async fn provider_set_key(
     state: tauri::State<'_, Arc<AppState>>,
     uuid: String,
     key: String,
 ) -> Result<(), String> {
+    // R11: fail fast on empty/whitespace keys at the command boundary, BEFORE
+    // spawning a blocking thread — no DB or keystore work for an empty key. The
+    // ORIGINAL key value is stored below (trim is validation-only).
+    if key.trim().is_empty() {
+        return Err("key must not be empty".to_string());
+    }
     let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || set_key_blocking(&app, &uuid, &key))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// R11: synchronous, testable core of [`provider_set_key`]. Validates the
+/// request (non-empty key, active profile, `needs_key=true`), then writes the
+/// key to the keystore.
+///
+/// Validation order:
+/// 1. Empty/whitespace key → reject (defense-in-depth; the command wrapper also
+///    checks this before spawning a thread).
+/// 2. Non-active status → reject (existing behavior: a row mid-deletion must not
+///    resurrect a secret whose owner is being torn down).
+/// 3. `needs_key=false` → reject (R11): a keyless provider must never accept a
+///    key — writing one would leave a dangling secret the provider will never
+///    read, and the UI now hides the key input for it.
+///
+/// The ORIGINAL key value is stored (`trim()` is validation-only — the user's
+/// exact value is preserved). Gate-first ordering is load-bearing (see
+/// `provider_list`): the readiness check + Arc clone are atomic w.r.t. the DB
+/// swap because the gate read guard is held across them.
+pub fn set_key_blocking(app: &Arc<AppState>, uuid: &str, key: &str) -> Result<(), String> {
+    // R11: reject empty/whitespace keys at the core boundary too (defense in
+    // depth — the command wrapper checks this before spawning a thread, but a
+    // direct caller of the core would otherwise skip it).
+    if key.trim().is_empty() {
+        return Err("key must not be empty".to_string());
+    }
     let keystore_dir = app.keystore_dir.clone();
-    tauri::async_runtime::spawn_blocking(move || -> Result<(), String> {
-        // Acquire the gate FIRST (see provider_list) so the readiness check +
-        // Arc clone are atomic w.r.t. the DB swap.
-        let _gate = app.data_gate.read();
-        let db = require_ready_gated(&app, &_gate)?;
+    // Acquire the gate FIRST (see provider_list) so the readiness check + Arc
+    // clone are atomic w.r.t. the DB swap.
+    let _gate = app.data_gate.read();
+    let db = require_ready_gated(app, &_gate)?;
 
-        // 1. Read the secret_ref + status under the DB Mutex, then release.
-        //    Reject deleting/deleted profiles: writing a key for a row that's
-        //    mid-deletion would resurrect a secret whose owner is being torn
-        //    down, and the next finalize_delete would orphan it silently.
-        let secret_ref = db
-            .with_conn(|conn| {
-                let p = db_providers::get(conn, &uuid)?;
-                if p.status != "active" {
-                    return Err(crate::db::DbError::Integrity(format!(
-                        "provider {} status is '{}'; cannot set key on a non-active profile",
-                        uuid, p.status
-                    )));
-                }
-                Ok(p.secret_ref)
-            })
-            .map_err(|e| e.to_string())?;
+    // 1. Read the secret_ref + status + needs_key under the DB Mutex, then
+    //    release. Reject deleting/deleted profiles: writing a key for a row
+    //    that's mid-deletion would resurrect a secret whose owner is being torn
+    //    down, and the next finalize_delete would orphan it silently. Reject
+    //    keyless providers (R11): a needs_key=false row must never hold a key.
+    let secret_ref = db
+        .with_conn(|conn| {
+            let p = db_providers::get(conn, uuid)?;
+            if p.status != "active" {
+                return Err(crate::db::DbError::Integrity(format!(
+                    "provider {} status is '{}'; cannot set key on a non-active profile",
+                    uuid, p.status
+                )));
+            }
+            if !p.needs_key {
+                return Err(crate::db::DbError::Integrity(
+                    "this provider type does not require a key".to_string(),
+                ));
+            }
+            Ok(p.secret_ref)
+        })
+        .map_err(|e| e.to_string())?;
 
-        // 2. Keystore RMW (flock only, DB NOT locked). Typed accessor converges
-        //    the payload to v2 and handles both v1 flat-map and v2 shapes.
-        let ks = keystore::Keystore::new(keystore_dir).map_err(|e| e.to_string())?;
-        ks.set_key(&secret_ref, &key).map_err(|e| e.to_string())?;
-        Ok(())
-    })
-    .await
-    .map_err(|e| e.to_string())?
+    // 2. Keystore RMW (flock only, DB NOT locked). Typed accessor converges
+    //    the payload to v2 and handles both v1 flat-map and v2 shapes.
+    let ks = keystore::Keystore::new(keystore_dir).map_err(|e| e.to_string())?;
+    ks.set_key(&secret_ref, key).map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 /// Set the active selection (primary, parallel, fallback). Empty primary and
@@ -1287,15 +1478,16 @@ async fn provider_set_key(
 #[tauri::command]
 async fn provider_set_active(
     state: tauri::State<'_, Arc<AppState>>,
+    app_handle: tauri::AppHandle,
     primary: String,
     parallel: Vec<String>,
     fallback: Option<String>,
 ) -> Result<SetActiveResult, String> {
-    let app = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || -> Result<SetActiveResult, String> {
+    let app_state = state.inner().clone();
+    let outcome = tauri::async_runtime::spawn_blocking(move || -> Result<SetActiveResult, String> {
         // Acquire the gate FIRST (see provider_list).
-        let _gate = app.data_gate.write();
-        let db = require_ready_gated_write(&app, &_gate)?;
+        let _gate = app_state.data_gate.write();
+        let db = require_ready_gated_write(&app_state, &_gate)?;
         // The `with_conn` closure must return Result<_, DbError> (Database's
         // contract). We carry the consent-required signal out via a SetActiveOutcome
         // so the outer closure can map it to the frontend-facing SetActiveResult
@@ -1359,7 +1551,177 @@ async fn provider_set_active(
         })
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())??;
+    // rev-7-8: refresh so the status item + submenu reflect the new primary.
+    refresh_tray_if_available(&app_handle).await;
+    Ok(outcome)
+}
+/// popup/popup CTAs (Surface 02/03) so they can show a friendly engine label.
+/// Returns the default (all-empty) selection if the DB is not ready yet.
+#[tauri::command]
+fn provider_get_active_selection(
+    app_state: tauri::State<'_, Arc<AppState>>,
+) -> Result<ActiveSelection, String> {
+    let app = app_state.inner().clone();
+    let _gate = app.data_gate.read();
+    let db = require_ready_gated(&app, &_gate)?;
+    db.with_conn(|conn| db_providers::read_active_selection(conn))
+        .map_err(|e| e.to_string())
+}
+
+/// A4 + rev-5-4: the sync core of `provider_set_active`, callable from the
+/// tray (which cannot resolve `tauri::State`). Sets `uuid` as the sole primary,
+/// no parallel, no fallback. This is the BODY the tray handler runs inside a
+/// `spawn_blocking` — do NOT wrap it in another `block_on(spawn_blocking(...))`.
+/// Uses the real write helper `set_active_slots`; because `parallel` is empty,
+/// the consent gate is never entered and the NeedsConsent branch is unreachable
+/// (kept in the match for exhaustiveness; if it ever fires it maps through).
+fn set_active_primary_core(
+    app_state: Arc<AppState>,
+    uuid: String,
+    rev: u64,
+) -> Result<SetActiveResult, String> {
+    let app = app_state.clone();
+    let outcome = db_set_active_primary(&app, &uuid, rev)?;
+    Ok(match outcome {
+        SetActiveOutcome::Written => SetActiveResult::Written,
+        SetActiveOutcome::NeedsConsent { actual_scope } => {
+            SetActiveResult::NeedsConsent { actual_scope }
+        }
+    })
+}
+
+/// rev-5-4: the gate + transaction that `set_active_primary_core` and the tray
+/// share. Acquires the write gate, runs `validate_active_selection` + the
+/// `set_active_slots` write inside ONE transaction. Returns the internal
+/// `SetActiveOutcome` so the caller can map it to the serialized result.
+///
+/// P1-3 (Task A3): `pub` + revision-guarded. The caller passes the `rev`
+/// captured via `tray.lock().begin_switch()`. This function checks `rev`
+/// against `tray.switch_revision()` BEFORE acquiring the write gate AND
+/// re-checks AFTER acquiring it, so a stale/late switch request (an older
+/// click whose DB write lands after a newer click already committed) is
+/// rejected at the DB level — guaranteeing last-click-wins.
+pub fn db_set_active_primary(
+    app: &Arc<AppState>,
+    uuid: &str,
+    rev: u64,
+) -> Result<SetActiveOutcome, String> {
+    // P1-3: check revision BEFORE acquiring the write gate. If a newer switch
+    // already bumped the revision, this stale request must NOT write.
+    {
+        let controller = app.tray.lock();
+        if controller.switch_revision() != rev {
+            return Err(format!(
+                "stale switch revision {rev} (current {})",
+                controller.switch_revision()
+            ));
+        }
+    }
+    let _gate = app.data_gate.write();
+    // Re-check after acquiring the gate: another switch may have bumped the
+    // revision between the first check and the gate acquisition.
+    {
+        let controller = app.tray.lock();
+        if controller.switch_revision() != rev {
+            return Err(format!(
+                "stale switch revision {rev} (current {})",
+                controller.switch_revision()
+            ));
+        }
+    }
+    let db = require_ready_gated_write(app, &_gate)?;
+    let outcome = db
+        .with_conn(|conn| -> Result<SetActiveOutcome, DbErr> {
+            let tx = conn.transaction()?;
+            let active = db_providers::list(&tx)?;
+            db_providers::validate_active_selection(uuid, &[], None, &active)?;
+            // parallel is empty → set_active_slots (clears prior consent).
+            set_active_slots(&tx, uuid, &[], None)?;
+            tx.commit()?;
+            Ok(SetActiveOutcome::Written)
+        })
+        .map_err(|e| e.to_string())?;
+    Ok(outcome)
+}
+
+/// A4 minimal `handle_switch_provider` (A5 Step 10 will enhance this with the
+/// tray-state controller wiring — begin_switch/finish_switch + the red-dot on
+/// failure). This A4 version: set the provider as sole primary (SYNC, inside
+/// the caller's `spawn_blocking`), refresh the tray, and on failure set a
+/// `"Switch failed: <msg>"` tooltip AFTER the refresh (rev-19-5) so the
+/// refresh's own tooltip is not clobbered. Returns Ok/Err so the caller can
+/// decide logging.
+/// A5 Step 10 (rev-18-1): the SYNC core of the switch-provider flow.
+///
+/// DB write and tray controller, NO AppHandle (the testable entry). Calls
+/// `set_active_primary_core(...)` directly (SYNC), then
+/// `tray.lock().finish_switch(rev, success)` (rev-16-3 revision-tagged; a stale
+/// `rev != switch_revision` is ignored). The `rev` is captured via
+/// `begin_switch()` BEFORE the DB call so a concurrent switch's late result
+/// cannot clobber this one. R2-B (P1-3 residual): the revision is now allocated
+/// by the SYNC menu callback (`handle_tray_menu_event`) BEFORE `spawn_blocking`
+/// so revision order = click order regardless of OS thread scheduling; the
+/// pre-allocated `rev` is passed in here (the core no longer calls
+/// `begin_switch()` itself). Does NOT touch the translation `GenerationToken`
+/// (rev-15 P1-3) and does NOT `.await` anything (SYNC).
+pub fn handle_switch_provider_core(
+    app_state: &Arc<AppState>,
+    uuid: &str,
+    rev: u64,
+) -> Result<(), String> {
+    let result = set_active_primary_core(app_state.clone(), uuid.to_string(), rev);
+    let success = result.is_ok();
+    app_state.tray.lock().finish_switch(rev, success);
+    // P1-3 (Task A3): if the DB write failed because a newer switch already
+    // bumped the revision, the newer click has already won — this is expected,
+    // not an error. Swallow the stale-revision error so the caller sees Ok
+    // (the DB already reflects the last click).
+    if let Err(ref e) = result {
+        if e.contains("stale switch revision") {
+            return Ok(());
+        }
+    }
+    result.map(|_| ())
+}
+
+/// A5 Step 10 (rev-18-1): the SYNC wrapper — calls the core + best-effort tray
+/// refresh + failure tooltip. The tray.switch arm runs this via
+/// `tauri::async_runtime::spawn_blocking` (offloads the SYNC SQLite I/O).
+///
+/// P1-2: this wrapper stays SYNC (it runs inside `spawn_blocking` and CANNOT
+/// `.await`). The tray refresh is now async ([`refresh_tray_if_available`]), so
+/// it is detached via `tauri::async_runtime::spawn` — the DB write commits
+/// synchronously and is returned immediately; the best-effort tray refresh runs
+/// as a fire-and-forget task on the runtime. The rev-19-5 ordering (refresh
+/// FIRST, THEN override the tooltip on failure) is preserved inside the spawned
+/// task. `result` is cloned into the task so the synchronous `Ok`/`Err` can be
+/// returned to the caller.
+pub fn handle_switch_provider(
+    app: &tauri::AppHandle,
+    app_state: &Arc<AppState>,
+    uuid: &str,
+    rev: u64,
+) -> Result<(), String> {
+    let result = handle_switch_provider_core(app_state, uuid, rev);
+    let app_clone = app.clone();
+    let result_for_refresh = result.clone();
+    tauri::async_runtime::spawn(async move {
+        match &result_for_refresh {
+            Ok(_) => {
+                refresh_tray_if_available(&app_clone).await;
+            }
+            Err(msg) => {
+                // rev-19-5: refresh FIRST (restores the pre-switch tooltip), THEN
+                // override with the failure tooltip (rev-21-2: prefixed).
+                refresh_tray_if_available(&app_clone).await;
+                if let Some(tray) = app_clone.tray_by_id("main-tray") {
+                    let _ = tray.set_tooltip(Some(&format!("Switch failed: {msg}")));
+                }
+            }
+        }
+    });
+    result
 }
 
 /// Confirm the user's explicit consent for a parallel selection and write it
@@ -1376,16 +1738,17 @@ async fn provider_set_active(
 #[tauri::command]
 async fn provider_confirm_and_set_active(
     state: tauri::State<'_, Arc<AppState>>,
+    app_handle: tauri::AppHandle,
     primary: String,
     parallel: Vec<String>,
     fallback: Option<String>,
     expected_scope: String,
 ) -> Result<i64, ProviderCommandError> {
-    let app = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || -> Result<i64, ProviderCommandError> {
+    let app_state = state.inner().clone();
+    let version = tauri::async_runtime::spawn_blocking(move || -> Result<i64, ProviderCommandError> {
         // Acquire the gate FIRST (see provider_list).
-        let _gate = app.data_gate.write();
-        let db = require_ready_gated_write(&app, &_gate).map_err(ProviderCommandError::from)?;
+        let _gate = app_state.data_gate.write();
+        let db = require_ready_gated_write(&app_state, &_gate).map_err(ProviderCommandError::from)?;
         let outcome = db.with_conn(|conn| -> Result<ConfirmActiveOutcome, DbErr> {
             let tx = conn.transaction()?;
             let active = db_providers::list(&tx)?;
@@ -1428,10 +1791,11 @@ async fn provider_confirm_and_set_active(
     .await
     .map_err(|e| ProviderCommandError::Db {
         message: format!("{e:?}"),
-    })?
+    })??;
+    // rev-8-8: refresh so the status item + submenu reflect the new primary.
+    refresh_tray_if_available(&app_handle).await;
+    Ok(version)
 }
-
-// ─── P1 #8: missing commands (provider diagnostics + DB recovery) ─────────
 
 /// One selectable model for a provider. The full HTTP model-list fetch is S3
 /// scope; for now [`provider_get_models`] returns a preset-derived list so the
@@ -1445,10 +1809,24 @@ pub struct ModelInfo {
 /// Result of a connection probe (P1 #8). `ok` + a human-readable message; the
 /// full connection-test HTTP flow is S3 scope, so the current implementation is
 /// a best-effort "reachable" check.
+///
+/// `latency_ms` is `Some(ms)` only on the reachable arm (a real Instant probe
+/// of the HTTP round-trip); it is `None` on every early-exit failure arm
+/// (empty/invalid endpoint, transport error, missing HTTP client).
 #[derive(Debug, Clone, Serialize)]
 pub struct ConnectionResult {
     pub ok: bool,
     pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub latency_ms: Option<u32>,
+}
+
+/// Measure elapsed time since `start` as whole milliseconds, using a saturating
+/// conversion so a probe that somehow exceeds `u128` → `u32` range clamps to
+/// `u32::MAX` rather than truncating via `as u32` (which silently wraps).
+/// Used by `provider_test_connection` to populate `ConnectionResult::latency_ms`.
+pub fn measure_latency_ms(start: std::time::Instant) -> u32 {
+    u32::try_from(start.elapsed().as_millis()).unwrap_or(u32::MAX)
 }
 
 /// List the models a provider can use (P1 #8).
@@ -1526,6 +1904,7 @@ async fn provider_test_connection(
         return Ok(ConnectionResult {
             ok: false,
             message: "endpoint not configured".into(),
+            latency_ms: None,
         });
     }
     // Validate the endpoint shape before sending any bytes.
@@ -1533,6 +1912,7 @@ async fn provider_test_connection(
         return Ok(ConnectionResult {
             ok: false,
             message: format!("invalid endpoint: {e}"),
+            latency_ms: None,
         });
     }
     // Best-effort reachability probe. We don't care about the response body —
@@ -1544,18 +1924,24 @@ async fn provider_test_connection(
             return Ok(ConnectionResult {
                 ok: false,
                 message: "HTTP client unavailable: startup build failed".into(),
+                latency_ms: None,
             })
         }
     };
+    // Time only the actual HTTP round-trip (the reachable arm). Early-exit
+    // failure arms above carry `latency_ms: None`.
+    let probe_start = std::time::Instant::now();
     let req = client.get(&profile.endpoint).send().await;
     match req {
         Ok(resp) => Ok(ConnectionResult {
             ok: true,
             message: format!("reachable (HTTP {})", resp.status().as_u16()),
+            latency_ms: Some(measure_latency_ms(probe_start)),
         }),
         Err(e) => Ok(ConnectionResult {
             ok: false,
             message: format!("connection failed: {e}"),
+            latency_ms: None,
         }),
     }
 }
@@ -1630,10 +2016,15 @@ pub enum SetActiveResult {
 /// Replaces free-form `String` errors so the frontend can pattern-match
 /// instead of parsing string prefixes.
 /// Wire shape for StaleScope: `{"error":"stale_scope","actual_scope":"..."}`
+/// Wire shape for StaleVersion (R2-E): `{"error":"stale_version","actual_version":N}`
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 #[serde(tag = "error", rename_all = "snake_case")]
 pub enum ProviderCommandError {
     StaleScope { actual_scope: String },
+    /// Optimistic-lock mismatch (R2-E): the provider row was modified elsewhere
+    /// since the frontend last read it. Carries the row's actual version so the
+    /// UI can prompt a reload.
+    StaleVersion { actual_version: i64 },
     /// Generic database or validation error.
     Db { message: String },
     /// Provider not found, invalid selection, etc.
@@ -1645,6 +2036,9 @@ impl std::fmt::Display for ProviderCommandError {
         match self {
             Self::StaleScope { actual_scope } => {
                 write!(f, "stale scope: {actual_scope}")
+            }
+            Self::StaleVersion { actual_version } => {
+                write!(f, "stale version: row is at version {actual_version}")
             }
             Self::Db { message } => write!(f, "{message}"),
             Self::Validation { message } => write!(f, "{message}"),
@@ -1669,7 +2063,11 @@ impl From<String> for ProviderCommandError {
 /// Outcome of a `provider_set_active` DB transaction (P1 #3). Carries the
 /// consent-required signal out of the `with_conn` closure (whose error type is
 /// fixed to `DbError`) so the command can surface it to the frontend.
-enum SetActiveOutcome {
+///
+/// `pub` + `Debug` (Task A3 / P1-3): exposed so the integration test for the
+/// revision-guarded `db_set_active_primary` can name and inspect the return.
+#[derive(Debug)]
+pub enum SetActiveOutcome {
     /// Selection written (no consent needed, or scope already matched).
     Written,
     /// A non-empty parallel selection needs explicit consent; carries the
@@ -1965,6 +2363,302 @@ impl EngineInfo {
     }
 }
 
+/// Outcome of the capture step. The popup UI for the non-`Selected` variants is
+/// rendered AFTER the `selection_lock` guard drops and AFTER the `is_latest(gen)`
+/// check, so the lock covers capture-only (P1-1). The physical cursor coords are
+/// carried alongside each variant so the post-lock UI code can place the popup.
+enum CaptureOutcome {
+    Selected(String, f64, f64),
+    NoSelection(f64, f64),
+    CaptureError(String, f64, f64),
+}
+
+/// Shared selection-capture + translate-session pipeline. Used by on_hotkey,
+/// translate_selection_ipc (tray + Retry). Emits the popup state per outcome.
+///
+/// - `supplied_text = Some(t)` (Retry): skip capture, use the saved SOURCE text.
+/// - `supplied_text = None` (hotkey/tray): run the selection_lock +
+///   capture_selection block on_hotkey used.
+/// - `x`, `y`: `Option<f64>` — `Some` = caller-supplied PHYSICAL cursor coords
+///   (Retry, tray: the caller captured coordinates itself); `None` = the helper
+///   reads `cursor::position()` itself, INSIDE the single `selection_lock()`
+///   guard that ALSO runs `capture_selection`, so the cursor read and the
+///   clipboard-touching capture are atomic — a second rapid press cannot
+///   interleave clipboard save/restore between them (P1-1). The helper resolves
+///   the cursor's monitor via `monitor_from_point` and converts to logical via
+///   THAT monitor's scale_factor (rev-7-1).
+/// - `gen`: the generation token. Checked at every await boundary so a stale
+///   run never overwrites a fresher popup (P1-1).
+///
+/// `to` is passed as `""` so run_translate_session's central resolver handles it.
+#[allow(clippy::too_many_arguments)]
+async fn capture_and_translate(
+    app: &tauri::AppHandle,
+    state: &Arc<Session>,
+    app_state: &Arc<AppState>,
+    supplied_text: Option<String>,
+    x: Option<f64>,
+    y: Option<f64>,
+    gen: u64,
+) {
+    // 1. Acquire text (capture or supplied).
+    let (text, anchor) = match supplied_text {
+        Some(t) if !t.is_empty() => {
+            let cx = x.unwrap_or(0.0);
+            let cy = y.unwrap_or(0.0);
+            let anchor = match build_popup_anchor(app, cx, cy) {
+                Some(a) => a,
+                None => return,
+            };
+            (t, anchor)
+        }
+        _ => {
+            // The selection_lock covers capture-only: the cursor read and
+            // capture_selection run under ONE guard so two rapid presses cannot
+            // interleave clipboard save/restore between them. The popup UI for
+            // the NoSelection / CaptureError branches is rendered AFTER the guard
+            // drops and AFTER the is_latest(gen) check (P1-1).
+            let captured: CaptureOutcome = {
+                let _g = state.gen.selection_lock();
+                // Read the cursor under the SAME guard as capture_selection so two
+                // rapid presses cannot interleave clipboard save/restore between the
+                // cursor read and the capture (the capture touches the clipboard).
+                let (cx, cy) = match (x, y) {
+                    (Some(cx), Some(cy)) => (cx, cy),
+                    // hotkey/tray path: no pre-captured coords; read live now.
+                    _ => {
+                        let pos = cursor::position();
+                        (pos.0 as f64, pos.1 as f64)
+                    }
+                };
+                #[cfg(target_os = "windows")]
+                let owner = match app
+                    .get_webview_window("main")
+                    .ok_or_else(|| "main window unavailable".to_string())
+                    .and_then(|w| w.hwnd().map(|h| h.0).map_err(|e| e.to_string()))
+                {
+                    Ok(h) => h,
+                    Err(e) => {
+                        log::warn!("clipboard restore skipped: no owner HWND ({e})");
+                        return;
+                    }
+                };
+                #[cfg(not(target_os = "windows"))]
+                let owner = ();
+                match selection::capture_selection(800, owner) {
+                    Ok(selection_engine::Capture::Selected(t)) => {
+                        CaptureOutcome::Selected(t, cx, cy)
+                    }
+                    Ok(selection_engine::Capture::NoSelection) => {
+                        CaptureOutcome::NoSelection(cx, cy)
+                    }
+                    Err(e) => CaptureOutcome::CaptureError(e, cx, cy),
+                }
+            };
+            // Stale-run guard BEFORE any popup UI: a superseded capture must never
+            // paint the popup (P1-1).
+            if !state.gen.is_latest(gen) {
+                return;
+            }
+            let (text, cx, cy) = match captured {
+                CaptureOutcome::Selected(t, cx, cy) => (t, cx, cy),
+                CaptureOutcome::NoSelection(cx, cy) => {
+                    let anchor = match build_popup_anchor(app, cx, cy) {
+                        Some(a) => a,
+                        None => return,
+                    };
+                    let (px, py, pw, ph) =
+                        popup::compute_popup_geometry_logical(popup::PopupMode::Error, &anchor);
+                    let _ = popup::show_at_sized(app, px, py, pw, ph);
+                    let _ = popup::error(
+                        app,
+                        if !a11y::enabled() {
+                            "No selection captured. Grant Accessibility in System Settings → Privacy → Accessibility."
+                        } else {
+                            "No text selected."
+                        },
+                    );
+                    return;
+                }
+                CaptureOutcome::CaptureError(e, cx, cy) => {
+                    let anchor = match build_popup_anchor(app, cx, cy) {
+                        Some(a) => a,
+                        None => return,
+                    };
+                    let (px, py, pw, ph) =
+                        popup::compute_popup_geometry_logical(popup::PopupMode::Error, &anchor);
+                    let _ = popup::show_at_sized(app, px, py, pw, ph);
+                    let _ = popup::error(app, &e);
+                    return;
+                }
+            };
+            let anchor = match build_popup_anchor(app, cx, cy) {
+                Some(a) => a,
+                None => return,
+            };
+            (text, anchor)
+        }
+    };
+
+    // 2. Show loading popup sized + clamped, carrying the source (P1-3).
+    if !state.gen.is_latest(gen) {
+        return;
+    }
+    let _ = popup::loading_with_source(app, &anchor, Some(&text));
+
+    // Task A5: the tray Active-pulse begins here. TranslationGuard::new calls
+    // begin_translation(gen); its Drop calls finish_translation(gen, succeeded)
+    // on EVERY return path below (early returns, error branches, success). On a
+    // success branch we call guard.mark_success() so Drop clears any prior-gen
+    // error; on an error branch we call record_translation_error(gen) BEFORE the
+    // guard drops (Drop then only decrements + recomputes, leaving the error).
+    let mut _tray_guard = tray_state::TranslationGuard::new(&app_state.tray, gen);
+
+    // 3. client/keystore guards acquired from Session FIRST.
+    let client = match state.client.as_ref() {
+        Some(c) => c.clone(),
+        None => {
+            if state.gen.is_latest(gen) {
+                app_state.tray.lock().record_translation_error(gen);
+                let _ = popup::set_popup_mode(app, popup::PopupMode::Error, &anchor);
+                let _ = popup::error_with_source(
+                    app,
+                    "HTTP client unavailable: startup build failed (recovery required)",
+                    &text,
+                );
+            }
+            return;
+        }
+    };
+    let keystore = match state.keystore.as_ref() {
+        Some(k) => k,
+        None => {
+            if state.gen.is_latest(gen) {
+                app_state.tray.lock().record_translation_error(gen);
+                let _ = popup::set_popup_mode(app, popup::PopupMode::Error, &anchor);
+                let _ = popup::error_with_source(
+                    app,
+                    "keystore unavailable: startup init failed (recovery required)",
+                    &text,
+                );
+            }
+            return;
+        }
+    };
+
+    // rev-9-1: acquire the db Arc via spawn_blocking (gate guard INSIDE the closure).
+    let app_arc = app_state.clone();
+    let db = match tauri::async_runtime::spawn_blocking(move || -> Result<Arc<Database>, String> {
+        let _gate = app_arc.data_gate.read();
+        require_ready_gated(&app_arc, &_gate)
+    })
+    .await
+    {
+        Ok(Ok(db)) => db,
+        Ok(Err(msg)) => {
+            if state.gen.is_latest(gen) {
+                app_state.tray.lock().record_translation_error(gen);
+                let _ = popup::set_popup_mode(app, popup::PopupMode::Error, &anchor);
+                let _ = popup::error_with_source(app, &msg, &text);
+            }
+            return;
+        }
+        Err(e) => {
+            if state.gen.is_latest(gen) {
+                app_state.tray.lock().record_translation_error(gen);
+                let _ = popup::set_popup_mode(app, popup::PopupMode::Error, &anchor);
+                let _ = popup::error_with_source(app, &format!("join error: {e}"), &text);
+            }
+            return;
+        }
+    };
+
+    if !state.gen.is_latest(gen) {
+        return;
+    }
+
+    // 4. run_translate_session — to:"" is resolved centrally inside it.
+    let session_result = match run_translate_session(
+        &db, &client, keystore, app, &text, "auto", "",
+    )
+    .await
+    {
+        Ok(r) => r,
+        Err(msg) => {
+            if state.gen.is_latest(gen) {
+                app_state.tray.lock().record_translation_error(gen);
+                let _ = popup::set_popup_mode(app, popup::PopupMode::Error, &anchor);
+                let _ = popup::error_with_source(app, &msg, &text);
+            }
+            return;
+        }
+    };
+    if !state.gen.is_latest(gen) {
+        return;
+    }
+
+    // 5. Route per decision + size per state.
+    match decide_clipboard_popup(&session_result) {
+        ClipboardPopupDecision::SingleSuccess { text: t, engine } => {
+            _tray_guard.mark_success();
+            let _ = popup::set_popup_mode(app, popup::PopupMode::Single, &anchor);
+            let _ = popup::result_with_source(app, &t, &engine, &text);
+        }
+        ClipboardPopupDecision::Multi => {
+            _tray_guard.mark_success();
+            let _ = popup::set_popup_mode(app, popup::PopupMode::Multi, &anchor);
+            let _ = popup::multi_result_with_source(app, &session_result.outcomes, &text);
+        }
+        ClipboardPopupDecision::Error(msg) => {
+            app_state.tray.lock().record_translation_error(gen);
+            let _ = popup::set_popup_mode(app, popup::PopupMode::Error, &anchor);
+            let _ = popup::error_with_source(app, &msg, &text);
+        }
+    }
+}
+
+/// Build a PopupAnchor from the physical cursor coords. The scale factor used
+/// to convert the work area AND the cursor is the TARGET MONITOR's
+/// `scale_factor()` — NOT the popup window's.
+fn build_popup_anchor(app: &tauri::AppHandle, x_phys: f64, y_phys: f64) -> Option<popup::PopupAnchor> {
+    let win = app.get_webview_window("popup")?;
+
+    let monitor = app
+        .monitor_from_point(x_phys, y_phys)
+        .ok()
+        .flatten()
+        .or_else(|| app.primary_monitor().ok().flatten());
+
+    let mut sf = match &monitor {
+        Some(m) => m.scale_factor(),
+        None => win.scale_factor().unwrap_or(1.0),
+    };
+    if !(sf > 0.0 && sf.is_finite()) {
+        sf = 1.0;
+    }
+    let cursor_logical = (x_phys / sf, y_phys / sf);
+
+    let work_area_logical = if let Some(m) = &monitor {
+        let wa = m.work_area();
+        let pos = &wa.position;
+        let sz = &wa.size;
+        let left = pos.x as f64 / sf;
+        let top = pos.y as f64 / sf;
+        let right = left + sz.width as f64 / sf;
+        let bottom = top + sz.height as f64 / sf;
+        popup::LogicalWorkArea { left, top, right, bottom }
+    } else {
+        let (cx, cy) = cursor_logical;
+        popup::LogicalWorkArea { left: cx, top: cy, right: cx + 1.0, bottom: cy + 1.0 }
+    };
+
+    Some(popup::PopupAnchor {
+        cursor_logical,
+        work_area: work_area_logical,
+        scale_factor: sf,
+    })
+}
+
 /// Selection-translate loop bound to the `Alt+Space` global shortcut (§B/§C/§D).
 ///
 /// The handler runs on the global-shortcut event thread, so all real work is
@@ -1986,140 +2680,19 @@ fn on_hotkey(app: &tauri::AppHandle, _shortcut: &tauri_plugin_global_shortcut::S
     }
 
     // (1) latest-wins token — allocate SYNCHRONOUSLY in the handler, BEFORE spawn.
-    // Doing this inside spawn let two presses' futures start out of order so the
-    // older press could grab the newer token (rev-3 race). Allocating here, in the
-    // handler thread (which is serialized per-press), guarantees strict press order.
     let state = app.state::<Arc<Session>>().inner().clone();
     let gen = state.gen.next();
 
     let app2 = app.clone();
     tauri::async_runtime::spawn(async move {
         let state = app2.state::<Arc<Session>>().inner().clone();
+        let app_state = app2.state::<Arc<AppState>>().inner().clone();
 
-        // (2) capture cursor position + selection under ONE selection-mutex hold,
-        // BEFORE the popup steals focus. The lock must span BOTH reads in a single
-        // guard — splitting it into two lock acquisitions lets a second hotkey
-        // trigger run its own capture_selection in between, whose clipboard writes
-        // (sentinel/copy) would interleave with this run's restore window and
-        // reopen the clipboard-corruption race the mutex exists to close (spec §concurrency).
-        let (x, y, captured) = {
-            let _g = state.gen.selection_lock();
-            let pos = cursor::position();
-            // Windows: owner HWND from the main webview window (the event-loop thread that
-            // pumps messages + receives WM_DESTROYCLIPBOARD). `WebviewWindow::hwnd()` is
-            // #[cfg(windows)] and returns the windows-crate HWND (newtype HWND(*mut c_void));
-            // `.0` is the raw *mut c_void == windows-sys HWND. Non-Windows: pass ().
-            // The async block returns (), so resolve the HWND via a `match` (not `?`) and
-            // log+return on failure (best-effort: no valid owner → no compound restore).
-            #[cfg(target_os = "windows")]
-            let owner = match app2
-                .get_webview_window("main")
-                .ok_or_else(|| "main window unavailable".to_string())
-                .and_then(|w| w.hwnd().map(|h| h.0).map_err(|e| e.to_string()))
-            {
-                Ok(h) => h,
-                Err(e) => {
-                    log::warn!("clipboard restore skipped: no owner HWND ({e})");
-                    return;
-                }
-            };
-            #[cfg(not(target_os = "windows"))]
-            let owner = ();
-            let cap = selection::capture_selection(800, owner);
-            (pos.0, pos.1, cap)
-        };
-
-        // (3) superseded by a newer trigger — drop this run silently.
-        if !state.gen.is_latest(gen) {
-            return;
-        }
-
-        let text = match captured {
-            Ok(selection_engine::Capture::Selected(t)) => t,
-            Ok(selection_engine::Capture::NoSelection) => {
-                // Surface it visibly (review P1 #5: errors must reach the user, not
-                // vanish into a popup that's never shown). show_at reveals the window
-                // (popup::error alone only emits to a hidden window — review catch).
-                let _ = popup::show_at(&app2, x, y);
-                let _ = popup::error(
-                    &app2,
-                    if !a11y::enabled() {
-                        "No selection captured. Grant Accessibility in System Settings → Privacy → Accessibility."
-                    } else {
-                        "No text selected."
-                    },
-                );
-                return;
-            }
-            Err(e) => {
-                let _ = popup::show_at(&app2, x, y);
-                let _ = popup::error(&app2, &e);
-                return;
-            }
-        };
-
-        // (4) show loading popup at the cursor.
-        let _ = popup::show_at(&app2, x, y);
-
-        // (5) translate via the §G fallback-aware service. Default provider and
-        //     target language come from settings (Phase 2b); fall back to a
-        //     provider-not-found error popup instead of panicking. The opt-in
-        //     `fallback_engine` (Phase 3 Task 3) is resolved here — None by
-        //     default, so behavior is unchanged unless the user opts in.
-        let s = settings::load(&app2);
-        let preset = match providers::presets().into_iter().find(|p| p.id == s.default_provider) {
-            Some(p) => p,
-            None => {
-                let _ = popup::error(
-                    &app2,
-                    &format!("default provider '{}' not found", s.default_provider),
-                );
-                return;
-            }
-        };
-        let fallback = s.fallback_engine.as_deref().and_then(engines::find);
-        let input = service::TranslateInput {
-            text: &text,
-            from: "auto",
-            to: &s.target_language,
-            options: wire::AppOptions::default(),
-        };
-        let client = match state.client.as_ref() {
-            Some(c) => c,
-            None => {
-                if state.gen.is_latest(gen) {
-                    let _ = popup::error(
-                        &app2,
-                        "HTTP client unavailable: startup build failed (recovery required)",
-                    );
-                }
-                return;
-            }
-        };
-        let keystore = match state.keystore.as_ref() {
-            Some(k) => k,
-            None => {
-                if state.gen.is_latest(gen) {
-                    let _ = popup::error(
-                        &app2,
-                        "keystore unavailable: startup init failed (recovery required)",
-                    );
-                }
-                return;
-            }
-        };
-        match service::translate_with_fallback(client, keystore, &preset, input, fallback).await {
-            Ok(out) => {
-                if state.gen.is_latest(gen) {
-                    let _ = popup::result(&app2, &out.text, &out.engine);
-                }
-            }
-            Err(e) => {
-                if state.gen.is_latest(gen) {
-                    let _ = popup::error(&app2, &e.to_string());
-                }
-            }
-        }
+        // The cursor read + capture_selection happen together under ONE lock
+        // inside capture_and_translate (so two rapid presses cannot interleave
+        // clipboard save/restore between them). on_hotkey no longer takes the
+        // lock itself.
+        capture_and_translate(&app2, &state, &app_state, None, None, None, gen).await;
     });
 }
 
@@ -2148,40 +2721,27 @@ fn on_input_hotkey(
 
 // ─── R2b Surface 04: system tray menu ──────────────────────────────────────
 
-/// Build the Surface 04 system tray menu and register it on the app.
-///
-/// Called once from `setup()`. Menu item IDs are stable strings so the
-/// [`handle_tray_menu_event`] handler can match them. IDs MUST stay in sync with
-/// the match arms there. Built last in setup so a tray-init failure does not
+/// rev-5-4: build the tray for the FIRST time (registers `"main-tray"`).
+/// Subsequent updates go through `refresh_tray` → `build_tray_menu` +
+/// `tray.set_menu(...)` so we never register a duplicate tray id.
+/// Called once from `setup()`. Built last so a tray-init failure does not
 /// block DB/keystore/window setup; the caller logs and continues on `Err`.
 fn build_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
-    // Quick actions group.
-    let sel = MenuItem::with_id(app, "tray.translate-selection", "Translate Selection", true, None::<&str>)?;
-    let inp = MenuItem::with_id(app, "tray.translate-input", "Translate Input", true, None::<&str>)?;
-    let clip = MenuItem::with_id(app, "tray.translate-clipboard", "Translate Clipboard", true, None::<&str>)?;
-    let ocr = MenuItem::with_id(app, "tray.ocr-capture", "OCR Translate", true, None::<&str>)?;
-    let sep1 = PredefinedMenuItem::separator(app)?;
-    // Active provider group (a live submenu populated from list_engines at click
-    // time is a follow-up; R2b ships a static status + switch affordance).
-    let provider_ready = MenuItem::with_id(app, "tray.provider-status", "Ready", false, None::<&str>)?;
-    let switch = MenuItem::with_id(app, "tray.switch-provider", "Switch Provider", true, None::<&str>)?;
-    let sep2 = PredefinedMenuItem::separator(app)?;
-    // Navigation + system group.
-    let history = MenuItem::with_id(app, "tray.history", "History", true, None::<&str>)?;
-    let settings = MenuItem::with_id(app, "tray.settings", "Settings", true, None::<&str>)?;
-    let sep3 = PredefinedMenuItem::separator(app)?;
-    let quit = MenuItem::with_id(app, "tray.quit", "Quit", true, None::<&str>)?;
-
-    let menu = Menu::with_items(app, &[
-        &sel, &inp, &clip, &ocr, &sep1,
-        &provider_ready, &switch, &sep2,
-        &history, &settings, &sep3,
-        &quit,
-    ])?;
-
+    use tauri::tray::{MouseButton, TrayIconBuilder, TrayIconEvent};
+    // P1-2: the tray data readers + menu builder are `async`. `build_tray` runs
+    // exactly once from `setup()` (sync, on the main thread, before the runtime
+    // serves commands), so a SINGLE `block_on` driving both awaits is safe here
+    // — it cannot nest inside an async worker thread the way the tray refresh
+    // path can. This is the ONLY legitimate `block_on` in the tray path.
+    let (menu, status) = tauri::async_runtime::block_on(async {
+        let menu = build_tray_menu(app).await?;
+        let status = read_primary_status(app).await;
+        Ok::<_, tauri::Error>((menu, status))
+    })?;
     TrayIconBuilder::with_id("main-tray")
         .icon(app.default_window_icon().cloned().expect("default window icon"))
         .menu(&menu)
+        .tooltip(status)
         .show_menu_on_left_click(false)
         .on_menu_event(handle_tray_menu_event)
         .on_tray_icon_event(|tray, event| {
@@ -2204,46 +2764,219 @@ fn build_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
-/// Menu item handler. Each arm matches a `with_id` string from [`build_tray`].
+/// rev-5-4: build ONLY the menu (reusable by build_tray + refresh_tray). Returns
+/// the full menu with the fresh provider list + status item text.
+///
+/// P1-2: `async fn` — awaits the async DB readers instead of nesting `block_on`.
+async fn build_tray_menu(app: &tauri::AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> {
+    use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
+
+    // Quick actions group.
+    let sel = MenuItem::with_id(app, "tray.translate-selection", "Translate Selection", true, None::<&str>)?;
+    let clip = MenuItem::with_id(app, "tray.translate-clipboard", "Translate Clipboard", true, None::<&str>)?;
+    let sep1 = PredefinedMenuItem::separator(app)?;
+
+    // Switch Provider submenu: built from the db at menu-build time;
+    // refresh_tray() rebuilds it after provider mutations.
+    let enabled = read_enabled_providers(app).await;
+    let switch_sub = build_switch_provider_submenu(app, &enabled)?;
+    let provider_status = MenuItem::with_id(app, "tray.provider-status", read_primary_status(app).await, false, None::<&str>)?;
+    let sep2 = PredefinedMenuItem::separator(app)?;
+
+    // Disabled "Coming later" items (P1-D).
+    let ocr = MenuItem::with_id(app, "tray.ocr-capture", "OCR Translate (Coming later)", false, None::<&str>)?;
+    let history = MenuItem::with_id(app, "tray.history", "History (Coming later)", false, None::<&str>)?;
+    let sep3 = PredefinedMenuItem::separator(app)?;
+
+    // Navigation + system group.
+    let settings = MenuItem::with_id(app, "tray.settings", "Settings", true, None::<&str>)?;
+    let sep4 = PredefinedMenuItem::separator(app)?;
+    let quit = MenuItem::with_id(app, "tray.quit", "Quit", true, None::<&str>)?;
+
+    let menu = Menu::with_items(app, &[
+        &sel, &clip, &sep1,
+        &switch_sub, &provider_status, &sep2,
+        &ocr, &history, &sep3,
+        &settings, &sep4,
+        &quit,
+    ])?;
+    Ok(menu)
+}
+
+/// Build the Switch Provider submenu from the given `(uuid, name)` pairs. Each
+/// item id encodes the uuid: `tray.switch-<uuid>`. Returns a Submenu.
+///
+/// P1-2: the DB read is no longer performed here — the caller (an async fn)
+/// reads the providers via [`read_enabled_providers`] and passes the slice in,
+/// so this builder stays sync and `block_on`-free.
+fn build_switch_provider_submenu(
+    app: &tauri::AppHandle,
+    enabled: &[(String, String)],
+) -> tauri::Result<tauri::menu::Submenu<tauri::Wry>> {
+    use tauri::menu::{MenuItem, SubmenuBuilder};
+    let mut sub = SubmenuBuilder::new(app, "Switch Provider");
+    for (uuid, name) in enabled {
+        let item = MenuItem::with_id(app, format!("tray.switch-{uuid}"), name, true, None::<&str>)?;
+        sub = sub.item(&item);
+    }
+    sub.build()
+}
+
+/// Read (uuid, name) for enabled providers. Best-effort: returns empty on db
+/// error.
+///
+/// P1-2: this is an `async fn` that drives the blocking DB read via
+/// `spawn_blocking().await`. It MUST NOT use `block_on(spawn_blocking(...))`
+/// because it is awaited from async command handlers — nesting `block_on`
+/// inside the async runtime risks a runtime panic ("Cannot start a runtime from
+/// within a runtime"). The single legitimate `block_on` caller is `build_tray`,
+/// which runs once in `setup()` (sync, before the runtime serves commands).
+async fn read_enabled_providers(app: &tauri::AppHandle) -> Vec<(String, String)> {
+    use tauri::Manager;
+    let app_state = app.state::<Arc<AppState>>().inner().clone();
+    match tauri::async_runtime::spawn_blocking(move || {
+        let _gate = app_state.data_gate.read();
+        let db = require_ready_gated(&app_state, &_gate)?;
+        db.with_conn(|conn| {
+            let list = db_providers::list(conn)?;
+            Ok(list.into_iter().filter(|p| p.enabled).map(|p| (p.uuid, p.name)).collect::<Vec<_>>())
+        })
+        .map_err(|e: DbErr| e.to_string())
+    })
+    .await
+    {
+        Ok(Ok(v)) => v,
+        _ => Vec::new(),
+    }
+}
+
+/// Read the primary provider name for the status item. Falls back to
+/// "No provider".
+///
+/// P1-2: `async fn` driving the blocking DB read via `spawn_blocking().await`
+/// (see [`read_enabled_providers`]). No `block_on`.
+async fn read_primary_status(app: &tauri::AppHandle) -> String {
+    use tauri::Manager;
+    let app_state = match app.try_state::<Arc<AppState>>() {
+        Some(s) => s.inner().clone(),
+        None => return "No provider".into(),
+    };
+    match tauri::async_runtime::spawn_blocking(move || {
+        let _gate = app_state.data_gate.read();
+        let db = match require_ready_gated(&app_state, &_gate) {
+            Ok(d) => d,
+            Err(_) => return "No provider".to_string(),
+        };
+        let selection = db.with_conn(|conn| db_providers::read_active_selection(conn));
+        match selection {
+            Ok(sel) => match sel.primary {
+                Some(uuid) => {
+                    let name = db.with_conn(|conn| db_providers::get(conn, &uuid)).ok().map(|p| p.name);
+                    name.unwrap_or_else(|| "Unknown provider".into())
+                }
+                None => "No provider".into(),
+            },
+            Err(_) => "No provider".into(),
+        }
+    })
+    .await
+    {
+        Ok(s) => s,
+        Err(_) => "No provider".into(),
+    }
+}
+
+/// Refresh the tray menu + status after a provider mutation. Called from the
+/// eight provider mutation command handlers (P1-5) via `refresh_tray_if_available`.
+///
+/// rev-5-4: refresh the EXISTING `"main-tray"` in place — rebuild the menu +
+/// re-set the status tooltip via `app.tray_by_id("main-tray")`. Rebuilding from
+/// scratch via the setup-time builder would register a DUPLICATE tray icon
+/// (Tauri panics on duplicate id). Instead, fetch the existing tray and update
+/// its menu + tooltip. Errors are PROPAGATED so the wrapper can log them.
+///
+/// P1-2 (R2-A): if the tray does not exist yet, this is a NO-OP. The
+/// setup-time first-build helper nests a single legitimate blocking drive of the
+/// runtime, but that is safe ONLY in `setup()` (sync, on the main thread, before
+/// the runtime serves commands). Calling it from here — an `async fn` awaited on
+/// a runtime worker thread — would nest that blocking drive inside the async
+/// runtime and risk a panic ("Cannot start a runtime from within a runtime").
+/// The tray is built exactly once in `setup()`; a refresh finding no tray has
+/// nothing to update, so it returns `Ok(())`. The tray will be present on the
+/// next launch / setup run.
+pub async fn refresh_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
+    if let Some(tray) = app.tray_by_id("main-tray") {
+        let menu = build_tray_menu(app).await?;
+        tray.set_menu(Some(menu))?;
+        tray.set_tooltip(Some(&read_primary_status(app).await))?;
+        Ok(())
+    } else {
+        // P1-2: Do NOT reach for the setup-time tray builder here — it nests a
+        // runtime blocking drive that is unsafe inside this async context. The
+        // tray is built once in setup(); if it is absent, there is nothing to
+        // refresh yet.
+        log::debug!("refresh_tray: main-tray not found, skipping refresh");
+        Ok(())
+    }
+}
+
+/// rev-9-3: best-effort tray refresh after a provider mutation. Wraps
+/// `refresh_tray` (which returns `tauri::Result<()>`) so a tray rebuild failure
+/// (e.g. tray not yet built during startup) NEVER turns a successful provider
+/// write into an error.
+///
+/// P1-2: `async fn` — awaits [`refresh_tray`]. Callers in async command
+/// handlers `.await` this directly; the SYNC `handle_switch_provider` (runs in
+/// `spawn_blocking`) detaches it via `tauri::async_runtime::spawn`.
+pub async fn refresh_tray_if_available(app: &tauri::AppHandle) {
+    if let Err(e) = refresh_tray(app).await {
+        log::warn!("tray refresh failed: {e}");
+    }
+}
+
+/// Menu item handler. Each arm matches a `with_id` string from [`build_tray_menu`].
 ///
 /// The translation entry points emit a `tray-action` event that the main window
-/// forwards to the existing commands (those commands depend on `tauri::State`
-/// handles only resolvable through the invoke handler, so we do not call them as
-/// plain functions here). Window-showing actions (`input`/`history`/`settings`)
-/// go through the manager directly.
+/// forwards (its listener invokes the matching backend command). The
+/// `tray.switch-<uuid>` arm runs the SYNC `handle_switch_provider` wrapper inside
+/// a `spawn_blocking` (rev-18-1/rev-20-4: offload the SYNC SQLite I/O). Settings
+/// shows the main window + emits a real `SettingsSection` value (rev-6-3).
 fn handle_tray_menu_event(app: &tauri::AppHandle, event: MenuEvent) {
-    match event.id().as_ref() {
+    let id = event.id().as_ref();
+    if let Some(uuid) = id.strip_prefix("tray.switch-") {
+        // P1-5 + rev-5-4: set this provider as the sole primary, then refresh
+        // the tray. On failure the write tx rolled back (old primary preserved);
+        // handle_switch_provider surfaces the error in the tray tooltip.
+        let app_state = app.state::<Arc<AppState>>().inner().clone();
+        // R2-B (P1-3 residual): allocate the switch revision in the SYNC menu
+        // callback BEFORE spawn_blocking, so revision order = click order
+        // regardless of OS thread scheduling. The pre-allocated `rev` is passed
+        // into the spawned closure (the core no longer calls begin_switch itself).
+        let rev = app_state.tray.lock().begin_switch();
+        let app_clone = app.clone();
+        let uuid_owned = uuid.to_string();
+        tauri::async_runtime::spawn_blocking(move || {
+            let _ = handle_switch_provider(&app_clone, &app_state, &uuid_owned, rev);
+        });
+        return;
+    }
+    match id {
         "tray.translate-selection" => {
-            // Forward to the main window; its listener reuses the selection
-            // trigger path that emits popup-state / popup-multi-result.
             let _ = app.emit("tray-action", "translate-selection");
         }
-        "tray.translate-input" => {
-            if let Some(w) = app.get_webview_window("input") {
-                let _ = w.show();
-                let _ = w.set_focus();
-            }
-        }
         "tray.translate-clipboard" => {
-            // Forward to the main window, which can invoke the clipboard command
-            // (its State dependencies are not callable as a plain function).
             let _ = app.emit("tray-action", "translate-clipboard");
         }
         "tray.ocr-capture" => {
             let _ = app.emit("tray-action", "ocr-capture");
         }
-        "tray.history" => {
-            if let Some(w) = app.get_webview_window("main") {
-                let _ = w.show();
-                let _ = w.set_focus();
-                let _ = w.emit("navigate", "history");
-            }
-        }
         "tray.settings" => {
             if let Some(w) = app.get_webview_window("main") {
                 let _ = w.show();
                 let _ = w.set_focus();
-                let _ = w.emit("navigate", "settings");
+                // rev-6-3: navigate value is a real SettingsSection union member,
+                // NOT the generic "settings" string the type rejects.
+                let _ = w.emit("navigate", "provider-center");
             }
         }
         "tray.quit" => {
@@ -2280,6 +3013,7 @@ pub fn run() {
         .plugin(shortcut_plugin)
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::new().build())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .setup(|app| {
             // Resolve the app-local data dir. Review P1 #2: this MUST NOT crash
             // setup — if the platform path is unavailable, fall back to a temp
@@ -2517,6 +3251,9 @@ pub fn run() {
                 db_path,
                 keystore_dir,
                 settings_path,
+                tray: Arc::new(parking_lot::Mutex::new(
+                    tray_state::TrayStateController::new(app.handle().clone()),
+                )),
             }));
             // Round-2 review P1 #2: register hotkeys at RUNTIME (per-shortcut,
             // catching each Result) so a conflict skips just that shortcut, not the
@@ -2549,6 +3286,7 @@ pub fn run() {
             translate_default,
             translate_clipboard,
             translate_session,
+            translate_selection_ipc,
             list_engines,
             set_key,
             delete_key,
@@ -2570,12 +3308,14 @@ pub fn run() {
             provider_toggle,
             provider_set_key,
             provider_set_active,
+            provider_get_active_selection,
             // P1 #3: multi-engine consent.
             provider_confirm_and_set_active,
             // P1 #8: provider diagnostics + DB recovery.
             provider_get_models,
             provider_test_connection,
-            archive_database
+            archive_database,
+            open_settings_window
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -2584,6 +3324,16 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Build a `TrayStateController` backed by a `RecordingRenderer` for unit
+    /// tests that construct an `AppState` (the `tray` field is required by the
+    /// struct but these tests only inspect `readiness`).
+    fn test_tray_controller() -> tray_state::TrayStateController {
+        tray_state::TrayStateController::with_renderer(
+            Arc::new(tray_state::RecordingRenderer::default()),
+            tray_state::Locale::En,
+        )
+    }
 
     /// Task 5a: `get_data_readiness` returns a `DataReadiness` (not a hand-rolled
     /// JSON `String`) so the frontend gets a properly serialized tagged union via
@@ -2601,6 +3351,7 @@ mod tests {
             db_path: dir.path().join("linguaray.db"),
             keystore_dir: dir.path().join("keystore"),
             settings_path: Some(dir.path().join("settings.json")),
+            tray: Arc::new(parking_lot::Mutex::new(test_tray_controller())),
         };
         let got = state.readiness.read().clone();
         assert_eq!(got, DataReadiness::Ready);
@@ -2626,6 +3377,7 @@ mod tests {
             db_path: dir.path().join("linguaray.db"),
             keystore_dir: dir.path().join("keystore"),
             settings_path: Some(dir.path().join("settings.json")),
+            tray: Arc::new(parking_lot::Mutex::new(test_tray_controller())),
         };
         let got = state.readiness.read().clone();
         let json = serde_json::to_string(&got).unwrap();
