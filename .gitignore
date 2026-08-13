@@ -7,6 +7,5 @@ s1b-shots/
 # ZCode agent runtime artifacts
 .zcode/
 
-# Mimosa security-scan artifacts
-.mimosa/
-src-tauri/.mimosa/
+# Local git worktrees (isolated dev workspaces)
+.worktrees/
