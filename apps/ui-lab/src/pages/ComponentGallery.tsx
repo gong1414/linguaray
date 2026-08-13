@@ -310,7 +310,7 @@ export const ComponentGallery: Component<Props> = (props) => {
             Labels default to defaultProviderCardLabels (English, matches the
             gallery's en locale). */}
         <section class="gallery__section" data-component-id="provider-card">
-          <h2 class="gallery__section-title">Provider Card</h2>
+          <h2 class="gallery__section-title">{t().providerCard.title}</h2>
           <ProviderCard
             profile={{ name: "Ollama", template: "llama3", status: "active" }}
             hasKey={false}
