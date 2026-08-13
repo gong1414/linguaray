@@ -93,7 +93,12 @@ fn read_macos_io_platform_uuid() -> Result<String, KeystoreError> {
 fn read_windows_machine_guid() -> Result<String, KeystoreError> {
     use std::process::Command;
     let out = Command::new("reg")
-        .args(["query", "HKLM\\SOFTWARE\\Microsoft\\Cryptography", "/v", "MachineGuid"])
+        .args([
+            "query",
+            "HKLM\\SOFTWARE\\Microsoft\\Cryptography",
+            "/v",
+            "MachineGuid",
+        ])
         .output()
         .map_err(|e| KeystoreError::Envelope(format!("reg spawn: {e}")))?;
     let s = String::from_utf8_lossy(&out.stdout);
@@ -104,7 +109,10 @@ fn read_windows_machine_guid() -> Result<String, KeystoreError> {
         .ok_or_else(|| KeystoreError::Envelope("MachineGuid not found".into()))
 }
 
-use aes_gcm::{aead::{Aead, KeyInit}, Aes256Gcm, Nonce};
+use aes_gcm::{
+    aead::{Aead, KeyInit},
+    Aes256Gcm, Nonce,
+};
 use argon2::Argon2;
 use base64::{engine::general_purpose::STANDARD as B64, Engine};
 use rand::RngCore;
@@ -132,7 +140,8 @@ fn derive_key(identity: &str, salt: &[u8]) -> [u8; 32] {
     password.extend_from_slice(identity.as_bytes());
     let argon = argon2();
     let mut out = [0u8; 32];
-    argon.hash_password_into(&password, salt, &mut out)
+    argon
+        .hash_password_into(&password, salt, &mut out)
         .expect("argon2 with valid params");
     zeroize::Zeroize::zeroize(&mut password);
     out
@@ -145,8 +154,8 @@ pub struct Envelope {
     pub kdf: String,
     pub kdf_params: KdfParams,
     pub identity_source: IdentitySource,
-    pub salt: String,    // base64
-    pub nonce: String,   // base64
+    pub salt: String,       // base64
+    pub nonce: String,      // base64
     pub ciphertext: String, // base64 (includes appended 16-byte GCM tag)
 }
 
@@ -158,7 +167,12 @@ pub struct KdfParams {
     pub output_len: u32,
 }
 
-const PINNED_KDF: KdfParams = KdfParams { m_kib: 65536, t: 3, p: 1, output_len: 32 };
+const PINNED_KDF: KdfParams = KdfParams {
+    m_kib: 65536,
+    t: 3,
+    p: 1,
+    output_len: 32,
+};
 
 // ── Versioned inner payload (spec §A, S2a) ────────────────────────────
 //
@@ -196,7 +210,12 @@ pub struct KeystoreData {
 impl KeystoreData {
     /// Build a fresh v2 payload carrying just the given provider keys.
     pub fn new_v2(provider_keys: HashMap<String, String>) -> Self {
-        Self { version: KEYSTORE_DATA_VERSION, provider_keys, history_key: None, external_api_token: None }
+        Self {
+            version: KEYSTORE_DATA_VERSION,
+            provider_keys,
+            history_key: None,
+            external_api_token: None,
+        }
     }
 
     /// Serialize to a serde_json::Value (the shape `encrypt` consumes).
@@ -250,8 +269,12 @@ fn has_version_field(v: &serde_json::Value) -> bool {
 /// merged with a v2 envelope, or a forward-incompatible v3 leak) and must be
 /// treated as Corrupt so the user is sent to recovery instead of silently
 /// losing data.
-const V2_ALLOWED_KEYS: &[&str] =
-    &["version", "provider_keys", "history_key", "external_api_token"];
+const V2_ALLOWED_KEYS: &[&str] = &[
+    "version",
+    "provider_keys",
+    "history_key",
+    "external_api_token",
+];
 
 /// Classify an already-decrypted payload into LegacyV1 / CurrentV2 / Corrupt.
 /// Shared between the production path (decrypt with machine identity) and the
@@ -275,16 +298,18 @@ fn classify_payload(payload: &serde_json::Value) -> Result<KeystoreLoadState, Ke
         })?;
         if version as u32 != KEYSTORE_DATA_VERSION {
             // Unknown/unsupported version → Corrupt (never auto-upgrade).
-            return Ok(KeystoreLoadState::Corrupt(KeystoreError::Envelope(format!(
+            return Ok(KeystoreLoadState::Corrupt(KeystoreError::Envelope(
+                format!(
                 "unsupported keystore data version: got {version}, expected {KEYSTORE_DATA_VERSION}"
-            ))));
+            ),
+            )));
         }
         // Reject extra top-level keys (mixed v1/v2 or a forward-incompatible v3).
         for key in obj.keys() {
             if !V2_ALLOWED_KEYS.contains(&key.as_str()) {
-                return Ok(KeystoreLoadState::Corrupt(KeystoreError::Envelope(format!(
-                    "unknown top-level key in versioned keystore payload: '{key}'"
-                ))));
+                return Ok(KeystoreLoadState::Corrupt(KeystoreError::Envelope(
+                    format!("unknown top-level key in versioned keystore payload: '{key}'"),
+                )));
             }
         }
         // version + key shape are valid → KeystoreData. A structurally wrong
@@ -348,27 +373,46 @@ fn payload_to_v2(v: &serde_json::Value) -> Result<KeystoreData, KeystoreError> {
 }
 
 /// Encrypt a keys map into an envelope (fresh salt + nonce each call).
-pub fn encrypt(identity: &str, identity_source: IdentitySource, keys: &serde_json::Value) -> Result<Envelope, KeystoreError> {
+pub fn encrypt(
+    identity: &str,
+    identity_source: IdentitySource,
+    keys: &serde_json::Value,
+) -> Result<Envelope, KeystoreError> {
     let mut salt = [0u8; SALT_LEN];
     let mut nonce = [0u8; NONCE_LEN];
     rand::thread_rng().fill_bytes(&mut salt);
     rand::thread_rng().fill_bytes(&mut nonce);
     let key = derive_key(identity, &salt);
-    let cipher = Aes256Gcm::new_from_slice(&key)
-        .map_err(|e| KeystoreError::Crypto(e.to_string()))?;
+    let cipher =
+        Aes256Gcm::new_from_slice(&key).map_err(|e| KeystoreError::Crypto(e.to_string()))?;
     let plaintext = serde_json::to_vec(keys).map_err(|e| KeystoreError::Envelope(e.to_string()))?;
-    let ct = cipher.encrypt(Nonce::from_slice(&nonce), aes_gcm::aead::Payload { msg: &plaintext, aad: FIXED_AAD })
+    let ct = cipher
+        .encrypt(
+            Nonce::from_slice(&nonce),
+            aes_gcm::aead::Payload {
+                msg: &plaintext,
+                aad: FIXED_AAD,
+            },
+        )
         .map_err(|e| KeystoreError::Crypto(e.to_string()))?;
     Ok(Envelope {
-        version: VERSION, aead: "aes-256-gcm".into(), kdf: "argon2id".into(),
-        kdf_params: PINNED_KDF, identity_source,
-        salt: B64.encode(salt), nonce: B64.encode(nonce), ciphertext: B64.encode(ct),
+        version: VERSION,
+        aead: "aes-256-gcm".into(),
+        kdf: "argon2id".into(),
+        kdf_params: PINNED_KDF,
+        identity_source,
+        salt: B64.encode(salt),
+        nonce: B64.encode(nonce),
+        ciphertext: B64.encode(ct),
     })
 }
 
 /// Validate the envelope header against the whitelist BEFORE decryption, then
 /// decrypt. A tampered `kdf_params` is rejected outright (DoS guard) — never honored.
-pub fn decrypt(envelope: &Envelope, machine_source: IdentitySource) -> Result<serde_json::Value, KeystoreError> {
+pub fn decrypt(
+    envelope: &Envelope,
+    machine_source: IdentitySource,
+) -> Result<serde_json::Value, KeystoreError> {
     if machine_source != IdentitySource::CURRENT {
         // Historical callers passed an explicit source; the current pin is the
         // platform's CURRENT source. Only CURRENT is honored (the envelope's
@@ -381,12 +425,15 @@ pub fn decrypt(envelope: &Envelope, machine_source: IdentitySource) -> Result<se
 #[doc(hidden)]
 /// Test-only: decrypt with an explicit identity string instead of reading the
 /// machine. Lets tests drive the crypto without touching real OS identity.
-pub fn decrypt_with_identity(envelope: &Envelope, identity: &str) -> Result<serde_json::Value, KeystoreError> {
+pub fn decrypt_with_identity(
+    envelope: &Envelope,
+    identity: &str,
+) -> Result<serde_json::Value, KeystoreError> {
     decrypt_with(envelope, Identity::Injected(identity))
 }
 
-use std::path::{Path, PathBuf};
 use parking_lot::Mutex;
+use std::path::{Path, PathBuf};
 
 /// Where the identity used to (de)crypt comes from. The single axis along which
 /// the production path and the test seam differ — every other piece of locked
@@ -419,7 +466,9 @@ impl<'a> Identity<'a> {
 /// production (`Machine`) and test (`Injected`) paths. The public `decrypt` and
 /// `decrypt_with_identity` are thin facades over this.
 fn decrypt_with(envelope: &Envelope, id: Identity<'_>) -> Result<serde_json::Value, KeystoreError> {
-    if envelope.version != VERSION { return Err(KeystoreError::UnsupportedVersion(envelope.version)); }
+    if envelope.version != VERSION {
+        return Err(KeystoreError::UnsupportedVersion(envelope.version));
+    }
     if envelope.aead != "aes-256-gcm" || envelope.kdf != "argon2id" {
         return Err(KeystoreError::Envelope("bad aead/kdf".into()));
     }
@@ -443,16 +492,29 @@ fn decrypt_with(envelope: &Envelope, id: Identity<'_>) -> Result<serde_json::Val
         }
         Identity::Injected(s) => s.to_string(),
     };
-    let salt = B64.decode(&envelope.salt).map_err(|e| KeystoreError::Envelope(e.to_string()))?;
-    let nonce = B64.decode(&envelope.nonce).map_err(|e| KeystoreError::Envelope(e.to_string()))?;
-    let ct = B64.decode(&envelope.ciphertext).map_err(|e| KeystoreError::Envelope(e.to_string()))?;
+    let salt = B64
+        .decode(&envelope.salt)
+        .map_err(|e| KeystoreError::Envelope(e.to_string()))?;
+    let nonce = B64
+        .decode(&envelope.nonce)
+        .map_err(|e| KeystoreError::Envelope(e.to_string()))?;
+    let ct = B64
+        .decode(&envelope.ciphertext)
+        .map_err(|e| KeystoreError::Envelope(e.to_string()))?;
     if salt.len() != SALT_LEN || nonce.len() != NONCE_LEN || ct.len() < 16 {
         return Err(KeystoreError::Envelope("bad field lengths".into()));
     }
     let key = derive_key(&identity, &salt);
-    let cipher = Aes256Gcm::new_from_slice(&key)
-        .map_err(|e| KeystoreError::Crypto(e.to_string()))?;
-    let pt = cipher.decrypt(Nonce::from_slice(&nonce), aes_gcm::aead::Payload { msg: &ct, aad: FIXED_AAD })
+    let cipher =
+        Aes256Gcm::new_from_slice(&key).map_err(|e| KeystoreError::Crypto(e.to_string()))?;
+    let pt = cipher
+        .decrypt(
+            Nonce::from_slice(&nonce),
+            aes_gcm::aead::Payload {
+                msg: &ct,
+                aad: FIXED_AAD,
+            },
+        )
         .map_err(|_| KeystoreError::AuthFailed)?;
     serde_json::from_slice(&pt).map_err(|e| KeystoreError::Envelope(e.to_string()))
 }
@@ -484,14 +546,19 @@ impl Keystore {
         // is actively writing. Stale-tmp cleanup happens UNDER the lock, inside
         // every write path (update_keys) — see with_locks/​update_keys. Construction
         // only prepares the dir + perms.
-        Ok(Self { dir, in_proc: Mutex::new(()) })
+        Ok(Self {
+            dir,
+            in_proc: Mutex::new(()),
+        })
     }
 
     fn set_dir_perms(dir: &Path) -> Result<(), KeystoreError> {
         Ok(crate::fs_acl::secure_dir(dir)?)
     }
 
-    fn file(&self) -> PathBuf { self.dir.join(FILE) }
+    fn file(&self) -> PathBuf {
+        self.dir.join(FILE)
+    }
 
     /// Run `body` under BOTH the in-proc mutex AND an exclusive flock on
     /// self.dir/keystore.lock. The flock File is opened per-call and bound to THIS
@@ -547,7 +614,9 @@ impl Keystore {
     /// to drift.
     fn load_locked_core(&self, id: Identity<'_>) -> Result<serde_json::Value, KeystoreError> {
         let path = self.file();
-        if !path.exists() { return Ok(serde_json::json!({})); }
+        if !path.exists() {
+            return Ok(serde_json::json!({}));
+        }
         let bytes = std::fs::read(&path)?;
         let env: Envelope = serde_json::from_slice(&bytes)
             .map_err(|e| KeystoreError::Envelope(format!("malformed: {e}")))?;
@@ -603,7 +672,9 @@ impl Keystore {
     fn load_state_locked_core(&self, id: Identity<'_>) -> Result<KeystoreLoadState, KeystoreError> {
         let path = self.file();
         // Re-check absence under the lock (race with a concurrent reset/archive).
-        if !path.exists() { return Ok(KeystoreLoadState::Missing); }
+        if !path.exists() {
+            return Ok(KeystoreLoadState::Missing);
+        }
         let bytes = std::fs::read(&path)?;
         let env: Envelope = serde_json::from_slice(&bytes)
             .map_err(|e| KeystoreError::Envelope(format!("malformed: {e}")))?;
@@ -628,7 +699,11 @@ impl Keystore {
     /// selected by `id` and atomically replaces the keystore file. The production
     /// [`store_locked`](Self::store_locked) and the migration test seam both go
     /// through here — no duplicated encrypt/atomic-replace logic to drift.
-    fn store_locked_core(&self, keys: &serde_json::Value, id: Identity<'_>) -> Result<(), KeystoreError> {
+    fn store_locked_core(
+        &self,
+        keys: &serde_json::Value,
+        id: Identity<'_>,
+    ) -> Result<(), KeystoreError> {
         // Production reads the real OS identity + records CURRENT as the source.
         // Tests inject the identity string and record the macOS source (the test
         // identity is the same on every host regardless of the platform it runs
@@ -661,11 +736,7 @@ impl Keystore {
     /// identity) and the [`update_keys_with_identity`](Self::update_keys_with_identity)
     /// test seam (injected identity) — no duplicated load/mutate/store logic to
     /// drift. Stale-tmp cleanup happens once in `with_locks` under the lock.
-    fn update_keys_core<F>(
-        &self,
-        mutator: F,
-        id: Identity<'_>,
-    ) -> Result<(), KeystoreError>
+    fn update_keys_core<F>(&self, mutator: F, id: Identity<'_>) -> Result<(), KeystoreError>
     where
         F: FnOnce(&mut serde_json::Value),
     {
@@ -749,11 +820,33 @@ impl Keystore {
         self.list_provider_key_refs_with(Identity::Machine)
     }
 
+    /// Read the opt-in AES-256 history key. A missing key is distinct from a
+    /// malformed key: corrupt payloads fail closed instead of becoming None.
+    pub fn get_history_key(&self) -> Result<Option<SerializableKey>, KeystoreError> {
+        self.get_history_key_with(Identity::Machine)
+    }
+
+    /// Return the existing history key or create it atomically under the same
+    /// in-process + cross-process locks used by provider-key writes.
+    pub fn get_or_create_history_key(&self) -> Result<SerializableKey, KeystoreError> {
+        self.get_or_create_history_key_with(Identity::Machine)
+    }
+
+    /// Remove the typed history key atomically. This is intentionally separate
+    /// from disabling history, which preserves the key and encrypted records.
+    pub fn clear_history_key(&self) -> Result<(), KeystoreError> {
+        self.clear_history_key_with(Identity::Machine)
+    }
+
     /// Test-only: same as [`get_key`](Self::get_key) but decrypts with an
     /// injected identity. Delegates to the SAME locked-read core as the
     /// production path.
     #[doc(hidden)]
-    pub fn get_key_with_identity(&self, secret_ref: &str, identity: &str) -> Result<Option<String>, KeystoreError> {
+    pub fn get_key_with_identity(
+        &self,
+        secret_ref: &str,
+        identity: &str,
+    ) -> Result<Option<String>, KeystoreError> {
         self.get_key_with(secret_ref, Identity::Injected(identity))
     }
 
@@ -761,32 +854,74 @@ impl Keystore {
     /// injected identity. Delegates to the SAME typed-RMW core as the
     /// production path.
     #[doc(hidden)]
-    pub fn set_key_with_identity(&self, secret_ref: &str, key: &str, identity: &str) -> Result<(), KeystoreError> {
+    pub fn set_key_with_identity(
+        &self,
+        secret_ref: &str,
+        key: &str,
+        identity: &str,
+    ) -> Result<(), KeystoreError> {
         self.set_key_with(secret_ref, key, Identity::Injected(identity))
     }
 
     /// Test-only: same as [`delete_key`](Self::delete_key) but the RMW uses an
     /// injected identity.
     #[doc(hidden)]
-    pub fn delete_key_with_identity(&self, secret_ref: &str, identity: &str) -> Result<(), KeystoreError> {
+    pub fn delete_key_with_identity(
+        &self,
+        secret_ref: &str,
+        identity: &str,
+    ) -> Result<(), KeystoreError> {
         self.delete_key_with(secret_ref, Identity::Injected(identity))
     }
 
     /// Test-only: same as [`list_provider_key_refs`](Self::list_provider_key_refs)
     /// but decrypts with an injected identity.
     #[doc(hidden)]
-    pub fn list_provider_key_refs_with_identity(&self, identity: &str) -> Result<Vec<String>, KeystoreError> {
+    pub fn list_provider_key_refs_with_identity(
+        &self,
+        identity: &str,
+    ) -> Result<Vec<String>, KeystoreError> {
         self.list_provider_key_refs_with(Identity::Injected(identity))
+    }
+
+    /// Test seam for [`get_history_key`](Self::get_history_key).
+    #[doc(hidden)]
+    pub fn get_history_key_with_identity(
+        &self,
+        identity: &str,
+    ) -> Result<Option<SerializableKey>, KeystoreError> {
+        self.get_history_key_with(Identity::Injected(identity))
+    }
+
+    /// Test seam for [`get_or_create_history_key`](Self::get_or_create_history_key).
+    #[doc(hidden)]
+    pub fn get_or_create_history_key_with_identity(
+        &self,
+        identity: &str,
+    ) -> Result<SerializableKey, KeystoreError> {
+        self.get_or_create_history_key_with(Identity::Injected(identity))
+    }
+
+    /// Test seam for [`clear_history_key`](Self::clear_history_key).
+    #[doc(hidden)]
+    pub fn clear_history_key_with_identity(&self, identity: &str) -> Result<(), KeystoreError> {
+        self.clear_history_key_with(Identity::Injected(identity))
     }
 
     /// Shared read core for [`get_key`](Self::get_key): load + decrypt under
     /// BOTH locks, normalize to `KeystoreData`, then return the named key.
-    fn get_key_with(&self, secret_ref: &str, id: Identity<'_>) -> Result<Option<String>, KeystoreError> {
+    fn get_key_with(
+        &self,
+        secret_ref: &str,
+        id: Identity<'_>,
+    ) -> Result<Option<String>, KeystoreError> {
         self.with_locks(|ks| {
             let v = ks.load_locked_core(id)?;
             // Fail-closed: payload_to_v2 propagates Corrupt as Err (a corrupt
             // payload must NOT degrade to a silent Ok(None) that masks the failure).
-            Ok(payload_to_v2(&v)?.get_provider_key(secret_ref).map(|s| s.to_string()))
+            Ok(payload_to_v2(&v)?
+                .get_provider_key(secret_ref)
+                .map(|s| s.to_string()))
         })
     }
 
@@ -794,9 +929,9 @@ impl Keystore {
     /// BOTH locks, normalize to v2, hand a typed mutator the data, then store the
     /// v2 value. One core for every mutating typed accessor (set/delete) so the
     /// v2-convergence guarantee lives in exactly one place.
-    fn update_data_core<F>(&self, mutator: F, id: Identity<'_>) -> Result<(), KeystoreError>
+    fn update_data_core<R, F>(&self, mutator: F, id: Identity<'_>) -> Result<R, KeystoreError>
     where
-        F: FnOnce(&mut KeystoreData),
+        F: FnOnce(&mut KeystoreData) -> R,
     {
         self.with_locks(|ks| {
             let raw = ks.load_locked_core(id)?;
@@ -808,22 +943,31 @@ impl Keystore {
             // keystore therefore NEVER gets silently overwritten with an empty v2
             // by set_key/delete_key — the write is aborted before the mutator runs.
             let mut data = payload_to_v2(&raw)?;
-            mutator(&mut data);
+            let result = mutator(&mut data);
             let value = data.to_value()?;
-            ks.store_locked_core(&value, id)
+            ks.store_locked_core(&value, id)?;
+            Ok(result)
         })
     }
 
     /// Shared set core: typed-RMW with `set_provider_key`.
-    fn set_key_with(&self, secret_ref: &str, key: &str, id: Identity<'_>) -> Result<(), KeystoreError> {
+    fn set_key_with(
+        &self,
+        secret_ref: &str,
+        key: &str,
+        id: Identity<'_>,
+    ) -> Result<(), KeystoreError> {
         self.update_data_core(|data| data.set_provider_key(secret_ref, key), id)
     }
 
     /// Shared delete core: typed-RMW with `remove_provider_key` (idempotent).
     fn delete_key_with(&self, secret_ref: &str, id: Identity<'_>) -> Result<(), KeystoreError> {
-        self.update_data_core(|data| {
-            data.remove_provider_key(secret_ref);
-        }, id)
+        self.update_data_core(
+            |data| {
+                data.remove_provider_key(secret_ref);
+            },
+            id,
+        )
     }
 
     /// Shared list core: load + normalize to v2, return the `secret_ref`s.
@@ -832,6 +976,44 @@ impl Keystore {
             let v = ks.load_locked_core(id)?;
             Ok(payload_to_v2(&v)?.provider_keys.into_keys().collect())
         })
+    }
+
+    fn get_history_key_with(
+        &self,
+        id: Identity<'_>,
+    ) -> Result<Option<SerializableKey>, KeystoreError> {
+        self.with_locks(|ks| {
+            let value = ks.load_locked_core(id)?;
+            Ok(payload_to_v2(&value)?.history_key)
+        })
+    }
+
+    fn get_or_create_history_key_with(
+        &self,
+        id: Identity<'_>,
+    ) -> Result<SerializableKey, KeystoreError> {
+        self.update_data_core(
+            |data| {
+                if let Some(key) = &data.history_key {
+                    return key.clone();
+                }
+                let mut bytes = [0_u8; 32];
+                rand::rngs::OsRng.fill_bytes(&mut bytes);
+                let key = SerializableKey(bytes);
+                data.history_key = Some(key.clone());
+                key
+            },
+            id,
+        )
+    }
+
+    fn clear_history_key_with(&self, id: Identity<'_>) -> Result<(), KeystoreError> {
+        self.update_data_core(
+            |data| {
+                data.history_key = None;
+            },
+            id,
+        )
     }
 
     /// Copy keystore.json → keystore.json.broken-<secs>-<nanos> (user-initiated
@@ -889,7 +1071,9 @@ impl Keystore {
 
     /// Path to the pre-migration backup (spec §A, S2a). Exposed so tests can
     /// assert on it without hardcoding the filename string.
-    fn backup_path(&self) -> PathBuf { self.dir.join(BACKUP_PRE_MIGRATION) }
+    fn backup_path(&self) -> PathBuf {
+        self.dir.join(BACKUP_PRE_MIGRATION)
+    }
 
     /// Under BOTH locks: create the pre-migration backup (TRUE no-clobber).
     /// Reads `keystore.json` bytes and publishes them to
@@ -965,7 +1149,11 @@ impl Keystore {
     /// (1) the idempotent pre-migration backup and (2) the atomic v2 rewrite. The
     /// production [`migrate_to_v2_locked`](Self::migrate_to_v2_locked) and the test
     /// seam go through here — no duplicated backup or rewrite logic to drift.
-    fn migrate_to_v2_locked_core(&self, data: &KeystoreData, id: Identity<'_>) -> Result<(), KeystoreError> {
+    fn migrate_to_v2_locked_core(
+        &self,
+        data: &KeystoreData,
+        id: Identity<'_>,
+    ) -> Result<(), KeystoreError> {
         // (1) Backup. Idempotent: a prior backup (from a standalone backup_keystore
         // call or a previous migration) is never overwritten.
         self.backup_locked()?;
@@ -988,7 +1176,11 @@ fn broken_archive_path(dir: &Path) -> std::path::PathBuf {
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default();
-    dir.join(format!("keystore.json.broken-{}-{}", now.as_secs(), now.subsec_nanos()))
+    dir.join(format!(
+        "keystore.json.broken-{}-{}",
+        now.as_secs(),
+        now.subsec_nanos()
+    ))
 }
 
 /// Inspect the keystore at `dir` and return its typed load state (S2a). Standalone
@@ -1181,7 +1373,9 @@ fn atomic_replace(src: &Path, dst: &Path) -> Result<(), KeystoreError> {
 
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
 fn atomic_replace(_src: &Path, _dst: &Path) -> Result<(), KeystoreError> {
-    Err(KeystoreError::Envelope("atomic_replace not implemented on this platform".into()))
+    Err(KeystoreError::Envelope(
+        "atomic_replace not implemented on this platform".into(),
+    ))
 }
 
 #[cfg(test)]
@@ -1189,7 +1383,12 @@ mod tests {
     use super::*;
     #[test]
     fn encrypt_produces_pinned_envelope() {
-        let env = encrypt("test-machine-uuid", IdentitySource::MacosIoplatformuuid, &serde_json::json!({"openai":"sk-test"})).unwrap();
+        let env = encrypt(
+            "test-machine-uuid",
+            IdentitySource::MacosIoplatformuuid,
+            &serde_json::json!({"openai":"sk-test"}),
+        )
+        .unwrap();
         assert_eq!(env.version, 1);
         assert_eq!(env.aead, "aes-256-gcm");
         assert_eq!(env.kdf, "argon2id");
@@ -1254,14 +1453,11 @@ mod tests {
     fn win32_dacl_locks_to_current_user_and_is_protected() {
         use std::os::windows::ffi::OsStrExt;
         use windows_sys::Win32::Foundation::LocalFree;
-        use windows_sys::Win32::Security::Authorization::{
-            GetNamedSecurityInfoW, SE_FILE_OBJECT,
-        };
+        use windows_sys::Win32::Security::Authorization::{GetNamedSecurityInfoW, SE_FILE_OBJECT};
         use windows_sys::Win32::Security::{
-            AclSizeInformation, EqualSid, GetAclInformation, GetAce,
-            GetSecurityDescriptorControl, ACL_SIZE_INFORMATION,
-            DACL_SECURITY_INFORMATION, OWNER_SECURITY_INFORMATION, PSECURITY_DESCRIPTOR,
-            SE_DACL_PROTECTED, ACL,
+            AclSizeInformation, EqualSid, GetAce, GetAclInformation, GetSecurityDescriptorControl,
+            ACL, ACL_SIZE_INFORMATION, DACL_SECURITY_INFORMATION, OWNER_SECURITY_INFORMATION,
+            PSECURITY_DESCRIPTOR, SE_DACL_PROTECTED,
         };
         // ACCESS_ALLOWED_ACE_TYPE lives in SystemServices (not Security) and is u32;
         // ACE_HEADER.AceType is u8, so compare against 0u8 directly.
@@ -1270,13 +1466,18 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let f = dir.path().join("keystore.json");
         std::fs::write(&f, b"x").unwrap();
-        crate::fs_acl::set_win32_owner_dacl(&f, false).expect("set_win32_owner_dacl should succeed");
+        crate::fs_acl::set_win32_owner_dacl(&f, false)
+            .expect("set_win32_owner_dacl should succeed");
 
         // Expected SID (same source the prod path used):
         let sid_buf = crate::fs_acl::current_user_sid().unwrap();
         let expected_sid = crate::fs_acl::sid_from_token_user_buf(&sid_buf).unwrap();
 
-        let path_wide: Vec<u16> = f.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
+        let path_wide: Vec<u16> = f
+            .as_os_str()
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect();
         let mut owner: PSECURITY_DESCRIPTOR = std::ptr::null_mut();
         let mut dacl: *mut ACL = std::ptr::null_mut();
         // SAFETY: path_wide is NUL-terminated + alive; the out-params receive the SD/DACL.
@@ -1318,7 +1519,11 @@ mod tests {
 
         // (b) Exactly ONE ACE. `dacl` was returned by GetNamedSecurityInfoW above and
         // points into the (still-alive via _sd) security descriptor.
-        let mut size_info = ACL_SIZE_INFORMATION { AceCount: 0, AclBytesInUse: 0, AclBytesFree: 0 };
+        let mut size_info = ACL_SIZE_INFORMATION {
+            AceCount: 0,
+            AclBytesInUse: 0,
+            AclBytesFree: 0,
+        };
         // SAFETY: dacl is a valid DACL pointer from the SD; buf is sized to the type.
         let ok = unsafe {
             GetAclInformation(
@@ -1340,10 +1545,18 @@ mod tests {
         // The SID starts at &SidStart; ACE_HEADER.AceType == ACCESS_ALLOWED_ACE_TYPE.
         #[repr(C)]
         #[allow(non_snake_case)] // field names mirror the Win32 ACE_HEADER / ACCESS_ALLOWED_ACE layout
-        struct AceHeader { AceType: u8, AceFlags: u8, AceSize: u16 }
+        struct AceHeader {
+            AceType: u8,
+            AceFlags: u8,
+            AceSize: u16,
+        }
         #[repr(C)]
         #[allow(non_snake_case)] // field names mirror the Win32 layout (Header/Mask/SidStart)
-        struct AccessAllowedAce { Header: AceHeader, Mask: u32, SidStart: u32 }
+        struct AccessAllowedAce {
+            Header: AceHeader,
+            Mask: u32,
+            SidStart: u32,
+        }
         let ace: &AccessAllowedAce = unsafe { &*(ace_ptr as *const AccessAllowedAce) };
         assert_eq!(ace.Header.AceType, ACCESS_ALLOWED, "ACE is ACCESS_ALLOWED");
         // GENERIC_ALL (0x10000000) is what we stored, but on a FILE object GetAce returns
@@ -1356,8 +1569,10 @@ mod tests {
         const WRITE_OWNER: u32 = 0x0008_0000;
         let full_ctrl = DELETE | WRITE_DAC | WRITE_OWNER;
         assert_eq!(
-            ace.Mask & full_ctrl, full_ctrl,
-            "ACE mask grants full control (DELETE|WRITE_DAC|WRITE_OWNER); mask=0x{:x}", ace.Mask
+            ace.Mask & full_ctrl,
+            full_ctrl,
+            "ACE mask grants full control (DELETE|WRITE_DAC|WRITE_OWNER); mask=0x{:x}",
+            ace.Mask
         );
         // SID begins at SidStart field.
         let ace_sid = (&ace.SidStart as *const u32) as windows_sys::Win32::Security::PSID;

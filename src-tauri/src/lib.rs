@@ -10,14 +10,17 @@
 //!       system-dictionary integration. Built-in Rust modules, NOT plugins.
 //! - No WASM, no plugin system in v1 (deferred to post-v1).
 
-pub mod engines;
 pub mod a11y;
 pub mod adapter;
 pub mod clipboard;
 pub mod concurrency;
 pub mod cursor;
+pub mod db;
 pub mod dict;
+pub mod engines;
 pub mod error;
+pub mod fs_acl;
+pub mod history;
 pub mod keystore;
 pub mod popup;
 pub mod providers;
@@ -25,11 +28,10 @@ pub mod selection;
 pub mod selection_engine;
 pub mod service;
 pub mod settings;
-pub mod wire;
-pub mod db;
-pub mod fs_acl;
+pub mod shortcuts;
 pub mod tray_state;
 pub mod uuid_util;
+pub mod wire;
 
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -37,14 +39,22 @@ use std::sync::Arc;
 use tauri::menu::MenuEvent;
 use tauri::Emitter;
 use tauri::Manager;
-use tauri_plugin_global_shortcut::{Builder as GlobalShortcutBuilder, GlobalShortcutExt, ShortcutState};
+use tauri_plugin_global_shortcut::{
+    Builder as GlobalShortcutBuilder, GlobalShortcutExt, ShortcutState,
+};
 
-use crate::db::migration::{run_migration, FailpointCell, MigrationError};
 use crate::adapter::profile_to_preset;
-use crate::db::providers::{self as db_providers, ActiveSelection, ProviderPatch, ProviderProfile, ProviderStatus};
+use crate::db::migration::{run_migration, FailpointCell, MigrationError};
+use crate::db::providers::{
+    self as db_providers, ActiveSelection, ProviderPatch, ProviderProfile, ProviderStatus,
+};
 use crate::db::readiness::DataReadiness;
 use crate::db::Database;
 use crate::service::{translate_parallel, translate_with_fallback_ref, TranslationOutcome};
+use crate::shortcuts::{
+    Registrar as ShortcutRegistrar, ShortcutAction, ShortcutController, ShortcutError,
+    ShortcutSnapshot,
+};
 
 // Re-export so integration tests can reference the error enum as
 // `linguaray_lib::Error` (mirrors `service::TranslationOutcome` usage).
@@ -111,6 +121,90 @@ pub struct AppState {
     /// `parking_lot::Mutex` (NOT `tokio::sync::Mutex`) so `TranslationGuard::drop`
     /// runs `finish_translation` synchronously on the calling thread.
     pub tray: Arc<parking_lot::Mutex<tray_state::TrayStateController>>,
+}
+
+/// Real OS adapter for the revisioned shortcut controller. It owns the exact
+/// set registered by LinguaRay and performs an inverse rollback if any new
+/// registration fails, so the controller's DB transaction never observes a
+/// partially rebound map.
+struct TauriShortcutRegistrar {
+    app: tauri::AppHandle,
+    current: parking_lot::Mutex<Vec<(ShortcutAction, String)>>,
+}
+
+impl TauriShortcutRegistrar {
+    fn new(app: tauri::AppHandle) -> Self {
+        Self {
+            app,
+            current: parking_lot::Mutex::new(Vec::new()),
+        }
+    }
+
+    fn register_binding(&self, action: ShortcutAction, combo: &str) -> Result<(), String> {
+        let action_for_handler = action;
+        self.app
+            .global_shortcut()
+            .on_shortcut(combo, move |app, shortcut, event| {
+                if app
+                    .try_state::<Arc<ShortcutController>>()
+                    .is_some_and(|state| state.is_recording())
+                {
+                    return;
+                }
+                match action_for_handler {
+                    ShortcutAction::Selection => on_hotkey(app, shortcut, event),
+                    ShortcutAction::Input => on_input_hotkey(app, shortcut, event),
+                    ShortcutAction::Clipboard if event.state == ShortcutState::Pressed => {
+                        let _ = app.emit("tray-action", "translate-clipboard");
+                    }
+                    ShortcutAction::Clipboard | ShortcutAction::Ocr => {}
+                }
+            })
+            .map_err(|error| error.to_string())
+    }
+
+    fn unregister_bindings(&self, bindings: &[(ShortcutAction, String)]) -> Result<(), String> {
+        for (_, combo) in bindings {
+            self.app
+                .global_shortcut()
+                .unregister(combo.as_str())
+                .map_err(|error| error.to_string())?;
+        }
+        Ok(())
+    }
+}
+
+impl ShortcutRegistrar for TauriShortcutRegistrar {
+    fn replace_all(&self, shortcuts: &[(ShortcutAction, String)]) -> Result<(), String> {
+        let mut current = self.current.lock();
+        let previous = current.clone();
+        self.unregister_bindings(&previous)?;
+
+        let mut registered = Vec::new();
+        for (action, combo) in shortcuts {
+            if let Err(operation) = self.register_binding(*action, combo) {
+                let _ = self.unregister_bindings(&registered);
+                let mut rollback_errors = Vec::new();
+                for (old_action, old_combo) in &previous {
+                    if let Err(error) = self.register_binding(*old_action, old_combo) {
+                        rollback_errors.push(error);
+                    }
+                }
+                if rollback_errors.is_empty() {
+                    *current = previous;
+                    return Err(operation);
+                }
+                current.clear();
+                return Err(format!(
+                    "{operation}; rollback failed: {}",
+                    rollback_errors.join("; ")
+                ));
+            }
+            registered.push((*action, combo.clone()));
+        }
+        *current = registered;
+        Ok(())
+    }
 }
 
 /// Gating check for provider commands that ALREADY hold the `data_gate` guard.
@@ -234,7 +328,8 @@ pub fn startup_migration_guard<'a>(
         return Err(format!("keystore init failed: {e}"));
     }
     settings_path.ok_or_else(|| {
-        "settings path could not be resolved; migration refused (no backup, no DB write)".to_string()
+        "settings path could not be resolved; migration refused (no backup, no DB write)"
+            .to_string()
     })
 }
 
@@ -252,9 +347,10 @@ fn session_client(session: &Session) -> Result<&reqwest::Client, String> {
 /// (degraded `NeedsKeystoreRecovery`) surfaces consistently instead of
 /// panicking.
 fn session_keystore(session: &Session) -> Result<&keystore::Keystore, String> {
-    session.keystore.as_ref().ok_or_else(|| {
-        "keystore unavailable: startup init failed (recovery required)".to_string()
-    })
+    session
+        .keystore
+        .as_ref()
+        .ok_or_else(|| "keystore unavailable: startup init failed (recovery required)".to_string())
 }
 
 #[tauri::command]
@@ -276,7 +372,10 @@ async fn translate(
         options: opts,
     };
     // §G: resolve the opt-in fallback engine from settings (None by default).
-    let fallback = settings::load(&app).fallback_engine.as_deref().and_then(engines::find);
+    let fallback = settings::load(&app)
+        .fallback_engine
+        .as_deref()
+        .and_then(engines::find);
     let client = session_client(&state)?;
     let keystore = session_keystore(&state)?;
     let t = service::translate_with_fallback(client, keystore, &preset, input, fallback)
@@ -421,7 +520,14 @@ async fn translate_clipboard(
 
     // 走统一核心（从 settings 读 fallback_engine；target_language 来自 settings）。
     let session_result = run_translate_session(
-        &db, &client, keystore, &app, &text, "auto", &s.target_language,
+        &db,
+        &client,
+        keystore,
+        &app,
+        &text,
+        "auto",
+        &s.target_language,
+        "clipboard",
     )
     .await;
 
@@ -508,7 +614,11 @@ pub fn decide_clipboard_popup(result: &TranslateSessionResult) -> ClipboardPopup
     // actual_engine=None：并行路径。
     if result.outcomes.len() == 1 {
         // 退化单引擎但失败。
-        if let Some(err) = result.outcomes.first().and_then(|o| o.result.as_ref().err()) {
+        if let Some(err) = result
+            .outcomes
+            .first()
+            .and_then(|o| o.result.as_ref().err())
+        {
             return ClipboardPopupDecision::Error(err.to_string());
         }
     }
@@ -541,6 +651,11 @@ pub fn resolve_target_language(to: &str, settings_target: &str) -> String {
 ///
 /// 流程见 plan Task 4：read_active_selection → list → 过滤 active+enabled →
 /// 单引擎 or translate_parallel。
+///
+/// 8 个参数是既定签名（`translate_session`/`translate_clipboard` 位置调用），
+/// 收敛成 ctx struct 会让所有调用点更绕；与 `translate_parallel` 的扁平签名
+/// 保持一致更易读。clippy 的 7 参数阈值是经验值，这里故意放宽。
+#[allow(clippy::too_many_arguments)]
 async fn run_translate_session(
     db: &Arc<Database>,
     client: &reqwest::Client,
@@ -549,16 +664,40 @@ async fn run_translate_session(
     text: &str,
     from: &str,
     to: &str,
+    trigger_source: &str,
 ) -> Result<TranslateSessionResult, String> {
     // P1-C: resolve the "" sentinel CENTRALLY so on_hotkey, translate_session,
     // translate_selection_ipc, and the tray all agree.
     let settings_target = settings::load(app).target_language;
     let to = resolve_target_language(to, &settings_target);
     // 读 fallback_engine（§G opt-in，默认 None）。
-    let fallback_box = settings::load(app).fallback_engine.as_deref().and_then(engines::find);
+    let fallback_box = settings::load(app)
+        .fallback_engine
+        .as_deref()
+        .and_then(engines::find);
     let fallback: Option<Arc<dyn engines::TraditionalEngine>> =
         fallback_box.map(Arc::<dyn engines::TraditionalEngine>::from);
-    run_translate_session_with_fallback(db, client, keystore, text, from, &to, fallback).await
+    let started = std::time::Instant::now();
+    let result =
+        run_translate_session_with_fallback(db, client, keystore, text, from, &to, fallback).await;
+    if let Ok(session) = &result {
+        let elapsed_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
+        let detected = (!from.is_empty() && from != "auto").then_some(from);
+        if let Err(error) = crate::history::persist_translation_session(
+            db,
+            keystore,
+            trigger_source,
+            text,
+            detected,
+            &to,
+            &session.outcomes,
+            elapsed_ms,
+        ) {
+            // Optional history must never break or expose translation content.
+            log::warn!("encrypted history persistence failed: {}", error);
+        }
+    }
+    result
 }
 
 /// 测试入口：不读 settings，fallback 直接传 None（聚焦核心路径）。
@@ -597,9 +736,8 @@ async fn run_translate_session_with_fallback(
 
     // 过滤出 active+enabled 的 profile，按 selection 顺序（primary 先，parallel 次）。
     // 与 validate_active_selection 的 active+enabled 判定一致。
-    let is_callable = |p: &ProviderProfile| {
-        p.status == ProviderStatus::Active.as_str() && p.enabled
-    };
+    let is_callable =
+        |p: &ProviderProfile| p.status == ProviderStatus::Active.as_str() && p.enabled;
     let mut profiles: Vec<ProviderProfile> = Vec::new();
     if let Some(primary_uuid) = &selection.primary {
         if let Some(p) = all_profiles.iter().find(|p| &p.uuid == primary_uuid) {
@@ -622,8 +760,7 @@ async fn run_translate_session_with_fallback(
     // 单引擎 vs 并行。
     if selection.parallel.is_empty() {
         // 单引擎：用 primary profile + translate_with_fallback_ref。
-        let preset = profile_to_preset(&profiles[0])
-            .map_err(|e| format!("adapter error: {e}"))?;
+        let preset = profile_to_preset(&profiles[0]).map_err(|e| format!("adapter error: {e}"))?;
         let input = service::TranslateInput {
             text,
             from,
@@ -631,10 +768,7 @@ async fn run_translate_session_with_fallback(
             options: wire::AppOptions::default(),
         };
         let fb_ref: Option<&dyn engines::TraditionalEngine> = fallback.as_deref();
-        let result = translate_with_fallback_ref(
-            client, keystore, &preset, input, fb_ref,
-        )
-        .await;
+        let result = translate_with_fallback_ref(client, keystore, &preset, input, fb_ref).await;
         let actual_engine = match &result {
             Ok(t) => Some(t.engine.clone()),
             Err(_) => None,
@@ -690,7 +824,10 @@ async fn translate_session(
     })
     .await
     .map_err(|e| e.to_string())??;
-    run_translate_session(&db, &client, keystore, &app, &req.text, &req.from, &req.to).await
+    run_translate_session(
+        &db, &client, keystore, &app, &req.text, &req.from, &req.to, "input",
+    )
+    .await
 }
 
 /// A4 (P1-5): translate the live OS selection (fresh capture) OR a
@@ -756,7 +893,11 @@ fn list_engines() -> Vec<EngineInfo> {
         .map(EngineInfo::from_provider)
         .collect();
     // Also include built-in traditional engines (for the fallback selector).
-    out.extend(engines::registry().iter().map(|e| EngineInfo::from_traditional(e.as_ref())));
+    out.extend(
+        engines::registry()
+            .iter()
+            .map(|e| EngineInfo::from_traditional(e.as_ref())),
+    );
     out
 }
 
@@ -789,7 +930,9 @@ fn set_key(
     // (NeedsDatabaseRecovery / not yet open) we can't validate, so refuse.
     assert_secret_ref_owned(&app, &provider_id)?;
     let keystore = session_keystore(&state)?;
-    keystore.set_key(&provider_id, &key).map_err(|e| e.to_string())?;
+    keystore
+        .set_key(&provider_id, &key)
+        .map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -812,7 +955,9 @@ fn delete_key(
     // the `status != 'deleted'` clause. If the DB isn't available, refuse.
     assert_secret_ref_owned(&app, &provider_id)?;
     let keystore = session_keystore(&state)?;
-    keystore.delete_key(&provider_id).map_err(|e| e.to_string())?;
+    keystore
+        .delete_key(&provider_id)
+        .map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -879,9 +1024,7 @@ fn assert_secret_ref_owned(app: &Arc<AppState>, provider_id: &str) -> Result<(),
 /// migration complete) and updates `DataReadiness` based on the old state +
 /// whether the DB is still usable.
 #[tauri::command]
-async fn archive_keystore(
-    state: tauri::State<'_, Arc<AppState>>,
-) -> Result<String, String> {
+async fn archive_keystore(state: tauri::State<'_, Arc<AppState>>) -> Result<String, String> {
     let app = state.inner().clone();
     let ks_dir = app.keystore_dir.clone();
     tauri::async_runtime::spawn_blocking(move || -> Result<String, String> {
@@ -913,9 +1056,7 @@ async fn archive_keystore(
 /// via the `data_gate` write lock, runs the DB cleanup transaction, and updates
 /// `DataReadiness` based on the old state + DB availability.
 #[tauri::command]
-async fn reset_keystore(
-    state: tauri::State<'_, Arc<AppState>>,
-) -> Result<Option<String>, String> {
+async fn reset_keystore(state: tauri::State<'_, Arc<AppState>>) -> Result<Option<String>, String> {
     let app = state.inner().clone();
     let ks_dir = app.keystore_dir.clone();
     tauri::async_runtime::spawn_blocking(move || -> Result<Option<String>, String> {
@@ -935,9 +1076,7 @@ async fn reset_keystore(
 }
 
 #[tauri::command]
-fn key_status(
-    state: tauri::State<'_, Arc<Session>>,
-) -> std::collections::HashMap<String, bool> {
+fn key_status(state: tauri::State<'_, Arc<Session>>) -> std::collections::HashMap<String, bool> {
     // Review P1 #6: swallow the error (return empty) so frontend onMount never
     // aborts. The recovery banner reads `keystore_health` for the reason.
     //
@@ -1078,8 +1217,8 @@ fn init_last_resort_keystore() -> Result<keystore::Keystore, String> {
     // one final attempt with a random name and surface the error.
     let mut last_err = String::new();
     for suffix in 0..=16 {
-        let candidate = std::env::temp_dir()
-            .join(format!("linguaray-keystore-lastresort-{pid}-{suffix}"));
+        let candidate =
+            std::env::temp_dir().join(format!("linguaray-keystore-lastresort-{pid}-{suffix}"));
         match keystore::Keystore::new(candidate) {
             Ok(ks) => return Ok(ks),
             Err(e) => {
@@ -1191,7 +1330,8 @@ async fn provider_list(
         // swap and could hand the command a stale DB.
         let _gate = app.data_gate.read();
         let db = require_ready_gated(&app, &_gate)?;
-        db.with_conn(|conn| db_providers::list(conn)).map_err(|e| e.to_string())
+        db.with_conn(|conn| db_providers::list(conn))
+            .map_err(|e| e.to_string())
     })
     .await
     .map_err(|e| e.to_string())?
@@ -1240,27 +1380,31 @@ async fn provider_update(
     patch: ProviderPatch,
 ) -> Result<ProviderProfile, ProviderCommandError> {
     let app_state = state.inner().clone();
-    let result = tauri::async_runtime::spawn_blocking(move || -> Result<ProviderProfile, ProviderCommandError> {
-        // Acquire the gate FIRST (see provider_list).
-        let _gate = app_state.data_gate.read();
-        let db = require_ready_gated(&app_state, &_gate).map_err(ProviderCommandError::from)?;
-        // The typed `UpdateOutcome` carries the stale/not-found signals out of
-        // the `with_conn` closure (whose error type is fixed to `DbError`), then
-        // we map them to structured `ProviderCommandError` variants here — same
-        // pattern as `ConfirmActiveOutcome` (no string-prefix parsing).
-        let outcome = db.with_conn(|conn| db_providers::update(conn, &uuid, &patch));
-        outcome
-            .map(|o| match o {
-                db_providers::UpdateOutcome::Written(p) => Ok(p),
-                db_providers::UpdateOutcome::StaleVersion { actual_version } => {
-                    Err(ProviderCommandError::StaleVersion { actual_version })
-                }
-                db_providers::UpdateOutcome::NotFound => Err(ProviderCommandError::Validation {
-                    message: "provider not found".into(),
-                }),
-            })
-            .map_err(ProviderCommandError::from)?
-    })
+    let result = tauri::async_runtime::spawn_blocking(
+        move || -> Result<ProviderProfile, ProviderCommandError> {
+            // Acquire the gate FIRST (see provider_list).
+            let _gate = app_state.data_gate.read();
+            let db = require_ready_gated(&app_state, &_gate).map_err(ProviderCommandError::from)?;
+            // The typed `UpdateOutcome` carries the stale/not-found signals out of
+            // the `with_conn` closure (whose error type is fixed to `DbError`), then
+            // we map them to structured `ProviderCommandError` variants here — same
+            // pattern as `ConfirmActiveOutcome` (no string-prefix parsing).
+            let outcome = db.with_conn(|conn| db_providers::update(conn, &uuid, &patch));
+            outcome
+                .map(|o| match o {
+                    db_providers::UpdateOutcome::Written(p) => Ok(p),
+                    db_providers::UpdateOutcome::StaleVersion { actual_version } => {
+                        Err(ProviderCommandError::StaleVersion { actual_version })
+                    }
+                    db_providers::UpdateOutcome::NotFound => {
+                        Err(ProviderCommandError::Validation {
+                            message: "provider not found".into(),
+                        })
+                    }
+                })
+                .map_err(ProviderCommandError::from)?
+        },
+    )
     .await
     .map_err(|e| ProviderCommandError::Db {
         message: format!("{e:?}"),
@@ -1282,7 +1426,8 @@ async fn provider_duplicate(
         // Acquire the gate FIRST (see provider_list).
         let _gate = app_state.data_gate.read();
         let db = require_ready_gated(&app_state, &_gate)?;
-        db.with_conn(|conn| db_providers::duplicate(conn, &uuid)).map_err(|e| e.to_string())
+        db.with_conn(|conn| db_providers::duplicate(conn, &uuid))
+            .map_err(|e| e.to_string())
     })
     .await
     .map_err(|e| e.to_string())??;
@@ -1348,7 +1493,8 @@ async fn provider_reorder(
         // Acquire the gate FIRST (see provider_list).
         let _gate = app_state.data_gate.write();
         let db = require_ready_gated_write(&app_state, &_gate)?;
-        db.with_conn(|conn| db_providers::reorder(conn, &uuids)).map_err(|e| e.to_string())
+        db.with_conn(|conn| db_providers::reorder(conn, &uuids))
+            .map_err(|e| e.to_string())
     })
     .await
     .map_err(|e| e.to_string())??;
@@ -1370,7 +1516,8 @@ async fn provider_toggle(
         // Acquire the gate FIRST (see provider_list).
         let _gate = app_state.data_gate.write();
         let db = require_ready_gated_write(&app_state, &_gate)?;
-        db.with_conn(|conn| db_providers::toggle(conn, &uuid, enabled)).map_err(|e| e.to_string())
+        db.with_conn(|conn| db_providers::toggle(conn, &uuid, enabled))
+            .map_err(|e| e.to_string())
     })
     .await
     .map_err(|e| e.to_string())??;
@@ -1484,74 +1631,77 @@ async fn provider_set_active(
     fallback: Option<String>,
 ) -> Result<SetActiveResult, String> {
     let app_state = state.inner().clone();
-    let outcome = tauri::async_runtime::spawn_blocking(move || -> Result<SetActiveResult, String> {
-        // Acquire the gate FIRST (see provider_list).
-        let _gate = app_state.data_gate.write();
-        let db = require_ready_gated_write(&app_state, &_gate)?;
-        // The `with_conn` closure must return Result<_, DbError> (Database's
-        // contract). We carry the consent-required signal out via a SetActiveOutcome
-        // so the outer closure can map it to the frontend-facing SetActiveResult
-        // without smuggling a ConsentError through the DbError boundary.
-        //
-        // P1 #4: ALL reads (list, compute_scope, read_consent_scope) + the
-        // write run inside ONE transaction so a concurrent writer can't change
-        // the active set between validation and the slot write.
-        let outcome = db
-            .with_conn(|conn| -> Result<SetActiveOutcome, DbErr> {
-                let tx = conn.transaction()?;
-                // Validate against the active set BEFORE writing.
-                let active = db_providers::list(&tx)?;
-                db_providers::validate_active_selection(
-                    &primary,
-                    &parallel,
-                    fallback.as_deref(),
-                    &active,
-                )?;
-                // P1 #3: parallel consent gate. A non-empty parallel selection
-                // requires explicit user consent; if the stored scope doesn't
-                // match the recomputed scope, return ConsentRequired so the
-                // frontend can prompt. A matching scope (re-affirming the same
-                // set) is allowed through without re-prompting.
-                if !parallel.is_empty() {
-                    let actual = db_providers::compute_scope(&primary, &parallel, &active)
-                        .map_err(consent_to_db)?;
-                    let stored = db_providers::read_consent_scope(&tx)?;
-                    if stored.as_deref() != Some(actual.as_str()) {
-                        // No write — drop the tx (rolls back, which is a no-op
-                        // since nothing was written) and surface NeedsConsent.
-                        return Ok(SetActiveOutcome::NeedsConsent { actual_scope: actual });
-                    }
-                }
-                // Scope matches (or parallel is empty → no consent needed):
-                // write the three slots. Clear prior consent only when there's
-                // no parallel set (membership went to a non-consented shape); a
-                // matching-scope write keeps the consent as-is.
-                if parallel.is_empty() {
-                    set_active_slots(&tx, &primary, &parallel, fallback.as_deref())?;
-                } else {
-                    set_active_slots_keep_consent(
-                        &tx,
+    let outcome =
+        tauri::async_runtime::spawn_blocking(move || -> Result<SetActiveResult, String> {
+            // Acquire the gate FIRST (see provider_list).
+            let _gate = app_state.data_gate.write();
+            let db = require_ready_gated_write(&app_state, &_gate)?;
+            // The `with_conn` closure must return Result<_, DbError> (Database's
+            // contract). We carry the consent-required signal out via a SetActiveOutcome
+            // so the outer closure can map it to the frontend-facing SetActiveResult
+            // without smuggling a ConsentError through the DbError boundary.
+            //
+            // P1 #4: ALL reads (list, compute_scope, read_consent_scope) + the
+            // write run inside ONE transaction so a concurrent writer can't change
+            // the active set between validation and the slot write.
+            let outcome = db
+                .with_conn(|conn| -> Result<SetActiveOutcome, DbErr> {
+                    let tx = conn.transaction()?;
+                    // Validate against the active set BEFORE writing.
+                    let active = db_providers::list(&tx)?;
+                    db_providers::validate_active_selection(
                         &primary,
                         &parallel,
                         fallback.as_deref(),
+                        &active,
                     )?;
+                    // P1 #3: parallel consent gate. A non-empty parallel selection
+                    // requires explicit user consent; if the stored scope doesn't
+                    // match the recomputed scope, return ConsentRequired so the
+                    // frontend can prompt. A matching scope (re-affirming the same
+                    // set) is allowed through without re-prompting.
+                    if !parallel.is_empty() {
+                        let actual = db_providers::compute_scope(&primary, &parallel, &active)
+                            .map_err(consent_to_db)?;
+                        let stored = db_providers::read_consent_scope(&tx)?;
+                        if stored.as_deref() != Some(actual.as_str()) {
+                            // No write — drop the tx (rolls back, which is a no-op
+                            // since nothing was written) and surface NeedsConsent.
+                            return Ok(SetActiveOutcome::NeedsConsent {
+                                actual_scope: actual,
+                            });
+                        }
+                    }
+                    // Scope matches (or parallel is empty → no consent needed):
+                    // write the three slots. Clear prior consent only when there's
+                    // no parallel set (membership went to a non-consented shape); a
+                    // matching-scope write keeps the consent as-is.
+                    if parallel.is_empty() {
+                        set_active_slots(&tx, &primary, &parallel, fallback.as_deref())?;
+                    } else {
+                        set_active_slots_keep_consent(
+                            &tx,
+                            &primary,
+                            &parallel,
+                            fallback.as_deref(),
+                        )?;
+                    }
+                    tx.commit()?;
+                    Ok(SetActiveOutcome::Written)
+                })
+                .map_err(|e| e.to_string())?;
+            // P1.1: map the internal outcome to the serialized tagged union. The
+            // consent-required path is now an Ok(SetActiveResult::NeedsConsent) so
+            // the frontend gets a structured payload, not a parsed error string.
+            Ok(match outcome {
+                SetActiveOutcome::Written => SetActiveResult::Written,
+                SetActiveOutcome::NeedsConsent { actual_scope } => {
+                    SetActiveResult::NeedsConsent { actual_scope }
                 }
-                tx.commit()?;
-                Ok(SetActiveOutcome::Written)
             })
-            .map_err(|e| e.to_string())?;
-        // P1.1: map the internal outcome to the serialized tagged union. The
-        // consent-required path is now an Ok(SetActiveResult::NeedsConsent) so
-        // the frontend gets a structured payload, not a parsed error string.
-        Ok(match outcome {
-            SetActiveOutcome::Written => SetActiveResult::Written,
-            SetActiveOutcome::NeedsConsent { actual_scope } => SetActiveResult::NeedsConsent {
-                actual_scope,
-            },
         })
-    })
-    .await
-    .map_err(|e| e.to_string())??;
+        .await
+        .map_err(|e| e.to_string())??;
     // rev-7-8: refresh so the status item + submenu reflect the new primary.
     refresh_tray_if_available(&app_handle).await;
     Ok(outcome)
@@ -1745,53 +1895,57 @@ async fn provider_confirm_and_set_active(
     expected_scope: String,
 ) -> Result<i64, ProviderCommandError> {
     let app_state = state.inner().clone();
-    let version = tauri::async_runtime::spawn_blocking(move || -> Result<i64, ProviderCommandError> {
-        // Acquire the gate FIRST (see provider_list).
-        let _gate = app_state.data_gate.write();
-        let db = require_ready_gated_write(&app_state, &_gate).map_err(ProviderCommandError::from)?;
-        let outcome = db.with_conn(|conn| -> Result<ConfirmActiveOutcome, DbErr> {
-            let tx = conn.transaction()?;
-            let active = db_providers::list(&tx)?;
-            db_providers::validate_active_selection(
-                &primary,
-                &parallel,
-                fallback.as_deref(),
-                &active,
-            )?;
-            let actual_scope = db_providers::compute_scope(&primary, &parallel, &active)
-                .map_err(consent_to_db)?;
-            if expected_scope != actual_scope {
-                // Stale frontend: the scope it asserts doesn't match what the
-                // backend recomputes (it raced a provider change). Carried out
-                // as a typed variant — no sentinel string to parse.
-                return Ok(ConfirmActiveOutcome::StaleScope { actual_scope });
-            }
-            let new_version = write_consented_selection(
-                &tx,
-                &primary,
-                &parallel,
-                fallback.as_deref(),
-                &actual_scope,
-            )?;
-            tx.commit()?;
-            Ok(ConfirmActiveOutcome::Written { version: new_version })
-        });
-        // Map the typed outcome: StaleScope → ProviderCommandError::StaleScope
-        // (structured wire error), Written → the consent version. Everything
-        // else (real DB errors) stays an error.
-        outcome
-            .map(|o| match o {
-                ConfirmActiveOutcome::Written { version } => Ok(version),
-                ConfirmActiveOutcome::StaleScope { actual_scope } => {
-                    Err(ProviderCommandError::StaleScope { actual_scope })
+    let version =
+        tauri::async_runtime::spawn_blocking(move || -> Result<i64, ProviderCommandError> {
+            // Acquire the gate FIRST (see provider_list).
+            let _gate = app_state.data_gate.write();
+            let db = require_ready_gated_write(&app_state, &_gate)
+                .map_err(ProviderCommandError::from)?;
+            let outcome = db.with_conn(|conn| -> Result<ConfirmActiveOutcome, DbErr> {
+                let tx = conn.transaction()?;
+                let active = db_providers::list(&tx)?;
+                db_providers::validate_active_selection(
+                    &primary,
+                    &parallel,
+                    fallback.as_deref(),
+                    &active,
+                )?;
+                let actual_scope = db_providers::compute_scope(&primary, &parallel, &active)
+                    .map_err(consent_to_db)?;
+                if expected_scope != actual_scope {
+                    // Stale frontend: the scope it asserts doesn't match what the
+                    // backend recomputes (it raced a provider change). Carried out
+                    // as a typed variant — no sentinel string to parse.
+                    return Ok(ConfirmActiveOutcome::StaleScope { actual_scope });
                 }
-            })
-            .map_err(ProviderCommandError::from)?
-    })
-    .await
-    .map_err(|e| ProviderCommandError::Db {
-        message: format!("{e:?}"),
-    })??;
+                let new_version = write_consented_selection(
+                    &tx,
+                    &primary,
+                    &parallel,
+                    fallback.as_deref(),
+                    &actual_scope,
+                )?;
+                tx.commit()?;
+                Ok(ConfirmActiveOutcome::Written {
+                    version: new_version,
+                })
+            });
+            // Map the typed outcome: StaleScope → ProviderCommandError::StaleScope
+            // (structured wire error), Written → the consent version. Everything
+            // else (real DB errors) stays an error.
+            outcome
+                .map(|o| match o {
+                    ConfirmActiveOutcome::Written { version } => Ok(version),
+                    ConfirmActiveOutcome::StaleScope { actual_scope } => {
+                        Err(ProviderCommandError::StaleScope { actual_scope })
+                    }
+                })
+                .map_err(ProviderCommandError::from)?
+        })
+        .await
+        .map_err(|e| ProviderCommandError::Db {
+            message: format!("{e:?}"),
+        })??;
     // rev-8-8: refresh so the status item + submenu reflect the new primary.
     refresh_tray_if_available(&app_handle).await;
     Ok(version)
@@ -1861,7 +2015,10 @@ async fn provider_get_models(
         }
         // Append the preset default model as a secondary option when it differs
         // from the configured one (so the UI can offer "reset to default").
-        if let Some(p) = providers::presets().into_iter().find(|p| p.id == profile.template_id) {
+        if let Some(p) = providers::presets()
+            .into_iter()
+            .find(|p| p.id == profile.template_id)
+        {
             if profile.model.as_deref() != Some(p.default_model.as_str()) {
                 out.push(ModelInfo {
                     id: p.default_model.clone(),
@@ -1890,13 +2047,15 @@ async fn provider_test_connection(
     let app = state.inner().clone();
     // Read the profile on a blocking thread, then hand the endpoint back to the
     // async caller for the HTTP probe.
-    let profile = tauri::async_runtime::spawn_blocking(move || -> Result<db_providers::ProviderProfile, String> {
-        // Acquire the gate FIRST (see provider_list).
-        let _gate = app.data_gate.read();
-        let db = require_ready_gated(&app, &_gate)?;
-        db.with_conn(|conn| db_providers::get(conn, &uuid))
-            .map_err(|e| e.to_string())
-    })
+    let profile = tauri::async_runtime::spawn_blocking(
+        move || -> Result<db_providers::ProviderProfile, String> {
+            // Acquire the gate FIRST (see provider_list).
+            let _gate = app.data_gate.read();
+            let db = require_ready_gated(&app, &_gate)?;
+            db.with_conn(|conn| db_providers::get(conn, &uuid))
+                .map_err(|e| e.to_string())
+        },
+    )
     .await
     .map_err(|e| e.to_string())??;
 
@@ -1969,9 +2128,7 @@ async fn provider_test_connection(
 /// failures, `Some` fresh DB) and a non-`Ready` readiness. Any failure BEFORE
 /// the rename leaves the original DB untouched and usable.
 #[tauri::command]
-async fn archive_database(
-    state: tauri::State<'_, Arc<AppState>>,
-) -> Result<String, String> {
+async fn archive_database(state: tauri::State<'_, Arc<AppState>>) -> Result<String, String> {
     let app = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || -> Result<String, String> {
         // Thin wrapper: delegate to the shared core with the production failpoint
@@ -2020,15 +2177,23 @@ pub enum SetActiveResult {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 #[serde(tag = "error", rename_all = "snake_case")]
 pub enum ProviderCommandError {
-    StaleScope { actual_scope: String },
+    StaleScope {
+        actual_scope: String,
+    },
     /// Optimistic-lock mismatch (R2-E): the provider row was modified elsewhere
     /// since the frontend last read it. Carries the row's actual version so the
     /// UI can prompt a reload.
-    StaleVersion { actual_version: i64 },
+    StaleVersion {
+        actual_version: i64,
+    },
     /// Generic database or validation error.
-    Db { message: String },
+    Db {
+        message: String,
+    },
     /// Provider not found, invalid selection, etc.
-    Validation { message: String },
+    Validation {
+        message: String,
+    },
 }
 
 impl std::fmt::Display for ProviderCommandError {
@@ -2122,11 +2287,7 @@ fn set_active_slots(
     tx.execute(
         "UPDATE preferences SET primary_uuid=?1, parallel_uuids=?2, fallback_uuid=?3, \
          parallel_consent_version=NULL, parallel_consent_scope=NULL WHERE id=1",
-        rusqlite::params![
-            primary_val,
-            parallel_json,
-            fallback_val,
-        ],
+        rusqlite::params![primary_val, parallel_json, fallback_val,],
     )?;
     Ok(())
 }
@@ -2140,12 +2301,14 @@ fn set_active_slots(
 ///    a key can't be used until the user re-enters one (the archived keystore
 ///    just lost them all). Keyless providers (Ollama, traditional engines) keep
 ///    their enabled state.
-/// 2. Clear `primary_uuid`, `parallel_uuids`, `fallback_uuid` — the prior
+/// 2. Disable encrypted history and delete history/vocabulary ciphertext that
+///    can no longer be decrypted after the key archive/reset.
+/// 3. Clear `primary_uuid`, `parallel_uuids`, `fallback_uuid` — the prior
 ///    selection referenced providers whose keys may be gone, so a stale
 ///    selection can't drive a translate.
-/// 3. Clear `parallel_consent_version` / `parallel_consent_scope` — consent was
+/// 4. Clear `parallel_consent_version` / `parallel_consent_scope` — consent was
 ///    given for the now-archived key set.
-/// 4. `UPDATE _schema_migrations SET migration_complete=1` — a recovery completes
+/// 5. `UPDATE _schema_migrations SET migration_complete=1` — a recovery completes
 ///    migration (the DB is now in a known-good state, just without keys).
 ///    **Guaranteed only when the OLD readiness was `Ready` or
 ///    `NeedsKeystoreRecovery`.** When the OLD readiness was
@@ -2197,11 +2360,15 @@ fn apply_keystore_recovery_db_cleanup(app: &Arc<AppState>) -> Result<(), String>
             .with_conn(|conn| {
                 let tx = conn.transaction()?;
                 // 1. Disable needs-key providers (their keys are gone after archive).
-                tx.execute(
-                    "UPDATE providers SET enabled=0 WHERE needs_key=1",
-                    [],
-                )?;
-                // 2-3. Clear active selection + consent.
+                tx.execute("UPDATE providers SET enabled=0 WHERE needs_key=1", [])?;
+                // 2. The history/vocabulary key was just archived. Keeping
+                // undecryptable ciphertext would strand private data while the
+                // UI claims recovery succeeded, so clear it atomically and
+                // revoke future history consent.
+                tx.execute("DELETE FROM history_sessions", [])?;
+                tx.execute("DELETE FROM vocabulary", [])?;
+                tx.execute("UPDATE preferences SET history_enabled=0 WHERE id=1", [])?;
+                // 3-4. Clear active selection + consent.
                 tx.execute(
                     "UPDATE preferences SET primary_uuid=NULL, parallel_uuids='[]', \
                      fallback_uuid=NULL, parallel_consent_version=NULL, \
@@ -2318,7 +2485,11 @@ fn write_consented_selection(
     fallback: Option<&str>,
     scope: &str,
 ) -> Result<i64, DbErr> {
-    let primary_val = if primary.is_empty() { None } else { Some(primary) };
+    let primary_val = if primary.is_empty() {
+        None
+    } else {
+        Some(primary)
+    };
     let parallel_json = serde_json::to_string(parallel).unwrap_or_else(|_| "[]".into());
     let fallback_val = fallback.filter(|s| !s.is_empty());
     // Bump the version: COALESCE(NULL, 0) + 1 so the first consent is version 1.
@@ -2578,21 +2749,20 @@ async fn capture_and_translate(
     }
 
     // 4. run_translate_session — to:"" is resolved centrally inside it.
-    let session_result = match run_translate_session(
-        &db, &client, keystore, app, &text, "auto", "",
-    )
-    .await
-    {
-        Ok(r) => r,
-        Err(msg) => {
-            if state.gen.is_latest(gen) {
-                app_state.tray.lock().record_translation_error(gen);
-                let _ = popup::set_popup_mode(app, popup::PopupMode::Error, &anchor);
-                let _ = popup::error_with_source(app, &msg, &text);
+    let session_result =
+        match run_translate_session(&db, &client, keystore, app, &text, "auto", "", "selection")
+            .await
+        {
+            Ok(r) => r,
+            Err(msg) => {
+                if state.gen.is_latest(gen) {
+                    app_state.tray.lock().record_translation_error(gen);
+                    let _ = popup::set_popup_mode(app, popup::PopupMode::Error, &anchor);
+                    let _ = popup::error_with_source(app, &msg, &text);
+                }
+                return;
             }
-            return;
-        }
-    };
+        };
     if !state.gen.is_latest(gen) {
         return;
     }
@@ -2620,7 +2790,11 @@ async fn capture_and_translate(
 /// Build a PopupAnchor from the physical cursor coords. The scale factor used
 /// to convert the work area AND the cursor is the TARGET MONITOR's
 /// `scale_factor()` — NOT the popup window's.
-fn build_popup_anchor(app: &tauri::AppHandle, x_phys: f64, y_phys: f64) -> Option<popup::PopupAnchor> {
+fn build_popup_anchor(
+    app: &tauri::AppHandle,
+    x_phys: f64,
+    y_phys: f64,
+) -> Option<popup::PopupAnchor> {
     let win = app.get_webview_window("popup")?;
 
     let monitor = app
@@ -2646,10 +2820,20 @@ fn build_popup_anchor(app: &tauri::AppHandle, x_phys: f64, y_phys: f64) -> Optio
         let top = pos.y as f64 / sf;
         let right = left + sz.width as f64 / sf;
         let bottom = top + sz.height as f64 / sf;
-        popup::LogicalWorkArea { left, top, right, bottom }
+        popup::LogicalWorkArea {
+            left,
+            top,
+            right,
+            bottom,
+        }
     } else {
         let (cx, cy) = cursor_logical;
-        popup::LogicalWorkArea { left: cx, top: cy, right: cx + 1.0, bottom: cy + 1.0 }
+        popup::LogicalWorkArea {
+            left: cx,
+            top: cy,
+            right: cx + 1.0,
+            bottom: cy + 1.0,
+        }
     };
 
     Some(popup::PopupAnchor {
@@ -2673,7 +2857,11 @@ fn build_popup_anchor(app: &tauri::AppHandle, x_phys: f64, y_phys: f64) -> Optio
 ///   4. `popup::show_at` loading at the captured cursor.
 ///   5. translate, then `is_latest` again before showing the result, so a stale
 ///      result never overwrites a fresher popup.
-fn on_hotkey(app: &tauri::AppHandle, _shortcut: &tauri_plugin_global_shortcut::Shortcut, event: tauri_plugin_global_shortcut::ShortcutEvent) {
+fn on_hotkey(
+    app: &tauri::AppHandle,
+    _shortcut: &tauri_plugin_global_shortcut::Shortcut,
+    event: tauri_plugin_global_shortcut::ShortcutEvent,
+) {
     // Only act on key-down; ignore release.
     if event.state != ShortcutState::Pressed {
         return;
@@ -2739,7 +2927,11 @@ fn build_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
         Ok::<_, tauri::Error>((menu, status))
     })?;
     TrayIconBuilder::with_id("main-tray")
-        .icon(app.default_window_icon().cloned().expect("default window icon"))
+        .icon(
+            app.default_window_icon()
+                .cloned()
+                .expect("default window icon"),
+        )
         .menu(&menu)
         .tooltip(status)
         .show_menu_on_left_click(false)
@@ -2772,20 +2964,50 @@ async fn build_tray_menu(app: &tauri::AppHandle) -> tauri::Result<tauri::menu::M
     use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 
     // Quick actions group.
-    let sel = MenuItem::with_id(app, "tray.translate-selection", "Translate Selection", true, None::<&str>)?;
-    let clip = MenuItem::with_id(app, "tray.translate-clipboard", "Translate Clipboard", true, None::<&str>)?;
+    let sel = MenuItem::with_id(
+        app,
+        "tray.translate-selection",
+        "Translate Selection",
+        true,
+        None::<&str>,
+    )?;
+    let clip = MenuItem::with_id(
+        app,
+        "tray.translate-clipboard",
+        "Translate Clipboard",
+        true,
+        None::<&str>,
+    )?;
     let sep1 = PredefinedMenuItem::separator(app)?;
 
     // Switch Provider submenu: built from the db at menu-build time;
     // refresh_tray() rebuilds it after provider mutations.
     let enabled = read_enabled_providers(app).await;
     let switch_sub = build_switch_provider_submenu(app, &enabled)?;
-    let provider_status = MenuItem::with_id(app, "tray.provider-status", read_primary_status(app).await, false, None::<&str>)?;
+    let provider_status = MenuItem::with_id(
+        app,
+        "tray.provider-status",
+        read_primary_status(app).await,
+        false,
+        None::<&str>,
+    )?;
     let sep2 = PredefinedMenuItem::separator(app)?;
 
     // Disabled "Coming later" items (P1-D).
-    let ocr = MenuItem::with_id(app, "tray.ocr-capture", "OCR Translate (Coming later)", false, None::<&str>)?;
-    let history = MenuItem::with_id(app, "tray.history", "History (Coming later)", false, None::<&str>)?;
+    let ocr = MenuItem::with_id(
+        app,
+        "tray.ocr-capture",
+        "OCR Translate (Coming later)",
+        false,
+        None::<&str>,
+    )?;
+    let history = MenuItem::with_id(
+        app,
+        "tray.history",
+        "History (Coming later)",
+        false,
+        None::<&str>,
+    )?;
     let sep3 = PredefinedMenuItem::separator(app)?;
 
     // Navigation + system group.
@@ -2793,13 +3015,23 @@ async fn build_tray_menu(app: &tauri::AppHandle) -> tauri::Result<tauri::menu::M
     let sep4 = PredefinedMenuItem::separator(app)?;
     let quit = MenuItem::with_id(app, "tray.quit", "Quit", true, None::<&str>)?;
 
-    let menu = Menu::with_items(app, &[
-        &sel, &clip, &sep1,
-        &switch_sub, &provider_status, &sep2,
-        &ocr, &history, &sep3,
-        &settings, &sep4,
-        &quit,
-    ])?;
+    let menu = Menu::with_items(
+        app,
+        &[
+            &sel,
+            &clip,
+            &sep1,
+            &switch_sub,
+            &provider_status,
+            &sep2,
+            &ocr,
+            &history,
+            &sep3,
+            &settings,
+            &sep4,
+            &quit,
+        ],
+    )?;
     Ok(menu)
 }
 
@@ -2839,7 +3071,11 @@ async fn read_enabled_providers(app: &tauri::AppHandle) -> Vec<(String, String)>
         let db = require_ready_gated(&app_state, &_gate)?;
         db.with_conn(|conn| {
             let list = db_providers::list(conn)?;
-            Ok(list.into_iter().filter(|p| p.enabled).map(|p| (p.uuid, p.name)).collect::<Vec<_>>())
+            Ok(list
+                .into_iter()
+                .filter(|p| p.enabled)
+                .map(|p| (p.uuid, p.name))
+                .collect::<Vec<_>>())
         })
         .map_err(|e: DbErr| e.to_string())
     })
@@ -2871,7 +3107,10 @@ async fn read_primary_status(app: &tauri::AppHandle) -> String {
         match selection {
             Ok(sel) => match sel.primary {
                 Some(uuid) => {
-                    let name = db.with_conn(|conn| db_providers::get(conn, &uuid)).ok().map(|p| p.name);
+                    let name = db
+                        .with_conn(|conn| db_providers::get(conn, &uuid))
+                        .ok()
+                        .map(|p| p.name);
                     name.unwrap_or_else(|| "Unknown provider".into())
                 }
                 None => "No provider".into(),
@@ -2984,6 +3223,195 @@ fn handle_tray_menu_event(app: &tauri::AppHandle, event: MenuEvent) {
         }
         _ => {}
     }
+}
+
+// ─── R3b Surface 07: revisioned global shortcuts ─────────────────────────
+
+fn shortcut_join_error(error: tauri::Error) -> ShortcutError {
+    ShortcutError::DatabaseFailed {
+        message: format!("shortcut worker join failed: {error}"),
+    }
+}
+
+#[tauri::command]
+async fn shortcut_list(
+    state: tauri::State<'_, Arc<ShortcutController>>,
+) -> Result<ShortcutSnapshot, ShortcutError> {
+    let controller = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || controller.snapshot())
+        .await
+        .map_err(shortcut_join_error)?
+}
+
+#[tauri::command]
+async fn shortcut_check_conflict(
+    state: tauri::State<'_, Arc<ShortcutController>>,
+    action: ShortcutAction,
+    combo: String,
+    revision: u64,
+) -> Result<Option<ShortcutAction>, ShortcutError> {
+    let controller = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        controller.check_conflict(action, &combo, revision)
+    })
+    .await
+    .map_err(shortcut_join_error)?
+}
+
+#[tauri::command]
+async fn shortcut_save(
+    state: tauri::State<'_, Arc<ShortcutController>>,
+    action: ShortcutAction,
+    combo: String,
+    expected_revision: u64,
+    override_action: Option<ShortcutAction>,
+) -> Result<ShortcutSnapshot, ShortcutError> {
+    let controller = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        controller.save(action, &combo, expected_revision, override_action)
+    })
+    .await
+    .map_err(shortcut_join_error)?
+}
+
+#[tauri::command]
+async fn shortcut_reset_defaults(
+    state: tauri::State<'_, Arc<ShortcutController>>,
+    expected_revision: u64,
+) -> Result<ShortcutSnapshot, ShortcutError> {
+    let controller = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || controller.reset_defaults(expected_revision))
+        .await
+        .map_err(shortcut_join_error)?
+}
+
+#[tauri::command]
+fn shortcut_recording_begin(
+    state: tauri::State<'_, Arc<ShortcutController>>,
+    action: ShortcutAction,
+) -> Result<(), ShortcutError> {
+    state.recording_begin(action)
+}
+
+#[tauri::command]
+fn shortcut_recording_end(state: tauri::State<'_, Arc<ShortcutController>>) {
+    state.recording_end();
+}
+
+// ─── R3b Surface 08: encrypted-history privacy controls ──────────────────
+
+#[derive(Debug, Clone, Serialize)]
+struct HistoryPrivacyStatusWire {
+    enabled: bool,
+    retention_days: u32,
+    record_count: u64,
+}
+
+fn read_history_privacy_status(db: &Database) -> Result<HistoryPrivacyStatusWire, String> {
+    db.with_conn(|conn| {
+        let status = crate::db::history::privacy_status(conn)?;
+        let count: i64 = conn.query_row("SELECT COUNT(*) FROM history_sessions", [], |row| {
+            row.get(0)
+        })?;
+        let record_count = u64::try_from(count)
+            .map_err(|_| crate::db::DbError::Integrity("negative history count".into()))?;
+        Ok(HistoryPrivacyStatusWire {
+            enabled: status.enabled,
+            retention_days: status.retention_days,
+            record_count,
+        })
+    })
+    .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+async fn history_privacy_status(
+    state: tauri::State<'_, Arc<AppState>>,
+) -> Result<HistoryPrivacyStatusWire, String> {
+    let app_state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let gate = app_state.data_gate.read();
+        let db = require_ready_gated(&app_state, &gate)?;
+        read_history_privacy_status(&db)
+    })
+    .await
+    .map_err(|error| format!("history status worker failed: {error}"))?
+}
+
+#[tauri::command]
+async fn history_set_enabled(
+    app_state: tauri::State<'_, Arc<AppState>>,
+    session: tauri::State<'_, Arc<Session>>,
+    enabled: bool,
+) -> Result<HistoryPrivacyStatusWire, String> {
+    let app_state = app_state.inner().clone();
+    let session = session.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let gate = app_state.data_gate.read();
+        let db = require_ready_gated(&app_state, &gate)?;
+        let keystore = session_keystore(&session)?;
+        crate::db::history::set_enabled(&db, keystore, enabled)
+            .map_err(|error| error.to_string())?;
+        read_history_privacy_status(&db)
+    })
+    .await
+    .map_err(|error| format!("history enable worker failed: {error}"))?
+}
+
+#[tauri::command]
+async fn history_set_retention(
+    state: tauri::State<'_, Arc<AppState>>,
+    days: u32,
+) -> Result<HistoryPrivacyStatusWire, String> {
+    let app_state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let gate = app_state.data_gate.read();
+        let db = require_ready_gated(&app_state, &gate)?;
+        db.with_conn(|conn| crate::db::history::set_retention(conn, days))
+            .map_err(|error| error.to_string())?;
+        read_history_privacy_status(&db)
+    })
+    .await
+    .map_err(|error| format!("history retention worker failed: {error}"))?
+}
+
+#[tauri::command]
+async fn history_clear_all(
+    state: tauri::State<'_, Arc<AppState>>,
+) -> Result<HistoryPrivacyStatusWire, String> {
+    let app_state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let gate = app_state.data_gate.write();
+        let db = require_ready_gated_write(&app_state, &gate)?;
+        db.with_conn(crate::db::history::clear_all)
+            .map_err(|error| error.to_string())?;
+        read_history_privacy_status(&db)
+    })
+    .await
+    .map_err(|error| format!("history clear worker failed: {error}"))?
+}
+
+#[tauri::command]
+async fn history_search(
+    state: tauri::State<'_, Arc<Session>>,
+    app_state: tauri::State<'_, Arc<AppState>>,
+    query: String,
+    cursor: Option<String>,
+) -> Result<crate::history::search::HistoryPage, String> {
+    // Check before scheduling so degraded startup fails quickly, then resolve
+    // again from the owned Session inside the blocking closure.
+    session_keystore(&state)?;
+    let session = state.inner().clone();
+    let state = app_state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let _gate = state.data_gate.read();
+        let db = require_ready_gated(&state, &_gate)?;
+        let keystore = session_keystore(&session)?;
+        crate::history::search::search(&db, keystore, &query, cursor.as_deref())
+            .map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -3244,6 +3672,7 @@ pub fn run() {
                 }
             }
 
+            let startup_ready = readiness.is_ready();
             app.manage(Arc::new(AppState {
                 db: parking_lot::RwLock::new(db_handle),
                 data_gate: parking_lot::RwLock::new(()),
@@ -3255,22 +3684,47 @@ pub fn run() {
                     tray_state::TrayStateController::new(app.handle().clone()),
                 )),
             }));
-            // Round-2 review P1 #2: register hotkeys at RUNTIME (per-shortcut,
-            // catching each Result) so a conflict skips just that shortcut, not the
-            // whole app. on_shortcut registers + attaches the handler in one call.
-            let handle: tauri::AppHandle = app.handle().clone();
-            let gs = handle.global_shortcut();
-            let handle_for_alt = handle.clone();
-            if let Err(e) = gs.on_shortcut("Alt+Space", move |_a, _s, ev| {
-                on_hotkey(&handle_for_alt, _s, ev);
-            }) {
-                log::warn!("Alt+Space registration failed (conflict?): {e} — selection hotkey disabled");
+
+            // S2b retention is enforced at startup, independently of whether
+            // history is currently enabled. Disabling history intentionally
+            // preserves existing encrypted rows, but rows older than the
+            // consented retention window must still be removed. Favorites are
+            // excluded by `cleanup_expired_now`. Failure is fail-soft because
+            // cleanup must never prevent translation or recovery UI startup.
+            if startup_ready {
+                if let Some(history_db) = app.state::<Arc<AppState>>().db.read().clone() {
+                    match history_db.with_conn(crate::history::cleanup_expired_now) {
+                        Ok(removed) if removed > 0 => {
+                            log::info!("expired encrypted history removed: {removed}");
+                        }
+                        Ok(_) => {}
+                        Err(error) => {
+                            log::warn!("encrypted history retention cleanup failed: {error}");
+                        }
+                    }
+                }
             }
-            let handle_for_ctrl = handle.clone();
-            if let Err(e) = gs.on_shortcut("Ctrl+Space", move |_a, _s, ev| {
-                on_input_hotkey(&handle_for_ctrl, _s, ev);
-            }) {
-                log::warn!("Ctrl+Space registration failed (conflict?): {e} — input hotkey disabled");
+
+            // R3b Surface 07: seed/load the persisted revisioned shortcut map,
+            // then atomically bind every available action through one registrar.
+            // Startup OS conflicts are fail-soft and appear in shortcut_list;
+            // DB failures leave the Settings page in its retryable load-error
+            // state without preventing the rest of the application from starting.
+            let shortcut_db = app
+                .state::<Arc<AppState>>()
+                .db
+                .read()
+                .clone();
+            if let Some(shortcut_db) = shortcut_db {
+                let registrar = Arc::new(TauriShortcutRegistrar::new(app.handle().clone()));
+                match ShortcutController::new(shortcut_db, registrar) {
+                    Ok(controller) => {
+                        app.manage(Arc::new(controller));
+                    }
+                    Err(error) => {
+                        log::error!("shortcut controller startup failed: {error}");
+                    }
+                }
             }
 
             // Surface 04: system tray (R2b). Built LAST so a tray init failure
@@ -3315,7 +3769,18 @@ pub fn run() {
             provider_get_models,
             provider_test_connection,
             archive_database,
-            open_settings_window
+            open_settings_window,
+            shortcut_list,
+            shortcut_check_conflict,
+            shortcut_save,
+            shortcut_reset_defaults,
+            shortcut_recording_begin,
+            shortcut_recording_end,
+            history_privacy_status,
+            history_set_enabled,
+            history_set_retention,
+            history_clear_all,
+            history_search
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -3333,6 +3798,66 @@ mod tests {
             Arc::new(tray_state::RecordingRenderer::default()),
             tray_state::Locale::En,
         )
+    }
+
+    #[test]
+    fn keystore_recovery_disables_and_clears_irrecoverable_encrypted_content() {
+        let dir = tempfile::tempdir().unwrap();
+        let db_path = dir.path().join("recovery-history.db");
+        let db = Arc::new(Database::open(&db_path).unwrap());
+        db.with_conn(|conn| {
+            let tx = conn.transaction()?;
+            crate::db::schema::create_all_tables(&tx)?;
+            crate::db::schema::seed_singletons(&tx)?;
+            tx.execute("UPDATE preferences SET history_enabled=1 WHERE id=1", [])?;
+            tx.execute(
+                "INSERT INTO history_sessions
+                 (session_uuid,timestamp,trigger_source,target_language,is_favorite,
+                  source_text_encrypted,source_text_nonce,crypto_version)
+                 VALUES ('s1',1,'input','zh',0,X'AA',X'000102030405060708090A0B',1)",
+                [],
+            )?;
+            tx.execute(
+                "INSERT INTO vocabulary
+                 (item_uuid,timestamp,source_language,target_language,word_encrypted,
+                  word_nonce,definition_encrypted,definition_nonce,crypto_version)
+                 VALUES ('v1',1,'en','zh',X'AA',X'000102030405060708090A0B',
+                         X'BB',X'000102030405060708090A0B',1)",
+                [],
+            )?;
+            tx.commit()?;
+            Ok(())
+        })
+        .unwrap();
+        let app = Arc::new(AppState {
+            db: parking_lot::RwLock::new(Some(db.clone())),
+            data_gate: parking_lot::RwLock::new(()),
+            readiness: parking_lot::RwLock::new(DataReadiness::Ready),
+            db_path,
+            keystore_dir: dir.path().join("keystore"),
+            settings_path: Some(dir.path().join("settings.json")),
+            tray: Arc::new(parking_lot::Mutex::new(test_tray_controller())),
+        });
+
+        apply_keystore_recovery_db_cleanup(&app).unwrap();
+        let state = db
+            .with_conn(|conn| {
+                Ok((
+                    conn.query_row(
+                        "SELECT history_enabled FROM preferences WHERE id=1",
+                        [],
+                        |row| row.get::<_, i64>(0),
+                    )?,
+                    conn.query_row("SELECT COUNT(*) FROM history_sessions", [], |row| {
+                        row.get::<_, i64>(0)
+                    })?,
+                    conn.query_row("SELECT COUNT(*) FROM vocabulary", [], |row| {
+                        row.get::<_, i64>(0)
+                    })?,
+                ))
+            })
+            .unwrap();
+        assert_eq!(state, (0, 0, 0));
     }
 
     /// Task 5a: `get_data_readiness` returns a `DataReadiness` (not a hand-rolled
@@ -3381,7 +3906,10 @@ mod tests {
         };
         let got = state.readiness.read().clone();
         let json = serde_json::to_string(&got).unwrap();
-        assert!(json.contains("\"state\":\"needs_keystore_recovery\""), "{json}");
+        assert!(
+            json.contains("\"state\":\"needs_keystore_recovery\""),
+            "{json}"
+        );
         assert!(json.contains("\"reason\":\"corrupt envelope\""), "{json}");
     }
 
@@ -3392,8 +3920,8 @@ mod tests {
     /// the builder succeeds and returns a usable `reqwest::Client`.
     #[test]
     fn build_http_client_returns_usable_client() {
-        let c = build_http_client()
-            .expect("hardened HTTP client builder must succeed in a normal env");
+        let c =
+            build_http_client().expect("hardened HTTP client builder must succeed in a normal env");
         // No network: a freshly built client is still a real reqwest::Client. We
         // confirm it's usable by constructing a request (build, not send).
         let _req = c.get("https://invalid.invalid/");
@@ -3419,7 +3947,10 @@ mod tests {
     fn validate_preset_endpoints_does_not_panic() {
         // All shipped presets are HTTPS/loopback-valid → Ok (empty error list).
         let invalid = validate_all_preset_endpoints();
-        assert!(invalid.is_empty(), "shipped presets must all validate: {invalid:?}");
+        assert!(
+            invalid.is_empty(),
+            "shipped presets must all validate: {invalid:?}"
+        );
 
         // A single bad endpoint validates to Err (the per-endpoint check the
         // loop calls), proving the loop would skip rather than panic.
@@ -3487,7 +4018,10 @@ mod tests {
     fn all_valid_presets_keep_client_gate_open() {
         // Positive control: a clean catalog keeps the gate open.
         let invalid = validate_preset_endpoints(&providers::presets());
-        assert!(invalid.is_empty(), "shipped catalog must validate: {invalid:?}");
+        assert!(
+            invalid.is_empty(),
+            "shipped catalog must validate: {invalid:?}"
+        );
         assert!(preset_gate_allows_client(&invalid));
     }
 
@@ -3526,7 +4060,10 @@ mod tests {
         let result = TranslateSessionResult {
             outcomes: vec![TranslationOutcome {
                 uuid: "u1".into(),
-                result: Ok(service::Translation { text: "你好".into(), engine: "provider/u1".into() }),
+                result: Ok(service::Translation {
+                    text: "你好".into(),
+                    engine: "provider/u1".into(),
+                }),
             }],
             actual_engine: Some("provider/u1".into()),
         };
@@ -3544,7 +4081,10 @@ mod tests {
             outcomes: vec![
                 TranslationOutcome {
                     uuid: "u1".into(),
-                    result: Ok(service::Translation { text: "a".into(), engine: "p/u1".into() }),
+                    result: Ok(service::Translation {
+                        text: "a".into(),
+                        engine: "p/u1".into(),
+                    }),
                 },
                 TranslationOutcome {
                     uuid: "u2".into(),
@@ -3577,8 +4117,14 @@ mod tests {
     fn clipboard_decision_all_parallel_failed_is_error() {
         let result = TranslateSessionResult {
             outcomes: vec![
-                TranslationOutcome { uuid: "u1".into(), result: Err(crate::error::Error::LocalNoFallback) },
-                TranslationOutcome { uuid: "u2".into(), result: Err(crate::error::Error::LocalNoFallback) },
+                TranslationOutcome {
+                    uuid: "u1".into(),
+                    result: Err(crate::error::Error::LocalNoFallback),
+                },
+                TranslationOutcome {
+                    uuid: "u2".into(),
+                    result: Err(crate::error::Error::LocalNoFallback),
+                },
             ],
             actual_engine: None,
         };

@@ -6,11 +6,16 @@ export type InlineErrorProps = {
   children: JSX.Element;
   id?: string;
   icon?: JSX.Element;
+  variant?: "danger" | "warning";
 };
 
 const InlineError: Component<InlineErrorProps> = (props) => {
   return (
-    <p class="inline-error" role="alert" id={props.id}>
+    <p
+      class={`inline-error inline-error--${props.variant ?? "danger"}`}
+      role="alert"
+      id={props.id}
+    >
       <span class="inline-error__icon" aria-hidden="true">
         {props.icon ?? <AlertTriangle size={14} />}
       </span>

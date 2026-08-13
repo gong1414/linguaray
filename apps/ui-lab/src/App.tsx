@@ -21,6 +21,10 @@ import { Settings } from "lucide-solid";
 import SettingsShell, {
   type SettingsSection,
 } from "@app/features/settings/SettingsShell";
+import { PrivacyDataView } from "@app/features/settings/PrivacyData";
+import { ShortcutsView } from "@app/features/settings/Shortcuts";
+import { SHORTCUTS_COPY } from "@app/features/settings/shortcuts-copy";
+import type { ShortcutSnapshot } from "@app/features/settings/shortcut-types";
 import "./App.css";
 
 type Theme = "light" | "dark";
@@ -101,7 +105,17 @@ const NAV_ITEMS: {
 ];
 
 // Implemented surfaces.
-const IMPLEMENTED: NavKey[] = ["selection-popup", "input-window", "provider-center", "keystore", "component-gallery", "sidebar-isolated", "confirm-isolated", "settings-keyboard"];
+const IMPLEMENTED: NavKey[] = ["selection-popup", "input-window", "provider-center", "shortcuts", "privacy", "keystore", "component-gallery", "sidebar-isolated", "confirm-isolated", "settings-keyboard"];
+
+const SHORTCUT_FIXTURE: ShortcutSnapshot = {
+  revision: 1,
+  entries: [
+    { action: "translate_selection", combo: "Alt+Space", available: true, registration_state: "registered", registration_error: null },
+    { action: "translate_input", combo: "Ctrl+Space", available: true, registration_state: "registered", registration_error: null },
+    { action: "translate_clipboard", combo: "Ctrl+Alt+Space", available: true, registration_state: "registered", registration_error: null },
+    { action: "ocr_translate", combo: "Alt+Shift+Space", available: false, registration_state: "unavailable", registration_error: null },
+  ],
+};
 
 const PROVIDER_STATES: ProviderState[] = [
   "empty",
@@ -447,6 +461,65 @@ const App: Component = () => {
 
             <Match when={nav() === "keystore"}>
               <KeystoreRecovery state={keystoreState()} />
+            </Match>
+
+            <Match when={nav() === "privacy"}>
+              <div
+                class="lab__frame lab__frame--settings"
+                style={{ width: "800px", height: "600px" }}
+              >
+                <PrivacyDataView
+                  status={{
+                    enabled: params.get("fixture") !== "disabled",
+                    retention_days: params.get("fixture") === "retention-90" ? 90 : 30,
+                    record_count: 12,
+                  }}
+                  loading={false}
+                  error={null}
+                  busy={null}
+                  clearOpen={false}
+                  toasts={[]}
+                  onRetry={() => {}}
+                  onEnabledChange={() => {}}
+                  onRetentionChange={() => {}}
+                  onOpenClear={() => {}}
+                  onCloseClear={() => {}}
+                  onConfirmClear={() => {}}
+                  onDismissToast={() => {}}
+                />
+              </div>
+            </Match>
+
+            <Match when={nav() === "shortcuts"}>
+              <div
+                class="lab__frame lab__frame--settings"
+                style={{ width: "800px", height: "600px" }}
+              >
+                <ShortcutsView
+                  snapshot={SHORTCUT_FIXTURE}
+                  loadError={false}
+                  recordingAction={params.get("fixture") === "recording" ? "translate_selection" : null}
+                  recordedCombo={params.get("fixture") === "recording" ? "Ctrl+Shift+K" : ""}
+                  conflict={params.get("fixture") === "conflict" ? {
+                    action: "translate_selection",
+                    otherAction: "translate_input",
+                    combo: "Ctrl+Space",
+                  } : null}
+                  busy={null}
+                  resetOpen={false}
+                  localRegistrationFailures={params.get("fixture") === "failure" ? { translate_selection: true } : {}}
+                  operationError={null}
+                  onRetryLoad={() => {}}
+                  onChange={() => {}}
+                  onCancelRecording={() => {}}
+                  onRecorderKeyDown={() => {}}
+                  onOverride={() => {}}
+                  onOpenReset={() => {}}
+                  onCloseReset={() => {}}
+                  onReset={() => {}}
+                  copy={SHORTCUTS_COPY[locale()]}
+                />
+              </div>
             </Match>
 
             <Match when={!IMPLEMENTED.includes(nav())}>

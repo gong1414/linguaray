@@ -14,16 +14,18 @@
 //!
 //! There is no deadlock window because the two locks are never nested.
 
-use std::path::Path;
 use parking_lot::Mutex;
 use rusqlite::Connection;
+use std::path::Path;
 
-pub mod schema;
-pub mod providers;
-pub mod migration;
 pub mod delete;
+pub mod history;
+pub mod migration;
+pub mod providers;
 pub mod readiness;
 pub mod recovery;
+pub mod schema;
+pub mod shortcuts;
 
 // Re-export the readiness type at the crate root (lib.rs uses `readiness::`).
 pub use readiness::DataReadiness;
@@ -62,11 +64,15 @@ impl std::fmt::Display for DbError {
 impl std::error::Error for DbError {}
 
 impl From<rusqlite::Error> for DbError {
-    fn from(e: rusqlite::Error) -> Self { DbError::Sqlite(e) }
+    fn from(e: rusqlite::Error) -> Self {
+        DbError::Sqlite(e)
+    }
 }
 
 impl From<std::io::Error> for DbError {
-    fn from(e: std::io::Error) -> Self { DbError::Io(e) }
+    fn from(e: std::io::Error) -> Self {
+        DbError::Io(e)
+    }
 }
 
 impl From<crate::fs_acl::AclError> for DbError {
@@ -100,7 +106,9 @@ impl Database {
         conn.pragma_update(None, "busy_timeout", 5000)?;
         conn.pragma_update(None, "journal_mode", "DELETE")?;
         conn.pragma_update(None, "synchronous", "FULL")?;
-        Ok(Self { conn: Mutex::new(conn) })
+        Ok(Self {
+            conn: Mutex::new(conn),
+        })
     }
 
     /// The SOLE access pattern. `f` receives `&mut Connection` so it can
@@ -123,6 +131,13 @@ impl Database {
     #[allow(clippy::result_large_err)]
     pub fn close(self) -> Result<(), (Database, rusqlite::Error)> {
         let conn = self.conn.into_inner();
-        conn.close().map_err(|(conn, e)| (Database { conn: Mutex::new(conn) }, e))
+        conn.close().map_err(|(conn, e)| {
+            (
+                Database {
+                    conn: Mutex::new(conn),
+                },
+                e,
+            )
+        })
     }
 }

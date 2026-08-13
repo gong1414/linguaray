@@ -1,27 +1,50 @@
 fn main() {
-    tauri_build::try_build(
-        tauri_build::Attributes::new()
-            .app_manifest(
-                tauri_build::AppManifest::new()
-                    .commands(&[
-                        "translate", "translate_default", "translate_clipboard",
-                        "translate_session",
-                        "translate_selection_ipc",
-                        "list_engines", "set_key", "delete_key", "key_status",
-                        "get_settings", "set_setting",
-                        "a11y_status", "keystore_health", "archive_keystore", "reset_keystore",
-                        "get_data_readiness",
-                        "provider_list", "provider_create", "provider_update",
-                        "provider_duplicate", "provider_delete", "provider_reorder",
-                        "provider_toggle", "provider_set_key", "provider_set_active",
-                        "provider_get_active_selection",
-                        "provider_confirm_and_set_active",
-                        "provider_get_models", "provider_test_connection",
-                        "archive_database",
-                        "open_settings_window",
-                    ]),
-            ),
-    )
+    tauri_build::try_build(tauri_build::Attributes::new().app_manifest(
+        tauri_build::AppManifest::new().commands(&[
+            "translate",
+            "translate_default",
+            "translate_clipboard",
+            "translate_session",
+            "translate_selection_ipc",
+            "list_engines",
+            "set_key",
+            "delete_key",
+            "key_status",
+            "get_settings",
+            "set_setting",
+            "a11y_status",
+            "keystore_health",
+            "archive_keystore",
+            "reset_keystore",
+            "get_data_readiness",
+            "provider_list",
+            "provider_create",
+            "provider_update",
+            "provider_duplicate",
+            "provider_delete",
+            "provider_reorder",
+            "provider_toggle",
+            "provider_set_key",
+            "provider_set_active",
+            "provider_get_active_selection",
+            "provider_confirm_and_set_active",
+            "provider_get_models",
+            "provider_test_connection",
+            "archive_database",
+            "open_settings_window",
+            "shortcut_list",
+            "shortcut_check_conflict",
+            "shortcut_save",
+            "shortcut_reset_defaults",
+            "shortcut_recording_begin",
+            "shortcut_recording_end",
+            "history_privacy_status",
+            "history_set_enabled",
+            "history_set_retention",
+            "history_clear_all",
+            "history_search",
+        ]),
+    ))
     .expect("failed to run tauri build");
 
     // rev-12 / Task A5: write the tray red-dot-overlay + dimmed-pulse PNGs to OUT_DIR.
@@ -39,8 +62,7 @@ fn build_tray_icons(out_dir: &std::path::Path) {
     const SIZE: u32 = 32;
 
     // Load the repo's existing app default icon as the base for BOTH variants.
-    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR")
-        .expect("CARGO_MANIFEST_DIR");
+    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR");
     let base_path = std::path::Path::new(&manifest_dir)
         .join("icons")
         .join("32x32.png");

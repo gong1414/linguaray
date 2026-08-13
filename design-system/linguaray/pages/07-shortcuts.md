@@ -50,5 +50,13 @@
 
 - 设置子页，遵循设置窗口尺寸与自适应规则。
 - 注册失败不崩溃；自动还原原组合键。
-- 冲突检测使用 `shortcut_check_conflict(combo)`。
+- 稳定动作 ID：`translate_selection`、`translate_input`、
+  `translate_clipboard`、`ocr_translate`；默认分别为 `Alt+Space`、
+  `Ctrl+Space`、`Ctrl+Alt+Space`、`Alt+Shift+Space`。
+- 组合键规范顺序为 `Ctrl+Alt+Shift+Super+Key`；覆盖冲突时交换两个动作的
+  组合键，不产生静默未分配动作。
+- 冲突检测使用 revision 守卫的
+  `shortcut_check_conflict(action, combo, revision)`；保存/恢复默认同样使用
+  `expected_revision`，防止并发页面覆盖新设置。
+- OCR 动作在 R3b 可见并持久化，但在 R5 OCR handler 落地前明确显示 unavailable。
 - 全局热键引擎在 macOS/Windows 一致；同样冲突检测。
