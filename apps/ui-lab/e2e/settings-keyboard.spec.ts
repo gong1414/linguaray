@@ -9,7 +9,7 @@ import { test, expect } from "@playwright/test";
  * fixture route. The shell is rendered in controlled mode
  * (activePage/onNavigate), so every Tab/Enter here drives the actual
  * shell's SidebarItem nav + data-page transitions — a regression in the
- * shell's focus management or disabled-item gating surfaces here as a
+ * shell's focus management or navigation gating surfaces here as a
  * failed assertion, not just a missed unit test.
  *
  * The fixture renders ONLY the shell (no lab header/nav/state-bar), so the
@@ -17,8 +17,8 @@ import { test, expect } from "@playwright/test";
  * exposes four items in DOM order:
  *   1. Provider Center   (enabled, initial active)
  *   2. Keystore Recovery (enabled)
- *   3. Shortcuts         (disabled placeholder — focusable, aria-disabled)
- *   4. Privacy           (disabled placeholder — focusable, aria-disabled)
+ *   3. Shortcuts         (enabled in R3b)
+ *   4. Privacy           (enabled in R3b)
  */
 
 const BASE = "http://localhost:1421";
@@ -42,7 +42,7 @@ async function tabToSidebarItem(page: import("@playwright/test").Page, cap = 12)
   throw new Error(`No sidebar item focused after ${cap} Tab presses`);
 }
 
-test("SettingsShell: Tab focuses nav, Enter on enabled changes page, Enter on disabled is a no-op", async ({
+test("SettingsShell: Tab focuses nav and Enter reaches every R3b destination", async ({
   page,
 }) => {
   // Wide viewport → data-layout="full" (labels visible).
@@ -86,16 +86,16 @@ test("SettingsShell: Tab focuses nav, Enter on enabled changes page, Enter on di
     "provider-center",
   );
 
-  // 5. Tab forward to a DISABLED item (Shortcuts) → Enter → data-page UNCHANGED.
+  // 5. Tab forward to Shortcuts → Enter → live R3b destination.
   //    From Provider Center: Tab → Keystore Recovery, Tab → Shortcuts.
   await page.keyboard.press("Tab"); // → Keystore Recovery
-  await page.keyboard.press("Tab"); // → Shortcuts (disabled)
-  const disabled = page.locator(FOCUSED_ITEM);
-  await expect(disabled).toHaveAttribute("aria-disabled", "true");
+  await page.keyboard.press("Tab"); // → Shortcuts
+  const shortcuts = page.locator(FOCUSED_ITEM);
+  await expect(shortcuts).not.toHaveAttribute("aria-disabled", "true");
   await page.keyboard.press("Enter");
   await expect(page.locator("[data-testid='shell']")).toHaveAttribute(
     "data-page",
-    "provider-center",
+    "shortcuts",
   );
 });
 
@@ -129,13 +129,13 @@ test("SettingsShell rail mode @699px: keyboard nav still works, items collapse t
     "keystore-recovery",
   );
 
-  // A disabled item stays focusable-but-inert in rail mode too.
-  await page.keyboard.press("Tab"); // → Shortcuts (disabled)
-  const disabled = page.locator(FOCUSED_ITEM);
-  await expect(disabled).toHaveAttribute("aria-disabled", "true");
+  // Shortcuts remains a live keyboard destination in rail mode too.
+  await page.keyboard.press("Tab"); // → Shortcuts
+  const shortcuts = page.locator(FOCUSED_ITEM);
+  await expect(shortcuts).not.toHaveAttribute("aria-disabled", "true");
   await page.keyboard.press("Enter");
   await expect(page.locator("[data-testid='shell']")).toHaveAttribute(
     "data-page",
-    "keystore-recovery",
+    "shortcuts",
   );
 });

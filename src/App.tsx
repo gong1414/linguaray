@@ -14,6 +14,8 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import SettingsShell, { type SettingsSection } from "./features/settings/SettingsShell";
 import ProviderCenter from "./features/settings/ProviderCenter";
 import KeystoreRecovery from "./features/settings/KeystoreRecovery";
+import Shortcuts from "./features/settings/Shortcuts";
+import PrivacyData from "./features/settings/PrivacyData";
 import { SETTINGS_COPY } from "./features/settings/copy";
 import { translateSelection, translateClipboard } from "./features/translation/selection-ipc";
 import { detectLocale } from "./i18n";
@@ -66,6 +68,10 @@ const App: Component = () => {
         <ProviderCenter />
       ) : activePage() === "keystore-recovery" ? (
         <KeystoreRecovery />
+      ) : activePage() === "shortcuts" ? (
+        <Shortcuts />
+      ) : activePage() === "privacy" ? (
+        <PrivacyData />
       ) : (
         <section class="app__placeholder" aria-label={t.nav.placeholderHint}>
           <p>{t.nav.placeholderHint}</p>

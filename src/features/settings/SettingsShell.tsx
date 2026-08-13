@@ -44,10 +44,9 @@ type NavDef = {
 /**
  * Settings shell: WindowChrome frame + a SidebarItem nav. The sidebar is
  * full-label at >=700px (`data-layout="full"`) and collapses to an icon rail
- * at 600-699px (`data-layout="rail"`), driven by matchMedia. Shortcuts and
- * Privacy are disabled placeholders surfaced in R3b; each disabled item plus
- * every rail item is wrapped in a Tooltip so the label is reachable via hover
- * or keyboard focus.
+ * at 600-699px (`data-layout="rail"`), driven by matchMedia. Rail items are
+ * wrapped in a Tooltip so their label remains reachable by hover or keyboard
+ * focus. R3b promotes Shortcuts and Privacy to live settings destinations.
  */
 const SettingsShell: Component<SettingsShellProps> = (props) => {
   const locale = detectLocale();
@@ -79,8 +78,8 @@ const SettingsShell: Component<SettingsShellProps> = (props) => {
   const navItems: NavDef[] = [
     { id: "provider-center", label: t.nav.providerCenter, icon: <Server size={16} />, disabled: false },
     { id: "keystore-recovery", label: t.nav.keystoreRecovery, icon: <ShieldCheck size={16} />, disabled: false },
-    { id: "shortcuts", label: t.nav.shortcuts, icon: <Keyboard size={16} />, disabled: true },
-    { id: "privacy", label: t.nav.privacy, icon: <ShieldAlert size={16} />, disabled: true },
+    { id: "shortcuts", label: t.nav.shortcuts, icon: <Keyboard size={16} />, disabled: false },
+    { id: "privacy", label: t.nav.privacy, icon: <ShieldAlert size={16} />, disabled: false },
   ];
 
   // macOS Accessibility permission. null = unknown (pre-first-resolve), true =
@@ -152,8 +151,8 @@ const SettingsShell: Component<SettingsShellProps> = (props) => {
         onClick={() => handleClick(item.id)}
       />
     );
-    // Disabled placeholders always show a "Coming in R3b" hint; in rail mode
-    // every item is wrapped so the hidden label is still discoverable.
+    // In rail mode every item is wrapped so the hidden label remains
+    // discoverable by pointer and keyboard users.
     const needsTooltip = item.disabled || !wide();
     const content = item.disabled ? t.nav.placeholderHint : item.label;
     return (

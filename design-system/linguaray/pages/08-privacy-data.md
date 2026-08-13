@@ -11,7 +11,7 @@
 
 | 状态 | 描述 | 组件 |
 |---|---|---|
-| History disabled | 开关关闭；解释未存储内容 | Switch (off) + 说明文本 |
+| History disabled | 开关关闭；停止未来写入；保留的密文仍可全部清除 | Switch (off) + 说明文本 + Button (destructive) |
 | History enabled | 开关开启；保留期选择器；"全部清除"按钮 | Switch (on) + Select + Button (destructive) |
 | External API off | 开关关闭；解释 | Switch (off) + 说明文本 |
 | External API on | 开关开启；端口显示；"重新生成令牌"（模态中显示一次新令牌）；"禁用"（此视图不可复制令牌） | Switch (on) + 端口文本 + Button × 2 |
@@ -42,7 +42,7 @@
 - **历史区：**
   - Switch (enable/disable) + 说明文本
   - 启用时：Select (保留期：30/90 天) + Button (destructive, "全部清除")
-- **外部 API 区：**
+- **外部 API 区（R6 由 Surface 15 的同一服务接入）：**
   - Switch (enable/disable) + 说明文本
   - 启用时：端口显示（TextField/只读）+ Button (重新生成令牌) + Button (禁用)
   - 令牌仅显示一次（模态）；此视图不可复制令牌
@@ -52,5 +52,9 @@
 
 - 设置子页，遵循设置窗口尺寸与自适应规则。
 - 历史加密：AES-256-GCM + 域分离 AAD；默认关闭，需显式同意。
+- 关闭历史只停止未来写入，不轮换/删除密钥或既有密文；Clear All 在开关两态
+  均可用，独立承担用户主动删除语义。
 - 保留期默认 30 天；收藏永不过期。
 - 外部 API 默认关闭；令牌仅创建/重新生成时返回一次，之后不可读、不可复制。
+- R3b 只完成 History privacy 子区；External API 由 R6 建立单一后端状态机后
+  同时接入本页摘要和 Surface 15 详情。在此前不得宣称 Surface 08 全部完成。

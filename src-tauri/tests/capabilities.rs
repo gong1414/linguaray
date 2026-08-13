@@ -20,13 +20,17 @@ fn permission_set(path: &str) -> HashSet<String> {
 #[test]
 fn input_window_authorizes_session_and_provider_list() {
     let perms = permission_set("capabilities/input.json");
-    for required in ["allow-translate-default", "allow-translate-session", "allow-provider-list"] {
+    for required in ["allow-translate-session", "allow-provider-list"] {
         assert!(
             perms.contains(required),
             "input.json missing {required}; has: {:?}",
             perms
         );
     }
+    assert!(
+        !perms.contains("allow-translate-default"),
+        "the legacy translation path bypasses encrypted-history persistence"
+    );
 }
 
 #[test]
@@ -60,6 +64,12 @@ fn main_window_authorizes_every_new_command() {
             perms.contains(required),
             "main.json missing {required}; has: {:?}",
             perms
+        );
+    }
+    for legacy in ["allow-translate", "allow-translate-default"] {
+        assert!(
+            !perms.contains(legacy),
+            "main must not expose legacy history-bypassing command {legacy}"
         );
     }
 }

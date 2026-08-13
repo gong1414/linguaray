@@ -19,6 +19,17 @@ describe("InlineError", () => {
     expect(container.querySelector("#field-err")).not.toBeNull();
   });
 
+  it("defaults to danger and supports a warning variant", () => {
+    const { container } = render(() => (
+      <>
+        <InlineError>Error</InlineError>
+        <InlineError variant="warning">Reserved shortcut</InlineError>
+      </>
+    ));
+    expect(container.querySelector(".inline-error--danger")).not.toBeNull();
+    expect(container.querySelector(".inline-error--warning")).not.toBeNull();
+  });
+
   it("custom icon", () => {
     const { container } = render(() => (
       <InlineError icon={<span data-testid="ci" />}>Err</InlineError>

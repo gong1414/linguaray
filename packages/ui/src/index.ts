@@ -74,6 +74,9 @@ export type { StatusBadgeProps, StatusBadgeVariant } from "./components/StatusBa
 export { default as InlineError } from "./components/InlineError";
 export type { InlineErrorProps } from "./components/InlineError";
 
+export { default as ListRow } from "./components/ListRow";
+export type { ListRowProps } from "./components/ListRow";
+
 export { default as WindowChrome } from "./components/WindowChrome";
 export type { WindowChromeProps, WindowChromeLabels } from "./components/WindowChrome";
 

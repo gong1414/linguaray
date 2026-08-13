@@ -1,6 +1,6 @@
 # Rayline R0 冻结决策记录（rev-4.2）
 
-**状态：等待第三次审核 / 待批准** · **日期：** 2026-08-08
+**状态：已冻结；R0/R1 已合并** · **日期：** 2026-08-08 · **状态同步：** 2026-08-13
 **所属流程：** Superpowers brainstorming → writing-plans（rev-4.2）
 **上游文档：**
 - 产品基线（S0 冻结）：[2026-08-01-linguaray-product-baseline.md](2026-08-01-linguaray-product-baseline.md)
@@ -118,7 +118,8 @@ Light `#0891B2`（3.682:1 ✅）、Dark `#22D3EE`（9.879:1 ✅）。Accent `#06
 
 **18 设计组件 = 9 已有 + 9 新增。**
 **6 辅助组件：** Banner、Dialog、Tooltip、Spinner、ProviderCard、VisuallyHidden。
-**概念契约（backlog，不在 R1）：** TextArea、Checkbox、Card、ListRow。
+**概念契约（R1 时 backlog）：** TextArea、Checkbox、Card、ListRow。TextArea
+已在 R2 提升为生产组件；ListRow 在 R3b Surface 07 提升为生产组件。
 **移出 R1：** AppSidebar、ProgressRail。
 **packages/ui 最终 = 24 导出。**
 
@@ -126,6 +127,5 @@ Light `#0891B2`（3.682:1 ✅）、Dark `#22D3EE`（9.879:1 ✅）。Accent `#06
 
 ## 5. 审核状态
 
-**等待第三次审核 / 待批准。**
-
-用户已进行 rev-1 → rev-2 → rev-3 → rev-4 → rev-4.1 → rev-4.2 六轮修订。尚未被用户批准。本文件状态为「待批准」，在用户明确批准前不得写「已批准」或「已冻结」。
+**已冻结。** 用户完成 rev-1 → rev-4.2 六轮审核，R0/R1 已实现、验证并合并。
+本状态同步只纠正历史治理信息，不改变上述冻结 Token 或组件契约。

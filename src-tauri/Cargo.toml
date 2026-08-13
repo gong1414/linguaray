@@ -61,6 +61,8 @@ fs2 = "0.4"
 thiserror = "1"
 log = "0.4"
 url = "2"
+unicode-normalization = "0.1"
+unicode-casefold = "0.2"
 rusqlite = { version = "0.40", features = ["bundled"] }
 uuid = { version = "1", features = ["v4", "v5"] }
 tauri-plugin-global-shortcut = "2"

@@ -635,7 +635,7 @@ props:     children, padding (default md), interactive, onClick
 - Non-interactive (has nested buttons/links): render as `<div>`; inner elements
   handle their own interaction.
 
-### ListRow `[backlog — 未实现]`
+### ListRow
 
 ```
 props:     leading (icon|avatar), title, subtitle, trailing (badge|action), onClick?
@@ -649,6 +649,8 @@ props:     leading (icon|avatar), title, subtitle, trailing (badge|action), onCl
   area is a separate `<button>` (the primary action); the trailing action is its own
   `<button>`. No nested interactive elements inside a button.
 - Selected: `--color-surface-selected` bg + `--color-text-selected` text.
+- R3b promotion: exported by `@linguaray/ui`; Surface 07 uses the shared
+  implementation rather than a page-local row.
 
 ### ProviderCard
 
@@ -738,7 +740,9 @@ props:     children, id?: string
   `aria-invalid="true"` and `aria-describedby` pointing at the InlineError `id`.
 - `id` is optional but should be supplied whenever the message must be associated
   with a control via `aria-describedby`.
-- Text in `--color-status-danger`, `--text-sm`.
+- `variant="danger"` (default) uses `--color-status-danger`;
+  `variant="warning"` uses the semantic warning foreground/soft pair. Both use
+  `--text-sm`; warning is used for recoverable OS shortcut-registration failure.
 
 ### WindowChrome
 
