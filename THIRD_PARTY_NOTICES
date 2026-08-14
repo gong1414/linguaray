@@ -1,0 +1,23 @@
+LinguaRay third-party notices
+=============================
+
+This product includes software developed by third parties.
+First-party code is MIT (see LICENSE).
+
+IMPORTANT: src-tauri/src/engines/google.rs currently states it was ported
+from pot-desktop (GPL-3.0). That file is isolated pending the clean-room
+rewrite required by spec §12.4. It is NOT covered by the MIT grant until
+that rewrite lands.
+
+Major runtime / build dependencies (non-exhaustive; see lockfiles for
+versions):
+
+- Tauri 2 and official plugins — MIT OR Apache-2.0
+  https://github.com/tauri-apps/tauri
+- SolidJS — MIT
+- reqwest, serde, tokio, rusqlite (bundled SQLite), uuid, aes-gcm,
+  argon2, zeroize — MIT OR Apache-2.0 as declared by each crate
+- Inter / IBM Plex Mono / Noto Sans SC font files under packages/ui
+  — see each font's OFL/license file in packages/ui/src/assets/fonts/
+
+Do not copy pot-app/pot-desktop or Easydict source (GPL-3.0).
