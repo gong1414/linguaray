@@ -130,22 +130,45 @@ pub struct ShortcutController {
 }
 
 impl ShortcutController {
+    /// Load persisted bindings and bind them to the OS registrar.
+    /// Integration tests use this so assertions stay on the controller, not
+    /// the kernel. Production startup uses [`load`] and lets ShortcutsPlugin
+    /// own the OS `replace_all` effect.
     pub fn new(db: Arc<Database>, registrar: Arc<dyn Registrar>) -> Result<Self, ShortcutError> {
+        let this = Self::load(db, registrar)?;
+        this.rebind_os();
+        Ok(this)
+    }
+
+    /// Load the controller without touching the OS registrar.
+    pub fn load(db: Arc<Database>, registrar: Arc<dyn Registrar>) -> Result<Self, ShortcutError> {
         shortcut_db::ensure_defaults(&db)?;
-        let bindings = load_canonical(&db)?;
-        // Startup is fail-soft: an OS-reserved conflict must not crash the
-        // application or hide the rest of Settings. Keep the persisted map and
-        // surface the authoritative registration error in the snapshot.
-        let registration_error = registrar.replace_all(&registrable(&bindings)).err();
+        let _ = load_canonical(&db)?;
         Ok(Self {
             db,
             registrar,
             state: Mutex::new(ControllerState {
                 revision: 0,
                 recording: None,
-                registration_error,
+                registration_error: None,
             }),
         })
+    }
+
+    pub fn registrable_now(&self) -> Result<Vec<(ShortcutAction, String)>, ShortcutError> {
+        Ok(registrable(&load_canonical(&self.db)?))
+    }
+
+    pub fn set_registration_error(&self, error: Option<String>) {
+        self.state.lock().registration_error = error;
+    }
+
+    fn rebind_os(&self) {
+        let error = match load_canonical(&self.db) {
+            Ok(bindings) => self.registrar.replace_all(&registrable(&bindings)).err(),
+            Err(error) => Some(error.to_string()),
+        };
+        self.set_registration_error(error);
     }
 
     /// IPC `list` domain operation.

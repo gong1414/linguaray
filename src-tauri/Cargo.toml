@@ -47,6 +47,7 @@ image = { version = "0.25", default-features = false, features = ["png"] }
 [dependencies]
 linguaray-contracts = { path = "crates/linguaray-contracts" }
 linguaray-catalog = { path = "crates/linguaray-catalog" }
+linguaray-kernel = { path = "crates/linguaray-kernel" }
 tauri = { version = "2", features = ["macos-private-api", "tray-icon", "image-png"] }
 tauri-plugin-opener = "2"
 tauri-plugin-store = "2"

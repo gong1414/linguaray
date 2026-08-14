@@ -19,6 +19,7 @@ pub mod error;
 pub mod fs_acl;
 pub mod history;
 pub mod keystore;
+pub mod plugins;
 pub mod popup;
 pub mod providers;
 pub mod selection;
@@ -35,9 +36,7 @@ use std::sync::Arc;
 use tauri::menu::MenuEvent;
 use tauri::Emitter;
 use tauri::Manager;
-use tauri_plugin_global_shortcut::{
-    Builder as GlobalShortcutBuilder, GlobalShortcutExt, ShortcutState,
-};
+use tauri_plugin_global_shortcut::{Builder as GlobalShortcutBuilder, ShortcutState};
 
 use crate::commands::{
     a11y_status, archive_database, archive_keystore, get_data_readiness, get_settings,
@@ -57,7 +56,7 @@ use crate::db::readiness::DataReadiness;
 use crate::db::Database;
 
 type DbErr = crate::db::DbError;
-use crate::shortcuts::{Registrar as ShortcutRegistrar, ShortcutAction, ShortcutController};
+use crate::shortcuts::ShortcutController;
 
 // Re-export so integration tests can reference the error enum as
 // `linguaray_lib::Error` (mirrors `service::TranslationOutcome` usage).
@@ -120,90 +119,6 @@ pub struct AppState {
     /// `parking_lot::Mutex` (NOT `tokio::sync::Mutex`) so `TranslationGuard::drop`
     /// runs `finish_translation` synchronously on the calling thread.
     pub tray: Arc<parking_lot::Mutex<tray_state::TrayStateController>>,
-}
-
-/// Real OS adapter for the revisioned shortcut controller. It owns the exact
-/// set registered by LinguaRay and performs an inverse rollback if any new
-/// registration fails, so the controller's DB transaction never observes a
-/// partially rebound map.
-struct TauriShortcutRegistrar {
-    app: tauri::AppHandle,
-    current: parking_lot::Mutex<Vec<(ShortcutAction, String)>>,
-}
-
-impl TauriShortcutRegistrar {
-    fn new(app: tauri::AppHandle) -> Self {
-        Self {
-            app,
-            current: parking_lot::Mutex::new(Vec::new()),
-        }
-    }
-
-    fn register_binding(&self, action: ShortcutAction, combo: &str) -> Result<(), String> {
-        let action_for_handler = action;
-        self.app
-            .global_shortcut()
-            .on_shortcut(combo, move |app, shortcut, event| {
-                if app
-                    .try_state::<Arc<ShortcutController>>()
-                    .is_some_and(|state| state.is_recording())
-                {
-                    return;
-                }
-                match action_for_handler {
-                    ShortcutAction::Selection => on_hotkey(app, shortcut, event),
-                    ShortcutAction::Input => on_input_hotkey(app, shortcut, event),
-                    ShortcutAction::Clipboard if event.state == ShortcutState::Pressed => {
-                        let _ = app.emit("tray-action", "translate-clipboard");
-                    }
-                    ShortcutAction::Clipboard | ShortcutAction::Ocr => {}
-                }
-            })
-            .map_err(|error| error.to_string())
-    }
-
-    fn unregister_bindings(&self, bindings: &[(ShortcutAction, String)]) -> Result<(), String> {
-        for (_, combo) in bindings {
-            self.app
-                .global_shortcut()
-                .unregister(combo.as_str())
-                .map_err(|error| error.to_string())?;
-        }
-        Ok(())
-    }
-}
-
-impl ShortcutRegistrar for TauriShortcutRegistrar {
-    fn replace_all(&self, shortcuts: &[(ShortcutAction, String)]) -> Result<(), String> {
-        let mut current = self.current.lock();
-        let previous = current.clone();
-        self.unregister_bindings(&previous)?;
-
-        let mut registered = Vec::new();
-        for (action, combo) in shortcuts {
-            if let Err(operation) = self.register_binding(*action, combo) {
-                let _ = self.unregister_bindings(&registered);
-                let mut rollback_errors = Vec::new();
-                for (old_action, old_combo) in &previous {
-                    if let Err(error) = self.register_binding(*old_action, old_combo) {
-                        rollback_errors.push(error);
-                    }
-                }
-                if rollback_errors.is_empty() {
-                    *current = previous;
-                    return Err(operation);
-                }
-                current.clear();
-                return Err(format!(
-                    "{operation}; rollback failed: {}",
-                    rollback_errors.join("; ")
-                ));
-            }
-            registered.push((*action, combo.clone()));
-        }
-        *current = registered;
-        Ok(())
-    }
 }
 
 /// Gating check for provider commands that ALREADY hold the `data_gate` guard.
@@ -685,7 +600,7 @@ pub(crate) fn apply_keystore_recovery_db_cleanup(app: &Arc<AppState>) -> Result<
 ///   4. `popup::show_at` loading at the captured cursor.
 ///   5. translate, then `is_latest` again before showing the result, so a stale
 ///      result never overwrites a fresher popup.
-fn on_hotkey(
+pub(crate) fn on_hotkey(
     app: &tauri::AppHandle,
     _shortcut: &tauri_plugin_global_shortcut::Shortcut,
     event: tauri_plugin_global_shortcut::ShortcutEvent,
@@ -720,7 +635,7 @@ fn on_hotkey(
 /// Unlike `on_hotkey` (Alt+Space), this is a pure UI toggle — no selection capture,
 /// no translate call, no popup, no generation token. It just surfaces the
 /// pre-declared `input` webview window so the user can type text into InputPanel.
-fn on_input_hotkey(
+pub(crate) fn on_input_hotkey(
     app: &tauri::AppHandle,
     _shortcut: &tauri_plugin_global_shortcut::Shortcut,
     event: tauri_plugin_global_shortcut::ShortcutEvent,
@@ -1360,10 +1275,29 @@ pub fn run() {
                 .read()
                 .clone();
             if let Some(shortcut_db) = shortcut_db {
-                let registrar = Arc::new(TauriShortcutRegistrar::new(app.handle().clone()));
-                match ShortcutController::new(shortcut_db, registrar) {
+                let registrar = Arc::new(crate::plugins::shortcuts::TauriShortcutRegistrar::new(
+                    app.handle().clone(),
+                ));
+                match ShortcutController::load(shortcut_db, registrar.clone()) {
                     Ok(controller) => {
-                        app.manage(Arc::new(controller));
+                        let controller = Arc::new(controller);
+                        app.manage(controller.clone());
+                        let plugin = Arc::new(crate::plugins::shortcuts::ShortcutsPlugin::new(
+                            registrar, controller,
+                        ));
+                        match linguaray_kernel::Supervisor::compose(
+                            crate::plugins::builtin_plugins(plugin),
+                        ) {
+                            Ok(supervisor) => {
+                                tauri::async_runtime::block_on(
+                                    supervisor.enable(linguaray_kernel::PluginId("shortcuts")),
+                                );
+                                app.manage(supervisor);
+                            }
+                            Err(error) => {
+                                log::error!("kernel compose failed: {error}");
+                            }
+                        }
                     }
                     Err(error) => {
                         log::error!("shortcut controller startup failed: {error}");
@@ -1424,8 +1358,18 @@ pub fn run() {
             history_clear_all,
             history_search
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            if let tauri::RunEvent::Exit = event {
+                if let Some(supervisor) = app.try_state::<linguaray_kernel::Supervisor>() {
+                    let supervisor = supervisor.inner().clone();
+                    tauri::async_runtime::spawn(async move {
+                        supervisor.shutdown().await;
+                    });
+                }
+            }
+        });
 }
 
 #[cfg(test)]
