@@ -4,13 +4,51 @@
 //! sacred (never silently degrade to a remote fallback).
 
 use crate::adapter::profile_to_preset;
-use crate::db::providers::ProviderProfile;
+use crate::db::providers::{
+    self as db_providers, ActiveSelection, ProviderProfile, ProviderStatus,
+};
+use crate::db::Database;
 use crate::engines::TraditionalEngine;
 use crate::error::{ConfigKind, Error};
-use crate::keystore::Keystore;
+use crate::keystore::{Keystore, KeystoreError};
 use crate::providers::ProviderPreset;
 use crate::wire::{build_prompt, call, AppOptions, WireParams};
+use std::collections::HashMap;
 use std::sync::Arc;
+
+/// Key lookup used by the orchestrator. Tests pass [`Keystore`]; the
+/// Translation plugin prefetches into [`PrefetchedSecrets`] so it does not
+/// hold a `&Keystore` across an await.
+pub trait SecretStore: Send + Sync {
+    fn get_key(&self, secret_ref: &str) -> Result<Option<String>, KeystoreError>;
+}
+
+impl SecretStore for Keystore {
+    fn get_key(&self, secret_ref: &str) -> Result<Option<String>, KeystoreError> {
+        Keystore::get_key(self, secret_ref)
+    }
+}
+
+#[derive(Default)]
+pub struct PrefetchedSecrets {
+    keys: HashMap<String, String>,
+}
+
+impl PrefetchedSecrets {
+    pub fn insert(&mut self, secret_ref: String, key: String) {
+        self.keys.insert(secret_ref, key);
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.keys.is_empty()
+    }
+}
+
+impl SecretStore for PrefetchedSecrets {
+    fn get_key(&self, secret_ref: &str) -> Result<Option<String>, KeystoreError> {
+        Ok(self.keys.get(secret_ref).cloned())
+    }
+}
 
 pub struct TranslateInput<'a> {
     pub text: &'a str,
@@ -30,7 +68,7 @@ pub struct Translation {
 
 pub async fn translate(
     client: &reqwest::Client,
-    keystore: Option<&Keystore>,
+    keystore: Option<&dyn SecretStore>,
     preset: &ProviderPreset,
     input: TranslateInput<'_>,
 ) -> Result<Translation, Error> {
@@ -96,7 +134,7 @@ pub async fn translate(
 /// 用 `_ref` 变体以共享 fallback 而不需要 per-call owned `Box`。
 pub async fn translate_with_fallback(
     client: &reqwest::Client,
-    keystore: Option<&Keystore>,
+    keystore: Option<&dyn SecretStore>,
     primary_preset: &ProviderPreset,
     input: TranslateInput<'_>,
     fallback: Option<Box<dyn TraditionalEngine>>,
@@ -119,7 +157,7 @@ pub async fn translate_with_fallback(
 /// - `Config`/`Keystore` → 原样传播，绝不 fallback。
 pub async fn translate_with_fallback_ref(
     client: &reqwest::Client,
-    keystore: Option<&Keystore>,
+    keystore: Option<&dyn SecretStore>,
     primary_preset: &ProviderPreset,
     input: TranslateInput<'_>,
     fallback: Option<&dyn TraditionalEngine>,
@@ -195,7 +233,7 @@ pub struct TranslationOutcome {
 /// is tagged with the primary preset id (engine == preset.id).
 pub async fn translate_primary_only(
     client: &reqwest::Client,
-    keystore: Option<&Keystore>,
+    keystore: Option<&dyn SecretStore>,
     primary_preset: &ProviderPreset,
     input: TranslateInput<'_>,
 ) -> Result<Translation, Error> {
@@ -283,7 +321,7 @@ pub fn eligible_for_session_fallback(
 #[allow(clippy::too_many_arguments)]
 pub async fn translate_parallel(
     client: &reqwest::Client,
-    keystore: Option<&Keystore>,
+    keystore: Option<&dyn SecretStore>,
     profiles: Vec<ProviderProfile>,
     text: &str,
     from: &str,
@@ -421,4 +459,94 @@ fn is_local(p: &ProviderPreset) -> bool {
     };
     let host = parsed.host_str().unwrap_or("");
     matches!(host, "localhost" | "127.0.0.1" | "::1" | "0.0.0.0")
+}
+
+/// Session result shared by the Translation plugin and IPC façade.
+#[derive(Debug, serde::Serialize)]
+pub struct TranslateSessionResult {
+    pub outcomes: Vec<TranslationOutcome>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub actual_engine: Option<String>,
+}
+
+/// Active-selection → single or parallel translate. Test seam: injected client
+/// and keystore. Production goes through [`crate::plugins::translation`].
+pub async fn run_session_with_fallback(
+    db: &Arc<Database>,
+    client: &reqwest::Client,
+    keystore: Option<&dyn SecretStore>,
+    text: &str,
+    from: &str,
+    to: &str,
+    fallback: Option<Arc<dyn TraditionalEngine>>,
+) -> Result<TranslateSessionResult, String> {
+    let (selection, all_profiles): (ActiveSelection, Vec<ProviderProfile>) = {
+        let sel = db
+            .with_conn(|conn| db_providers::read_active_selection(conn))
+            .map_err(|e| e.to_string())?;
+        let list = db
+            .with_conn(|conn| db_providers::list(conn))
+            .map_err(|e| e.to_string())?;
+        (sel, list)
+    };
+
+    let is_callable =
+        |p: &ProviderProfile| p.status == ProviderStatus::Active.as_str() && p.enabled;
+    let mut profiles: Vec<ProviderProfile> = Vec::new();
+    if let Some(primary_uuid) = &selection.primary {
+        if let Some(p) = all_profiles.iter().find(|p| &p.uuid == primary_uuid) {
+            if is_callable(p) {
+                profiles.push(p.clone());
+            }
+        }
+    }
+    for uuid in &selection.parallel {
+        if let Some(p) = all_profiles.iter().find(|p| &p.uuid == uuid) {
+            if is_callable(p) && !profiles.iter().any(|q| q.uuid == p.uuid) {
+                profiles.push(p.clone());
+            }
+        }
+    }
+    if profiles.is_empty() {
+        return Err("no active provider selected".into());
+    }
+
+    if selection.parallel.is_empty() {
+        let preset = profile_to_preset(&profiles[0]).map_err(|e| format!("adapter error: {e}"))?;
+        let input = TranslateInput {
+            text,
+            from,
+            to,
+            options: AppOptions::default(),
+        };
+        let fb_ref: Option<&dyn TraditionalEngine> = fallback.as_deref();
+        let result = translate_with_fallback_ref(client, keystore, &preset, input, fb_ref).await;
+        let actual_engine = match &result {
+            Ok(t) => Some(t.engine.clone()),
+            Err(_) => None,
+        };
+        Ok(TranslateSessionResult {
+            outcomes: vec![TranslationOutcome {
+                uuid: profiles[0].uuid.clone(),
+                result,
+            }],
+            actual_engine,
+        })
+    } else {
+        let outcomes = translate_parallel(
+            client,
+            keystore,
+            profiles,
+            text,
+            from,
+            to,
+            AppOptions::default(),
+            fallback,
+        )
+        .await;
+        Ok(TranslateSessionResult {
+            outcomes,
+            actual_engine: None,
+        })
+    }
 }

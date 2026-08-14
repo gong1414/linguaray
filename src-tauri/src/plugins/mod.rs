@@ -6,6 +6,7 @@ pub mod http;
 pub mod providers;
 pub mod secrets;
 pub mod shortcuts;
+pub mod translation;
 
 use linguaray_kernel::CapabilityPlugin;
 use std::sync::Arc;
@@ -23,6 +24,7 @@ pub fn builtin_plugins(
         http,
         Arc::new(drivers::DriversPlugin::new()),
         Arc::new(providers::ProvidersPlugin),
+        Arc::new(translation::TranslationPlugin),
     ];
     if let Some(shortcuts) = shortcuts {
         out.push(shortcuts);
@@ -45,6 +47,7 @@ mod tests {
         let ids: Vec<_> = plugins.iter().map(|p| p.descriptor().id.0).collect();
         assert!(ids.contains(&"drivers"));
         assert!(ids.contains(&"providers"));
+        assert!(ids.contains(&"translation"));
         assert!(!ids.contains(&"azure-openai"));
         assert!(!ids.contains(&"custom-http"));
         assert!(!ids.contains(&"ocr"));

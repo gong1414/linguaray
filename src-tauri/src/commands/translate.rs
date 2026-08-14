@@ -1,15 +1,11 @@
 //! Translate IPC commands and session helpers (plugin-core PR-3).
 
-use crate::adapter::profile_to_preset;
-use crate::db::providers::{
-    self as db_providers, ActiveSelection, ProviderProfile, ProviderStatus,
-};
 use crate::db::Database;
-use crate::service::{self, translate_parallel, translate_with_fallback_ref, TranslationOutcome};
+use crate::plugins::translation::{PersistSpec, TranslationHub, TRANSLATION};
+use crate::service::{self, TranslateSessionResult};
 use crate::{
-    a11y, clipboard, cursor, engines, keystore, popup, providers, require_database, selection,
-    selection_engine, session_client, session_keystore, settings, tray_state, wire, AppState,
-    Session,
+    a11y, clipboard, cursor, engines, popup, providers, require_database, selection,
+    selection_engine, settings, tray_state, AppState, Session,
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -30,10 +26,39 @@ pub struct TranslateResult {
     pub engine: String,
 }
 
+fn map_lease(err: impl std::fmt::Display) -> String {
+    let text = err.to_string();
+    if text.contains("unloaded") {
+        "HTTP client unavailable: startup build failed (recovery required)".into()
+    } else {
+        text
+    }
+}
+
+async fn with_translation<F, Fut, R>(app: &tauri::AppHandle, f: F) -> Result<R, String>
+where
+    F: FnOnce(TranslationHub) -> Fut,
+    Fut: std::future::Future<Output = Result<R, String>>,
+{
+    let supervisor = app
+        .try_state::<linguaray_kernel::Supervisor>()
+        .ok_or_else(|| {
+            "HTTP client unavailable: startup build failed (recovery required)".to_string()
+        })?;
+    let lease = supervisor.handle().lease(TRANSLATION).map_err(map_lease)?;
+    lease
+        .call(|tx| {
+            let tx = tx.clone();
+            async move { f(tx).await }
+        })
+        .await
+        .map_err(map_lease)?
+}
+
 #[tauri::command]
 pub async fn translate(
     app: tauri::AppHandle,
-    state: tauri::State<'_, Arc<Session>>,
+    _state: tauri::State<'_, Arc<Session>>,
     req: TranslateRequest,
     engine: String,
 ) -> Result<TranslateResult, String> {
@@ -41,30 +66,18 @@ pub async fn translate(
         .into_iter()
         .find(|p| p.id == engine)
         .ok_or_else(|| format!("unknown engine: {engine}"))?;
-    let opts = wire::AppOptions::default(); // v1: no app-options UI yet
-    let input = service::TranslateInput {
-        text: &req.text,
-        from: &req.from,
-        to: &req.to,
-        options: opts,
-    };
-    // §G: resolve the opt-in fallback engine from settings (None by default).
     let fallback = settings::load(&app)
         .fallback_engine
         .as_deref()
         .and_then(engines::find);
-    let client = session_client(&state)?;
-    let keystore = if preset.needs_key {
-        Some(session_keystore(&state)?)
-    } else {
-        None
-    };
-    let t = service::translate_with_fallback(client, keystore, &preset, input, fallback)
-        .await
-        .map_err(|e| e.to_string())?;
+    let t = with_translation(&app, |tx| async move {
+        tx.translate_preset(preset, req.text, req.from, req.to, fallback)
+            .await
+    })
+    .await?;
     Ok(TranslateResult {
         text: t.text,
-        engine: t.engine, // actual producing engine (primary or fallback)
+        engine: t.engine,
     })
 }
 
@@ -76,7 +89,7 @@ pub async fn translate(
 #[tauri::command]
 pub async fn translate_default(
     app: tauri::AppHandle,
-    state: tauri::State<'_, Arc<Session>>,
+    _state: tauri::State<'_, Arc<Session>>,
     req: TranslateRequest,
 ) -> Result<TranslateResult, String> {
     let s = settings::load(&app);
@@ -89,23 +102,12 @@ pub async fn translate_default(
         .into_iter()
         .find(|p| p.id == s.default_provider)
         .ok_or_else(|| format!("default provider '{}' not found", s.default_provider))?;
-    // §G: opt-in fallback engine from settings (None by default).
     let fallback = s.fallback_engine.as_deref().and_then(engines::find);
-    let input = service::TranslateInput {
-        text: &req.text,
-        from: &req.from,
-        to: &to,
-        options: wire::AppOptions::default(),
-    };
-    let client = session_client(&state)?;
-    let keystore = if preset.needs_key {
-        Some(session_keystore(&state)?)
-    } else {
-        None
-    };
-    let t = service::translate_with_fallback(client, keystore, &preset, input, fallback)
-        .await
-        .map_err(|e| e.to_string())?;
+    let t = with_translation(&app, |tx| async move {
+        tx.translate_preset(preset, req.text, req.from, to, fallback)
+            .await
+    })
+    .await?;
     Ok(TranslateResult {
         text: t.text,
         engine: t.engine,
@@ -153,20 +155,6 @@ pub async fn translate_clipboard(
     // record_translation_error(gen) before the guard drops.
     let mut _tray_guard = tray_state::TranslationGuard::new(&app_state.tray, gen);
 
-    let client = match session_client(&state) {
-        Ok(c) => c.clone(),
-        Err(msg) => {
-            if state.gen.is_latest(gen) {
-                app_state.tray.lock().record_translation_error(gen);
-                let _ = popup::set_popup_mode(&app, popup::PopupMode::Error, &anchor);
-                let _ = popup::error_with_source(&app, &msg, &text);
-            }
-            return Ok(());
-        }
-    };
-    let keystore = state.keystore.as_deref();
-
-    // gate + require_database 拿 db（spawn_blocking 内，与 translate_session 一致）。
     let app_arc = app_state.inner().clone();
     let db = match tauri::async_runtime::spawn_blocking(move || -> Result<Arc<Database>, String> {
         let _gate = app_arc.data_gate.read();
@@ -193,16 +181,14 @@ pub async fn translate_clipboard(
         }
     };
 
-    // 走统一核心（从 settings 读 fallback_engine；target_language 来自 settings）。
     let session_result = run_translate_session(
-        &db,
-        &client,
-        keystore,
         &app,
+        &db,
         &text,
         "auto",
         &s.target_language,
         "clipboard",
+        Some((&state.gen, gen)),
     )
     .await;
 
@@ -244,16 +230,6 @@ pub struct TranslateSessionRequest {
     pub text: String,
     pub from: String,
     pub to: String,
-}
-
-#[derive(Debug, Serialize)]
-pub struct TranslateSessionResult {
-    /// 每个引擎的结果（成功或分类过的错误）。单引擎路径长度=1，并行=primary+parallel 数。
-    pub outcomes: Vec<TranslationOutcome>,
-    /// 单引擎成功时的实际 engine id（preset.id=secret_ref）；并行或全失败时 None。
-    /// 老前端可只读这个字段保持单结果 UI 工作；新前端读 outcomes 渲染多结果。
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub actual_engine: Option<String>,
 }
 
 /// translate_clipboard 根据翻译结果决定发哪种 popup 事件的纯函数决策。
@@ -332,148 +308,55 @@ pub fn resolve_target_language(to: &str, settings_target: &str) -> String {
 /// 保持一致更易读。clippy 的 7 参数阈值是经验值，这里故意放宽。
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn run_translate_session(
-    db: &Arc<Database>,
-    client: &reqwest::Client,
-    keystore: Option<&keystore::Keystore>,
     app: &tauri::AppHandle,
+    db: &Arc<Database>,
     text: &str,
     from: &str,
     to: &str,
     trigger_source: &str,
+    gen: Option<(&crate::concurrency::GenerationToken, u64)>,
 ) -> Result<TranslateSessionResult, String> {
-    // P1-C: resolve the "" sentinel CENTRALLY so on_hotkey, translate_session,
-    // translate_selection_ipc, and the tray all agree.
     let settings_target = settings::load(app).target_language;
     let to = resolve_target_language(to, &settings_target);
-    // 读 fallback_engine（§G opt-in，默认 None）。
     let fallback_box = settings::load(app)
         .fallback_engine
         .as_deref()
         .and_then(engines::find);
     let fallback: Option<Arc<dyn engines::TraditionalEngine>> =
         fallback_box.map(Arc::<dyn engines::TraditionalEngine>::from);
-    let started = std::time::Instant::now();
-    let result =
-        run_translate_session_with_fallback(db, client, keystore, text, from, &to, fallback).await;
-    if let Ok(session) = &result {
-        let elapsed_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
-        let detected = (!from.is_empty() && from != "auto").then_some(from);
-        if let Some(keystore) = keystore {
-            if let Err(error) = crate::history::persist_translation_session(
-                db,
-                keystore,
-                trigger_source,
-                text,
-                detected,
-                &to,
-                &session.outcomes,
-                elapsed_ms,
-            ) {
-                log::warn!("encrypted history persistence failed: {}", error);
-            }
+    let db = db.clone();
+    let text = text.to_string();
+    let from = from.to_string();
+    let trigger_source = trigger_source.to_string();
+    with_translation(app, |tx| {
+        let persist = PersistSpec {
+            trigger_source,
+            gen,
+        };
+        let db = db.clone();
+        let text = text.clone();
+        let from = from.clone();
+        let to = to.clone();
+        async move {
+            tx.run_session(&db, &text, &from, &to, fallback, Some(persist))
+                .await
         }
-    }
-    result
+    })
+    .await
 }
 
 /// 测试入口：不读 settings，fallback 直接传 None（聚焦核心路径）。
 pub async fn run_translate_session_no_settings(
     db: &Arc<Database>,
     client: &reqwest::Client,
-    keystore: Option<&keystore::Keystore>,
+    keystore: Option<&crate::keystore::Keystore>,
     text: &str,
     from: &str,
     to: &str,
 ) -> Result<TranslateSessionResult, String> {
-    run_translate_session_with_fallback(db, client, keystore, text, from, to, None).await
-}
-
-async fn run_translate_session_with_fallback(
-    db: &Arc<Database>,
-    client: &reqwest::Client,
-    keystore: Option<&keystore::Keystore>,
-    text: &str,
-    from: &str,
-    to: &str,
-    fallback: Option<Arc<dyn engines::TraditionalEngine>>,
-) -> Result<TranslateSessionResult, String> {
-    // 读 active selection + 全量 list（一个 blocking 块内，gate 保护）。
-    // 注意：调用方（命令）已持有 data_gate + require_database；这里为了
-    // 让纯函数可测，直接用 db（测试里 db 是健康的）。命令路径会在外层先 gate。
-    let (selection, all_profiles): (ActiveSelection, Vec<ProviderProfile>) = {
-        let sel = db
-            .with_conn(|conn| db_providers::read_active_selection(conn))
-            .map_err(|e| e.to_string())?;
-        let list = db
-            .with_conn(|conn| db_providers::list(conn))
-            .map_err(|e| e.to_string())?;
-        (sel, list)
-    };
-
-    // 过滤出 active+enabled 的 profile，按 selection 顺序（primary 先，parallel 次）。
-    // 与 validate_active_selection 的 active+enabled 判定一致。
-    let is_callable =
-        |p: &ProviderProfile| p.status == ProviderStatus::Active.as_str() && p.enabled;
-    let mut profiles: Vec<ProviderProfile> = Vec::new();
-    if let Some(primary_uuid) = &selection.primary {
-        if let Some(p) = all_profiles.iter().find(|p| &p.uuid == primary_uuid) {
-            if is_callable(p) {
-                profiles.push(p.clone());
-            }
-        }
-    }
-    for uuid in &selection.parallel {
-        if let Some(p) = all_profiles.iter().find(|p| &p.uuid == uuid) {
-            if is_callable(p) && !profiles.iter().any(|q| q.uuid == p.uuid) {
-                profiles.push(p.clone());
-            }
-        }
-    }
-    if profiles.is_empty() {
-        return Err("no active provider selected".into());
-    }
-
-    // 单引擎 vs 并行。
-    if selection.parallel.is_empty() {
-        // 单引擎：用 primary profile + translate_with_fallback_ref。
-        let preset = profile_to_preset(&profiles[0]).map_err(|e| format!("adapter error: {e}"))?;
-        let input = service::TranslateInput {
-            text,
-            from,
-            to,
-            options: wire::AppOptions::default(),
-        };
-        let fb_ref: Option<&dyn engines::TraditionalEngine> = fallback.as_deref();
-        let result = translate_with_fallback_ref(client, keystore, &preset, input, fb_ref).await;
-        let actual_engine = match &result {
-            Ok(t) => Some(t.engine.clone()),
-            Err(_) => None,
-        };
-        Ok(TranslateSessionResult {
-            outcomes: vec![TranslationOutcome {
-                uuid: profiles[0].uuid.clone(),
-                result,
-            }],
-            actual_engine,
-        })
-    } else {
-        // 并行。
-        let outcomes = translate_parallel(
-            client,
-            keystore,
-            profiles,
-            text,
-            from,
-            to,
-            wire::AppOptions::default(),
-            fallback,
-        )
-        .await;
-        Ok(TranslateSessionResult {
-            outcomes,
-            actual_engine: None,
-        })
-    }
+    let store: Option<&dyn service::SecretStore> =
+        keystore.map(|ks| ks as &dyn service::SecretStore);
+    service::run_session_with_fallback(db, client, store, text, from, to, None).await
 }
 
 /// 并行/单引擎翻译命令（R2a）。前端用 `invoke('translate_session', { req })` 调用。
@@ -483,16 +366,11 @@ async fn run_translate_session_with_fallback(
 #[tauri::command]
 pub async fn translate_session(
     app: tauri::AppHandle,
-    state: tauri::State<'_, Arc<Session>>,
+    _state: tauri::State<'_, Arc<Session>>,
     app_state: tauri::State<'_, Arc<AppState>>,
     req: TranslateSessionRequest,
 ) -> Result<TranslateSessionResult, String> {
-    let client = session_client(&state)?.clone();
-    let keystore = state.keystore.as_deref();
     let app_arc = app_state.inner().clone();
-    // 在 blocking 内 gate + 读 DB 快照（gate 必须在 clone Arc 之前，见 provider_list 注释）。
-    // 这里我们让 run_translate_session 自己用 db.with_conn 读；但 gate 要由命令持有。
-    // 所以：spawn_blocking 里 gate + require_database 拿到 db Arc，直接交给核心。
     let db = tauri::async_runtime::spawn_blocking(move || -> Result<Arc<Database>, String> {
         let _gate = app_arc.data_gate.read();
         let db = require_database(&app_arc, &_gate)?;
@@ -500,10 +378,7 @@ pub async fn translate_session(
     })
     .await
     .map_err(|e| e.to_string())??;
-    run_translate_session(
-        &db, &client, keystore, &app, &req.text, &req.from, &req.to, "input",
-    )
-    .await
+    run_translate_session(&app, &db, &req.text, &req.from, &req.to, "input", None).await
 }
 
 /// A4 (P1-5): translate the live OS selection (fresh capture) OR a
@@ -689,24 +564,6 @@ pub(crate) async fn capture_and_translate(
     // guard drops (Drop then only decrements + recomputes, leaving the error).
     let mut _tray_guard = tray_state::TranslationGuard::new(&app_state.tray, gen);
 
-    // 3. client/keystore guards acquired from Session FIRST.
-    let client = match state.client.as_ref() {
-        Some(c) => c.clone(),
-        None => {
-            if state.gen.is_latest(gen) {
-                app_state.tray.lock().record_translation_error(gen);
-                let _ = popup::set_popup_mode(app, popup::PopupMode::Error, &anchor);
-                let _ = popup::error_with_source(
-                    app,
-                    "HTTP client unavailable: startup build failed (recovery required)",
-                    &text,
-                );
-            }
-            return;
-        }
-    };
-    let keystore = state.keystore.as_deref();
-
     // rev-9-1: acquire the db Arc via spawn_blocking (gate guard INSIDE the closure).
     let app_arc = app_state.clone();
     let db = match tauri::async_runtime::spawn_blocking(move || -> Result<Arc<Database>, String> {
@@ -739,20 +596,27 @@ pub(crate) async fn capture_and_translate(
     }
 
     // 4. run_translate_session — to:"" is resolved centrally inside it.
-    let session_result =
-        match run_translate_session(&db, &client, keystore, app, &text, "auto", "", "selection")
-            .await
-        {
-            Ok(r) => r,
-            Err(msg) => {
-                if state.gen.is_latest(gen) {
-                    app_state.tray.lock().record_translation_error(gen);
-                    let _ = popup::set_popup_mode(app, popup::PopupMode::Error, &anchor);
-                    let _ = popup::error_with_source(app, &msg, &text);
-                }
-                return;
+    let session_result = match run_translate_session(
+        app,
+        &db,
+        &text,
+        "auto",
+        "",
+        "selection",
+        Some((&state.gen, gen)),
+    )
+    .await
+    {
+        Ok(r) => r,
+        Err(msg) => {
+            if state.gen.is_latest(gen) {
+                app_state.tray.lock().record_translation_error(gen);
+                let _ = popup::set_popup_mode(app, popup::PopupMode::Error, &anchor);
+                let _ = popup::error_with_source(app, &msg, &text);
             }
-        };
+            return;
+        }
+    };
     if !state.gen.is_latest(gen) {
         return;
     }
@@ -831,4 +695,29 @@ fn build_popup_anchor(
         work_area: work_area_logical,
         scale_factor: sf,
     })
+}
+
+#[cfg(test)]
+mod remnant {
+    #[test]
+    fn translate_commands_do_not_read_session_client_or_keystore() {
+        let src = include_str!("translate.rs");
+        let prod = src.split("mod remnant").next().unwrap();
+        assert!(
+            !prod.contains("session_client"),
+            "translate path must lease Translation, not Session.client"
+        );
+        assert!(
+            !prod.contains("session_keystore"),
+            "translate path must not read Session.keystore"
+        );
+        assert!(
+            !prod.contains("state.client"),
+            "capture_and_translate must not read Session.client"
+        );
+        assert!(
+            !prod.contains("state.keystore"),
+            "capture_and_translate must not read Session.keystore"
+        );
+    }
 }
