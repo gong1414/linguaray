@@ -2554,8 +2554,18 @@ dependencies = [
 name = "linguaray-contracts"
 version = "0.1.0"
 dependencies = [
+ "linguaray-kernel",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "linguaray-kernel"
+version = "0.1.0"
+dependencies = [
+ "futures",
+ "thiserror 1.0.69",
+ "tokio",
 ]
 
 [[package]]
