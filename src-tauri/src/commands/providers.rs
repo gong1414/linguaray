@@ -2,7 +2,7 @@
 
 use crate::db::providers::{self as db_providers, ActiveSelection, ProviderPatch, ProviderProfile};
 use crate::db::readiness::DataReadiness;
-use crate::{keystore, require_ready_gated, require_ready_gated_write, AppState, Session};
+use crate::{keystore, require_database, require_database_write, AppState, Session};
 use serde::Serialize;
 use std::sync::Arc;
 
@@ -62,7 +62,7 @@ pub async fn provider_list(
         // DB handle). Cloning the Arc before the gate (the old shape) raced the
         // swap and could hand the command a stale DB.
         let _gate = app.data_gate.read();
-        let db = require_ready_gated(&app, &_gate)?;
+        let db = require_database(&app, &_gate)?;
         db.with_conn(|conn| db_providers::list(conn))
             .map_err(|e| e.to_string())
     })
@@ -86,7 +86,7 @@ pub async fn provider_create(
     let result = tauri::async_runtime::spawn_blocking(move || {
         // Acquire the gate FIRST (see provider_list).
         let _gate = app_state.data_gate.read();
-        let db = require_ready_gated(&app_state, &_gate)?;
+        let db = require_database(&app_state, &_gate)?;
         db.with_conn(|conn| {
             db_providers::create(conn, &template_id, &name, &endpoint, model.as_deref())
         })
@@ -117,7 +117,7 @@ pub async fn provider_update(
         move || -> Result<ProviderProfile, ProviderCommandError> {
             // Acquire the gate FIRST (see provider_list).
             let _gate = app_state.data_gate.read();
-            let db = require_ready_gated(&app_state, &_gate).map_err(ProviderCommandError::from)?;
+            let db = require_database(&app_state, &_gate).map_err(ProviderCommandError::from)?;
             // The typed `UpdateOutcome` carries the stale/not-found signals out of
             // the `with_conn` closure (whose error type is fixed to `DbError`), then
             // we map them to structured `ProviderCommandError` variants here — same
@@ -158,7 +158,7 @@ pub async fn provider_duplicate(
     let result = tauri::async_runtime::spawn_blocking(move || {
         // Acquire the gate FIRST (see provider_list).
         let _gate = app_state.data_gate.read();
-        let db = require_ready_gated(&app_state, &_gate)?;
+        let db = require_database(&app_state, &_gate)?;
         db.with_conn(|conn| db_providers::duplicate(conn, &uuid))
             .map_err(|e| e.to_string())
     })
@@ -188,7 +188,7 @@ pub async fn provider_delete(
         // Acquire the gate FIRST (see provider_list) so the readiness check +
         // Arc clone are atomic w.r.t. the DB swap.
         let _gate = app_state.data_gate.write();
-        let db = require_ready_gated_write(&app_state, &_gate)?;
+        let db = require_database_write(&app_state, &_gate)?;
 
         // Step 1: begin_delete under the DB Mutex → returns the secret_ref. The
         // DB guard (with_conn closure) is released before the keystore step.
@@ -225,7 +225,7 @@ pub async fn provider_reorder(
     tauri::async_runtime::spawn_blocking(move || {
         // Acquire the gate FIRST (see provider_list).
         let _gate = app_state.data_gate.write();
-        let db = require_ready_gated_write(&app_state, &_gate)?;
+        let db = require_database_write(&app_state, &_gate)?;
         db.with_conn(|conn| db_providers::reorder(conn, &uuids))
             .map_err(|e| e.to_string())
     })
@@ -248,7 +248,7 @@ pub async fn provider_toggle(
     tauri::async_runtime::spawn_blocking(move || {
         // Acquire the gate FIRST (see provider_list).
         let _gate = app_state.data_gate.write();
-        let db = require_ready_gated_write(&app_state, &_gate)?;
+        let db = require_database_write(&app_state, &_gate)?;
         db.with_conn(|conn| db_providers::toggle(conn, &uuid, enabled))
             .map_err(|e| e.to_string())
     })
@@ -311,7 +311,7 @@ pub fn set_key_blocking(app: &Arc<AppState>, uuid: &str, key: &str) -> Result<()
     // Acquire the gate FIRST (see provider_list) so the readiness check + Arc
     // clone are atomic w.r.t. the DB swap.
     let _gate = app.data_gate.read();
-    let db = require_ready_gated(app, &_gate)?;
+    let db = require_database(app, &_gate)?;
 
     // 1. Read the secret_ref + status + needs_key under the DB Mutex, then
     //    release. Reject deleting/deleted profiles: writing a key for a row
@@ -368,7 +368,7 @@ pub async fn provider_set_active(
         tauri::async_runtime::spawn_blocking(move || -> Result<SetActiveResult, String> {
             // Acquire the gate FIRST (see provider_list).
             let _gate = app_state.data_gate.write();
-            let db = require_ready_gated_write(&app_state, &_gate)?;
+            let db = require_database_write(&app_state, &_gate)?;
             // The `with_conn` closure must return Result<_, DbError> (Database's
             // contract). We carry the consent-required signal out via a SetActiveOutcome
             // so the outer closure can map it to the frontend-facing SetActiveResult
@@ -447,7 +447,7 @@ pub fn provider_get_active_selection(
 ) -> Result<ActiveSelection, String> {
     let app = app_state.inner().clone();
     let _gate = app.data_gate.read();
-    let db = require_ready_gated(&app, &_gate)?;
+    let db = require_database(&app, &_gate)?;
     db.with_conn(|conn| db_providers::read_active_selection(conn))
         .map_err(|e| e.to_string())
 }
@@ -513,7 +513,7 @@ pub fn db_set_active_primary(
             ));
         }
     }
-    let db = require_ready_gated_write(app, &_gate)?;
+    let db = require_database_write(app, &_gate)?;
     let outcome = db
         .with_conn(|conn| -> Result<SetActiveOutcome, DbErr> {
             let tx = conn.transaction()?;
@@ -625,7 +625,7 @@ pub async fn provider_confirm_and_set_active(
         tauri::async_runtime::spawn_blocking(move || -> Result<i64, ProviderCommandError> {
             // Acquire the gate FIRST (see provider_list).
             let _gate = app_state.data_gate.write();
-            let db = require_ready_gated_write(&app_state, &_gate)
+            let db = require_database_write(&app_state, &_gate)
                 .map_err(ProviderCommandError::from)?;
             let outcome = db.with_conn(|conn| -> Result<ConfirmActiveOutcome, DbErr> {
                 let tx = conn.transaction()?;
@@ -724,7 +724,7 @@ pub async fn provider_get_models(
     let profile = tauri::async_runtime::spawn_blocking(
         move || -> Result<db_providers::ProviderProfile, String> {
             let _gate = app.data_gate.read();
-            let db = require_ready_gated(&app, &_gate)?;
+            let db = require_database(&app, &_gate)?;
             db.with_conn(|conn| db_providers::get(conn, &uuid))
                 .map_err(|e| e.to_string())
         },
@@ -851,7 +851,7 @@ pub async fn provider_test_connection(
         move || -> Result<db_providers::ProviderProfile, String> {
             // Acquire the gate FIRST (see provider_list).
             let _gate = app.data_gate.read();
-            let db = require_ready_gated(&app, &_gate)?;
+            let db = require_database(&app, &_gate)?;
             db.with_conn(|conn| db_providers::get(conn, &uuid))
                 .map_err(|e| e.to_string())
         },

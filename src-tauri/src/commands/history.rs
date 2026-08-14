@@ -1,4 +1,4 @@
-use crate::{require_ready_gated, require_ready_gated_write, session_keystore, AppState, Session};
+use crate::{require_database, require_database_write, session_keystore, AppState, Session};
 use serde::Serialize;
 use std::sync::Arc;
 
@@ -35,7 +35,7 @@ pub async fn history_privacy_status(
     let app_state = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         let gate = app_state.data_gate.read();
-        let db = require_ready_gated(&app_state, &gate)?;
+        let db = require_database(&app_state, &gate)?;
         read_history_privacy_status(&db)
     })
     .await
@@ -52,7 +52,7 @@ pub async fn history_set_enabled(
     let session = session.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         let gate = app_state.data_gate.read();
-        let db = require_ready_gated(&app_state, &gate)?;
+        let db = require_database(&app_state, &gate)?;
         let keystore = session_keystore(&session)?;
         crate::db::history::set_enabled(&db, keystore, enabled)
             .map_err(|error| error.to_string())?;
@@ -70,7 +70,7 @@ pub async fn history_set_retention(
     let app_state = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         let gate = app_state.data_gate.read();
-        let db = require_ready_gated(&app_state, &gate)?;
+        let db = require_database(&app_state, &gate)?;
         db.with_conn(|conn| crate::db::history::set_retention(conn, days))
             .map_err(|error| error.to_string())?;
         read_history_privacy_status(&db)
@@ -82,11 +82,13 @@ pub async fn history_set_retention(
 #[tauri::command]
 pub async fn history_clear_all(
     state: tauri::State<'_, Arc<AppState>>,
+    session: tauri::State<'_, Arc<Session>>,
 ) -> Result<HistoryPrivacyStatusWire, String> {
+    session_keystore(&session)?;
     let app_state = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         let gate = app_state.data_gate.write();
-        let db = require_ready_gated_write(&app_state, &gate)?;
+        let db = require_database_write(&app_state, &gate)?;
         db.with_conn(crate::db::history::clear_all)
             .map_err(|error| error.to_string())?;
         read_history_privacy_status(&db)
@@ -107,7 +109,7 @@ pub async fn history_search(
     let state = app_state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         let _gate = state.data_gate.read();
-        let db = require_ready_gated(&state, &_gate)?;
+        let db = require_database(&state, &_gate)?;
         let keystore = session_keystore(&session)?;
         crate::history::search::search(&db, keystore, &query, cursor.as_deref())
             .map_err(|error| error.to_string())
