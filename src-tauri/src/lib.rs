@@ -81,7 +81,7 @@ pub use crate::commands::translate::{
 /// clobber the result of a newer trigger.
 pub(crate) struct Session {
     pub(crate) client: Option<reqwest::Client>,
-    pub(crate) keystore: Option<keystore::Keystore>,
+    pub(crate) keystore: Option<Arc<keystore::Keystore>>,
     pub(crate) gen: concurrency::GenerationToken,
 }
 
@@ -90,8 +90,9 @@ pub(crate) struct Session {
 /// Managed alongside [`Session`] as `Arc<AppState>` (existing translate/key
 /// commands keep their `State<'_, Arc<Session>>` signature unchanged — least
 /// disruptive). The provider commands added in step 6 take
-/// `State<'_, Arc<AppState>>` and gate on [`DataReadiness`] via
-/// [`require_ready_gated`] / [`require_ready_gated_write`].
+/// `State<'_, Arc<AppState>>` and gate on the database handle via
+/// [`require_database`] / [`require_database_write`]. `DataReadiness` is the
+/// banner projection only.
 ///
 /// ## Field semantics
 ///
@@ -133,15 +134,14 @@ pub struct AppState {
 /// gate-first ordering is load-bearing: cloning the `Arc` before acquiring the
 /// gate races a concurrent archive/reset/recovery that holds the write guard
 /// and swaps the DB handle, handing the command a stale DB.
-pub(crate) fn require_ready_gated(
+///
+/// §5.7.0: this is a **database** gate, not `DataReadiness == Ready`.
+/// `NeedsKeystoreRecovery` still drives the Settings banner and must not
+/// block keyless translate or DB-only provider commands.
+pub(crate) fn require_database(
     state: &AppState,
     _gate_guard: &parking_lot::RwLockReadGuard<'_, ()>,
 ) -> Result<Arc<Database>, String> {
-    let readiness = state.readiness.read();
-    if !readiness.is_ready() {
-        return Err(format!("Database not ready: {:?}", *readiness));
-    }
-    drop(readiness);
     state
         .db
         .read()
@@ -149,19 +149,13 @@ pub(crate) fn require_ready_gated(
         .ok_or_else(|| "Database not available".to_string())
 }
 
-/// Same as [`require_ready_gated`] but the proof is a WRITE guard (for commands
-/// that need exclusive access: delete/reorder/toggle/set_active). Holding the
-/// write guard excludes every other gate holder, so the readiness + Arc clone
-/// are atomic w.r.t. the DB mutators just the same.
-pub(crate) fn require_ready_gated_write(
+/// Same as [`require_database`] but the proof is a WRITE guard (delete /
+/// reorder / toggle / set_active). Holding the write guard excludes every
+/// other gate holder, so the Arc clone is atomic w.r.t. archive/reset.
+pub(crate) fn require_database_write(
     state: &AppState,
     _gate_guard: &parking_lot::RwLockWriteGuard<'_, ()>,
 ) -> Result<Arc<Database>, String> {
-    let readiness = state.readiness.read();
-    if !readiness.is_ready() {
-        return Err(format!("Database not ready: {:?}", *readiness));
-    }
-    drop(readiness);
     state
         .db
         .read()
@@ -263,7 +257,7 @@ pub(crate) fn session_client(session: &Session) -> Result<&reqwest::Client, Stri
 pub(crate) fn session_keystore(session: &Session) -> Result<&keystore::Keystore, String> {
     session
         .keystore
-        .as_ref()
+        .as_deref()
         .ok_or_else(|| "keystore unavailable: startup init failed (recovery required)".to_string())
 }
 
@@ -275,7 +269,7 @@ pub(crate) fn session_keystore(session: &Session) -> Result<&keystore::Keystore,
 //      parking_lot guards are `!Send`, so they must never cross an `.await`;
 //      keeping them on the blocking thread for the closure's duration is the
 //      one safe pattern.
-//   3. `require_ready_gated` / `require_ready_gated_write` — gate on
+//   3. `require_database` / `require_database_write` — gate on
 //      DataReadiness + clone the Arc<Database>, passing the guard from step 2
 //      as proof the gate is held. Acquiring the gate BEFORE the clone is
 //      load-bearing: a concurrent archive/reset/recovery holds the write guard
@@ -814,7 +808,7 @@ async fn read_enabled_providers(app: &tauri::AppHandle) -> Vec<(String, String)>
     let app_state = app.state::<Arc<AppState>>().inner().clone();
     match tauri::async_runtime::spawn_blocking(move || {
         let _gate = app_state.data_gate.read();
-        let db = require_ready_gated(&app_state, &_gate)?;
+        let db = require_database(&app_state, &_gate)?;
         db.with_conn(|conn| {
             let list = db_providers::list(conn)?;
             Ok(list
@@ -845,7 +839,7 @@ async fn read_primary_status(app: &tauri::AppHandle) -> String {
     };
     match tauri::async_runtime::spawn_blocking(move || {
         let _gate = app_state.data_gate.read();
-        let db = match require_ready_gated(&app_state, &_gate) {
+        let db = match require_database(&app_state, &_gate) {
             Ok(d) => d,
             Err(_) => return "No provider".to_string(),
         };
@@ -1100,9 +1094,10 @@ pub fn run() {
                     None
                 }
             };
+            let keystore = keystore.map(Arc::new);
             app.manage(Arc::new(Session {
-                client,
-                keystore,
+                client: client.clone(),
+                keystore: keystore.clone(),
                 gen: concurrency::GenerationToken::new(),
             }));
 
@@ -1274,6 +1269,7 @@ pub fn run() {
                 .db
                 .read()
                 .clone();
+            let mut shortcuts_plugin = None;
             if let Some(shortcut_db) = shortcut_db {
                 let registrar = Arc::new(crate::plugins::shortcuts::TauriShortcutRegistrar::new(
                     app.handle().clone(),
@@ -1282,26 +1278,34 @@ pub fn run() {
                     Ok(controller) => {
                         let controller = Arc::new(controller);
                         app.manage(controller.clone());
-                        let plugin = Arc::new(crate::plugins::shortcuts::ShortcutsPlugin::new(
-                            registrar, controller,
+                        shortcuts_plugin = Some(Arc::new(
+                            crate::plugins::shortcuts::ShortcutsPlugin::new(registrar, controller),
                         ));
-                        match linguaray_kernel::Supervisor::compose(
-                            crate::plugins::builtin_plugins(plugin),
-                        ) {
-                            Ok(supervisor) => {
-                                tauri::async_runtime::block_on(
-                                    supervisor.enable(linguaray_kernel::PluginId("shortcuts")),
-                                );
-                                app.manage(supervisor);
-                            }
-                            Err(error) => {
-                                log::error!("kernel compose failed: {error}");
-                            }
-                        }
                     }
                     Err(error) => {
                         log::error!("shortcut controller startup failed: {error}");
                     }
+                }
+            }
+
+            let database_plugin = Arc::new(crate::plugins::database::DatabasePlugin::new(
+                app.state::<Arc<AppState>>().db.read().clone(),
+            ));
+            let secrets_plugin =
+                Arc::new(crate::plugins::secrets::SecretsPlugin::new(keystore.clone()));
+            let http_plugin = Arc::new(crate::plugins::http::HttpPlugin::new(client));
+            match linguaray_kernel::Supervisor::compose(crate::plugins::builtin_plugins(
+                database_plugin,
+                secrets_plugin,
+                http_plugin,
+                shortcuts_plugin,
+            )) {
+                Ok(supervisor) => {
+                    tauri::async_runtime::block_on(supervisor.enable_all());
+                    app.manage(supervisor);
+                }
+                Err(error) => {
+                    log::error!("kernel compose failed: {error}");
                 }
             }
 
@@ -1639,6 +1643,45 @@ mod tests {
             gen: concurrency::GenerationToken::new(),
         };
         assert!(session_client(&session).is_ok());
+    }
+
+    #[test]
+    fn database_gate_allows_keystore_recovery_banner() {
+        let dir = tempfile::tempdir().unwrap();
+        let db_path = dir.path().join("gate.db");
+        let db = Arc::new(Database::open(&db_path).unwrap());
+        let state = AppState {
+            db: parking_lot::RwLock::new(Some(db)),
+            data_gate: parking_lot::RwLock::new(()),
+            readiness: parking_lot::RwLock::new(DataReadiness::NeedsKeystoreRecovery {
+                reason: "corrupt".into(),
+            }),
+            db_path,
+            keystore_dir: dir.path().join("keystore"),
+            settings_path: Some(dir.path().join("settings.json")),
+            tray: Arc::new(parking_lot::Mutex::new(test_tray_controller())),
+        };
+        let gate = state.data_gate.read();
+        assert!(
+            require_database(&state, &gate).is_ok(),
+            "NeedsKeystoreRecovery must not block the database gate"
+        );
+    }
+
+    #[test]
+    fn database_gate_fails_without_handle() {
+        let dir = tempfile::tempdir().unwrap();
+        let state = AppState {
+            db: parking_lot::RwLock::new(None),
+            data_gate: parking_lot::RwLock::new(()),
+            readiness: parking_lot::RwLock::new(DataReadiness::Ready),
+            db_path: dir.path().join("missing.db"),
+            keystore_dir: dir.path().join("keystore"),
+            settings_path: Some(dir.path().join("settings.json")),
+            tray: Arc::new(parking_lot::Mutex::new(test_tray_controller())),
+        };
+        let gate = state.data_gate.read();
+        assert!(require_database(&state, &gate).is_err());
     }
 
     // ─── R2a Task 6: translate_clipboard 分支决策 ──────────────────────────────

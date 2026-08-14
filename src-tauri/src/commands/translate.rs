@@ -7,7 +7,7 @@ use crate::db::providers::{
 use crate::db::Database;
 use crate::service::{self, translate_parallel, translate_with_fallback_ref, TranslationOutcome};
 use crate::{
-    a11y, clipboard, cursor, engines, keystore, popup, providers, require_ready_gated, selection,
+    a11y, clipboard, cursor, engines, keystore, popup, providers, require_database, selection,
     selection_engine, session_client, session_keystore, settings, tray_state, wire, AppState,
     Session,
 };
@@ -54,7 +54,11 @@ pub async fn translate(
         .as_deref()
         .and_then(engines::find);
     let client = session_client(&state)?;
-    let keystore = session_keystore(&state)?;
+    let keystore = if preset.needs_key {
+        Some(session_keystore(&state)?)
+    } else {
+        None
+    };
     let t = service::translate_with_fallback(client, keystore, &preset, input, fallback)
         .await
         .map_err(|e| e.to_string())?;
@@ -94,7 +98,11 @@ pub async fn translate_default(
         options: wire::AppOptions::default(),
     };
     let client = session_client(&state)?;
-    let keystore = session_keystore(&state)?;
+    let keystore = if preset.needs_key {
+        Some(session_keystore(&state)?)
+    } else {
+        None
+    };
     let t = service::translate_with_fallback(client, keystore, &preset, input, fallback)
         .await
         .map_err(|e| e.to_string())?;
@@ -156,23 +164,13 @@ pub async fn translate_clipboard(
             return Ok(());
         }
     };
-    let keystore = match session_keystore(&state) {
-        Ok(k) => k,
-        Err(msg) => {
-            if state.gen.is_latest(gen) {
-                app_state.tray.lock().record_translation_error(gen);
-                let _ = popup::set_popup_mode(&app, popup::PopupMode::Error, &anchor);
-                let _ = popup::error_with_source(&app, &msg, &text);
-            }
-            return Ok(());
-        }
-    };
+    let keystore = state.keystore.as_deref();
 
-    // gate + require_ready_gated 拿 db（spawn_blocking 内，与 translate_session 一致）。
+    // gate + require_database 拿 db（spawn_blocking 内，与 translate_session 一致）。
     let app_arc = app_state.inner().clone();
     let db = match tauri::async_runtime::spawn_blocking(move || -> Result<Arc<Database>, String> {
         let _gate = app_arc.data_gate.read();
-        require_ready_gated(&app_arc, &_gate)
+        require_database(&app_arc, &_gate)
     })
     .await
     {
@@ -336,7 +334,7 @@ pub fn resolve_target_language(to: &str, settings_target: &str) -> String {
 pub(crate) async fn run_translate_session(
     db: &Arc<Database>,
     client: &reqwest::Client,
-    keystore: &keystore::Keystore,
+    keystore: Option<&keystore::Keystore>,
     app: &tauri::AppHandle,
     text: &str,
     from: &str,
@@ -360,18 +358,19 @@ pub(crate) async fn run_translate_session(
     if let Ok(session) = &result {
         let elapsed_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
         let detected = (!from.is_empty() && from != "auto").then_some(from);
-        if let Err(error) = crate::history::persist_translation_session(
-            db,
-            keystore,
-            trigger_source,
-            text,
-            detected,
-            &to,
-            &session.outcomes,
-            elapsed_ms,
-        ) {
-            // Optional history must never break or expose translation content.
-            log::warn!("encrypted history persistence failed: {}", error);
+        if let Some(keystore) = keystore {
+            if let Err(error) = crate::history::persist_translation_session(
+                db,
+                keystore,
+                trigger_source,
+                text,
+                detected,
+                &to,
+                &session.outcomes,
+                elapsed_ms,
+            ) {
+                log::warn!("encrypted history persistence failed: {}", error);
+            }
         }
     }
     result
@@ -381,7 +380,7 @@ pub(crate) async fn run_translate_session(
 pub async fn run_translate_session_no_settings(
     db: &Arc<Database>,
     client: &reqwest::Client,
-    keystore: &keystore::Keystore,
+    keystore: Option<&keystore::Keystore>,
     text: &str,
     from: &str,
     to: &str,
@@ -392,14 +391,14 @@ pub async fn run_translate_session_no_settings(
 async fn run_translate_session_with_fallback(
     db: &Arc<Database>,
     client: &reqwest::Client,
-    keystore: &keystore::Keystore,
+    keystore: Option<&keystore::Keystore>,
     text: &str,
     from: &str,
     to: &str,
     fallback: Option<Arc<dyn engines::TraditionalEngine>>,
 ) -> Result<TranslateSessionResult, String> {
     // 读 active selection + 全量 list（一个 blocking 块内，gate 保护）。
-    // 注意：调用方（命令）已持有 data_gate + require_ready_gated；这里为了
+    // 注意：调用方（命令）已持有 data_gate + require_database；这里为了
     // 让纯函数可测，直接用 db（测试里 db 是健康的）。命令路径会在外层先 gate。
     let (selection, all_profiles): (ActiveSelection, Vec<ProviderProfile>) = {
         let sel = db
@@ -489,14 +488,14 @@ pub async fn translate_session(
     req: TranslateSessionRequest,
 ) -> Result<TranslateSessionResult, String> {
     let client = session_client(&state)?.clone();
-    let keystore = session_keystore(&state)?;
+    let keystore = state.keystore.as_deref();
     let app_arc = app_state.inner().clone();
     // 在 blocking 内 gate + 读 DB 快照（gate 必须在 clone Arc 之前，见 provider_list 注释）。
     // 这里我们让 run_translate_session 自己用 db.with_conn 读；但 gate 要由命令持有。
-    // 所以：spawn_blocking 里 gate + require_ready_gated 拿到 db Arc，直接交给核心。
+    // 所以：spawn_blocking 里 gate + require_database 拿到 db Arc，直接交给核心。
     let db = tauri::async_runtime::spawn_blocking(move || -> Result<Arc<Database>, String> {
         let _gate = app_arc.data_gate.read();
-        let db = require_ready_gated(&app_arc, &_gate)?;
+        let db = require_database(&app_arc, &_gate)?;
         Ok(db)
     })
     .await
@@ -706,27 +705,13 @@ pub(crate) async fn capture_and_translate(
             return;
         }
     };
-    let keystore = match state.keystore.as_ref() {
-        Some(k) => k,
-        None => {
-            if state.gen.is_latest(gen) {
-                app_state.tray.lock().record_translation_error(gen);
-                let _ = popup::set_popup_mode(app, popup::PopupMode::Error, &anchor);
-                let _ = popup::error_with_source(
-                    app,
-                    "keystore unavailable: startup init failed (recovery required)",
-                    &text,
-                );
-            }
-            return;
-        }
-    };
+    let keystore = state.keystore.as_deref();
 
     // rev-9-1: acquire the db Arc via spawn_blocking (gate guard INSIDE the closure).
     let app_arc = app_state.clone();
     let db = match tauri::async_runtime::spawn_blocking(move || -> Result<Arc<Database>, String> {
         let _gate = app_arc.data_gate.read();
-        require_ready_gated(&app_arc, &_gate)
+        require_database(&app_arc, &_gate)
     })
     .await
     {

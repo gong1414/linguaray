@@ -96,7 +96,7 @@ async fn two_engines_both_success() {
     let keystore = empty_keystore();
 
     let outcomes = translate_parallel(
-        &client, &keystore, profiles, "hello", "auto", "zh",
+        &client, Some(&keystore), profiles, "hello", "auto", "zh",
         AppOptions::default(), None,
     )
     .await;
@@ -131,7 +131,7 @@ async fn one_success_one_failure_no_fallback() {
     let keystore = empty_keystore();
 
     let outcomes = translate_parallel(
-        &client, &keystore, profiles, "x", "auto", "zh",
+        &client, Some(&keystore), profiles, "x", "auto", "zh",
         AppOptions::default(), None,
     )
     .await;
@@ -171,7 +171,7 @@ async fn all_fail_no_fallback_yields_raw_fallback_eligible() {
     let keystore = empty_keystore();
 
     let outcomes = translate_parallel(
-        &client, &keystore, profiles, "x", "auto", "zh",
+        &client, Some(&keystore), profiles, "x", "auto", "zh",
         AppOptions::default(), None,
     )
     .await;
@@ -203,7 +203,7 @@ async fn unsupported_protocol_profile_yields_config_error_outcome() {
     let client = direct_client();
     let keystore = empty_keystore();
     let outcomes = translate_parallel(
-        &client, &keystore, profiles, "x", "auto", "zh",
+        &client, Some(&keystore), profiles, "x", "auto", "zh",
         AppOptions::default(), None,
     )
     .await;
@@ -224,7 +224,7 @@ async fn empty_profiles_yields_empty_outcomes() {
     let client = direct_client();
     let keystore = empty_keystore();
     let outcomes = translate_parallel(
-        &client, &keystore, vec![], "x", "auto", "zh",
+        &client, Some(&keystore), vec![], "x", "auto", "zh",
         AppOptions::default(), None,
     )
     .await;
@@ -247,7 +247,7 @@ async fn outcomes_preserve_input_order_with_pre_failed_middle() {
     let client = direct_client();
     let keystore = empty_keystore();
     let outcomes = translate_parallel(
-        &client, &keystore, profiles, "x", "auto", "zh",
+        &client, Some(&keystore), profiles, "x", "auto", "zh",
         AppOptions::default(), None,
     ).await;
     let got: Vec<&str> = outcomes.iter().map(|o| o.uuid.as_str()).collect();
@@ -280,7 +280,7 @@ async fn ready_outcomes_preserve_input_order_under_completion_jitter() {
     let client = direct_client();
     let keystore = empty_keystore();
     let outcomes = translate_parallel(
-        &client, &keystore, profiles, "x", "auto", "zh",
+        &client, Some(&keystore), profiles, "x", "auto", "zh",
         AppOptions::default(), None,
     ).await;
     let got: Vec<&str> = outcomes.iter().map(|o| o.uuid.as_str()).collect();
@@ -347,7 +347,7 @@ async fn local_primary_failure_does_not_trigger_remote_fallback() {
     let counter = Arc::new(CountingFallback::new());
 
     let outcomes = translate_parallel(
-        &client, &keystore, profiles, "hello", "auto", "zh",
+        &client, Some(&keystore), profiles, "hello", "auto", "zh",
         AppOptions::default(), Some(counter.clone() as Arc<dyn TraditionalEngine>),
     )
     .await;
@@ -376,7 +376,7 @@ async fn config_failure_does_not_trigger_fallback() {
     let counter = Arc::new(CountingFallback::new());
 
     let outcomes = translate_parallel(
-        &client, &keystore, profiles, "x", "auto", "zh",
+        &client, Some(&keystore), profiles, "x", "auto", "zh",
         AppOptions::default(), Some(counter.clone() as Arc<dyn TraditionalEngine>),
     )
     .await;
@@ -407,7 +407,7 @@ async fn two_remote_transient_failures_trigger_at_most_one_fallback() {
     let counter = Arc::new(CountingFallback::new());
 
     let outcomes = translate_parallel(
-        &client, &keystore, profiles, "x", "auto", "zh",
+        &client, Some(&keystore), profiles, "x", "auto", "zh",
         AppOptions::default(), Some(counter.clone() as Arc<dyn TraditionalEngine>),
     )
     .await;
@@ -481,7 +481,7 @@ async fn mixed_local_primary_and_remote_transient_does_not_trigger_fallback() {
     let counter = Arc::new(CountingFallback::new());
 
     let outcomes = translate_parallel(
-        &client, &keystore, profiles, "x", "auto", "zh",
+        &client, Some(&keystore), profiles, "x", "auto", "zh",
         AppOptions::default(), Some(counter.clone() as Arc<dyn TraditionalEngine>),
     )
     .await;
@@ -509,7 +509,7 @@ async fn remote_primary_config_fail_plus_local_parallel_fallback_eligible_no_fal
     let counter = Arc::new(CountingFallback::new());
 
     let outcomes = translate_parallel(
-        &client, &keystore, profiles, "x", "auto", "zh",
+        &client, Some(&keystore), profiles, "x", "auto", "zh",
         AppOptions::default(), Some(counter.clone() as Arc<dyn TraditionalEngine>),
     )
     .await;
@@ -547,7 +547,7 @@ async fn primary_pre_failed_locality_identified_correctly_rev6_4() {
     let counter = Arc::new(CountingFallback::new());
 
     let outcomes = translate_parallel(
-        &client, &keystore, profiles, "x", "auto", "zh",
+        &client, Some(&keystore), profiles, "x", "auto", "zh",
         AppOptions::default(), Some(counter.clone() as Arc<dyn TraditionalEngine>),
     )
     .await;

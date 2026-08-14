@@ -1,13 +1,10 @@
 //! Data readiness state (S2a step 6).
 //!
-//! [`DataReadiness`] is the single source of truth for "can the app serve
-//! provider/data commands right now?" It's computed once at startup from the
-//! DB-open + migration outcomes and held in [`crate::AppState`]. Provider
-//! commands gate on it via [`crate::require_ready_gated`] /
-//! [`crate::require_ready_gated_write`]; a handful of commands
-//! (`keystore_health`, `archive_keystore`, `reset_keystore`,
-//! `get_data_readiness`) are always available so the UI can surface the
-//! recovery banner and the user can act on it.
+//! [`DataReadiness`] is the **banner projection** (plugin-core §5.7).
+//! Database / HTTP / Secrets liveness is the command gate. `NeedsKeystoreRecovery`
+//! still drives the Settings banner and must not abort keyless translate.
+//! `keystore_health`, `archive_keystore`, `reset_keystore`, and
+//! `get_data_readiness` stay always-available.
 //!
 //! The variants are ordered by "how broken":
 //! - [`DataReadiness::Ready`] — DB open, migration complete, keystore healthy.

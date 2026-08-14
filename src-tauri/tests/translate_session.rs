@@ -83,7 +83,7 @@ async fn single_engine_path_primary_only() {
     let db_arc = std::sync::Arc::new(db);
 
     let result = linguaray_lib::run_translate_session_no_settings(
-        &db_arc, &client, &keystore, "hello", "auto", "zh",
+        &db_arc, &client, Some(&keystore), "hello", "auto", "zh",
     )
     .await
     .expect("single engine ok");
@@ -140,7 +140,7 @@ async fn parallel_path_two_engines() {
     let db_arc = std::sync::Arc::new(db);
 
     let result = linguaray_lib::run_translate_session_no_settings(
-        &db_arc, &client, &keystore, "hi", "auto", "zh",
+        &db_arc, &client, Some(&keystore), "hi", "auto", "zh",
     )
     .await
     .expect("parallel ok");
@@ -162,7 +162,7 @@ async fn no_active_selection_errors() {
     let keystore = empty_keystore();
     let db_arc = std::sync::Arc::new(db);
     let err = linguaray_lib::run_translate_session_no_settings(
-        &db_arc, &client, &keystore, "x", "auto", "zh",
+        &db_arc, &client, Some(&keystore), "x", "auto", "zh",
     )
     .await
     .unwrap_err();
@@ -197,7 +197,7 @@ async fn disabled_primary_is_skipped_even_if_selected() {
     let keystore = empty_keystore();
     let db_arc = std::sync::Arc::new(db);
     let err = linguaray_lib::run_translate_session_no_settings(
-        &db_arc, &client, &keystore, "x", "auto", "zh",
+        &db_arc, &client, Some(&keystore), "x", "auto", "zh",
     )
     .await
     .unwrap_err();

@@ -129,7 +129,7 @@ async fn fallback_eligible_tries_fallback() {
         to: "zh",
         options: Default::default(),
     };
-    let out = translate_with_fallback(&client, &keystore, &preset, input, Some(fallback))
+    let out = translate_with_fallback(&client, Some(&keystore), &preset, input, Some(fallback))
         .await
         .expect("fallback should succeed");
 
@@ -170,7 +170,7 @@ async fn config_error_does_not_fallback() {
         to: "zh",
         options: Default::default(),
     };
-    let err = translate_with_fallback(&client, &keystore, &preset, input, Some(fallback))
+    let err = translate_with_fallback(&client, Some(&keystore), &preset, input, Some(fallback))
         .await
         .expect_err("Config error must propagate");
 
@@ -216,7 +216,7 @@ async fn local_primary_no_remote_fallback() {
         to: "zh",
         options: Default::default(),
     };
-    let err = translate_with_fallback(&client, &keystore, &preset, input, Some(fallback))
+    let err = translate_with_fallback(&client, Some(&keystore), &preset, input, Some(fallback))
         .await
         .expect_err("local primary must not fall back");
 
@@ -250,7 +250,7 @@ async fn remote_primary_no_fallback_configured_yields_local_no_fallback() {
         to: "zh",
         options: Default::default(),
     };
-    let err = translate_with_fallback(&client, &keystore, &preset, input, None)
+    let err = translate_with_fallback(&client, Some(&keystore), &preset, input, None)
         .await
         .expect_err("no fallback configured → error");
 
@@ -288,7 +288,7 @@ async fn primary_success_skips_fallback() {
         to: "zh",
         options: Default::default(),
     };
-    let out = translate_with_fallback(&client, &keystore, &preset, input, Some(fallback))
+    let out = translate_with_fallback(&client, Some(&keystore), &preset, input, Some(fallback))
         .await
         .expect("primary success");
     assert_eq!(out.text, "你好");

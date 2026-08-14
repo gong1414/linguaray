@@ -30,7 +30,7 @@ pub struct Translation {
 
 pub async fn translate(
     client: &reqwest::Client,
-    keystore: &Keystore,
+    keystore: Option<&Keystore>,
     preset: &ProviderPreset,
     input: TranslateInput<'_>,
 ) -> Result<Translation, Error> {
@@ -38,17 +38,22 @@ pub async fn translate(
     // window between keystore-read and HTTP-send, and zeroize it after use.
     // Zeroizing<String> wipes the heap buffer on drop.
     //
-    // S2a P0: read via the typed `KeystoreData` accessor so the key is found in
-    // the nested `provider_keys` map after the v2 migration (the old raw
-    // `keys[preset.id]` lookup hit the flat map and returned None for migrated
-    // keystores). For the built-in presets the key name is the preset id; for a
-    // migrated DB-backed provider the row's `secret_ref` carries the same name
-    // (see db::providers), so `preset.id` is the right `secret_ref` here.
+    // §5.7.0: keyless presets (Ollama) must not touch Secrets. A missing
+    // keystore is only fatal when `needs_key`.
     let key = if preset.needs_key {
-        let k = keystore
+        let ks = keystore.ok_or_else(|| {
+            Error::Config(ConfigKind::MissingKey {
+                provider: preset.id.clone(),
+            })
+        })?;
+        let k = ks
             .get_key(&preset.id)
             .map_err(Error::Keystore)?
-            .ok_or_else(|| Error::Config(ConfigKind::MissingKey { provider: preset.id.clone() }))?;
+            .ok_or_else(|| {
+                Error::Config(ConfigKind::MissingKey {
+                    provider: preset.id.clone(),
+                })
+            })?;
         zeroize::Zeroizing::new(k)
     } else {
         zeroize::Zeroizing::new(String::new())
@@ -56,10 +61,16 @@ pub async fn translate(
     let (system, user) = build_prompt(input.text, input.from, input.to, &input.options);
     let params = WireParams {
         model: preset.default_model.clone(),
-        temperature: None, max_tokens: None, stream: false,
+        temperature: None,
+        max_tokens: None,
+        stream: false,
     };
-    call(client, preset, &key, &params, &system, &user).await
-        .map(|text| Translation { text, engine: preset.id.clone() })
+    call(client, preset, &key, &params, &system, &user)
+        .await
+        .map(|text| Translation {
+            text,
+            engine: preset.id.clone(),
+        })
 }
 
 /// Translate with §G classified fallback.
@@ -85,7 +96,7 @@ pub async fn translate(
 /// 用 `_ref` 变体以共享 fallback 而不需要 per-call owned `Box`。
 pub async fn translate_with_fallback(
     client: &reqwest::Client,
-    keystore: &Keystore,
+    keystore: Option<&Keystore>,
     primary_preset: &ProviderPreset,
     input: TranslateInput<'_>,
     fallback: Option<Box<dyn TraditionalEngine>>,
@@ -108,7 +119,7 @@ pub async fn translate_with_fallback(
 /// - `Config`/`Keystore` → 原样传播，绝不 fallback。
 pub async fn translate_with_fallback_ref(
     client: &reqwest::Client,
-    keystore: &Keystore,
+    keystore: Option<&Keystore>,
     primary_preset: &ProviderPreset,
     input: TranslateInput<'_>,
     fallback: Option<&dyn TraditionalEngine>,
@@ -144,7 +155,10 @@ pub async fn translate_with_fallback_ref(
                     let fb_id = eng.id().to_string();
                     eng.translate(client, input.text, input.from, input.to)
                         .await
-                        .map(|text| Translation { text, engine: fb_id })
+                        .map(|text| Translation {
+                            text,
+                            engine: fb_id,
+                        })
                 }
             }
         }
@@ -181,7 +195,7 @@ pub struct TranslationOutcome {
 /// is tagged with the primary preset id (engine == preset.id).
 pub async fn translate_primary_only(
     client: &reqwest::Client,
-    keystore: &Keystore,
+    keystore: Option<&Keystore>,
     primary_preset: &ProviderPreset,
     input: TranslateInput<'_>,
 ) -> Result<Translation, Error> {
@@ -232,19 +246,16 @@ pub fn eligible_for_session_fallback(
     // them. (Plan deviation: the verbatim plan body only checked `.any()` for a
     // non-local FallbackEligible, which would wrongly return true for a session
     // like [FallbackEligible, Config]. Added this guard so test 5 holds.)
-    let any_config_or_keystore = outcomes.iter().any(|o| {
-        matches!(o.result, Err(Error::Config(_)) | Err(Error::Keystore(_)))
-    });
+    let any_config_or_keystore = outcomes
+        .iter()
+        .any(|o| matches!(o.result, Err(Error::Config(_)) | Err(Error::Keystore(_))));
     if any_config_or_keystore {
         return false;
     }
-    outcomes
-        .iter()
-        .enumerate()
-        .any(|(i, o)| {
-            let was_local = locality.get(i).copied().unwrap_or(false);
-            !was_local && matches!(o.result, Err(Error::FallbackEligible(_)))
-        })
+    outcomes.iter().enumerate().any(|(i, o)| {
+        let was_local = locality.get(i).copied().unwrap_or(false);
+        !was_local && matches!(o.result, Err(Error::FallbackEligible(_)))
+    })
 }
 
 /// 并行调用多个 AI 引擎，再用 B6 bounded session-level fallback（P1-4, rev-6-4）。
@@ -272,7 +283,7 @@ pub fn eligible_for_session_fallback(
 #[allow(clippy::too_many_arguments)]
 pub async fn translate_parallel(
     client: &reqwest::Client,
-    keystore: &Keystore,
+    keystore: Option<&Keystore>,
     profiles: Vec<ProviderProfile>,
     text: &str,
     from: &str,
@@ -285,7 +296,11 @@ pub async fn translate_parallel(
     // STRICT input order. Pre-failed profiles (profile_to_preset rejects) must
     // stay at their input position — NOT float before the ready outcomes, which
     // happened in the old "push pre-failed then append ready" code path.
-    type Entry = (usize, Option<(String, ProviderPreset)>, Option<TranslationOutcome>);
+    type Entry = (
+        usize,
+        Option<(String, ProviderPreset)>,
+        Option<TranslationOutcome>,
+    );
     let mut entries: Vec<Entry> = Vec::with_capacity(profiles.len());
     for (idx, p) in profiles.into_iter().enumerate() {
         match profile_to_preset(&p) {
@@ -316,16 +331,20 @@ pub async fn translate_parallel(
     let futs: Vec<_> = entries
         .iter()
         .filter_map(|(idx, ready, _)| {
-            ready.as_ref().map(|(uuid, preset)| {
-                (*idx, uuid.clone(), preset, is_local(preset))
-            })
+            ready
+                .as_ref()
+                .map(|(uuid, preset)| (*idx, uuid.clone(), preset, is_local(preset)))
         })
         .map(|(idx, uuid, preset, was_local)| {
             let options = options.clone();
             async move {
-                let input = TranslateInput { text, from, to, options };
-                let result =
-                    translate_primary_only(client, keystore, preset, input).await;
+                let input = TranslateInput {
+                    text,
+                    from,
+                    to,
+                    options,
+                };
+                let result = translate_primary_only(client, keystore, preset, input).await;
                 (idx, was_local, TranslationOutcome { uuid, result })
             }
         })
@@ -377,8 +396,14 @@ pub async fn translate_parallel(
             let fb_result = eng
                 .translate(client, text, from, to)
                 .await
-                .map(|text| Translation { text, engine: fb_id.clone() });
-            outcomes.push(TranslationOutcome { uuid: fb_id, result: fb_result });
+                .map(|text| Translation {
+                    text,
+                    engine: fb_id.clone(),
+                });
+            outcomes.push(TranslationOutcome {
+                uuid: fb_id,
+                result: fb_result,
+            });
         }
     }
     outcomes
