@@ -16,6 +16,7 @@ pub mod engines;
 pub mod error;
 pub mod fs_acl;
 pub use crate::plugins::history;
+pub use crate::plugins::vocabulary;
 pub mod keystore;
 pub mod plugins;
 pub use crate::plugins::popup;
@@ -37,8 +38,8 @@ use tauri::Manager;
 use tauri_plugin_global_shortcut::{Builder as GlobalShortcutBuilder, ShortcutState};
 
 use crate::commands::{
-    a11y_status, archive_database, archive_keystore, dict_list_packages, dict_lookup,
-    get_data_readiness, get_settings,
+    a11y_status, archive_database, archive_keystore, dict_install_package, dict_list_packages,
+    dict_lookup, get_data_readiness, get_settings,
     history_clear_all, history_delete_session, history_export, history_privacy_status,
     history_search, history_set_enabled, history_set_retention, history_toggle_favorite,
     key_status, keystore_health, open_settings_window,
@@ -48,7 +49,8 @@ use crate::commands::{
     provider_toggle, provider_update, reset_keystore, set_setting, shortcut_check_conflict,
     shortcut_list, shortcut_recording_begin, shortcut_recording_end, shortcut_reset_defaults,
     shortcut_save, translate, translate_clipboard, translate_default, translate_selection_ipc,
-    translate_session, vocabulary_add, vocabulary_delete, vocabulary_export_file, vocabulary_list,
+    translate_session, vocabulary_add, vocabulary_delete, vocabulary_export_anki,
+    vocabulary_export_file, vocabulary_list,
 };
 use crate::db::migration::{run_migration, FailpointCell, MigrationError};
 use crate::db::providers::{self as db_providers};
@@ -1378,8 +1380,10 @@ pub fn run() {
             vocabulary_list,
             vocabulary_delete,
             vocabulary_export_file,
+            vocabulary_export_anki,
             dict_lookup,
-            dict_list_packages
+            dict_list_packages,
+            dict_install_package
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

@@ -24,6 +24,9 @@ const COPY = {
     delete: "Delete",
     exportCsv: "Export CSV",
     exportJson: "Export JSON",
+    exportAnki: "AnkiConnect",
+    exportDone: "Export complete",
+    exportFailed: "Export failed",
   },
   zh: {
     title: "生词本",
@@ -35,6 +38,9 @@ const COPY = {
     delete: "删除",
     exportCsv: "导出 CSV",
     exportJson: "导出 JSON",
+    exportAnki: "AnkiConnect",
+    exportDone: "导出完成",
+    exportFailed: "导出失败",
   },
 };
 
@@ -73,11 +79,20 @@ export const VocabularyView: Component = () => {
   };
 
   const exportFile = async (format: string) => {
-    const path = await invoke<string>("vocabulary_export_file", {
-      filePath: `linguaray-vocabulary.${format}`,
-      format,
-    });
-    setNotice(path);
+    try {
+      if (format === "anki") {
+        await invoke("vocabulary_export_anki", { deckName: "LinguaRay" });
+        setNotice(t.exportDone);
+        return;
+      }
+      const path = await invoke<string>("vocabulary_export_file", {
+        filePath: `linguaray-vocabulary.${format}`,
+        format,
+      });
+      setNotice(path);
+    } catch (e) {
+      setNotice(`${t.exportFailed}: ${String(e)}`);
+    }
   };
 
   return (
@@ -98,6 +113,9 @@ export const VocabularyView: Component = () => {
         </Button>
         <Button variant="ghost" onClick={() => void exportFile("json")}>
           {t.exportJson}
+        </Button>
+        <Button variant="ghost" onClick={() => void exportFile("anki")}>
+          {t.exportAnki}
         </Button>
       </div>
       <Show when={notice()}>

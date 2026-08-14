@@ -5,10 +5,9 @@ use std::collections::HashSet;
 use std::fs;
 
 fn permission_set(path: &str) -> HashSet<String> {
-    let raw = fs::read_to_string(path)
-        .unwrap_or_else(|e| panic!("read {path}: {e}"));
-    let v: serde_json::Value = serde_json::from_str(&raw)
-        .unwrap_or_else(|e| panic!("parse {path}: {e}"));
+    let raw = fs::read_to_string(path).unwrap_or_else(|e| panic!("read {path}: {e}"));
+    let v: serde_json::Value =
+        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {path}: {e}"));
     v["permissions"]
         .as_array()
         .unwrap_or_else(|| panic!("{path} has no permissions array"))
@@ -20,7 +19,11 @@ fn permission_set(path: &str) -> HashSet<String> {
 #[test]
 fn input_window_authorizes_session_and_provider_list() {
     let perms = permission_set("capabilities/input.json");
-    for required in ["allow-translate-session", "allow-provider-list"] {
+    for required in [
+        "allow-translate-session",
+        "allow-provider-list",
+        "allow-vocabulary-add",
+    ] {
         assert!(
             perms.contains(required),
             "input.json missing {required}; has: {:?}",
@@ -41,6 +44,7 @@ fn popup_window_authorizes_selection_clipboard_and_settings() {
         "allow-provider-get-active-selection",
         "allow-translate-selection-ipc",
         "allow-open-settings-window",
+        "allow-vocabulary-add",
         "clipboard-manager:allow-write-text",
     ] {
         assert!(
@@ -59,6 +63,9 @@ fn main_window_authorizes_every_new_command() {
         "allow-translate-selection-ipc",
         "allow-provider-get-active-selection",
         "allow-open-settings-window",
+        "allow-vocabulary-add",
+        "allow-vocabulary-export-anki",
+        "allow-dict-install-package",
     ] {
         assert!(
             perms.contains(required),

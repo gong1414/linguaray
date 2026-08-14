@@ -251,7 +251,9 @@ describe("Popup (Surface 01)", () => {
     cleanup();
   });
 
-  it("TTS and Favorite are aria-disabled but focusable (not native disabled)", async () => {
+  it("TTS stays aria-disabled; Favorite saves the source and translation", async () => {
+    const { invoke } = await import("@tauri-apps/api/core");
+    vi.mocked(invoke).mockClear();
     const { findByLabelText } = render(() => <Popup />);
     await emitEvent("popup-state", {
       status: "result",
@@ -260,11 +262,18 @@ describe("Popup (Surface 01)", () => {
       source_text: "hello",
     });
     const speak = await findByLabelText(/朗读|Speak/);
-    const favorite = await findByLabelText(/收藏|Favorite/);
-    for (const btn of [speak, favorite]) {
-      expect(btn.getAttribute("aria-disabled")).toBe("true");
-      expect(btn.hasAttribute("disabled")).toBe(false);
-    }
+    expect(speak.getAttribute("aria-disabled")).toBe("true");
+    expect(speak.hasAttribute("disabled")).toBe(false);
+    const favorite = await findByLabelText(/收藏到生词本|Save to vocabulary/);
+    expect(favorite.getAttribute("aria-disabled")).not.toBe("true");
+    await fireEvent.click(favorite);
+    expect(vi.mocked(invoke)).toHaveBeenCalledWith(
+      "vocabulary_add",
+      expect.objectContaining({
+        word: "hello",
+        definition: "你好",
+      }),
+    );
     cleanup();
   });
 

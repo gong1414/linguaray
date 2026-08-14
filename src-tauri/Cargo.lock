@@ -2512,6 +2512,7 @@ dependencies = [
  "core-foundation-sys",
  "crossbeam-channel",
  "enigo",
+ "flate2",
  "fs2",
  "futures",
  "hmac",

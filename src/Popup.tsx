@@ -63,6 +63,8 @@ export type PopupViewProps = {
   onRetry: () => void;
   /** Open the settings window to a named section (e.g. provider-center). */
   onOpenSettings: (section?: string) => void;
+  /** Save the translation (and its source) to vocabulary. */
+  onFavorite?: (translation: string) => void | Promise<void>;
 };
 
 export function PopupView(props: PopupViewProps): JSX.Element {
@@ -73,6 +75,7 @@ export function PopupView(props: PopupViewProps): JSX.Element {
   // "Copied" label. This is presentational feedback only — the actual clipboard
   // write is delegated to props.onCopy.
   const [copiedUuid, setCopiedUuid] = createSignal<string | null>(null);
+  const [favoritedUuid, setFavoritedUuid] = createSignal<string | null>(null);
   let copiedTimer: ReturnType<typeof setTimeout> | undefined;
   onCleanup(() => {
     if (copiedTimer) clearTimeout(copiedTimer);
@@ -111,12 +114,12 @@ export function PopupView(props: PopupViewProps): JSX.Element {
   }
 
   // Copy delegates to props.onCopy (the controller writes via the Tauri
-  // clipboard plugin; the lab fixture passes a no-op). TTS/Favorite are
-  // aria-disabled (focusable for discovery, not natively disabled) because they
-  // are not yet implemented.
+  // clipboard plugin; the lab fixture passes a no-op). TTS stays
+  // aria-disabled (focusable for discovery) because it is not yet shipped.
   const buildActions = (uuid: string): ResultAction[] => {
     const isPinned = props.pinned;
     const isCopied = copiedUuid() === uuid;
+    const isFavorited = favoritedUuid() === uuid;
     return [
       {
         label: isCopied ? t("selection.action.copied") : t("selection.action.copy"),
@@ -154,10 +157,18 @@ export function PopupView(props: PopupViewProps): JSX.Element {
         onClick: () => (isPinned ? props.onUnpin() : props.onPin()),
       },
       {
-        label: t("selection.action.comingFavorite"),
-        icon: <Star size={14} />,
-        ariaDisabled: true,
-        onClick: () => { /* vocabulary IPC: not yet shipped */ },
+        label: isFavorited ? t("selection.action.favorited") : t("selection.action.favorite"),
+        icon: <Star size={14} fill={isFavorited ? "currentColor" : "none"} />,
+        active: isFavorited,
+        onClick: async () => {
+          const translation = textFor(uuid) ?? "";
+          try {
+            await props.onFavorite?.(translation);
+            setFavoritedUuid(uuid);
+          } catch {
+            // Keep the button unmarked when the save fails.
+          }
+        },
       },
     ];
   };
@@ -325,6 +336,15 @@ const Popup: Component = () => {
       onOpenSettings={(section) =>
         void invoke("open_settings_window", section ? { section } : {})
       }
+      onFavorite={async (translation) => {
+        const source = ctrl.lastSource();
+        await invoke("vocabulary_add", {
+          word: source || translation,
+          definition: translation,
+          sourceLanguage: "auto",
+          targetLanguage: detectLocale() === "zh" ? "zh" : "en",
+        });
+      }}
     />
   );
 };

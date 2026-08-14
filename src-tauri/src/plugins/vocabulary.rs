@@ -73,7 +73,8 @@ fn decrypt_item(
         source_language: row.source_language,
         target_language: row.target_language,
         word: String::from_utf8(word.to_vec()).map_err(|_| "word is not utf-8")?,
-        definition: String::from_utf8(definition.to_vec()).map_err(|_| "definition is not utf-8")?,
+        definition: String::from_utf8(definition.to_vec())
+            .map_err(|_| "definition is not utf-8")?,
     })
 }
 
@@ -85,7 +86,12 @@ pub fn add_word(
     source_language: &str,
     target_language: &str,
 ) -> Result<VocabularyItem, String> {
-    let key = Zeroizing::new(keystore.get_or_create_history_key().map_err(|e| e.to_string())?.0);
+    let key = Zeroizing::new(
+        keystore
+            .get_or_create_history_key()
+            .map_err(|e| e.to_string())?
+            .0,
+    );
     let uuid = uuid::Uuid::new_v4().to_string();
     let timestamp = now_ts()?;
     let enc_word = encrypt_field(
@@ -137,7 +143,10 @@ pub fn list_words(
     let (cursor_ts, cursor_uuid) = match cursor {
         Some(raw) => {
             let (ts, uuid) = raw.split_once(':').ok_or("invalid vocabulary cursor")?;
-            (ts.parse::<i64>().map_err(|_| "invalid vocabulary cursor")?, uuid.to_string())
+            (
+                ts.parse::<i64>().map_err(|_| "invalid vocabulary cursor")?,
+                uuid.to_string(),
+            )
         }
         None => (i64::MAX, "\u{10ffff}".into()),
     };
@@ -145,7 +154,9 @@ pub fn list_words(
         .with_conn(|conn| db::vocabulary::read_page(conn, cursor_ts, &cursor_uuid))
         .map_err(|e| e.to_string())?;
     let scan_complete = rows.len() < db::vocabulary::VOCABULARY_PAGE;
-    let last = rows.last().map(|r| format!("{}:{}", r.timestamp, r.item_uuid));
+    let last = rows
+        .last()
+        .map(|r| format!("{}:{}", r.timestamp, r.item_uuid));
     let mut items = Vec::new();
     for row in rows {
         items.push(decrypt_item(&key, row)?);
@@ -162,7 +173,7 @@ pub fn delete_word(db: &Database, item_uuid: &str) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
-pub fn export_file(db: &Database, keystore: &Keystore, path: &str, format: &str) -> Result<String, String> {
+pub fn collect_all(db: &Database, keystore: &Keystore) -> Result<Vec<VocabularyItem>, String> {
     let mut all = Vec::new();
     let mut cursor = None;
     loop {
@@ -173,6 +184,16 @@ pub fn export_file(db: &Database, keystore: &Keystore, path: &str, format: &str)
         }
         cursor = page.next_cursor;
     }
+    Ok(all)
+}
+
+pub fn export_file(
+    db: &Database,
+    keystore: &Keystore,
+    path: &str,
+    format: &str,
+) -> Result<String, String> {
+    let all = collect_all(db, keystore)?;
     let content = match format {
         "csv" => {
             let mut out = String::from("word,definition,source_language,target_language\n");
@@ -192,4 +213,84 @@ pub fn export_file(db: &Database, keystore: &Keystore, path: &str, format: &str)
     };
     std::fs::write(path, content).map_err(|e| e.to_string())?;
     Ok(path.to_string())
+}
+
+const ANKI_URL: &str = "http://127.0.0.1:8765";
+const ANKI_TIMEOUT_SECS: u64 = 10;
+
+#[derive(Debug)]
+pub enum AnkiError {
+    Request(String),
+    Response(String),
+}
+
+impl std::fmt::Display for AnkiError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Request(s) => write!(f, "AnkiConnect request failed: {s}"),
+            Self::Response(s) => write!(f, "AnkiConnect returned error: {s}"),
+        }
+    }
+}
+
+impl std::error::Error for AnkiError {}
+
+/// POST decrypted items to AnkiConnect. Never writes a plaintext file.
+pub async fn export_anki_from_items(
+    items: &[VocabularyItem],
+    deck_name: &str,
+) -> Result<(), AnkiError> {
+    export_anki_from_items_url(items, deck_name, ANKI_URL).await
+}
+
+/// Testable variant that accepts the AnkiConnect URL (wiremock).
+pub async fn export_anki_from_items_url(
+    items: &[VocabularyItem],
+    deck_name: &str,
+    url: &str,
+) -> Result<(), AnkiError> {
+    let client = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .timeout(std::time::Duration::from_secs(ANKI_TIMEOUT_SECS))
+        .build()
+        .map_err(|e| AnkiError::Request(e.to_string()))?;
+    for item in items {
+        let body = serde_json::json!({
+            "action": "addNote",
+            "version": 6,
+            "params": {
+                "note": {
+                    "deckName": deck_name,
+                    "modelName": "Basic",
+                    "fields": {
+                        "Front": item.word,
+                        "Back": item.definition,
+                    }
+                }
+            }
+        });
+        let resp = client
+            .post(url)
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| AnkiError::Request(e.to_string()))?;
+        let status = resp.status();
+        if status.is_redirection() {
+            return Err(AnkiError::Request(format!("redirect rejected: {status}")));
+        }
+        if !status.is_success() {
+            return Err(AnkiError::Request(format!("http {status}")));
+        }
+        let json: serde_json::Value = resp
+            .json()
+            .await
+            .map_err(|e| AnkiError::Request(e.to_string()))?;
+        if let Some(err) = json.get("error").and_then(|v| v.as_str()) {
+            if !err.is_empty() {
+                return Err(AnkiError::Response(err.to_string()));
+            }
+        }
+    }
+    Ok(())
 }

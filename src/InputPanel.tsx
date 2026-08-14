@@ -1,7 +1,7 @@
 import { createSignal, createMemo, createEffect, Show, For, onMount, onCleanup, type Component, type JSX } from "solid-js";
 import { invoke } from "@tauri-apps/api/core";
-import { AlertTriangle } from "lucide-solid";
-import { Button, InlineError, ResultCard, TextArea, type ResultOutcome } from "@linguaray/ui";
+import { AlertTriangle, Star } from "lucide-solid";
+import { Button, InlineError, ResultCard, TextArea, type ResultAction, type ResultOutcome } from "@linguaray/ui";
 import { decodeSessionResult } from "./features/translation/decode";
 import { ensureProviderNameMap, engineLabel } from "./features/translation/inputController";
 import { detectLocale, t } from "./i18n";
@@ -22,10 +22,12 @@ export type InputPanelViewProps = {
   onText: (v: string) => void;
   onTranslate: () => void;
   onClear: () => void;
+  onFavorite?: (source: string, translation: string) => void | Promise<void>;
 };
 
 export function InputPanelView(props: InputPanelViewProps): JSX.Element {
   const labelOf = (raw: string) => (props.engineLabel ?? ((r: string) => r))(raw);
+  const [favoritedUuid, setFavoritedUuid] = createSignal<string | null>(null);
   // rev-8-6: showClear is a DERIVATION (a function of props), not a value read
   // once at mount — keeps it reactive in Solid's fine-grained model.
   // P1-5: Clear is also enabled when the user has typed text but never
@@ -60,6 +62,20 @@ export function InputPanelView(props: InputPanelViewProps): JSX.Element {
       e.preventDefault();
       props.onTranslate();
     }
+  };
+
+  const favoriteAction = (uuid: string, translation: string): ResultAction => {
+    const isFavorited = favoritedUuid() === uuid;
+    return {
+      label: isFavorited ? t("selection.action.favorited") : t("selection.action.favorite"),
+      icon: <Star size={14} fill={isFavorited ? "currentColor" : "none"} />,
+      active: isFavorited,
+      onClick: () => {
+        void Promise.resolve(props.onFavorite?.(props.text, translation))
+          .then(() => setFavoritedUuid(uuid))
+          .catch(() => {});
+      },
+    };
   };
 
   return (
@@ -99,6 +115,7 @@ export function InputPanelView(props: InputPanelViewProps): JSX.Element {
             engineLabel={labelOf(s.engine)}
             text={s.text}
             outcome={"success" as ResultOutcome}
+            actions={[favoriteAction("__single__", s.text)]}
           />
         )}
       </Show>
@@ -114,6 +131,7 @@ export function InputPanelView(props: InputPanelViewProps): JSX.Element {
                   text={r.text ?? ""}
                   outcome={(r.ok ? "success" : "failure") as ResultOutcome}
                   errorText={r.errorText}
+                  actions={r.ok && r.text ? [favoriteAction(r.uuid, r.text)] : undefined}
                 />
               )}
             </For>
@@ -212,6 +230,14 @@ const InputPanel: Component = () => {
       onText={setText}
       onTranslate={translate}
       onClear={clear}
+      onFavorite={async (source, translation) => {
+        await invoke("vocabulary_add", {
+          word: source,
+          definition: translation,
+          sourceLanguage: "auto",
+          targetLanguage: detectLocale() === "zh" ? "zh" : "en",
+        });
+      }}
     />
   );
 };

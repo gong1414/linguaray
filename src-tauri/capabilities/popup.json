@@ -10,6 +10,7 @@
     "allow-provider-get-active-selection",
     "allow-translate-selection-ipc",
     "allow-open-settings-window",
+    "allow-vocabulary-add",
     "clipboard-manager:allow-write-text"
   ]
 }

@@ -13,6 +13,12 @@ const COPY = {
     noPackages: "No offline packages installed",
     noResult: "No definition found",
     source: "Source: {source}",
+    install: "Install package",
+    sourceDir: "Folder path",
+    packageId: "Package id",
+    packageName: "Name",
+    version: "Version",
+    installed: "Installed",
   },
   zh: {
     title: "词典",
@@ -21,6 +27,12 @@ const COPY = {
     noPackages: "尚未安装离线词库",
     noResult: "未找到释义",
     source: "来源：{source}",
+    install: "安装词库",
+    sourceDir: "文件夹路径",
+    packageId: "词库 ID",
+    packageName: "名称",
+    version: "版本",
+    installed: "已安装",
   },
 };
 
@@ -31,11 +43,19 @@ export const DictionaryView: Component = () => {
   const [miss, setMiss] = createSignal(false);
   const [packages, setPackages] = createSignal<{ package_id: string; name: string }[]>([]);
   const [error, setError] = createSignal("");
+  const [sourceDir, setSourceDir] = createSignal("");
+  const [packageId, setPackageId] = createSignal("");
+  const [packageName, setPackageName] = createSignal("");
+  const [version, setVersion] = createSignal("1.0");
+  const [notice, setNotice] = createSignal("");
+
+  const reloadPackages = async () => {
+    const listed = await invoke<{ package_id: string; name: string }[]>("dict_list_packages");
+    setPackages(listed);
+  };
 
   onMount(() => {
-    void invoke<{ package_id: string; name: string }[]>("dict_list_packages")
-      .then(setPackages)
-      .catch((e) => setError(String(e)));
+    void reloadPackages().catch((e) => setError(String(e)));
   });
 
   const lookup = async () => {
@@ -53,6 +73,23 @@ export const DictionaryView: Component = () => {
     }
   };
 
+  const install = async () => {
+    setError("");
+    setNotice("");
+    try {
+      await invoke("dict_install_package", {
+        sourceDir: sourceDir().trim(),
+        packageId: packageId().trim(),
+        name: packageName().trim() || packageId().trim(),
+        version: version().trim() || "1.0",
+      });
+      setNotice(t.installed);
+      await reloadPackages();
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
   return (
     <section class="dictionary-view" aria-label={t.title}>
       <header>
@@ -61,6 +98,31 @@ export const DictionaryView: Component = () => {
       <div class="dictionary-view__lookup">
         <TextField label={t.word} value={word()} onInput={(e) => setWord(e.currentTarget.value)} />
         <Button onClick={() => void lookup()}>{t.lookup}</Button>
+      </div>
+      <div class="dictionary-view__install">
+        <TextField
+          label={t.sourceDir}
+          value={sourceDir()}
+          onInput={(e) => setSourceDir(e.currentTarget.value)}
+        />
+        <TextField
+          label={t.packageId}
+          value={packageId()}
+          onInput={(e) => setPackageId(e.currentTarget.value)}
+        />
+        <TextField
+          label={t.packageName}
+          value={packageName()}
+          onInput={(e) => setPackageName(e.currentTarget.value)}
+        />
+        <TextField
+          label={t.version}
+          value={version()}
+          onInput={(e) => setVersion(e.currentTarget.value)}
+        />
+        <Button onClick={() => void install()} disabled={!sourceDir().trim() || !packageId().trim()}>
+          {t.install}
+        </Button>
       </div>
       <Show when={packages().length === 0}>
         <EmptyState icon={<BookOpen size={32} />} title={t.noPackages} />
@@ -78,6 +140,9 @@ export const DictionaryView: Component = () => {
       </Show>
       <Show when={miss()}>
         <p>{t.noResult}</p>
+      </Show>
+      <Show when={notice()}>
+        <p role="status">{notice()}</p>
       </Show>
       <Show when={error()}>
         <p role="alert">{error()}</p>

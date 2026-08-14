@@ -102,7 +102,6 @@ export type CopyKey =
   | "selection.action.openSettings"
   | "selection.action.recovery"
   | "selection.action.comingTts"
-  | "selection.action.comingFavorite"
   | "selection.multi.title"
   // Surface 02
   | "input.title"
