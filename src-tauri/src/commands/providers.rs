@@ -528,14 +528,7 @@ pub fn db_set_active_primary(
     Ok(outcome)
 }
 
-/// A4 minimal `handle_switch_provider` (A5 Step 10 will enhance this with the
-/// tray-state controller wiring — begin_switch/finish_switch + the red-dot on
-/// failure). This A4 version: set the provider as sole primary (SYNC, inside
-/// the caller's `spawn_blocking`), refresh the tray, and on failure set a
-/// `"Switch failed: <msg>"` tooltip AFTER the refresh (rev-19-5) so the
-/// refresh's own tooltip is not clobbered. Returns Ok/Err so the caller can
-/// decide logging.
-/// A5 Step 10 (rev-18-1): the SYNC core of the switch-provider flow.
+/// SYNC core of tray switch-provider: write primary, then finish_switch.
 ///
 /// DB write and tray controller, NO AppHandle (the testable entry). Calls
 /// `set_active_primary_core(...)` directly (SYNC), then

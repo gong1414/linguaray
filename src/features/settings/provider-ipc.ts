@@ -108,11 +108,11 @@ export const providerConfirmAndSetActive = (
     expectedScope,
   });
 
-/** Preset-derived model list (full HTTP fetch is S3 scope). */
+/** Local list plus same-origin HTTP GET /models. */
 export const providerGetModels = (uuid: string): Promise<ModelInfo[]> =>
   invoke<ModelInfo[]>("provider_get_models", { uuid });
 
-/** Best-effort reachability probe (full probe is S3 scope). */
+/** Best-effort reachability probe. */
 export const providerTestConnection = (uuid: string): Promise<ConnectionResult> =>
   invoke<ConnectionResult>("provider_test_connection", { uuid });
 

@@ -539,48 +539,6 @@ pub async fn translate_selection_ipc(
     Ok(())
 }
 
-#[tauri::command]
-pub fn list_engines() -> Vec<EngineInfo> {
-    let mut out: Vec<EngineInfo> = providers::presets()
-        .into_iter()
-        .map(EngineInfo::from_provider)
-        .collect();
-    // Also include built-in traditional engines (for the fallback selector).
-    out.extend(
-        engines::registry()
-            .iter()
-            .map(|e| EngineInfo::from_traditional(e.as_ref())),
-    );
-    out
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct EngineInfo {
-    pub id: String,
-    pub label: String,
-    pub kind: String,
-    pub needs_key: bool,
-}
-
-impl EngineInfo {
-    fn from_provider(p: providers::ProviderPreset) -> Self {
-        Self {
-            id: p.id,
-            label: p.label,
-            kind: "provider".into(),
-            needs_key: p.needs_key,
-        }
-    }
-    fn from_traditional(e: &dyn engines::TraditionalEngine) -> Self {
-        Self {
-            id: e.id().into(),
-            label: e.label().into(),
-            kind: "traditional".into(),
-            needs_key: e.needs_key(),
-        }
-    }
-}
-
 /// Outcome of the capture step. The popup UI for the non-`Selected` variants is
 /// rendered AFTER the `selection_lock` guard drops and AFTER the `is_latest(gen)`
 /// check, so the lock covers capture-only (P1-1). The physical cursor coords are
