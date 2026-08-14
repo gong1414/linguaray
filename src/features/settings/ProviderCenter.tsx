@@ -218,6 +218,7 @@ export type ProviderCenterViewProps = {
   onModelChange: (uuid: string, value: string) => void;
   onKeyInput: (uuid: string, value: string) => void;
   onSaveProfile: (uuid: string) => void;
+  onToggleCustomAnthropic?: (uuid: string, anthropic: boolean) => void;
   onSaveKey: (uuid: string) => void;
   onFetchModels: (uuid: string) => void;
   onTestConnection: (uuid: string) => void;
@@ -566,6 +567,52 @@ export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element 
                       props.onEndpointInput(uuid(), e.currentTarget.value)
                     }
                   />
+                  <Show when={d().provider.template_id === "azure-openai"}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={d().saveState === "saving" || isReloading() || locked()}
+                      onClick={() =>
+                        props.onEndpointInput(
+                          uuid(),
+                          "https://{resource}.openai.azure.com/openai/v1/chat/completions",
+                        )
+                      }
+                    >
+                      {t().insertAzureTemplate}
+                    </Button>
+                  </Show>
+                  <Show when={d().provider.template_id === "kimi"}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={d().saveState === "saving" || isReloading() || locked()}
+                      onClick={() =>
+                        props.onEndpointInput(
+                          uuid(),
+                          "https://api.moonshot.ai/v1/chat/completions",
+                        )
+                      }
+                    >
+                      {t().useKimiGlobal}
+                    </Button>
+                  </Show>
+                  <Show when={d().provider.template_id === "custom"}>
+                    <label class="pc__anthropic-toggle">
+                      <input
+                        type="checkbox"
+                        checked={d().provider.protocol === "anthropic"}
+                        disabled={d().saveState === "saving" || isReloading() || locked()}
+                        onChange={(e) =>
+                          props.onToggleCustomAnthropic?.(
+                            uuid(),
+                            e.currentTarget.checked,
+                          )
+                        }
+                      />
+                      {t().customAnthropic}
+                    </label>
+                  </Show>
 
                   {/* Model: dropdown + Fetch models only when the provider
                       advertises model_list; otherwise a manual-entry input.
@@ -1254,6 +1301,26 @@ const ProviderCenter: Component = () => {
     });
   };
 
+  const handleToggleCustomAnthropic = async (uuid: string, anthropic: boolean) => {
+    await runExclusive(async () => {
+      const provider = providers().find((p) => p.uuid === uuid);
+      if (!provider || provider.template_id !== "custom") return;
+      try {
+        const updated = await providerUpdate(uuid, {
+          expected_version: provider.version,
+          protocol: anthropic ? "anthropic" : "openai_chat",
+        });
+        setProviders((prev) =>
+          prev.map((p) => (p.uuid === uuid ? { ...p, ...updated, hasKey: p.hasKey } : p)),
+        );
+        bumpConfigEpoch(uuid);
+        pushToast("success", t.profileSaved);
+      } catch {
+        pushToast("destructive", t.saveFailed);
+      }
+    });
+  };
+
   /** Save profile: validate endpoint locally (reactive epError already shown),
    *  then IPC. Aborts on invalid endpoint or a duplicate-name conflict. */
   const handleSaveProfile = async (uuid: string) => {
@@ -1740,6 +1807,7 @@ const ProviderCenter: Component = () => {
         }
       }}
       onSaveProfile={(uuid) => void handleSaveProfile(uuid)}
+      onToggleCustomAnthropic={(uuid, on) => void handleToggleCustomAnthropic(uuid, on)}
       onSaveKey={(uuid) => void handleSaveKey(uuid)}
       onFetchModels={(uuid) => void handleFetchModels(uuid)}
       onTestConnection={(uuid) => void handleTestConnection(uuid)}

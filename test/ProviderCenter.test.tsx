@@ -2007,6 +2007,108 @@ describe("ProviderCenter (Surface 05)", () => {
     expect(setKeyCalls.length).toBeGreaterThanOrEqual(1);
   });
 
+  // ─── PR-1 closeout: Azure template / Kimi global / Custom Anthropic ───
+
+  it("azure-openai: Insert Azure URL template fills the endpoint draft", async () => {
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => [
+        profile({
+          uuid: "u-az",
+          name: "MyAzure",
+          template_id: "azure-openai",
+          endpoint: "",
+          secret_ref: "provider/u-az",
+        }),
+      ],
+      key_status: () => ({ "provider/u-az": false }),
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("MyAzure")).toBeTruthy());
+    fireEvent.click(screen.getByLabelText("Edit MyAzure"));
+    await flush();
+
+    fireEvent.click(screen.getByText("Insert Azure URL template"));
+    await flush();
+    const ep = screen.getByLabelText("Endpoint") as HTMLInputElement;
+    expect(ep.value).toBe(
+      "https://{resource}.openai.azure.com/openai/v1/chat/completions",
+    );
+    expect(screen.queryByText("Use global endpoint")).toBeNull();
+    expect(screen.queryByText("Anthropic Messages API")).toBeNull();
+  });
+
+  it("kimi: Use global endpoint switches the draft to moonshot.ai", async () => {
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => [
+        profile({
+          uuid: "u-kimi",
+          name: "MyKimi",
+          template_id: "kimi",
+          endpoint: "https://api.moonshot.cn/v1/chat/completions",
+          secret_ref: "provider/u-kimi",
+        }),
+      ],
+      key_status: () => ({ "provider/u-kimi": true }),
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("MyKimi")).toBeTruthy());
+    fireEvent.click(screen.getByLabelText("Edit MyKimi"));
+    await flush();
+
+    fireEvent.click(screen.getByText("Use global endpoint"));
+    await flush();
+    const ep = screen.getByLabelText("Endpoint") as HTMLInputElement;
+    expect(ep.value).toBe("https://api.moonshot.ai/v1/chat/completions");
+    expect(screen.queryByText("Insert Azure URL template")).toBeNull();
+  });
+
+  it("custom: Anthropic checkbox patches protocol via provider_update", async () => {
+    const updates: unknown[] = [];
+    routeInvoke({
+      ...DEFAULT_ROUTES,
+      provider_list: () => [
+        profile({
+          uuid: "u-custom",
+          name: "MyCustom",
+          template_id: "custom",
+          protocol: "openai_chat",
+          endpoint: "https://example.com/v1/chat/completions",
+          secret_ref: "provider/u-custom",
+        }),
+      ],
+      key_status: () => ({ "provider/u-custom": true }),
+      provider_update: (args) => {
+        updates.push(args);
+        return profile({
+          uuid: "u-custom",
+          name: "MyCustom",
+          template_id: "custom",
+          protocol: "anthropic",
+          endpoint: "https://example.com/v1/chat/completions",
+          secret_ref: "provider/u-custom",
+          version: 2,
+        });
+      },
+    });
+    render(() => <ProviderCenter />);
+    await waitFor(() => expect(screen.getByText("MyCustom")).toBeTruthy());
+    fireEvent.click(screen.getByLabelText("Edit MyCustom"));
+    await flush();
+
+    const box = screen.getByLabelText("Anthropic Messages API") as HTMLInputElement;
+    expect(box.checked).toBe(false);
+    fireEvent.click(box);
+    await waitFor(() =>
+      expect(invokeMock).toHaveBeenCalledWith("provider_update", {
+        uuid: "u-custom",
+        patch: { expected_version: 1, protocol: "anthropic" },
+      }),
+    );
+    expect(updates.length).toBe(1);
+  });
+
   // ─── R11 regression (non-blocking): configEpoch invalidates stale completions
 
   it("R11 regression: toggle IPC failure rolls back enabled, old Test completion NOT written (epoch bumped)", async () => {

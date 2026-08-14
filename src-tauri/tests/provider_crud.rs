@@ -1206,6 +1206,10 @@ fn create_custom_allows_empty_endpoint() {
     assert_eq!(p.protocol, Protocol::OpenaiChat);
     assert_eq!(p.capabilities.auth, Some(linguaray_contracts::AuthKind::Bearer));
     assert!(p.capabilities.models_url.is_none());
+    assert!(
+        !p.capabilities.model_list,
+        "no models_url → Fetch models stays off"
+    );
 }
 
 #[test]
@@ -1219,6 +1223,10 @@ fn create_azure_allows_empty_endpoint() {
         p.capabilities.auth,
         Some(linguaray_contracts::AuthKind::AzureKey)
     );
+    assert!(
+        !p.capabilities.model_list,
+        "Azure has no catalog models_url until the user pastes an endpoint"
+    );
 }
 
 #[test]
@@ -1228,6 +1236,14 @@ fn create_openai_empty_endpoint_uses_catalog_default() {
         .with_conn(|conn| providers::create(conn, "openai", "O", "", None))
         .unwrap();
     assert_eq!(p.endpoint, "https://api.openai.com/v1/chat/completions");
+    assert!(
+        p.capabilities.model_list,
+        "catalog models_url must flip model_list on create"
+    );
+    assert_eq!(
+        p.capabilities.models_url.as_deref(),
+        Some("https://api.openai.com/v1/models")
+    );
     let err = db
         .with_conn(|conn| providers::create(conn, "openai", "O2", "ftp://evil.example/x", None))
         .unwrap_err();
