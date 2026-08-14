@@ -10,6 +10,7 @@
 //!       system-dictionary integration. Built-in Rust modules, NOT plugins.
 //! - No WASM, no plugin system in v1 (deferred to post-v1).
 
+pub mod commands;
 pub mod a11y;
 pub mod adapter;
 pub mod clipboard;
@@ -43,6 +44,13 @@ use tauri_plugin_global_shortcut::{
     Builder as GlobalShortcutBuilder, GlobalShortcutExt, ShortcutState,
 };
 
+use crate::commands::{
+    a11y_status, archive_keystore, delete_key, get_settings, history_clear_all,
+    history_privacy_status, history_search, history_set_enabled, history_set_retention,
+    key_status, keystore_health, open_settings_window, reset_keystore, set_key, set_setting,
+    shortcut_check_conflict, shortcut_list, shortcut_recording_begin, shortcut_recording_end,
+    shortcut_reset_defaults, shortcut_save,
+};
 use crate::adapter::profile_to_preset;
 use crate::db::migration::{run_migration, FailpointCell, MigrationError};
 use crate::db::providers::{
@@ -81,10 +89,10 @@ pub struct TranslateResult {
 /// bumps it, and every async transition (popup, translate-result) checks
 /// `is_latest` before mutating the popup, so a stale in-flight request can never
 /// clobber the result of a newer trigger.
-struct Session {
-    client: Option<reqwest::Client>,
-    keystore: Option<keystore::Keystore>,
-    gen: concurrency::GenerationToken,
+pub(crate) struct Session {
+    pub(crate) client: Option<reqwest::Client>,
+    pub(crate) keystore: Option<keystore::Keystore>,
+    pub(crate) gen: concurrency::GenerationToken,
 }
 
 /// S2a application state: the SQLite database + data-readiness gate.
@@ -219,7 +227,7 @@ impl ShortcutRegistrar for TauriShortcutRegistrar {
 /// gate-first ordering is load-bearing: cloning the `Arc` before acquiring the
 /// gate races a concurrent archive/reset/recovery that holds the write guard
 /// and swaps the DB handle, handing the command a stale DB.
-fn require_ready_gated(
+pub(crate) fn require_ready_gated(
     state: &AppState,
     _gate_guard: &parking_lot::RwLockReadGuard<'_, ()>,
 ) -> Result<Arc<Database>, String> {
@@ -239,7 +247,7 @@ fn require_ready_gated(
 /// that need exclusive access: delete/reorder/toggle/set_active). Holding the
 /// write guard excludes every other gate holder, so the readiness + Arc clone
 /// are atomic w.r.t. the DB mutators just the same.
-fn require_ready_gated_write(
+pub(crate) fn require_ready_gated_write(
     state: &AppState,
     _gate_guard: &parking_lot::RwLockWriteGuard<'_, ()>,
 ) -> Result<Arc<Database>, String> {
@@ -336,7 +344,7 @@ pub fn startup_migration_guard<'a>(
 /// Resolve the optional `client` from the [`Session`] or return a clear error
 /// string. Used by the translate commands so a startup build failure surfaces
 /// consistently instead of panicking.
-fn session_client(session: &Session) -> Result<&reqwest::Client, String> {
+pub(crate) fn session_client(session: &Session) -> Result<&reqwest::Client, String> {
     session.client.as_ref().ok_or_else(|| {
         "HTTP client unavailable: startup build failed (recovery required)".to_string()
     })
@@ -346,7 +354,7 @@ fn session_client(session: &Session) -> Result<&reqwest::Client, String> {
 /// string. Used by the translate / key commands so a startup init failure
 /// (degraded `NeedsKeystoreRecovery`) surfaces consistently instead of
 /// panicking.
-fn session_keystore(session: &Session) -> Result<&keystore::Keystore, String> {
+pub(crate) fn session_keystore(session: &Session) -> Result<&keystore::Keystore, String> {
     session
         .keystore
         .as_ref()
@@ -862,30 +870,6 @@ async fn translate_selection_ipc(
     Ok(())
 }
 
-/// A4 (P1-5): show the main (settings) window and emit a `navigate` event so
-/// the App mount sets the shell's active page. The popup/input CTAs and the
-/// tray `settings` action both route here so the main window surfaces + jumps
-/// to the right section in one call. `section = None` defaults to the provider
-/// center.
-#[tauri::command]
-async fn open_settings_window(
-    app: tauri::AppHandle,
-    section: Option<String>,
-) -> Result<(), String> {
-    let page = section.unwrap_or_else(|| "provider-center".to_string());
-    let app2 = app.clone();
-    tauri::async_runtime::spawn(async move {
-        if let Some(w) = app2.get_webview_window("main") {
-            let _ = w.show();
-            let _ = w.set_focus();
-            let _ = w.emit("navigate", page);
-        }
-    })
-    .await
-    .map_err(|e| format!("join error: {e}"))?;
-    Ok(())
-}
-
 #[tauri::command]
 fn list_engines() -> Vec<EngineInfo> {
     let mut out: Vec<EngineInfo> = providers::presets()
@@ -899,262 +883,6 @@ fn list_engines() -> Vec<EngineInfo> {
             .map(|e| EngineInfo::from_traditional(e.as_ref())),
     );
     out
-}
-
-#[tauri::command]
-fn set_key(
-    state: tauri::State<'_, Arc<Session>>,
-    app: tauri::State<'_, Arc<AppState>>,
-    provider_id: String,
-    key: String,
-) -> Result<(), String> {
-    // Acquire data_gate.read() for the duration of the keystore write so this
-    // legacy command can't race archive/reset/recovery (which hold the write
-    // guard). Key writes are allowed even when the DB isn't Ready — the
-    // keystore is independent — but they MUST serialize against the data-gate
-    // writers.
-    //
-    // S2a P0: typed accessor — converges the payload to v2 (a load()+store() or
-    // a flat-map write would create a mixed v1/v2 structure post-migration).
-    let _gate = app.data_gate.read();
-    // P1 orphan-key guard: a legacy `set_key(provider_id, …)` accepts ANY
-    // provider_id and writes a key under it. Post-2a the keystore is keyed by
-    // `secret_ref` (a bare preset id like "openai" for legacy rows, or
-    // "provider/<uuid>" for v2 rows), and every keystore key MUST be owned by a
-    // non-deleted provider row (verified at migration Phase 5 + on every
-    // translate). Writing a key whose `provider_id` is no row's `secret_ref`
-    // creates an orphan that Phase-5 verification would later reject as
-    // "keystore key has no matching active provider row", surfacing a bogus
-    // recovery banner. So validate ownership BEFORE the write: the `provider_id`
-    // must equal some non-deleted row's `secret_ref`. If the DB isn't available
-    // (NeedsDatabaseRecovery / not yet open) we can't validate, so refuse.
-    assert_secret_ref_owned(&app, &provider_id)?;
-    let keystore = session_keystore(&state)?;
-    keystore
-        .set_key(&provider_id, &key)
-        .map_err(|e| e.to_string())?;
-    Ok(())
-}
-
-#[tauri::command]
-fn delete_key(
-    state: tauri::State<'_, Arc<Session>>,
-    app: tauri::State<'_, Arc<AppState>>,
-    provider_id: String,
-) -> Result<(), String> {
-    // See set_key: serialize against archive/reset via the data_gate read guard.
-    // S2a P0: typed accessor (idempotent — removing an absent key succeeds).
-    let _gate = app.data_gate.read();
-    // P1 orphan-key guard (mirrors set_key): only delete a key whose
-    // `provider_id` is owned by a non-deleted provider row. This stops a stale
-    // frontend from deleting a key under an arbitrary id (harmless to the DB but
-    // inconsistent with the ownership invariant the keystore now maintains).
-    // Unlike set_key, a delete of a key whose owner was just tombstoned is
-    // legitimate (finalize_delete already purged it), so we still require the
-    // row to exist — but a 'deleted' row no longer owns its secret_ref, hence
-    // the `status != 'deleted'` clause. If the DB isn't available, refuse.
-    assert_secret_ref_owned(&app, &provider_id)?;
-    let keystore = session_keystore(&state)?;
-    keystore
-        .delete_key(&provider_id)
-        .map_err(|e| e.to_string())?;
-    Ok(())
-}
-
-/// P1 orphan-key guard shared by the legacy `set_key` / `delete_key` commands.
-///
-/// Asserts that `provider_id` equals the `secret_ref` of some non-deleted
-/// provider row in the DB. Returns `Err` (refusing the keystore write) when:
-/// - the DB isn't `Ready` (S2a P1: refuse key writes during
-///   `MigrationIncomplete` / `NeedsDatabaseRecovery` / `NeedsKeystoreRecovery` —
-///   the row set may be mid-migration or absent, so we can't validate ownership
-///   safely and a write could create an orphan the migration's Phase-5
-///   verification would later reject),
-/// - the DB handle is unavailable (can't validate — refuse rather than risk an
-///   orphan), or
-/// - no non-deleted row owns that `secret_ref` (the write would create / touch
-///   an orphan key the migration's Phase-5 verification would later reject).
-///
-/// MUST be called while holding `data_gate.read()` (the legacy commands acquire
-/// it before calling) so the row set can't change under us.
-fn assert_secret_ref_owned(app: &Arc<AppState>, provider_id: &str) -> Result<(), String> {
-    // Readiness gate FIRST: refuse key writes unless the DB is Ready. A
-    // MigrationIncomplete / Needs*Recovery state means the row set is in flux
-    // (or absent), so the COUNT below could race the migration or read a
-    // half-built schema. The keystore is independent, but writing a key whose
-    // owner we can't verify would create an orphan.
-    let readiness = app.readiness.read();
-    if !readiness.is_ready() {
-        return Err(format!(
-            "cannot set/delete key: database not ready ({:?})",
-            *readiness
-        ));
-    }
-    drop(readiness);
-    let db = app
-        .db
-        .read()
-        .clone()
-        .ok_or_else(|| "cannot set/delete key: database unavailable".to_string())?;
-    let owned: i64 = db
-        .with_conn(|conn| -> Result<i64, crate::db::DbError> {
-            let n: i64 = conn.query_row(
-                "SELECT COUNT(*) FROM providers WHERE secret_ref=?1 AND status != 'deleted'",
-                rusqlite::params![provider_id],
-                |r| r.get(0),
-            )?;
-            Ok(n)
-        })
-        .map_err(|e| format!("cannot set/delete key: db lookup failed: {e}"))?;
-    if owned == 0 {
-        return Err(format!(
-            "cannot set/delete key: no active provider owns secret_ref '{provider_id}'"
-        ));
-    }
-    Ok(())
-}
-
-/// User-initiated keystore recovery (§A fail-closed): archive the unreadable file
-/// to keystore.json.broken-<secs>-<nanos> so the user can re-enter keys.
-///
-/// Review P1 #2: recovery MUST coordinate with `AppState`, not just `Session.keystore`.
-/// The command acquires the `data_gate` write lock (blocking all provider commands),
-/// runs the keystore archive, then performs the DB cleanup transaction
-/// (disable needs-key providers, clear active selection + consent, mark
-/// migration complete) and updates `DataReadiness` based on the old state +
-/// whether the DB is still usable.
-#[tauri::command]
-async fn archive_keystore(state: tauri::State<'_, Arc<AppState>>) -> Result<String, String> {
-    let app = state.inner().clone();
-    let ks_dir = app.keystore_dir.clone();
-    tauri::async_runtime::spawn_blocking(move || -> Result<String, String> {
-        // 1. data_gate write guard: blocks all provider reads/writes for the
-        //    duration of the recovery so no command observes a half-archived
-        //    keystore + un-updated DB.
-        let _gate = app.data_gate.write();
-        // 2. Keystore archive (existing logic, now under the gate). Construct a
-        //    fresh Keystore for the canonical dir rather than reusing the
-        //    Session's (which may be pointing at a fallback dir after a startup
-        //    init failure).
-        let ks = keystore::Keystore::new(ks_dir.clone()).map_err(|e| e.to_string())?;
-        let dst = ks.archive().map_err(|e| e.to_string())?;
-        let dst_str = dst.to_string_lossy().into_owned();
-        // 3. DB cleanup transaction + 4. readiness update. A cleanup failure
-        //    propagates: the keystore archive already happened, but the DB is
-        //    now in an inconsistent state (keys gone, needs-key providers still
-        //    enabled) and the user must see the error + recovery banner.
-        apply_keystore_recovery_db_cleanup(&app)?;
-        Ok(dst_str)
-    })
-    .await
-    .map_err(|e| e.to_string())?
-}
-
-/// User-initiated: reset the keystore to a fresh state (archive then clear tmp).
-///
-/// Review P1 #2: like `archive_keystore`, this now coordinates with `AppState`
-/// via the `data_gate` write lock, runs the DB cleanup transaction, and updates
-/// `DataReadiness` based on the old state + DB availability.
-#[tauri::command]
-async fn reset_keystore(state: tauri::State<'_, Arc<AppState>>) -> Result<Option<String>, String> {
-    let app = state.inner().clone();
-    let ks_dir = app.keystore_dir.clone();
-    tauri::async_runtime::spawn_blocking(move || -> Result<Option<String>, String> {
-        let _gate = app.data_gate.write();
-        let ks = keystore::Keystore::new(ks_dir.clone()).map_err(|e| e.to_string())?;
-        let archived = ks
-            .reset()
-            .map_err(|e| e.to_string())?
-            .map(|p| p.to_string_lossy().into_owned());
-        // See archive_keystore: a cleanup failure propagates (keystore already
-        // reset, but DB is now inconsistent).
-        apply_keystore_recovery_db_cleanup(&app)?;
-        Ok(archived)
-    })
-    .await
-    .map_err(|e| e.to_string())?
-}
-
-#[tauri::command]
-fn key_status(state: tauri::State<'_, Arc<Session>>) -> std::collections::HashMap<String, bool> {
-    // Review P1 #6: swallow the error (return empty) so frontend onMount never
-    // aborts. The recovery banner reads `keystore_health` for the reason.
-    //
-    // S2a P0: enumerate via the typed accessor so the map is keyed by
-    // `secret_ref` from the nested v2 `provider_keys` (the old raw-object walk
-    // iterated the flat map and missed migrated keys).
-    let refs = match state.keystore.as_ref() {
-        Some(ks) => match ks.list_provider_key_refs() {
-            Ok(r) => r,
-            Err(_) => return std::collections::HashMap::new(),
-        },
-        // No keystore (startup init failure): return empty so onMount doesn't
-        // abort. The recovery banner reads `keystore_health` for the reason.
-        None => return std::collections::HashMap::new(),
-    };
-    refs.into_iter().map(|r| (r, true)).collect()
-}
-
-#[tauri::command]
-fn get_settings(app: tauri::AppHandle) -> settings::Settings {
-    settings::load(&app)
-}
-
-#[tauri::command]
-fn set_setting(app: tauri::AppHandle, key: String, value: String) -> Result<(), String> {
-    let mut s = settings::load(&app);
-    match key.as_str() {
-        "default_provider" => s.default_provider = value,
-        "target_language" => s.target_language = value,
-        // §G: fallback_engine is opt-in. Empty string clears it (None = no
-        // fallback); a non-empty value must be a known traditional-engine id,
-        // validated against the registry so a typo can't silently disable fallback.
-        "fallback_engine" => {
-            if value.is_empty() {
-                s.fallback_engine = None;
-            } else if engines::find(&value).is_some() {
-                s.fallback_engine = Some(value);
-            } else {
-                return Err(format!("unknown fallback engine: {value}"));
-            }
-        }
-        _ => return Err(format!("unknown setting: {key}")),
-    }
-    settings::save(&app, &s)
-}
-
-/// Look up a word in the macOS system dictionary (spec §E: word definitions
-/// where LLMs are weak). Returns plain text or None. On non-macOS / when no
-/// definition is found, returns None. The dictionary product UI (select-word →
-/// definition popup) is deferred to v1.x; the backend groundwork is kept here.
-#[allow(dead_code)] // v1.x: dictionary UI not yet wired (removed from invoke_handler + AppManifest)
-#[tauri::command]
-fn lookup_dictionary(word: String) -> Option<String> {
-    dict::lookup(&word)
-}
-
-/// Is Accessibility (macOS) granted? Selection capture needs it for both the AX
-/// direct-read and the simulated Cmd+C. Non-macOS: always true.
-#[tauri::command]
-fn a11y_status() -> bool {
-    a11y::enabled()
-}
-
-/// Keystore health: Ok / the fail-closed reason (corrupt / auth / unknown).
-/// key_status swallows the error (returns empty) so onMount never aborts; this
-/// command surfaces the reason for the recovery banner. Review P1 #6.
-#[tauri::command]
-fn keystore_health(state: tauri::State<'_, Arc<Session>>) -> String {
-    // "" = healthy (or absent = first run). Non-empty = the fail-closed reason.
-    // When the keystore couldn't be initialized at startup (Session.keystore is
-    // None), surface that reason so the recovery banner shows it.
-    match state.keystore.as_ref() {
-        Some(ks) => match ks.load() {
-            Ok(_) => String::new(),
-            Err(e) => format!("{e}"),
-        },
-        None => "keystore unavailable: startup init failed".to_string(),
-    }
 }
 
 // ─── S2a data-readiness + provider commands ──────────────────────────────
@@ -2456,7 +2184,7 @@ fn set_active_slots(
 ///   (a half-applied schema, a corrupt settings file, a resume-deletions
 ///   fault); promoting to Ready would hide that. The user must retry the
 ///   recovery that targets the migration itself.
-fn apply_keystore_recovery_db_cleanup(app: &Arc<AppState>) -> Result<(), String> {
+pub(crate) fn apply_keystore_recovery_db_cleanup(app: &Arc<AppState>) -> Result<(), String> {
     // Capture the OLD readiness BEFORE any mutation so the post-state logic can
     // branch on it, and so the cleanup tx knows whether it may mark migration
     // complete (only Ready / NeedsKeystoreRecovery were fully migrated before
@@ -3347,193 +3075,6 @@ fn handle_tray_menu_event(app: &tauri::AppHandle, event: MenuEvent) {
 
 // ─── R3b Surface 07: revisioned global shortcuts ─────────────────────────
 
-fn shortcut_join_error(error: tauri::Error) -> ShortcutError {
-    ShortcutError::DatabaseFailed {
-        message: format!("shortcut worker join failed: {error}"),
-    }
-}
-
-#[tauri::command]
-async fn shortcut_list(
-    state: tauri::State<'_, Arc<ShortcutController>>,
-) -> Result<ShortcutSnapshot, ShortcutError> {
-    let controller = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || controller.snapshot())
-        .await
-        .map_err(shortcut_join_error)?
-}
-
-#[tauri::command]
-async fn shortcut_check_conflict(
-    state: tauri::State<'_, Arc<ShortcutController>>,
-    action: ShortcutAction,
-    combo: String,
-    revision: u64,
-) -> Result<Option<ShortcutAction>, ShortcutError> {
-    let controller = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        controller.check_conflict(action, &combo, revision)
-    })
-    .await
-    .map_err(shortcut_join_error)?
-}
-
-#[tauri::command]
-async fn shortcut_save(
-    state: tauri::State<'_, Arc<ShortcutController>>,
-    action: ShortcutAction,
-    combo: String,
-    expected_revision: u64,
-    override_action: Option<ShortcutAction>,
-) -> Result<ShortcutSnapshot, ShortcutError> {
-    let controller = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        controller.save(action, &combo, expected_revision, override_action)
-    })
-    .await
-    .map_err(shortcut_join_error)?
-}
-
-#[tauri::command]
-async fn shortcut_reset_defaults(
-    state: tauri::State<'_, Arc<ShortcutController>>,
-    expected_revision: u64,
-) -> Result<ShortcutSnapshot, ShortcutError> {
-    let controller = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || controller.reset_defaults(expected_revision))
-        .await
-        .map_err(shortcut_join_error)?
-}
-
-#[tauri::command]
-fn shortcut_recording_begin(
-    state: tauri::State<'_, Arc<ShortcutController>>,
-    action: ShortcutAction,
-) -> Result<(), ShortcutError> {
-    state.recording_begin(action)
-}
-
-#[tauri::command]
-fn shortcut_recording_end(state: tauri::State<'_, Arc<ShortcutController>>) {
-    state.recording_end();
-}
-
-// ─── R3b Surface 08: encrypted-history privacy controls ──────────────────
-
-#[derive(Debug, Clone, Serialize)]
-struct HistoryPrivacyStatusWire {
-    enabled: bool,
-    retention_days: u32,
-    record_count: u64,
-}
-
-fn read_history_privacy_status(db: &Database) -> Result<HistoryPrivacyStatusWire, String> {
-    db.with_conn(|conn| {
-        let status = crate::db::history::privacy_status(conn)?;
-        let count: i64 = conn.query_row("SELECT COUNT(*) FROM history_sessions", [], |row| {
-            row.get(0)
-        })?;
-        let record_count = u64::try_from(count)
-            .map_err(|_| crate::db::DbError::Integrity("negative history count".into()))?;
-        Ok(HistoryPrivacyStatusWire {
-            enabled: status.enabled,
-            retention_days: status.retention_days,
-            record_count,
-        })
-    })
-    .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-async fn history_privacy_status(
-    state: tauri::State<'_, Arc<AppState>>,
-) -> Result<HistoryPrivacyStatusWire, String> {
-    let app_state = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        let gate = app_state.data_gate.read();
-        let db = require_ready_gated(&app_state, &gate)?;
-        read_history_privacy_status(&db)
-    })
-    .await
-    .map_err(|error| format!("history status worker failed: {error}"))?
-}
-
-#[tauri::command]
-async fn history_set_enabled(
-    app_state: tauri::State<'_, Arc<AppState>>,
-    session: tauri::State<'_, Arc<Session>>,
-    enabled: bool,
-) -> Result<HistoryPrivacyStatusWire, String> {
-    let app_state = app_state.inner().clone();
-    let session = session.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        let gate = app_state.data_gate.read();
-        let db = require_ready_gated(&app_state, &gate)?;
-        let keystore = session_keystore(&session)?;
-        crate::db::history::set_enabled(&db, keystore, enabled)
-            .map_err(|error| error.to_string())?;
-        read_history_privacy_status(&db)
-    })
-    .await
-    .map_err(|error| format!("history enable worker failed: {error}"))?
-}
-
-#[tauri::command]
-async fn history_set_retention(
-    state: tauri::State<'_, Arc<AppState>>,
-    days: u32,
-) -> Result<HistoryPrivacyStatusWire, String> {
-    let app_state = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        let gate = app_state.data_gate.read();
-        let db = require_ready_gated(&app_state, &gate)?;
-        db.with_conn(|conn| crate::db::history::set_retention(conn, days))
-            .map_err(|error| error.to_string())?;
-        read_history_privacy_status(&db)
-    })
-    .await
-    .map_err(|error| format!("history retention worker failed: {error}"))?
-}
-
-#[tauri::command]
-async fn history_clear_all(
-    state: tauri::State<'_, Arc<AppState>>,
-) -> Result<HistoryPrivacyStatusWire, String> {
-    let app_state = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        let gate = app_state.data_gate.write();
-        let db = require_ready_gated_write(&app_state, &gate)?;
-        db.with_conn(crate::db::history::clear_all)
-            .map_err(|error| error.to_string())?;
-        read_history_privacy_status(&db)
-    })
-    .await
-    .map_err(|error| format!("history clear worker failed: {error}"))?
-}
-
-#[tauri::command]
-async fn history_search(
-    state: tauri::State<'_, Arc<Session>>,
-    app_state: tauri::State<'_, Arc<AppState>>,
-    query: String,
-    cursor: Option<String>,
-) -> Result<crate::history::search::HistoryPage, String> {
-    // Check before scheduling so degraded startup fails quickly, then resolve
-    // again from the owned Session inside the blocking closure.
-    session_keystore(&state)?;
-    let session = state.inner().clone();
-    let state = app_state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        let _gate = state.data_gate.read();
-        let db = require_ready_gated(&state, &_gate)?;
-        let keystore = session_keystore(&session)?;
-        crate::history::search::search(&db, keystore, &query, cursor.as_deref())
-            .map_err(|error| error.to_string())
-    })
-    .await
-    .map_err(|error| error.to_string())?
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Round-2 review P1 #2: the REAL registration failure point is the plugin's
@@ -3856,6 +3397,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            // commands/* (PR-3) + remaining in-crate handlers
             translate,
             translate_default,
             translate_clipboard,
