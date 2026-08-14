@@ -136,6 +136,7 @@ type EmptyCopy = {
 type ProviderCopy = {
   empty: EmptyCopy;
   addProvider: string;
+  tier: { setupRequired: string; unverified: string };
   models: string;
   fetchModels: string;
   modelFetchError: string;
@@ -288,6 +289,7 @@ const EN: SettingsCopy = {
       description: "Pick a preset, enter your API key, and start translating.",
     },
     addProvider: "Add provider",
+    tier: { setupRequired: "Setup", unverified: "Unverified" },
     models: "Model",
     fetchModels: "Fetch models",
     modelFetchError: "Failed to fetch models — enter manually",
@@ -424,6 +426,7 @@ const ZH: SettingsCopy = {
       description: "选择预设，输入 API 密钥，即可开始翻译。",
     },
     addProvider: "添加服务商",
+    tier: { setupRequired: "需配置", unverified: "未认证" },
     models: "模型",
     fetchModels: "获取模型",
     modelFetchError: "获取模型失败 —— 请手动输入",

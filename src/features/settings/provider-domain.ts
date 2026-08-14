@@ -268,9 +268,16 @@ export type EndpointValidationResult =
  * Returns a STABLE ERROR CODE (not a display string) — the caller must map
  * `code` through the i18n dictionary before showing it to users.
  */
-export function validateEndpoint(endpoint: string): EndpointValidationResult {
+export function validateEndpoint(
+  endpoint: string,
+  opts?: { allowEmpty?: boolean },
+): EndpointValidationResult {
   const trimmed = endpoint.trim();
-  if (!trimmed) return { ok: false, code: "endpoint-required" };
+  if (!trimmed) {
+    return opts?.allowEmpty
+      ? { ok: true }
+      : { ok: false, code: "endpoint-required" };
+  }
 
   let url: URL;
   try {

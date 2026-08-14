@@ -68,6 +68,9 @@ const profile = (over: Partial<ProviderProfile> = {}): ProviderProfile => ({
 
 function routeInvoke(routes: Record<string, (args?: unknown) => unknown>): void {
   invokeMock.mockImplementation(async (cmd: string, args?: unknown) => {
+    if (cmd === "provider_list_presets" && !routes[cmd]) {
+      return OFFICIAL_PRESET_DTOS;
+    }
     const fn = routes[cmd];
     if (!fn) throw new Error(`unexpected invoke ${cmd}`);
     return fn(args);
@@ -79,8 +82,11 @@ const TWO_NO_KEY: ProviderProfile[] = [
   profile({ uuid: "u2", name: "Beta", sort_order: 1, secret_ref: "provider/u2" }),
 ];
 
+import { OFFICIAL_PRESET_DTOS } from "./catalogPresets";
+
 const DEFAULT_ROUTES: Record<string, (args?: unknown) => unknown> = {
   provider_list: () => TWO_NO_KEY,
+  provider_list_presets: () => OFFICIAL_PRESET_DTOS,
   key_status: () => ({}), // both keyless
   provider_get_active_selection: () => ({ primary: null, parallel: [], fallback: null }),
 };

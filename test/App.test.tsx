@@ -24,6 +24,7 @@ beforeEach(() => {
   invokeMock.mockReset();
   invokeMock.mockImplementation(async (cmd: string) => {
     if (cmd === "provider_list") return [];
+    if (cmd === "provider_list_presets") return [];
     if (cmd === "key_status") return ({});
     if (cmd === "keystore_health") return "";
     if (cmd === "shortcut_list") return { revision: 1, entries: [] };

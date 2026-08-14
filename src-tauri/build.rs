@@ -17,6 +17,7 @@ fn main() {
             "archive_keystore",
             "reset_keystore",
             "get_data_readiness",
+            "provider_list_presets",
             "provider_list",
             "provider_create",
             "provider_update",

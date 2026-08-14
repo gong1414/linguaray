@@ -52,14 +52,20 @@ const POPULATED: ProviderProfile[] = [
 
 function routeInvoke(routes: Record<string, (args?: unknown) => unknown>): void {
   invokeMock.mockImplementation(async (cmd: string, args?: unknown) => {
+    if (cmd === "provider_list_presets" && !routes[cmd]) {
+      return OFFICIAL_PRESET_DTOS;
+    }
     const fn = routes[cmd];
     if (!fn) throw new Error(`unexpected invoke ${cmd}`);
     return fn(args);
   });
 }
 
+import { OFFICIAL_PRESET_DTOS } from "./catalogPresets";
+
 const DEFAULT_ROUTES: Record<string, (args?: unknown) => unknown> = {
   provider_list: () => POPULATED,
+  provider_list_presets: () => OFFICIAL_PRESET_DTOS,
   key_status: () => ({ "provider/u1": true, "provider/u2": true }),
   provider_get_active_selection: () => ({ primary: "u1", parallel: [], fallback: null }),
 };
