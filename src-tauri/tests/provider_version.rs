@@ -409,7 +409,9 @@ fn migrate_on_fresh_v2_db_is_noop() {
         Ok(())
     })
     .unwrap();
-    // The fresh DB's seeded schema_version was already 2; the UPDATE is benign.
+    // migrate_v1_to_v2 always writes the literal 2 (not SCHEMA_VERSION) so a
+    // later v3 bump cannot skip v2→v3. A fresh DB is seeded at SCHEMA_VERSION
+    // (3); this helper only runs the v1→v2 step, so the recorded version is 2.
     let sv: i64 = db
         .with_conn(|conn| {
             Ok(conn.query_row(
@@ -419,7 +421,7 @@ fn migrate_on_fresh_v2_db_is_noop() {
             )?)
         })
         .unwrap();
-    assert_eq!(sv, schema::SCHEMA_VERSION as i64);
+    assert_eq!(sv, 2, "migrate_v1_to_v2 stamps literal 2");
 }
 
 /// `insert_or_ignore` on a fresh v2 DB leaves the row at version 1 (the column's
@@ -651,7 +653,11 @@ fn full_pipeline_v1_to_v2_migration_via_run_migration() {
             [],
             |r| Ok((r.get(0)?, r.get(1)?)),
         )?;
-        assert_eq!(sv, 2, "schema_version bumped to 2");
+        assert_eq!(
+            sv,
+            schema::SCHEMA_VERSION as i64,
+            "full pipeline converges to SCHEMA_VERSION"
+        );
         assert_eq!(mc, 1, "migration marked complete");
         Ok(())
     })
@@ -792,7 +798,11 @@ fn full_pipeline_v1_providers_no_version_with_missing_singleton() {
             [],
             |r| Ok((r.get(0)?, r.get(1)?)),
         )?;
-        assert_eq!(sv, 2, "schema_version bumped to 2");
+        assert_eq!(
+            sv,
+            schema::SCHEMA_VERSION as i64,
+            "full pipeline converges to SCHEMA_VERSION"
+        );
         assert_eq!(mc, 1, "migration marked complete");
         Ok(())
     })
@@ -849,7 +859,7 @@ fn fresh_complete_db_with_version_decl(version_decl: &str) -> (tempfile::TempDir
             uuid TEXT PRIMARY KEY,
             template_id TEXT NOT NULL,
             name TEXT NOT NULL,
-            protocol TEXT NOT NULL,
+            protocol TEXT NOT NULL CHECK (protocol IN {}),
             endpoint TEXT NOT NULL,
             model TEXT,
             enabled INTEGER NOT NULL DEFAULT 1,
@@ -859,7 +869,8 @@ fn fresh_complete_db_with_version_decl(version_decl: &str) -> (tempfile::TempDir
             secret_ref TEXT NOT NULL UNIQUE,
             capabilities TEXT NOT NULL DEFAULT '{{}}',
             status TEXT NOT NULL DEFAULT 'active'{version_clause}
-         );"
+         );",
+        schema::PROVIDERS_PROTOCOL_CHECK
     );
     db.with_conn(|conn| {
         let tx = conn.transaction()?;
@@ -869,10 +880,12 @@ fn fresh_complete_db_with_version_decl(version_decl: &str) -> (tempfile::TempDir
         schema::seed_singletons(&tx)?;
         tx.execute_batch("DROP TABLE providers;")?;
         tx.execute_batch(&providers_create)?;
-        // Mark Complete (seed_singletons wrote schema_version=2, complete=0).
+        // Mark Complete at the *current* SCHEMA_VERSION so preflight takes
+        // the Complete short-circuit (a stale 2 would read as Incomplete
+        // after the v3 bump and run the upgrade path instead).
         tx.execute(
-            "UPDATE _schema_migrations SET schema_version=2, migration_complete=1 WHERE id=1",
-            [],
+            "UPDATE _schema_migrations SET schema_version=?1, migration_complete=1 WHERE id=1",
+            rusqlite::params![schema::SCHEMA_VERSION as i64],
         )?;
         tx.commit()?;
         Ok(())
@@ -1312,4 +1325,169 @@ fn validate_v2_schema_fails_when_history_results_outcome_tag_missing() {
         matches!(res, Err(DbError::Integrity(_))),
         "history_results missing outcome_tag column → Integrity; got {res:?}"
     );
+}
+
+// ─── PR-6f-schema: v2 → v3 protocol CHECK ─────────────────────────────────
+
+/// A v2-shaped DB: full current tables except `providers` still has the v2
+/// CHECK (no deepl/…). schema_version=2, one google_translate row.
+fn fresh_v2_db_old_protocol_check() -> (tempfile::TempDir, Database) {
+    let dir = tempdir().unwrap();
+    let db_path = dir.path().join("v2_old_check.db");
+    let db = Database::open(&db_path).unwrap();
+    db.with_conn(|conn| {
+        let tx = conn.transaction()?;
+        schema::create_all_tables(&tx)?;
+        schema::seed_singletons(&tx)?;
+        tx.execute_batch("DROP TABLE providers;")?;
+        tx.execute_batch(
+            "CREATE TABLE providers (
+                uuid TEXT PRIMARY KEY,
+                template_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                protocol TEXT NOT NULL CHECK (protocol IN ('openai_chat','anthropic','gemini','google_translate','custom_http')),
+                endpoint TEXT NOT NULL,
+                model TEXT,
+                enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0,1)),
+                sort_order INTEGER NOT NULL DEFAULT 0,
+                is_local INTEGER NOT NULL DEFAULT 0 CHECK (is_local IN (0,1)),
+                needs_key INTEGER NOT NULL CHECK (needs_key IN (0,1)),
+                secret_ref TEXT NOT NULL UNIQUE,
+                capabilities TEXT NOT NULL DEFAULT '{}',
+                status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','deleting','deleted')),
+                version INTEGER NOT NULL DEFAULT 1
+            );
+            CREATE INDEX IF NOT EXISTS idx_providers_status ON providers(status);",
+        )?;
+        tx.execute(
+            "INSERT INTO providers (uuid, template_id, name, protocol, endpoint, needs_key, secret_ref)
+             VALUES ('g1', 'google', 'Google', 'google_translate', 'https://translate.google.com', 0, 'provider/g1')",
+            [],
+        )?;
+        tx.execute(
+            "UPDATE _schema_migrations SET schema_version=2, migration_complete=1 WHERE id=1",
+            [],
+        )?;
+        tx.commit()?;
+        Ok(())
+    })
+    .unwrap();
+    (dir, db)
+}
+
+#[test]
+fn v2_check_rejects_deepl_before_migration() {
+    let (_dir, db) = fresh_v2_db_old_protocol_check();
+    let err = db
+        .with_conn(|conn| {
+            conn.execute(
+                "INSERT INTO providers (uuid, template_id, name, protocol, endpoint, needs_key, secret_ref)
+                 VALUES ('d1', 'deepl', 'DeepL', 'deepl', 'https://api.deepl.com', 1, 'provider/d1')",
+                [],
+            )?;
+            Ok(())
+        })
+        .unwrap_err();
+    assert!(
+        matches!(err, DbError::Sqlite(_)),
+        "v2 CHECK must reject deepl, got {err:?}"
+    );
+}
+
+#[test]
+fn migrate_v2_to_v3_rebuilds_check_preserves_rows_and_is_idempotent() {
+    let (_dir, db) = fresh_v2_db_old_protocol_check();
+    db.with_conn(|conn| {
+        let tx = conn.transaction()?;
+        schema::migrate_v2_to_v3(&tx)?;
+        tx.commit()?;
+        Ok(())
+    })
+    .unwrap();
+
+    db.with_conn(|conn| {
+        assert!(
+            schema::providers_check_is_v3(conn)?,
+            "rebuild must land 'deepl' in sqlite_master CHECK"
+        );
+        let name: String = conn.query_row(
+            "SELECT name FROM providers WHERE uuid='g1'",
+            [],
+            |r| r.get(0),
+        )?;
+        assert_eq!(name, "Google", "existing row must survive the rebuild");
+
+        conn.execute(
+            "INSERT INTO providers (uuid, template_id, name, protocol, endpoint, needs_key, secret_ref)
+             VALUES ('d1', 'deepl', 'DeepL', 'deepl', 'https://api.deepl.com', 1, 'provider/d1')",
+            [],
+        )?;
+        let proto: String = conn.query_row(
+            "SELECT protocol FROM providers WHERE uuid='d1'",
+            [],
+            |r| r.get(0),
+        )?;
+        assert_eq!(proto, "deepl");
+
+        let sv: i64 = conn.query_row(
+            "SELECT schema_version FROM _schema_migrations WHERE id=1",
+            [],
+            |r| r.get(0),
+        )?;
+        assert_eq!(sv, 3);
+        Ok(())
+    })
+    .unwrap();
+
+    db.with_conn(|conn| {
+        let tx = conn.transaction()?;
+        schema::migrate_v2_to_v3(&tx)?;
+        tx.commit()?;
+        Ok(())
+    })
+    .unwrap();
+    let count: i64 = db
+        .with_conn(|conn| {
+            Ok(conn.query_row("SELECT COUNT(*) FROM providers", [], |r| r.get(0))?)
+        })
+        .unwrap();
+    assert_eq!(count, 2, "idempotent re-run must not duplicate rows");
+}
+
+#[test]
+fn validate_v2_schema_rejects_stale_protocol_check() {
+    let (_dir, db) = fresh_v2_db_old_protocol_check();
+    let res = db.with_conn(|conn| schema::validate_v2_schema(conn));
+    assert!(
+        matches!(res, Err(DbError::Integrity(_))),
+        "old CHECK on an otherwise-complete table must fail closed, got {res:?}"
+    );
+}
+
+#[test]
+fn full_pipeline_upgrades_v2_check_to_v3() {
+    let (dir, db) = fresh_v2_db_old_protocol_check();
+    let keystore_dir = dir.path().join("keystore");
+    let settings_path = dir.path().join("settings.json");
+    let fp = FailpointCell::none();
+    run_migration_with_identity(&db, &keystore_dir, &settings_path, &fp, PIPE_ID)
+        .expect("v2 Complete DB (schema_version=2) must upgrade through Phase 2d");
+
+    db.with_conn(|conn| {
+        assert!(schema::providers_check_is_v3(conn)?);
+        let (sv, mc): (i64, i64) = conn.query_row(
+            "SELECT schema_version, migration_complete FROM _schema_migrations WHERE id=1",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )?;
+        assert_eq!(sv, schema::SCHEMA_VERSION as i64);
+        assert_eq!(mc, 1);
+        conn.execute(
+            "INSERT INTO providers (uuid, template_id, name, protocol, endpoint, needs_key, secret_ref)
+             VALUES ('d1', 'deepl', 'DeepL', 'deepl', 'https://api.deepl.com', 1, 'provider/d1')",
+            [],
+        )?;
+        Ok(())
+    })
+    .unwrap();
 }

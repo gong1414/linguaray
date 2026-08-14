@@ -559,16 +559,32 @@ fn run_migration_core<K: KeystoreIo>(
     // Always call migrate_v1_to_v2 — it's idempotent AND fail-closed, so an
     // unconditional call is safe. Checking the ACTUAL table structure (not just
     // `_schema_migrations.schema_version`) is necessary because seed_singletons
-    // in Phase 2 may have just written schema_version=2 for a DB whose `providers`
-    // table predates the version column (the missing-singleton-row case). On such
-    // a DB the previous `stored < SCHEMA_VERSION` gate evaluated `2 < 2` → false
-    // and SKIPPED the migration, leaving the app believing it was v2 while the
-    // column was still absent — a silent corruption. migrate_v1_to_v2 probes
-    // PRAGMA table_info itself, so for an already-correct column this is a no-op;
+    // in Phase 2 may have just written schema_version=SCHEMA_VERSION for a DB
+    // whose `providers` table predates the version column (the
+    // missing-singleton-row case). On such a DB the previous
+    // `stored < SCHEMA_VERSION` gate evaluated equal → false and SKIPPED the
+    // migration, leaving the app believing it was current while the column was
+    // still absent — a silent corruption. migrate_v1_to_v2 probes PRAGMA
+    // table_info itself, so for an already-correct column this is a no-op;
     // for a missing one it ALTERs; for a wrong-shaped one it fails closed.
+    // It writes the literal `2` (not SCHEMA_VERSION) so a later v3 bump
+    // cannot skip v2→v3 by stamping 3 here.
     db.with_conn(|conn| {
         let tx = conn.transaction()?;
         schema::migrate_v1_to_v2(&tx)?;
+        tx.commit()?;
+        Ok(())
+    })?;
+
+    // ── PHASE 2d: v2→v3 protocol CHECK expansion (PR-6f-schema) ──────────
+    // Always call migrate_v2_to_v3. Idempotent via sqlite_master `'deepl'`
+    // probe. Fresh DBs already have the v3 CHECK from create_all_tables and
+    // only get schema_version stamped to 3. v2 DBs rebuild providers (SQLite
+    // cannot ALTER CHECK). Must run AFTER 2c so the SELECT list includes
+    // `version`.
+    db.with_conn(|conn| {
+        let tx = conn.transaction()?;
+        schema::migrate_v2_to_v3(&tx)?;
         tx.commit()?;
         Ok(())
     })?;

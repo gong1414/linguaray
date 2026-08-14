@@ -40,6 +40,11 @@ pub enum Protocol {
     Gemini,
     GoogleTranslate,
     CustomHttp,
+    Deepl,
+    Microsoft,
+    Baidu,
+    Youdao,
+    Tencent,
 }
 
 impl Protocol {
@@ -52,6 +57,11 @@ impl Protocol {
             Protocol::Gemini => "gemini",
             Protocol::GoogleTranslate => "google_translate",
             Protocol::CustomHttp => "custom_http",
+            Protocol::Deepl => "deepl",
+            Protocol::Microsoft => "microsoft",
+            Protocol::Baidu => "baidu",
+            Protocol::Youdao => "youdao",
+            Protocol::Tencent => "tencent",
         }
     }
 
@@ -64,6 +74,11 @@ impl Protocol {
             "gemini" => Ok(Protocol::Gemini),
             "google_translate" => Ok(Protocol::GoogleTranslate),
             "custom_http" => Ok(Protocol::CustomHttp),
+            "deepl" => Ok(Protocol::Deepl),
+            "microsoft" => Ok(Protocol::Microsoft),
+            "baidu" => Ok(Protocol::Baidu),
+            "youdao" => Ok(Protocol::Youdao),
+            "tencent" => Ok(Protocol::Tencent),
             other => Err(DbError::Integrity(format!(
                 "unknown protocol: {other}"
             ))),
@@ -1102,9 +1117,25 @@ fn traditional_lookup(template_id: &str) -> Option<&'static TraditionalProviderC
 pub const TRADITIONAL_TEMPLATES: &[&str] =
     &["google", "deepl", "microsoft", "baidu", "youdao", "tencent"];
 
+/// Protocols that prove a fallback row is a real traditional engine, not a
+/// repair/AI shell reusing a traditional `template_id`. CHECK-allowed since
+/// v3; a `deepl` template with [`Protocol::CustomHttp`] is still rejected.
+pub const TRADITIONAL_PROTOCOLS: &[Protocol] = &[
+    Protocol::GoogleTranslate,
+    Protocol::Deepl,
+    Protocol::Microsoft,
+    Protocol::Baidu,
+    Protocol::Youdao,
+    Protocol::Tencent,
+];
+
 /// Is `template_id` a permitted fallback-engine template?
 fn is_traditional_template(template_id: &str) -> bool {
     TRADITIONAL_TEMPLATES.contains(&template_id)
+}
+
+fn is_traditional_protocol(protocol: Protocol) -> bool {
+    TRADITIONAL_PROTOCOLS.contains(&protocol)
 }
 
 // ─── validate_active_selection ────────────────────────────────────────────
@@ -1160,14 +1191,12 @@ pub fn validate_active_selection(
         // Fallback must be a REAL traditional engine. P1.3: check BOTH the
         // template_id (catalog identity) AND the protocol (proof it's an
         // implemented traditional engine, not a repair/AI shell reusing a
-        // traditional template_id). The only currently-implemented traditional
-        // protocol is GoogleTranslate; when DeepL/Microsoft/etc. land, extend
-        // this to a TRADITIONAL_PROTOCOLS set. A template_id like "deepl" with
+        // traditional template_id). A template_id like "deepl" with
         // Protocol::CustomHttp must be rejected — it isn't a real traditional
         // engine, just a repair row borrowing the name.
         if let Some(p) = active.get(fb) {
             if !is_traditional_template(&p.template_id)
-                || p.protocol != Protocol::GoogleTranslate
+                || !is_traditional_protocol(p.protocol)
             {
                 return Err(DbError::Integrity(format!(
                     "fallback uuid {fb} template_id '{}' protocol '{:?}' is not a traditional engine",
@@ -1439,6 +1468,11 @@ mod tests {
             Protocol::Gemini,
             Protocol::GoogleTranslate,
             Protocol::CustomHttp,
+            Protocol::Deepl,
+            Protocol::Microsoft,
+            Protocol::Baidu,
+            Protocol::Youdao,
+            Protocol::Tencent,
         ] {
             assert_eq!(Protocol::from_db_str(p.as_db_str()).unwrap(), p);
         }

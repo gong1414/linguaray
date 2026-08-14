@@ -523,6 +523,27 @@ fn constraint_providers_protocol_check() {
     let (_dir, db) = fresh_db();
     db.with_conn(|conn| {
         assert_rejected(conn, "invalid protocol", "INSERT INTO providers (uuid, template_id, name, protocol, endpoint, needs_key, secret_ref) VALUES ('u1', 't', 'N', 'bogus_proto', 'https://a.com', 1, 'r1')");
+        for (i, proto) in [
+            "openai_chat",
+            "anthropic",
+            "gemini",
+            "google_translate",
+            "custom_http",
+            "deepl",
+            "microsoft",
+            "baidu",
+            "youdao",
+            "tencent",
+        ]
+        .iter()
+        .enumerate()
+        {
+            conn.execute(
+                "INSERT INTO providers (uuid, template_id, name, protocol, endpoint, needs_key, secret_ref) VALUES (?1, 't', 'N', ?2, 'https://a.com', 1, ?3)",
+                rusqlite::params![format!("ok{i}"), proto, format!("ref{i}")],
+            )
+            .unwrap_or_else(|e| panic!("v3 protocol {proto} must be accepted, got {e}"));
+        }
         Ok(())
     }).unwrap();
 }

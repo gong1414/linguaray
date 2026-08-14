@@ -44,6 +44,11 @@ fn protocol_to_kind_maps_ai_protocols() {
 fn protocol_to_kind_returns_none_for_non_ai() {
     assert_eq!(protocol_to_kind(&Protocol::GoogleTranslate), None);
     assert_eq!(protocol_to_kind(&Protocol::CustomHttp), None);
+    assert_eq!(protocol_to_kind(&Protocol::Deepl), None);
+    assert_eq!(protocol_to_kind(&Protocol::Microsoft), None);
+    assert_eq!(protocol_to_kind(&Protocol::Baidu), None);
+    assert_eq!(protocol_to_kind(&Protocol::Youdao), None);
+    assert_eq!(protocol_to_kind(&Protocol::Tencent), None);
 }
 
 #[test]

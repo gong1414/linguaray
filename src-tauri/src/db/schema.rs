@@ -2,14 +2,25 @@
 //!
 //! All DDL uses `CREATE TABLE IF NOT EXISTS` for idempotency (§8.5 Phase 2).
 
-use rusqlite::{Connection, OptionalExtension};
 use crate::db::DbError;
+use rusqlite::{Connection, OptionalExtension};
 
 /// Current schema version. Bumped only on breaking schema changes.
 ///
 /// v2 (R2-E): added `providers.version INTEGER NOT NULL DEFAULT 1` for
 /// optimistic-lock (CAS) updates. See [`migrate_v1_to_v2`].
-pub const SCHEMA_VERSION: u32 = 2;
+/// v3 (PR-6f-schema): expanded `providers.protocol` CHECK to the traditional
+/// MT set (`deepl`/`microsoft`/`baidu`/`youdao`/`tencent`). SQLite cannot
+/// ALTER a CHECK in place, so v2→v3 rebuilds the table. See [`migrate_v2_to_v3`].
+pub const SCHEMA_VERSION: u32 = 3;
+
+/// Values allowed by `providers.protocol` CHECK. Quoted so the sqlite_master
+/// probe in [`providers_check_is_v3`] can look for `'deepl'` as the v3 marker
+/// without colliding with row data (CREATE SQL lives in sqlite_master, not
+/// the table body).
+pub const PROVIDERS_PROTOCOL_CHECK: &str = "(\
+'openai_chat','anthropic','gemini','google_translate','custom_http',\
+'deepl','microsoft','baidu','youdao','tencent')";
 
 /// Migration state for the preflight read-only check.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -28,6 +39,46 @@ pub enum MigrationState {
     Incompatible,
 }
 
+/// `CREATE TABLE [IF NOT EXISTS] {table}` for the providers row shape.
+/// Shared by [`create_all_tables`] and [`migrate_v2_to_v3`] so the CHECK
+/// list cannot drift between a fresh DB and a rebuilt v2 table.
+fn providers_table_ddl(table: &str, if_not_exists: bool) -> String {
+    let if_ne = if if_not_exists { "IF NOT EXISTS " } else { "" };
+    format!(
+        "CREATE TABLE {if_ne}{table} (
+            uuid TEXT PRIMARY KEY,
+            template_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            protocol TEXT NOT NULL CHECK (protocol IN {PROVIDERS_PROTOCOL_CHECK}),
+            endpoint TEXT NOT NULL,
+            model TEXT,
+            enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0,1)),
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            is_local INTEGER NOT NULL DEFAULT 0 CHECK (is_local IN (0,1)),
+            needs_key INTEGER NOT NULL CHECK (needs_key IN (0,1)),
+            secret_ref TEXT NOT NULL UNIQUE,
+            capabilities TEXT NOT NULL DEFAULT '{{}}',
+            status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','deleting','deleted')),
+            version INTEGER NOT NULL DEFAULT 1
+        )"
+    )
+}
+
+/// Does `sqlite_master` already describe a providers CHECK that includes
+/// `'deepl'`? Used as the v3 idempotency probe: SQLite stores the CREATE
+/// statement, so a rebuilt (or fresh-v3) table matches; a v2 CHECK does not.
+/// Row data never appears in `sqlite_master.sql`.
+pub fn providers_check_is_v3(conn: &Connection) -> Result<bool, DbError> {
+    let sql: Option<String> = conn
+        .query_row(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='providers'",
+            [],
+            |r| r.get(0),
+        )
+        .optional()?;
+    Ok(sql.as_deref().is_some_and(|s| s.contains("'deepl'")))
+}
+
 /// Create all 8 tables + seed singletons. Must be called inside a transaction.
 /// Idempotent: safe to call multiple times (CREATE TABLE IF NOT EXISTS).
 pub fn create_all_tables(conn: &Connection) -> Result<(), DbError> {
@@ -39,7 +90,7 @@ pub fn create_all_tables(conn: &Connection) -> Result<(), DbError> {
             migration_complete INTEGER NOT NULL DEFAULT 0 CHECK (migration_complete IN (0,1)),
             migration_checkpoint TEXT,
             migrated_at INTEGER
-        );"
+        );",
     )?;
 
     // ── preferences: singleton active selection + settings ──
@@ -54,36 +105,22 @@ pub fn create_all_tables(conn: &Connection) -> Result<(), DbError> {
             parallel_consent_scope TEXT,
             history_enabled INTEGER NOT NULL DEFAULT 0 CHECK (history_enabled IN (0,1)),
             history_retention_days INTEGER NOT NULL DEFAULT 30
-        );"
+        );",
     )?;
 
     // ── providers: ProviderProfile rows ──
-    conn.execute_batch(
-        "CREATE TABLE IF NOT EXISTS providers (
-            uuid TEXT PRIMARY KEY,
-            template_id TEXT NOT NULL,
-            name TEXT NOT NULL,
-            protocol TEXT NOT NULL CHECK (protocol IN ('openai_chat','anthropic','gemini','google_translate','custom_http')),
-            endpoint TEXT NOT NULL,
-            model TEXT,
-            enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0,1)),
-            sort_order INTEGER NOT NULL DEFAULT 0,
-            is_local INTEGER NOT NULL DEFAULT 0 CHECK (is_local IN (0,1)),
-            needs_key INTEGER NOT NULL CHECK (needs_key IN (0,1)),
-            secret_ref TEXT NOT NULL UNIQUE,
-            capabilities TEXT NOT NULL DEFAULT '{}',
-            status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','deleting','deleted')),
-            version INTEGER NOT NULL DEFAULT 1
-        );
-        CREATE INDEX IF NOT EXISTS idx_providers_status ON providers(status);"
-    )?;
+    conn.execute_batch(&format!(
+        "{};
+        CREATE INDEX IF NOT EXISTS idx_providers_status ON providers(status);",
+        providers_table_ddl("providers", true)
+    ))?;
 
     // ── shortcuts ──
     conn.execute_batch(
         "CREATE TABLE IF NOT EXISTS shortcuts (
             action TEXT PRIMARY KEY,
             keys TEXT NOT NULL
-        );"
+        );",
     )?;
 
     // ── history_sessions ──
@@ -99,7 +136,7 @@ pub fn create_all_tables(conn: &Connection) -> Result<(), DbError> {
             source_text_nonce BLOB NOT NULL,
             crypto_version INTEGER NOT NULL
         );
-        CREATE INDEX IF NOT EXISTS idx_history_sessions_ts ON history_sessions(timestamp DESC);"
+        CREATE INDEX IF NOT EXISTS idx_history_sessions_ts ON history_sessions(timestamp DESC);",
     )?;
 
     // ── history_results ──
@@ -133,7 +170,7 @@ pub fn create_all_tables(conn: &Connection) -> Result<(), DbError> {
                  AND (error_message_encrypted IS NULL AND error_message_nonce IS NULL
                       OR error_message_encrypted IS NOT NULL AND error_message_nonce IS NOT NULL))
             )
-        );"
+        );",
     )?;
 
     // ── vocabulary ──
@@ -148,7 +185,7 @@ pub fn create_all_tables(conn: &Connection) -> Result<(), DbError> {
             definition_encrypted BLOB NOT NULL,
             definition_nonce BLOB NOT NULL,
             crypto_version INTEGER NOT NULL
-        );"
+        );",
     )?;
 
     // ── dict_packages ──
@@ -158,7 +195,7 @@ pub fn create_all_tables(conn: &Connection) -> Result<(), DbError> {
             name TEXT NOT NULL,
             version TEXT NOT NULL,
             installed_at INTEGER NOT NULL
-        );"
+        );",
     )?;
 
     Ok(())
@@ -284,7 +321,10 @@ fn table_columns(conn: &Connection, table: &str) -> Result<Vec<ColumnInfo>, DbEr
     let rows = stmt.query_map([], |r| {
         Ok(ColumnInfo {
             name: r.get::<_, String>(1)?,
-            col_type: r.get::<_, String>(2).unwrap_or_default().to_ascii_uppercase(),
+            col_type: r
+                .get::<_, String>(2)
+                .unwrap_or_default()
+                .to_ascii_uppercase(),
             notnull: r.get::<_, i64>(3)? != 0,
             dflt: r.get::<_, Option<String>>(4)?,
         })
@@ -352,10 +392,12 @@ pub fn migrate_v1_to_v2(conn: &Connection) -> Result<(), DbError> {
             let landed = after.iter().find(|c| c.name == "version");
             match landed {
                 Some(col) if version_column_is_correct(col) => { /* ok */ }
-                other => return Err(DbError::Integrity(format!(
-                    "ALTER TABLE providers ADD COLUMN version did not produce the \
+                other => {
+                    return Err(DbError::Integrity(format!(
+                        "ALTER TABLE providers ADD COLUMN version did not produce the \
                      expected INTEGER NOT NULL DEFAULT 1 column; got: {other:?}"
-                ))),
+                    )))
+                }
             }
         }
     }
@@ -365,6 +407,54 @@ pub fn migrate_v1_to_v2(conn: &Connection) -> Result<(), DbError> {
     conn.execute(
         "UPDATE _schema_migrations SET schema_version=?1 WHERE id=1",
         rusqlite::params![2i64],
+    )?;
+    Ok(())
+}
+
+/// v2 → v3 migration (PR-6f-schema): expand `providers.protocol` CHECK to
+/// include traditional MT values (`deepl`/`microsoft`/`baidu`/`youdao`/`tencent`).
+///
+/// SQLite cannot `ALTER` a CHECK constraint in place, so this rebuilds the
+/// table: `CREATE providers_new` (v3 CHECK) → `INSERT SELECT` → `DROP` →
+/// `RENAME` → recreate `idx_providers_status`. Existing rows are copied
+/// verbatim; v2 values remain valid under the wider CHECK.
+///
+/// Idempotent: probes `sqlite_master` for `'deepl'` in the providers CREATE
+/// SQL (see [`providers_check_is_v3`]). A fresh DB already created by
+/// [`create_all_tables`] with the v3 CHECK is a no-op rebuild; we only bump
+/// `_schema_migrations.schema_version` to the literal `3`.
+///
+/// Caller MUST be inside a transaction.
+pub fn migrate_v2_to_v3(conn: &Connection) -> Result<(), DbError> {
+    if !providers_check_is_v3(conn)? {
+        let ddl = providers_table_ddl("providers_new", false);
+        conn.execute_batch(&format!(
+            "{ddl};
+             INSERT INTO providers_new
+                 (uuid, template_id, name, protocol, endpoint, model, enabled,
+                  sort_order, is_local, needs_key, secret_ref, capabilities,
+                  status, version)
+             SELECT uuid, template_id, name, protocol, endpoint, model, enabled,
+                    sort_order, is_local, needs_key, secret_ref, capabilities,
+                    status, version
+             FROM providers;
+             DROP TABLE providers;
+             ALTER TABLE providers_new RENAME TO providers;
+             CREATE INDEX IF NOT EXISTS idx_providers_status ON providers(status);"
+        ))?;
+        if !providers_check_is_v3(conn)? {
+            return Err(DbError::Integrity(
+                "migrate_v2_to_v3 rebuilt providers but sqlite_master CHECK \
+                 still lacks 'deepl'"
+                    .into(),
+            ));
+        }
+    }
+    // Literal 3 — not SCHEMA_VERSION — so a future v4 bump doesn't skip the
+    // v3→v4 migration by writing 4 here before that migration runs.
+    conn.execute(
+        "UPDATE _schema_migrations SET schema_version=?1 WHERE id=1",
+        rusqlite::params![3i64],
     )?;
     Ok(())
 }
@@ -393,7 +483,13 @@ pub fn validate_v2_schema(conn: &Connection) -> Result<(), DbError> {
     validate_table_columns(
         conn,
         "_schema_migrations",
-        &["id", "schema_version", "migration_complete", "migration_checkpoint", "migrated_at"],
+        &[
+            "id",
+            "schema_version",
+            "migration_complete",
+            "migration_checkpoint",
+            "migrated_at",
+        ],
     )?;
 
     // 2. preferences: the active-selection singleton + settings.
@@ -461,6 +557,13 @@ pub fn validate_v2_schema(conn: &Connection) -> Result<(), DbError> {
                 "validate_v2_schema: table 'providers' missing required column 'version'".into(),
             ))
         }
+    }
+    if !providers_check_is_v3(conn)? {
+        return Err(DbError::Integrity(
+            "validate_v2_schema: providers.protocol CHECK is missing v3 \
+             traditional values (deepl/microsoft/baidu/youdao/tencent)"
+                .into(),
+        ));
     }
 
     // 4. shortcuts

@@ -733,6 +733,38 @@ fn build_profile_traditional_catalog_lookup() {
 }
 
 #[test]
+fn traditional_catalog_stays_google_only_until_pr6f_drivers() {
+    // PR-6f-schema opens the CHECK; it must not seed DeepL/etc rows or the
+    // fallback picker would list engines that cannot run.
+    let cat = providers::traditional_catalog();
+    assert_eq!(cat.len(), 1, "traditional_catalog must stay google-only");
+    assert_eq!(cat[0].template_id, "google");
+    for id in ["deepl", "microsoft", "baidu", "youdao", "tencent"] {
+        assert!(
+            providers::build_profile(&CandidateSource::LegacyId(id.into()))
+                .unwrap()
+                .protocol
+                == Protocol::CustomHttp,
+            "{id} must still be a repair shell, not a catalog row"
+        );
+    }
+}
+
+#[test]
+fn engines_registry_does_not_expose_non_google_fallback() {
+    assert!(
+        linguaray_lib::engines::find("google").is_some(),
+        "google remains the only fallback picker entry"
+    );
+    for id in ["deepl", "microsoft", "baidu", "youdao", "tencent"] {
+        assert!(
+            linguaray_lib::engines::find(id).is_none(),
+            "{id} must not appear in the fallback picker until PR-6f Drivers"
+        );
+    }
+}
+
+#[test]
 fn build_profile_unknown_legacy_id_is_repair_profile() {
     let cs = CandidateSource::LegacyId("no-such-engine".into());
     let p = providers::build_profile(&cs).unwrap();
@@ -989,8 +1021,8 @@ fn create_preset_local_http_override_accepted() {
 // template_id alone is not proof: a "deepl" template_id row built as a
 // CustomHttp repair shell (e.g. via build_profile's repair arm, or a
 // hand-crafted row) would pass the template_id check but isn't an implemented
-// traditional protocol. validate_active_selection must also require
-// Protocol::GoogleTranslate (the only currently-implemented traditional protocol).
+// traditional protocol. validate_active_selection requires both
+// TRADITIONAL_TEMPLATES and TRADITIONAL_PROTOCOLS.
 
 #[test]
 fn vas_fallback_custom_http_protocol_rejected_even_with_traditional_template() {
@@ -1015,6 +1047,19 @@ fn vas_fallback_google_translate_protocol_with_traditional_template_accepted() {
     let provs = vec![p];
     providers::validate_active_selection("", &[], Some("u1"), &provs)
         .expect("google template + GoogleTranslate protocol is a valid fallback");
+}
+
+#[test]
+fn vas_fallback_deepl_protocol_with_traditional_template_accepted() {
+    // PR-6f-schema: DeepL (and the other traditional protocols) are valid
+    // selection-slot protocols. They are still NOT callable and still NOT in
+    // the fallback picker (traditional_catalog / engines::registry stay
+    // google-only until PR-6f Drivers).
+    let mut p = active_profile("u1", "deepl", true);
+    p.protocol = Protocol::Deepl;
+    let provs = vec![p];
+    providers::validate_active_selection("", &[], Some("u1"), &provs)
+        .expect("deepl template + Deepl protocol is a valid fallback");
 }
 
 // ─── Task 5c: parallel_uuids corruption must error, not silently empty ──────
