@@ -170,10 +170,7 @@ pub(super) enum RestoreError {
         "clipboard set failed: {cause}; cleanup also failed: {cleanup_err}; \
          clipboard may contain partial data"
     )]
-    SetPartial {
-        cause: String,
-        cleanup_err: String,
-    },
+    SetPartial { cause: String, cleanup_err: String },
 }
 
 #[cfg(test)]
@@ -398,7 +395,11 @@ mod tests {
         assert!(matches!(r, Err(RestoreError::Set(_))), "got {r:?}");
         assert_eq!(f.count("free"), 2, "both unsubmitted handles freed");
         assert_eq!(f.count("close"), 1);
-        assert_eq!(f.count("empty"), 1, "initial clear only — NO remedial empty");
+        assert_eq!(
+            f.count("empty"),
+            1,
+            "initial clear only — NO remedial empty"
+        );
     }
 
     #[test]
@@ -422,7 +423,11 @@ mod tests {
         });
         let r = restore_with(&mut f, &[fmt(1, b"a"), fmt(2, b"b")]);
         assert!(matches!(r, Err(RestoreError::Alloc(_))), "got {r:?}");
-        assert_eq!(f.count("free"), 0, "nothing held when the first alloc fails");
+        assert_eq!(
+            f.count("free"),
+            0,
+            "nothing held when the first alloc fails"
+        );
         assert_eq!(f.count("open"), 0);
         assert_eq!(f.count("close"), 0);
     }
@@ -458,16 +463,20 @@ mod tests {
         assert!(s.contains("partial data"), "msg: {s}");
         // And the concrete fields (by value now that we've taken to_string):
         match err {
-            RestoreError::SetPartial {
-                cause,
-                cleanup_err,
-            } => {
+            RestoreError::SetPartial { cause, cleanup_err } => {
                 assert!(cause.contains("set failed"), "cause: {cause}");
-                assert!(cleanup_err.contains("remedial boom"), "cleanup_err: {cleanup_err}");
+                assert!(
+                    cleanup_err.contains("remedial boom"),
+                    "cleanup_err: {cleanup_err}"
+                );
             }
             other => panic!("expected SetPartial, got {other:?}"),
         }
-        assert_eq!(f.count("free"), 1, "h_dib freed; h_text system-owned (may persist)");
+        assert_eq!(
+            f.count("free"),
+            1,
+            "h_dib freed; h_text system-owned (may persist)"
+        );
         // NOTE: we do NOT assert all handles cleared — h_text (system-owned) may legitimately
         // remain on the clipboard after a failed remedial empty. The Drop leak-check only
         // flags app-owned ("ours") handles, which are all gone here.

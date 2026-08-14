@@ -4,12 +4,14 @@ pub mod clipboard;
 pub mod database;
 pub mod drivers;
 pub mod http;
+pub mod popup;
 pub mod providers;
 pub mod secrets;
 pub mod selection;
 pub mod selection_engine;
 pub mod shortcuts;
 pub mod translation;
+pub mod tray_state;
 
 use linguaray_kernel::CapabilityPlugin;
 use std::sync::Arc;
@@ -20,6 +22,8 @@ pub fn builtin_plugins(
     secrets: Arc<secrets::SecretsPlugin>,
     http: Arc<http::HttpPlugin>,
     shortcuts: Option<Arc<shortcuts::ShortcutsPlugin>>,
+    popup: Option<Arc<popup::PopupPlugin>>,
+    tray: Option<Arc<tray_state::TrayPlugin>>,
 ) -> Vec<Arc<dyn CapabilityPlugin>> {
     let mut out: Vec<Arc<dyn CapabilityPlugin>> = vec![
         database,
@@ -34,6 +38,12 @@ pub fn builtin_plugins(
     if let Some(shortcuts) = shortcuts {
         out.push(shortcuts);
     }
+    if let Some(popup) = popup {
+        out.push(popup);
+    }
+    if let Some(tray) = tray {
+        out.push(tray);
+    }
     out
 }
 
@@ -47,6 +57,8 @@ mod tests {
             Arc::new(database::DatabasePlugin::new(None)),
             Arc::new(secrets::SecretsPlugin::new(None)),
             Arc::new(http::HttpPlugin::new(None)),
+            None,
+            None,
             None,
         );
         let ids: Vec<_> = plugins.iter().map(|p| p.descriptor().id.0).collect();

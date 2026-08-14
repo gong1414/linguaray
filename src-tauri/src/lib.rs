@@ -20,14 +20,14 @@ pub mod fs_acl;
 pub mod history;
 pub mod keystore;
 pub mod plugins;
-pub mod popup;
+pub use crate::plugins::popup;
 pub mod providers;
 pub use crate::plugins::selection;
 pub use crate::plugins::selection_engine;
 pub mod service;
 pub mod settings;
 pub mod shortcuts;
-pub mod tray_state;
+pub use crate::plugins::tray_state;
 pub mod uuid_util;
 pub mod wire;
 
@@ -116,9 +116,8 @@ pub struct AppState {
     pub db_path: PathBuf,
     pub keystore_dir: PathBuf,
     pub settings_path: Option<PathBuf>,
-    /// rev-13/rev-14 (Task A5): the tray visual-state controller. SYNC
-    /// `parking_lot::Mutex` (NOT `tokio::sync::Mutex`) so `TranslationGuard::drop`
-    /// runs `finish_translation` synchronously on the calling thread.
+    /// Tray plugin owns the controller; this is the sync façade so
+    /// `TranslationGuard::drop` can `finish_translation` on the calling thread.
     pub tray: Arc<parking_lot::Mutex<tray_state::TrayStateController>>,
 }
 
@@ -1297,11 +1296,19 @@ pub fn run() {
             let secrets_plugin =
                 Arc::new(crate::plugins::secrets::SecretsPlugin::new(keystore.clone()));
             let http_plugin = Arc::new(crate::plugins::http::HttpPlugin::new(client));
+            let popup_plugin = Some(Arc::new(crate::plugins::popup::PopupPlugin::new(
+                app.handle().clone(),
+            )));
+            let tray_plugin = Some(Arc::new(crate::plugins::tray_state::TrayPlugin::new(
+                app.state::<Arc<AppState>>().tray.clone(),
+            )));
             match linguaray_kernel::Supervisor::compose(crate::plugins::builtin_plugins(
                 database_plugin,
                 secrets_plugin,
                 http_plugin,
                 shortcuts_plugin,
+                popup_plugin,
+                tray_plugin,
             )) {
                 Ok(supervisor) => {
                     tauri::async_runtime::block_on(supervisor.enable_all());

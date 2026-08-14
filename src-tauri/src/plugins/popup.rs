@@ -1,18 +1,30 @@
 //! Show/move/hide the frameless popup window; push a payload (loading / result).
+use std::sync::Arc;
 use tauri::{Emitter, Manager, WebviewWindow};
 
-const POPUP: &str = "popup";
+const POPUP_WINDOW: &str = "popup";
 /// R2a: 多结果事件名（独立于 popup-state，向后兼容老前端）。
 const POPUP_MULTI_EVENT: &str = "popup-multi-result";
 
 fn window(app: &tauri::AppHandle) -> Result<WebviewWindow, String> {
-    app.get_webview_window(POPUP).ok_or_else(|| "no popup window".to_string())
+    app.get_webview_window(POPUP_WINDOW)
+        .ok_or_else(|| "no popup window".to_string())
 }
 
 pub fn show_at(app: &tauri::AppHandle, x: i32, y: i32) -> Result<(), String> {
     let win = window(app)?;
-    win.set_position(tauri::PhysicalPosition { x, y }).map_err(|e| e.to_string())?;
-    win.emit("popup-state", Payload { status: "loading", text: "", engine: "", source_text: None }).map_err(|e| e.to_string())?;
+    win.set_position(tauri::PhysicalPosition { x, y })
+        .map_err(|e| e.to_string())?;
+    win.emit(
+        "popup-state",
+        Payload {
+            status: "loading",
+            text: "",
+            engine: "",
+            source_text: None,
+        },
+    )
+    .map_err(|e| e.to_string())?;
     win.show().map_err(|e| e.to_string())?;
     win.set_focus().map_err(|e| e.to_string())?;
     Ok(())
@@ -20,13 +32,31 @@ pub fn show_at(app: &tauri::AppHandle, x: i32, y: i32) -> Result<(), String> {
 
 pub fn result(app: &tauri::AppHandle, text: &str, engine: &str) -> Result<(), String> {
     let win = window(app)?;
-    win.emit("popup-state", Payload { status: "result", text, engine, source_text: None }).map_err(|e| e.to_string())?;
+    win.emit(
+        "popup-state",
+        Payload {
+            status: "result",
+            text,
+            engine,
+            source_text: None,
+        },
+    )
+    .map_err(|e| e.to_string())?;
     Ok(())
 }
 
 pub fn error(app: &tauri::AppHandle, msg: &str) -> Result<(), String> {
     let win = window(app)?;
-    win.emit("popup-state", Payload { status: "error", text: msg, engine: "", source_text: None }).map_err(|e| e.to_string())?;
+    win.emit(
+        "popup-state",
+        Payload {
+            status: "error",
+            text: msg,
+            engine: "",
+            source_text: None,
+        },
+    )
+    .map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -97,10 +127,14 @@ pub fn multi_result(
 ) -> Result<(), String> {
     let win = window(app)?;
     let payload = PopupMultiPayload {
-        outcomes: outcomes.iter().map(TranslationOutcomeSerialized::from).collect(),
+        outcomes: outcomes
+            .iter()
+            .map(TranslationOutcomeSerialized::from)
+            .collect(),
         source_text: None,
     };
-    win.emit(POPUP_MULTI_EVENT, payload).map_err(|e| e.to_string())?;
+    win.emit(POPUP_MULTI_EVENT, payload)
+        .map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -115,7 +149,12 @@ pub fn result_with_source(
     let win = window(app)?;
     win.emit(
         "popup-state",
-        Payload { status: "result", text, engine, source_text: Some(source_text) },
+        Payload {
+            status: "result",
+            text,
+            engine,
+            source_text: Some(source_text),
+        },
     )
     .map_err(|e| e.to_string())
 }
@@ -128,10 +167,14 @@ pub fn multi_result_with_source(
 ) -> Result<(), String> {
     let win = window(app)?;
     let payload = PopupMultiPayload {
-        outcomes: outcomes.iter().map(TranslationOutcomeSerialized::from).collect(),
+        outcomes: outcomes
+            .iter()
+            .map(TranslationOutcomeSerialized::from)
+            .collect(),
         source_text: Some(source_text.to_owned()),
     };
-    win.emit(POPUP_MULTI_EVENT, payload).map_err(|e| e.to_string())
+    win.emit(POPUP_MULTI_EVENT, payload)
+        .map_err(|e| e.to_string())
 }
 
 /// A2: emit error WITH source so the popup can still offer Retry (P1-3).
@@ -143,7 +186,12 @@ pub fn error_with_source(
     let win = window(app)?;
     win.emit(
         "popup-state",
-        Payload { status: "error", text: msg, engine: "", source_text: Some(source_text) },
+        Payload {
+            status: "error",
+            text: msg,
+            engine: "",
+            source_text: Some(source_text),
+        },
     )
     .map_err(|e| e.to_string())
 }
@@ -233,7 +281,11 @@ pub fn compute_popup_geometry_logical(
     let phys = |v: f64| -> i32 { (v * sf).round() as i32 };
     let phys_u = |v: f64| -> u32 {
         let p = phys(v);
-        if p < 0 { 0 } else { p as u32 }
+        if p < 0 {
+            0
+        } else {
+            p as u32
+        }
     };
     (phys(x_logical), phys(y_logical), phys_u(lwf), phys_u(lhf))
 }
@@ -255,7 +307,12 @@ pub fn show_at_sized(
         .map_err(|e| e.to_string())?;
     win.emit(
         "popup-state",
-        Payload { status: "loading", text: "", engine: "", source_text: None },
+        Payload {
+            status: "loading",
+            text: "",
+            engine: "",
+            source_text: None,
+        },
     )
     .map_err(|e| e.to_string())?;
     win.show().map_err(|e| e.to_string())?;
@@ -273,14 +330,22 @@ pub fn loading_with_source(
 ) -> Result<(), String> {
     let (x, y, w, h) = compute_popup_geometry_logical(PopupMode::Loading, anchor);
     let win = window(app)?;
-    let size = tauri::PhysicalSize { width: w, height: h };
+    let size = tauri::PhysicalSize {
+        width: w,
+        height: h,
+    };
     win.set_max_size(Some(size)).map_err(|e| e.to_string())?;
     win.set_size(size).map_err(|e| e.to_string())?;
     win.set_position(tauri::PhysicalPosition { x, y })
         .map_err(|e| e.to_string())?;
     win.emit(
         "popup-state",
-        Payload { status: "loading", text: "", engine: "", source_text },
+        Payload {
+            status: "loading",
+            text: "",
+            engine: "",
+            source_text,
+        },
     )
     .map_err(|e| e.to_string())?;
     win.show().map_err(|e| e.to_string())?;
@@ -297,7 +362,10 @@ pub fn set_popup_mode(
 ) -> Result<(), String> {
     let (x, y, w, h) = compute_popup_geometry_logical(mode, anchor);
     let win = window(app)?;
-    let size = tauri::PhysicalSize { width: w, height: h };
+    let size = tauri::PhysicalSize {
+        width: w,
+        height: h,
+    };
     win.set_max_size(Some(size)).map_err(|e| e.to_string())?;
     win.set_size(size).map_err(|e| e.to_string())?;
     win.set_position(tauri::PhysicalPosition { x, y })
@@ -314,12 +382,18 @@ mod tests {
     fn ok_outcome(uuid: &str, text: &str, engine: &str) -> TranslationOutcome {
         TranslationOutcome {
             uuid: uuid.into(),
-            result: Ok(Translation { text: text.into(), engine: engine.into() }),
+            result: Ok(Translation {
+                text: text.into(),
+                engine: engine.into(),
+            }),
         }
     }
 
     fn err_outcome(uuid: &str, err: Error) -> TranslationOutcome {
-        TranslationOutcome { uuid: uuid.into(), result: Err(err) }
+        TranslationOutcome {
+            uuid: uuid.into(),
+            result: Err(err),
+        }
     }
 
     #[test]
@@ -349,7 +423,10 @@ mod tests {
     fn serialize_config_error_outcome() {
         let o = err_outcome(
             "u3",
-            Error::Config(ConfigKind::AuthFailed { provider: "p".into(), status: 401 }),
+            Error::Config(ConfigKind::AuthFailed {
+                provider: "p".into(),
+                status: 401,
+            }),
         );
         let s = TranslationOutcomeSerialized::from(&o);
         assert!(!s.ok);
@@ -375,7 +452,10 @@ mod tests {
             err_outcome("u2", Error::LocalNoFallback),
         ];
         let payload = PopupMultiPayload {
-            outcomes: outcomes.iter().map(TranslationOutcomeSerialized::from).collect(),
+            outcomes: outcomes
+                .iter()
+                .map(TranslationOutcomeSerialized::from)
+                .collect(),
             source_text: None,
         };
         let json = serde_json::to_string(&payload).unwrap();
@@ -391,5 +471,67 @@ mod tests {
     fn multi_result_emits_named_event() {
         // 直接验证事件名常量，避免依赖 Tauri runtime。
         assert_eq!(POPUP_MULTI_EVENT, "popup-multi-result");
+    }
+}
+
+use futures::future::BoxFuture;
+use linguaray_kernel::{
+    ActivationContext, CapabilityPlugin, EffectDisposer, PluginDescriptor, PluginError, PluginId,
+    ServiceId, ServiceKey,
+};
+
+pub static POPUP: ServiceKey<PopupHub> = ServiceKey::new("linguaray.popup");
+static PROVIDES: &[ServiceId] = &[ServiceId("linguaray.popup")];
+
+pub struct PopupHub {
+    app: tauri::AppHandle,
+}
+
+impl PopupHub {
+    pub fn hide(&self) -> Result<(), String> {
+        hide(&self.app)
+    }
+}
+
+pub struct PopupPlugin {
+    app: tauri::AppHandle,
+}
+
+impl PopupPlugin {
+    pub fn new(app: tauri::AppHandle) -> Self {
+        Self { app }
+    }
+}
+
+impl CapabilityPlugin for PopupPlugin {
+    fn descriptor(&self) -> PluginDescriptor {
+        PluginDescriptor {
+            id: PluginId("popup"),
+            required: &[],
+            optional: &[],
+            provides: PROVIDES,
+            manifest: None,
+            restart_on_optional_change: false,
+        }
+    }
+
+    fn config_fingerprint(&self) -> u64 {
+        1
+    }
+
+    fn activate(&self, ctx: ActivationContext) -> BoxFuture<'_, Result<(), PluginError>> {
+        let app = self.app.clone();
+        Box::pin(async move {
+            ctx.stage_provide(POPUP, Arc::new(PopupHub { app: app.clone() }))?;
+            ctx.install_effect("popup.hide", move || {
+                let app = app.clone();
+                async move {
+                    Ok(EffectDisposer::from_fn(move || {
+                        let _ = hide(&app);
+                    }))
+                }
+            })
+            .await
+        })
     }
 }

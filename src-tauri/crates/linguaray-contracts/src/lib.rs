@@ -11,6 +11,8 @@ pub trait HttpTransport: Send + Sync {}
 pub trait ProviderService: Send + Sync {}
 pub trait SelectionService: Send + Sync {}
 pub trait ClipboardService: Send + Sync {}
+pub trait PopupService: Send + Sync {}
+pub trait TrayService: Send + Sync {}
 
 /// One HTTP dialect. Implementations live in the host; this crate stays
 /// reqwest-free (`HttpRequestPlan` is headers + JSON).
@@ -34,6 +36,8 @@ pub static DRIVERS: ServiceKey<dyn EngineDriverRegistry> = ServiceKey::new("ling
 pub static PROVIDERS: ServiceKey<dyn ProviderService> = ServiceKey::new("linguaray.providers");
 pub static SELECTION: ServiceKey<dyn SelectionService> = ServiceKey::new("linguaray.selection");
 pub static CLIPBOARD: ServiceKey<dyn ClipboardService> = ServiceKey::new("linguaray.clipboard");
+pub static POPUP: ServiceKey<dyn PopupService> = ServiceKey::new("linguaray.popup");
+pub static TRAY: ServiceKey<dyn TrayService> = ServiceKey::new("linguaray.tray");
 
 /// Snapshot the openai-chat / anthropic Driver reads. `key` is borrowed for
 /// the shortest window; the Driver must not store it.
@@ -170,6 +174,8 @@ mod tests {
         assert_eq!(PROVIDERS.id.0, "linguaray.providers");
         assert_eq!(SELECTION.id.0, "linguaray.selection");
         assert_eq!(CLIPBOARD.id.0, "linguaray.clipboard");
+        assert_eq!(POPUP.id.0, "linguaray.popup");
+        assert_eq!(TRAY.id.0, "linguaray.tray");
     }
 
     #[test]

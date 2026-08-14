@@ -319,7 +319,10 @@ pub struct RecordingRenderer {
 impl RecordingRenderer {
     /// Snapshot of the recorded (icon, tooltip) pairs, in call order.
     pub fn calls(&self) -> Vec<(RenderedIcon, Option<String>)> {
-        self.calls.lock().expect("RecordingRenderer poisoned").clone()
+        self.calls
+            .lock()
+            .expect("RecordingRenderer poisoned")
+            .clone()
     }
 }
 
@@ -397,7 +400,10 @@ impl TrayStateController {
     /// rev-13 (P1-5): constructor with an injected renderer (test entry point).
     pub fn with_renderer(renderer: Arc<dyn TrayRenderer>, locale: Locale) -> Self {
         Self::with_renderer_interval_and_notify(
-            renderer, locale, std::time::Duration::from_millis(800), None,
+            renderer,
+            locale,
+            std::time::Duration::from_millis(800),
+            None,
         )
     }
 
@@ -529,6 +535,11 @@ impl TrayStateController {
     /// rev-16-3: finish a switch revision. If `rev != self.switch_revision`, this
     /// is a STALE/late switch result — IGNORE it. Otherwise set `switch_error_rev`
     /// based on `success`. Recomputes. SYNC.
+    /// Fiber disposer: stop any running pulse without changing visual state.
+    pub fn stop_pulse(&mut self) {
+        self.pulse_worker.take();
+    }
+
     pub fn finish_switch(&mut self, rev: u64, success: bool) {
         if rev != self.switch_revision {
             return; // stale switch result — ignore
@@ -582,18 +593,21 @@ impl TrayStateController {
         match self.current_state {
             TrayVisualState::Normal => {
                 self.renderer.set_icon_normal();
-                self.renderer.set_tooltip(tray_tooltip_text(self.current_state, self.locale));
+                self.renderer
+                    .set_tooltip(tray_tooltip_text(self.current_state, self.locale));
             }
             TrayVisualState::ActiveTranslation => {
                 // The PulseWorker drives the visible icon swaps on each tick; this
                 // initial render sets the first dimmed frame + tooltip for instant
                 // feedback.
                 self.renderer.set_icon_dimmed();
-                self.renderer.set_tooltip(tray_tooltip_text(self.current_state, self.locale));
+                self.renderer
+                    .set_tooltip(tray_tooltip_text(self.current_state, self.locale));
             }
             TrayVisualState::Error => {
                 self.renderer.set_icon_error_dot();
-                self.renderer.set_tooltip(tray_tooltip_text(self.current_state, self.locale));
+                self.renderer
+                    .set_tooltip(tray_tooltip_text(self.current_state, self.locale));
             }
             TrayVisualState::UpdateAvailable => {
                 log::warn!(
@@ -668,7 +682,10 @@ impl PulseWorker {
                 }
             }
         });
-        Self { stop_tx, handle: Some(handle) }
+        Self {
+            stop_tx,
+            handle: Some(handle),
+        }
     }
 
     /// Stop the worker: send the quit signal, then join the handle. The worker
@@ -748,5 +765,58 @@ impl Drop for TranslationGuard<'_> {
         // succeeded) clear error_gen + recompute. No spawn, no detached future.
         let mut c = self.controller.lock();
         c.finish_translation(self.gen, self.succeeded);
+    }
+}
+
+use futures::future::BoxFuture;
+use linguaray_kernel::{
+    ActivationContext, CapabilityPlugin, EffectDisposer, PluginDescriptor, PluginError, PluginId,
+    ServiceId, ServiceKey,
+};
+
+pub static TRAY: ServiceKey<parking_lot::Mutex<TrayStateController>> =
+    ServiceKey::new("linguaray.tray");
+static PROVIDES: &[ServiceId] = &[ServiceId("linguaray.tray")];
+
+pub struct TrayPlugin {
+    controller: Arc<parking_lot::Mutex<TrayStateController>>,
+}
+
+impl TrayPlugin {
+    pub fn new(controller: Arc<parking_lot::Mutex<TrayStateController>>) -> Self {
+        Self { controller }
+    }
+}
+
+impl CapabilityPlugin for TrayPlugin {
+    fn descriptor(&self) -> PluginDescriptor {
+        PluginDescriptor {
+            id: PluginId("tray"),
+            required: &[],
+            optional: &[],
+            provides: PROVIDES,
+            manifest: None,
+            restart_on_optional_change: false,
+        }
+    }
+
+    fn config_fingerprint(&self) -> u64 {
+        1
+    }
+
+    fn activate(&self, ctx: ActivationContext) -> BoxFuture<'_, Result<(), PluginError>> {
+        let controller = self.controller.clone();
+        Box::pin(async move {
+            ctx.stage_provide(TRAY, controller.clone())?;
+            ctx.install_effect("tray.pulse", move || {
+                let controller = controller.clone();
+                async move {
+                    Ok(EffectDisposer::from_fn(move || {
+                        controller.lock().stop_pulse();
+                    }))
+                }
+            })
+            .await
+        })
     }
 }

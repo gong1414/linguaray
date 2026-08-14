@@ -143,9 +143,7 @@ impl ClipOps for Win32ClipOps {
     fn open(&mut self) -> Result<(), String> {
         // SAFETY: self.owner is a valid HWND (the Tauri main window's, milestone 3).
         // OpenClipboard returns 0 on failure.
-        let ok = unsafe {
-            windows_sys::Win32::System::DataExchange::OpenClipboard(self.owner)
-        };
+        let ok = unsafe { windows_sys::Win32::System::DataExchange::OpenClipboard(self.owner) };
         if ok == 0 {
             return Err("OpenClipboard failed".into());
         }
@@ -161,9 +159,7 @@ impl ClipOps for Win32ClipOps {
     fn empty(&mut self) -> Result<(), String> {
         // SAFETY: clipboard is open (called via the OpenClip guard). EmptyClipboard
         // assigns ownership to the window that has the clipboard open + frees prior data.
-        let ok = unsafe {
-            windows_sys::Win32::System::DataExchange::EmptyClipboard()
-        };
+        let ok = unsafe { windows_sys::Win32::System::DataExchange::EmptyClipboard() };
         if ok == 0 {
             return Err("EmptyClipboard failed".into());
         }
@@ -175,9 +171,7 @@ impl ClipOps for Win32ClipOps {
         // handle so the caller frees it.
         // SAFETY: h.0 is a valid GMEM_MOVEABLE HGLOBAL (from alloc_global); fmt is a real
         // clipboard format id (CF_UNICODETEXT/CF_DIBV5 from build_blobs).
-        let r = unsafe {
-            windows_sys::Win32::System::DataExchange::SetClipboardData(fmt, h.0)
-        };
+        let r = unsafe { windows_sys::Win32::System::DataExchange::SetClipboardData(fmt, h.0) };
         if r.is_null() {
             return Err((h, "SetClipboardData failed".into()));
         }
@@ -237,7 +231,7 @@ fn build_blobs(
     text: Option<&str>,
     image: Option<&ImageBlob>,
 ) -> Result<Vec<(u32, Vec<u8>)>, String> {
-    use windows_sys::Win32::Graphics::Gdi::{BI_BITFIELDS, BITMAPV5HEADER};
+    use windows_sys::Win32::Graphics::Gdi::{BITMAPV5HEADER, BI_BITFIELDS};
     use windows_sys::Win32::System::Ole::{CF_DIBV5, CF_UNICODETEXT};
     use windows_sys::Win32::UI::ColorSystem::LCS_sRGB;
     // LCS_GM_IMAGES is in Graphics::Gdi (verified); render intent = perceptual/picture.
@@ -278,8 +272,8 @@ fn build_blobs(
             .checked_mul(img.height as u64)
             .and_then(|n| n.checked_mul(4))
             .ok_or_else(|| "image byte count overflows u64".to_string())?;
-        let expected = usize::try_from(total_u64)
-            .map_err(|_| "image byte count exceeds usize".to_string())?;
+        let expected =
+            usize::try_from(total_u64).map_err(|_| "image byte count exceeds usize".to_string())?;
         if img.bytes.len() != expected {
             return Err(format!(
                 "image bytes {} != width*height*4 ({})",
@@ -297,7 +291,7 @@ fn build_blobs(
         hdr.bV5Planes = 1;
         hdr.bV5BitCount = 32;
         hdr.bV5Compression = BI_BITFIELDS; // 3 — required to honor the masks below
-        // bV5SizeImage is u32; total_u64 may exceed it for huge images → checked conversion.
+                                           // bV5SizeImage is u32; total_u64 may exceed it for huge images → checked conversion.
         hdr.bV5SizeImage = u32::try_from(total_u64)
             .map_err(|_| "image byte count exceeds u32 (bV5SizeImage)".to_string())?;
         // BGRA masks (Windows native byte order: B,G,R,A per pixel).
@@ -365,7 +359,7 @@ mod tests {
         assert!(classify_unlock_result(0, NO_ERROR).is_ok());
         // 0 + nonzero error ⇒ failure.
         assert!(classify_unlock_result(0, 5).is_err()); // ERROR_ACCESS_DENIED (arbitrary nonzero)
-        // nonzero ⇒ still locked ⇒ failure (NOT success).
+                                                        // nonzero ⇒ still locked ⇒ failure (NOT success).
         assert!(
             classify_unlock_result(1, NO_ERROR).is_err(),
             "nonzero return means still-locked — must be Err"
@@ -414,8 +408,13 @@ mod tests {
         let expected = "a\r\nb\r\n\r\nc\r\nd\r\n\0";
         assert_eq!(s, expected, "CRLF normalization: got {s:?}");
         // No lone \n (every \n is preceded by \r) and no lone \r (every \r is followed by \n).
-        assert!(!s.contains('\n') || s.as_bytes().windows(2).all(|w| !(w[0] != b'\r' && w[1] == b'\n')),
-            "no lone LF in result");
+        assert!(
+            !s.contains('\n')
+                || s.as_bytes()
+                    .windows(2)
+                    .all(|w| !(w[0] != b'\r' && w[1] == b'\n')),
+            "no lone LF in result"
+        );
     }
 
     #[test]
@@ -461,7 +460,10 @@ mod tests {
         let out = build_blobs(None, Some(&img)).unwrap();
         let blob = &out[0].1;
         // Header is 124 bytes.
-        assert_eq!(std::mem::size_of::<windows_sys::Win32::Graphics::Gdi::BITMAPV5HEADER>(), 124);
+        assert_eq!(
+            std::mem::size_of::<windows_sys::Win32::Graphics::Gdi::BITMAPV5HEADER>(),
+            124
+        );
         assert!(blob.len() > 124);
         let hdr_size = u32::from_le_bytes([blob[0], blob[1], blob[2], blob[3]]);
         assert_eq!(hdr_size, 124);
@@ -469,7 +471,9 @@ mod tests {
         // (only u8-alignment guaranteed), not the struct's alignment. A direct &-cast would
         // be undefined behavior on platforms where the struct needs stricter alignment.
         let hdr: windows_sys::Win32::Graphics::Gdi::BITMAPV5HEADER = unsafe {
-            std::ptr::read_unaligned(blob.as_ptr() as *const windows_sys::Win32::Graphics::Gdi::BITMAPV5HEADER)
+            std::ptr::read_unaligned(
+                blob.as_ptr() as *const windows_sys::Win32::Graphics::Gdi::BITMAPV5HEADER
+            )
         };
         assert_eq!(hdr.bV5Width, 1);
         assert_eq!(hdr.bV5Height, -1, "negated ⇒ top-down");
@@ -483,8 +487,24 @@ mod tests {
 
     #[test]
     fn build_blobs_rejects_zero_dim_and_bad_len() {
-        assert!(build_blobs(None, Some(&ImageBlob { width: 0, height: 4, bytes: vec![] })).is_err());
-        assert!(build_blobs(None, Some(&ImageBlob { width: 2, height: 2, bytes: vec![0; 4] })).is_err());
+        assert!(build_blobs(
+            None,
+            Some(&ImageBlob {
+                width: 0,
+                height: 4,
+                bytes: vec![]
+            })
+        )
+        .is_err());
+        assert!(build_blobs(
+            None,
+            Some(&ImageBlob {
+                width: 2,
+                height: 2,
+                bytes: vec![0; 4]
+            })
+        )
+        .is_err());
     }
 
     // === The REAL alloc_global leak/unlock tests (round-13 + round-14 review P1) ===
@@ -549,7 +569,10 @@ mod tests {
             log.contains(&"free"),
             "free MUST be called on lock fail (the leak this test guards): {log:?}"
         );
-        assert!(!log.contains(&"unlock"), "no unlock on the lock-fail path: {log:?}");
+        assert!(
+            !log.contains(&"unlock"),
+            "no unlock on the lock-fail path: {log:?}"
+        );
     }
 
     #[test]
