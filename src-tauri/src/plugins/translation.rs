@@ -176,21 +176,18 @@ impl TranslationHub {
                 .map(|p| (p.secret_ref, p.template_id))
                 .collect::<Vec<_>>();
             for (secret_ref, template_id) in refs {
-                match secrets
+                if let Ok(Ok(Some(key))) = secrets
                     .call(|ks| {
                         let r = ks.get_key(&secret_ref);
                         async move { r }
                     })
                     .await
                 {
-                    Ok(Ok(Some(key))) => {
-                        if crate::db::providers::TRADITIONAL_TEMPLATES.contains(&template_id.as_str())
-                        {
-                            prefetched.insert(template_id, key.clone());
-                        }
-                        prefetched.insert(secret_ref, key);
+                    if crate::db::providers::TRADITIONAL_TEMPLATES.contains(&template_id.as_str())
+                    {
+                        prefetched.insert(template_id, key.clone());
                     }
-                    Ok(Ok(None)) | Ok(Err(_)) | Err(_) => {}
+                    prefetched.insert(secret_ref, key);
                 }
             }
             for eng in crate::engines::registry() {
@@ -201,15 +198,14 @@ impl TranslationHub {
                 if prefetched.get_key(&id).ok().flatten().is_some() {
                     continue;
                 }
-                match secrets
+                if let Ok(Ok(Some(key))) = secrets
                     .call(|ks| {
                         let r = ks.get_key(&id);
                         async move { r }
                     })
                     .await
                 {
-                    Ok(Ok(Some(key))) => prefetched.insert(id, key),
-                    _ => {}
+                    prefetched.insert(id, key);
                 }
             }
         }

@@ -54,7 +54,7 @@ fn install_package_copies_files_and_registers_in_db() {
     )
     .unwrap();
     assert!(dest_root.join("test-pkg/test.ifo").exists());
-    let packages = h.db.with_conn(|c| package::list_packages(c)).unwrap();
+    let packages = h.db.with_conn(package::list_packages).unwrap();
     assert_eq!(packages.len(), 1);
     assert_eq!(packages[0].package_id, "test-pkg");
 }

@@ -7,6 +7,11 @@ use crate::{keystore, require_database, require_database_write, AppState, Sessio
 use serde::Serialize;
 use std::sync::Arc;
 
+/// Live [`DataReadiness`] for the Settings recovery banner. Always available
+/// (no readiness gate) — this is how the UI discovers the gate is closed.
+///
+/// Serialized as a JSON object via `#[serde(tag = "state")]`:
+/// `{"state":"ready"}`, `{"state":"needs_keystore_recovery",...}`, etc.
 #[tauri::command]
 pub fn get_data_readiness(state: tauri::State<'_, Arc<AppState>>) -> DataReadiness {
     state.readiness.read().clone()

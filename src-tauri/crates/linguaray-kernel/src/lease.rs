@@ -251,9 +251,8 @@ impl InstalledEffect {
     pub(crate) async fn run(mut self) {
         if let Some(d) = self.disposer.take() {
             // Panic in a sync disposer must not skip the rest (spec §5.4).
-            match std::panic::catch_unwind(std::panic::AssertUnwindSafe(d.inner)) {
-                Ok(fut) => fut.await,
-                Err(_) => {}
+            if let Ok(fut) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(d.inner)) {
+                fut.await;
             }
         }
     }

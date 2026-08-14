@@ -27,7 +27,7 @@ pub async fn dict_list_packages(
     tauri::async_runtime::spawn_blocking(move || {
         let gate = app_state.data_gate.read();
         let db = require_database(&app_state, &gate)?;
-        db.with_conn(|conn| dict::list_packages(conn))
+        db.with_conn(dict::list_packages)
             .map_err(|e| e.to_string())
     })
     .await

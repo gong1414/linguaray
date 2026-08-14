@@ -373,6 +373,68 @@ pub fn set_popup_mode(
     Ok(())
 }
 
+use futures::future::BoxFuture;
+use linguaray_kernel::{
+    ActivationContext, CapabilityPlugin, EffectDisposer, PluginDescriptor, PluginError, PluginId,
+    ServiceId, ServiceKey,
+};
+
+pub static POPUP: ServiceKey<PopupHub> = ServiceKey::new("linguaray.popup");
+static PROVIDES: &[ServiceId] = &[ServiceId("linguaray.popup")];
+
+pub struct PopupHub {
+    app: tauri::AppHandle,
+}
+
+impl PopupHub {
+    pub fn hide(&self) -> Result<(), String> {
+        hide(&self.app)
+    }
+}
+
+pub struct PopupPlugin {
+    app: tauri::AppHandle,
+}
+
+impl PopupPlugin {
+    pub fn new(app: tauri::AppHandle) -> Self {
+        Self { app }
+    }
+}
+
+impl CapabilityPlugin for PopupPlugin {
+    fn descriptor(&self) -> PluginDescriptor {
+        PluginDescriptor {
+            id: PluginId("popup"),
+            required: &[],
+            optional: &[],
+            provides: PROVIDES,
+            manifest: None,
+            restart_on_optional_change: false,
+        }
+    }
+
+    fn config_fingerprint(&self) -> u64 {
+        1
+    }
+
+    fn activate(&self, ctx: ActivationContext) -> BoxFuture<'_, Result<(), PluginError>> {
+        let app = self.app.clone();
+        Box::pin(async move {
+            ctx.stage_provide(POPUP, Arc::new(PopupHub { app: app.clone() }))?;
+            ctx.install_effect("popup.hide", move || {
+                let app = app.clone();
+                async move {
+                    Ok(EffectDisposer::from_fn(move || {
+                        let _ = hide(&app);
+                    }))
+                }
+            })
+            .await
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -446,7 +508,6 @@ mod tests {
 
     #[test]
     fn multi_result_payload_shape_is_outcomes_array() {
-        // 序列化 shape 校验（不发真实事件）：payload 必须是 { "outcomes": [...] }。
         let outcomes = [
             ok_outcome("u1", "a", "provider/u1"),
             err_outcome("u2", Error::LocalNoFallback),
@@ -462,76 +523,12 @@ mod tests {
         assert!(json.contains("\"outcomes\""), "{json}");
         assert!(json.contains("\"u1\""), "{json}");
         assert!(json.contains("\"u2\""), "{json}");
-        // ok outcome 带 text，err outcome 带 error。
         assert!(json.contains("\"text\":\"a\""), "{json}");
         assert!(json.contains("\"error\""), "{json}");
     }
 
     #[test]
     fn multi_result_emits_named_event() {
-        // 直接验证事件名常量，避免依赖 Tauri runtime。
         assert_eq!(POPUP_MULTI_EVENT, "popup-multi-result");
-    }
-}
-
-use futures::future::BoxFuture;
-use linguaray_kernel::{
-    ActivationContext, CapabilityPlugin, EffectDisposer, PluginDescriptor, PluginError, PluginId,
-    ServiceId, ServiceKey,
-};
-
-pub static POPUP: ServiceKey<PopupHub> = ServiceKey::new("linguaray.popup");
-static PROVIDES: &[ServiceId] = &[ServiceId("linguaray.popup")];
-
-pub struct PopupHub {
-    app: tauri::AppHandle,
-}
-
-impl PopupHub {
-    pub fn hide(&self) -> Result<(), String> {
-        hide(&self.app)
-    }
-}
-
-pub struct PopupPlugin {
-    app: tauri::AppHandle,
-}
-
-impl PopupPlugin {
-    pub fn new(app: tauri::AppHandle) -> Self {
-        Self { app }
-    }
-}
-
-impl CapabilityPlugin for PopupPlugin {
-    fn descriptor(&self) -> PluginDescriptor {
-        PluginDescriptor {
-            id: PluginId("popup"),
-            required: &[],
-            optional: &[],
-            provides: PROVIDES,
-            manifest: None,
-            restart_on_optional_change: false,
-        }
-    }
-
-    fn config_fingerprint(&self) -> u64 {
-        1
-    }
-
-    fn activate(&self, ctx: ActivationContext) -> BoxFuture<'_, Result<(), PluginError>> {
-        let app = self.app.clone();
-        Box::pin(async move {
-            ctx.stage_provide(POPUP, Arc::new(PopupHub { app: app.clone() }))?;
-            ctx.install_effect("popup.hide", move || {
-                let app = app.clone();
-                async move {
-                    Ok(EffectDisposer::from_fn(move || {
-                        let _ = hide(&app);
-                    }))
-                }
-            })
-            .await
-        })
     }
 }

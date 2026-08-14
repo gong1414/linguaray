@@ -92,8 +92,7 @@ fn platform_speak(text: &str, voice_id: Option<&str>) -> Result<(), TtsError> {
     let text_c = CString::new(text).map_err(|_| TtsError::Message("text contains NUL".into()))?;
     let voice_c = voice_id
         .filter(|s| !s.is_empty())
-        .map(|s| CString::new(s).ok())
-        .flatten();
+        .and_then(|s| CString::new(s).ok());
     unsafe {
         let mut err: *mut c_char = std::ptr::null_mut();
         let voice_ptr = voice_c

@@ -16,6 +16,12 @@ impl ExternalApiSlot {
     }
 }
 
+impl Default for ExternalApiSlot {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 fn mint_token() -> String {
     let mut bytes = [0u8; 32];
     rand::rngs::OsRng.fill_bytes(&mut bytes);
@@ -76,9 +82,10 @@ fn production_hooks(app: AppHandle) -> ApiHooks {
                 let session = handle
                     .try_state::<Arc<Session>>()
                     .ok_or_else(|| "session missing".to_string())?;
-                let gate = state.data_gate.read();
-                let db = require_database(&state, &gate)?;
-                drop(gate);
+                let db = {
+                    let gate = state.data_gate.read();
+                    require_database(&state, &gate)?
+                };
                 let client = session
                     .client
                     .as_ref()

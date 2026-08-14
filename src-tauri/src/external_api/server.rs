@@ -24,13 +24,18 @@ pub enum ExternalApiStatus {
     PortInUse { configured_port: u16 },
 }
 
+type JsonHook = Box<dyn Fn() -> Result<serde_json::Value, String> + Send + Sync>;
+type JsonBodyHook = Box<dyn Fn(serde_json::Value) -> Result<serde_json::Value, String> + Send + Sync>;
+type BytesHook = Box<dyn Fn(&[u8]) -> Result<serde_json::Value, String> + Send + Sync>;
+type UnitHook = Box<dyn Fn() -> Result<(), String> + Send + Sync>;
+
 pub struct ApiHooks {
     pub health_version: String,
-    pub providers: Box<dyn Fn() -> Result<serde_json::Value, String> + Send + Sync>,
-    pub translate: Box<dyn Fn(serde_json::Value) -> Result<serde_json::Value, String> + Send + Sync>,
-    pub ocr: Box<dyn Fn(&[u8]) -> Result<serde_json::Value, String> + Send + Sync>,
-    pub selection: Box<dyn Fn() -> Result<(), String> + Send + Sync>,
-    pub show_input: Box<dyn Fn() -> Result<(), String> + Send + Sync>,
+    pub providers: JsonHook,
+    pub translate: JsonBodyHook,
+    pub ocr: BytesHook,
+    pub selection: UnitHook,
+    pub show_input: UnitHook,
 }
 
 impl ApiHooks {

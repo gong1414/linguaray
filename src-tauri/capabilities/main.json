@@ -46,6 +46,7 @@
     "allow-history-toggle-favorite",
     "allow-history-delete-session",
     "allow-history-export",
+    "dialog:allow-save",
     "allow-vocabulary-add",
     "allow-vocabulary-list",
     "allow-vocabulary-delete",

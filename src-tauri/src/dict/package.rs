@@ -73,8 +73,7 @@ pub fn install_package(
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_err(|_| {
-            PackageError::Io(std::io::Error::new(
-                std::io::ErrorKind::Other,
+            PackageError::Io(std::io::Error::other(
                 "system clock precedes Unix epoch",
             ))
         })?;

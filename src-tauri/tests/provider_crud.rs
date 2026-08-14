@@ -754,10 +754,7 @@ fn engines_registry_exposes_traditional_fallback_picker() {
             "{id} must appear in the fallback picker"
         );
     }
-    assert!(linguaray_lib::engines::find("google")
-        .unwrap()
-        .needs_key()
-        == false);
+    assert!(!linguaray_lib::engines::find("google").unwrap().needs_key());
     assert!(linguaray_lib::engines::find("deepl").unwrap().needs_key());
 }
 

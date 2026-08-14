@@ -90,7 +90,7 @@ pub use crate::service::TranslateSessionResult;
 /// bumps it, and every async transition (popup, translate-result) checks
 /// `is_latest` before mutating the popup, so a stale in-flight request can never
 /// clobber the result of a newer trigger.
-pub(crate) struct Session {
+pub struct Session {
     pub(crate) client: Option<reqwest::Client>,
     pub(crate) keystore: Option<Arc<keystore::Keystore>>,
     pub(crate) gen: concurrency::GenerationToken,
@@ -266,7 +266,7 @@ pub(crate) fn session_client(session: &Session) -> Result<&reqwest::Client, Stri
 /// Resolve the optional `keystore` from the [`Session`] or return a clear error
 /// string. History writes lease Secrets via HistoryHub; translate does not
 /// read Session.keystore.
-#[cfg_attr(not(test), allow(dead_code))]
+#[allow(dead_code)]
 pub(crate) fn session_keystore(session: &Session) -> Result<&keystore::Keystore, String> {
     session
         .keystore
@@ -417,24 +417,6 @@ fn validate_preset_endpoints(list: &[providers::ProviderPreset]) -> Vec<String> 
 fn preset_gate_allows_client(invalid_presets: &[String]) -> bool {
     invalid_presets.is_empty()
 }
-
-/// Returns the live [`DataReadiness`] so the frontend can drive the recovery
-/// banner. Always available (no readiness gate) — it's how the UI discovers the
-/// gate is closed in the first place.
-///
-/// Returns the typed `DataReadiness` directly (Tauri auto-serializes it via the
-/// `#[derive(Serialize)]` + `#[serde(tag="state", rename_all="snake_case")]` on
-/// the enum).
-///
-/// WIRE CONTRACT: this is a breaking change from the pre-S2a `String` return —
-/// the old command returned a JSON-ENCODED STRING (the frontend had to parse
-/// the string's contents as JSON). It now ships a real JSON OBJECT:
-/// - `Ready` → `{"state":"ready"}`
-/// - `NeedsKeystoreRecovery` → `{"state":"needs_keystore_recovery","reason":"…"}`
-/// - `NeedsDatabaseRecovery` → `{"state":"needs_database_recovery","reason":"…"}`
-/// - `MigrationIncomplete` → `{"state":"migration_incomplete","checkpoint":…,"reason":"…"}`
-/// (internally-tagged enum: the variant determines which fields exist).
-/// Frontend callers must read a JSON object, not a string.
 
 /// Shared DB cleanup + readiness update for keystore recovery
 /// (`archive_keystore` / `reset_keystore`). Review P1 #2.
@@ -1002,6 +984,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             // Resolve the app-local data dir. Review P1 #2: this MUST NOT crash
             // setup — if the platform path is unavailable, fall back to a temp

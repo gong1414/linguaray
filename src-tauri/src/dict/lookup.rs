@@ -80,7 +80,7 @@ pub fn lookup(
         }));
     }
 
-    let packages: Vec<DictPackageInfo> = db.with_conn(|conn| pkg::list_packages(conn))?;
+    let packages: Vec<DictPackageInfo> = db.with_conn(pkg::list_packages)?;
     for pkg_info in &packages {
         let pkg_dir = dict_dir.join(&pkg_info.package_id);
         if !pkg_dir.exists() {

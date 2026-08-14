@@ -506,6 +506,7 @@ fn next_sort_order(conn: &Connection) -> Result<i32, DbError> {
 /// type is fixed to `DbError`) so the command layer can surface a structured
 /// error without string parsing — the same pattern as `ConfirmActiveOutcome`.
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum UpdateOutcome {
     /// The CAS matched; carries the re-read profile (with the bumped version).
     Written(ProviderProfile),

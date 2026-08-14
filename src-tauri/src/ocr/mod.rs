@@ -129,7 +129,7 @@ fn platform_capture_region(x: i32, y: i32, w: i32, h: i32) -> Result<Vec<u8>, Oc
     Ok(bytes)
 }
 
-#[cfg(all(not(target_os = "macos"), target_os = "windows"))]
+#[cfg(target_os = "windows")]
 fn platform_recognize(bytes: &[u8]) -> Result<OcrResult, OcrError> {
     windows_ocr::recognize(bytes)
 }
@@ -139,7 +139,12 @@ fn platform_recognize(_bytes: &[u8]) -> Result<OcrResult, OcrError> {
     Err(OcrError::Message("OCR is not available on this platform".into()))
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(target_os = "windows")]
+fn platform_capture_region(x: i32, y: i32, w: i32, h: i32) -> Result<Vec<u8>, OcrError> {
+    windows_ocr::capture_region(x, y, w, h)
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 fn platform_capture_region(_x: i32, _y: i32, _w: i32, _h: i32) -> Result<Vec<u8>, OcrError> {
     Err(OcrError::Message(
         "region capture is not available on this host".into(),
@@ -148,14 +153,144 @@ fn platform_capture_region(_x: i32, _y: i32, _w: i32, _h: i32) -> Result<Vec<u8>
 
 #[cfg(target_os = "windows")]
 mod windows_ocr {
-    use super::{OcrError, OcrResult};
+    use super::{encode_rgba_png, OcrError, OcrResult};
 
-    pub fn recognize(_bytes: &[u8]) -> Result<OcrResult, OcrError> {
-        // Windows.Media.Ocr requires a WinRT apartment and an IRandomAccessStream
-        // of the image. The binding is compiled so `cargo check --target` works;
-        // a full DXGI + WinRT path is exercised on a Windows machine.
-        Err(OcrError::Message(
-            "Windows.Media.Ocr requires a Windows runtime host".into(),
-        ))
+    pub fn recognize(bytes: &[u8]) -> Result<OcrResult, OcrError> {
+        use windows::Graphics::Imaging::{BitmapDecoder, BitmapPixelFormat, SoftwareBitmap};
+        use windows::Media::Ocr::OcrEngine;
+        use windows::Storage::Streams::{DataWriter, InMemoryRandomAccessStream};
+        use windows::Win32::System::Com::{CoInitializeEx, COINIT_MULTITHREADED};
+
+        unsafe {
+            let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+        }
+
+        let stream = InMemoryRandomAccessStream::new()
+            .map_err(|e| OcrError::Message(format!("ocr stream: {e}")))?;
+        let writer = DataWriter::CreateDataWriter(&stream)
+            .map_err(|e| OcrError::Message(format!("ocr writer: {e}")))?;
+        writer
+            .WriteBytes(bytes)
+            .map_err(|e| OcrError::Message(format!("ocr write: {e}")))?;
+        writer
+            .StoreAsync()
+            .map_err(|e| OcrError::Message(format!("ocr store: {e}")))?
+            .get()
+            .map_err(|e| OcrError::Message(format!("ocr store: {e}")))?;
+        writer
+            .FlushAsync()
+            .map_err(|e| OcrError::Message(format!("ocr flush: {e}")))?
+            .get()
+            .map_err(|e| OcrError::Message(format!("ocr flush: {e}")))?;
+        drop(writer);
+        stream
+            .Seek(0)
+            .map_err(|e| OcrError::Message(format!("ocr seek: {e}")))?;
+
+        let decoder = BitmapDecoder::CreateAsync(&stream)
+            .map_err(|e| OcrError::Message(format!("ocr decode: {e}")))?
+            .get()
+            .map_err(|e| OcrError::Message(format!("ocr decode: {e}")))?;
+        let bitmap = decoder
+            .GetSoftwareBitmapAsync()
+            .map_err(|e| OcrError::Message(format!("ocr bitmap: {e}")))?
+            .get()
+            .map_err(|e| OcrError::Message(format!("ocr bitmap: {e}")))?;
+        let bitmap = SoftwareBitmap::Convert(&bitmap, BitmapPixelFormat::Gray8)
+            .map_err(|e| OcrError::Message(format!("ocr convert: {e}")))?;
+
+        let engine = OcrEngine::TryCreateFromUserProfileLanguages().map_err(|e| {
+            OcrError::Message(format!("Windows.Media.Ocr engine unavailable: {e}"))
+        })?;
+        let result = engine
+            .RecognizeAsync(&bitmap)
+            .map_err(|e| OcrError::Message(format!("ocr recognize: {e}")))?
+            .get()
+            .map_err(|e| OcrError::Message(format!("ocr recognize: {e}")))?;
+        let text = result
+            .Text()
+            .map_err(|e| OcrError::Message(format!("ocr text: {e}")))?
+            .to_string();
+        Ok(OcrResult {
+            text: text.trim().to_string(),
+            confidence: 1.0,
+        })
+    }
+
+    pub fn capture_region(x: i32, y: i32, w: i32, h: i32) -> Result<Vec<u8>, OcrError> {
+        use windows_sys::Win32::Graphics::Gdi::{
+            BitBlt, CreateCompatibleBitmap, CreateCompatibleDC, DeleteDC, DeleteObject, GetDC,
+            GetDIBits, ReleaseDC, SelectObject, BITMAPINFO, BITMAPINFOHEADER, BI_RGB,
+            DIB_RGB_COLORS, SRCCOPY,
+        };
+
+        if w <= 0 || h <= 0 {
+            return Err(OcrError::Message("invalid region".into()));
+        }
+
+        unsafe {
+            let hdc_screen = GetDC(std::ptr::null_mut());
+            if hdc_screen.is_null() {
+                return Err(OcrError::Message("GetDC failed".into()));
+            }
+            let hdc_mem = CreateCompatibleDC(hdc_screen);
+            if hdc_mem.is_null() {
+                ReleaseDC(std::ptr::null_mut(), hdc_screen);
+                return Err(OcrError::Message("CreateCompatibleDC failed".into()));
+            }
+            let hbmp = CreateCompatibleBitmap(hdc_screen, w, h);
+            if hbmp.is_null() {
+                DeleteDC(hdc_mem);
+                ReleaseDC(std::ptr::null_mut(), hdc_screen);
+                return Err(OcrError::Message("CreateCompatibleBitmap failed".into()));
+            }
+            let old = SelectObject(hdc_mem, hbmp);
+            let copied = BitBlt(hdc_mem, 0, 0, w, h, hdc_screen, x, y, SRCCOPY);
+            if copied == 0 {
+                SelectObject(hdc_mem, old);
+                DeleteObject(hbmp);
+                DeleteDC(hdc_mem);
+                ReleaseDC(std::ptr::null_mut(), hdc_screen);
+                return Err(OcrError::Message("BitBlt failed".into()));
+            }
+
+            let mut info = BITMAPINFO {
+                bmiHeader: BITMAPINFOHEADER {
+                    biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
+                    biWidth: w,
+                    biHeight: -h,
+                    biPlanes: 1,
+                    biBitCount: 32,
+                    biCompression: BI_RGB,
+                    biSizeImage: 0,
+                    biXPelsPerMeter: 0,
+                    biYPelsPerMeter: 0,
+                    biClrUsed: 0,
+                    biClrImportant: 0,
+                },
+                bmiColors: [std::mem::zeroed()],
+            };
+            let mut bgra = vec![0u8; (w as usize) * (h as usize) * 4];
+            let lines = GetDIBits(
+                hdc_mem,
+                hbmp,
+                0,
+                h as u32,
+                bgra.as_mut_ptr().cast(),
+                &mut info,
+                DIB_RGB_COLORS,
+            );
+            SelectObject(hdc_mem, old);
+            DeleteObject(hbmp);
+            DeleteDC(hdc_mem);
+            ReleaseDC(std::ptr::null_mut(), hdc_screen);
+            if lines == 0 {
+                return Err(OcrError::Message("GetDIBits failed".into()));
+            }
+            for px in bgra.chunks_exact_mut(4) {
+                px.swap(0, 2);
+            }
+            encode_rgba_png(w as u32, h as u32, &bgra)
+        }
     }
 }
