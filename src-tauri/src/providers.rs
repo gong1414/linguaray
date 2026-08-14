@@ -2,9 +2,8 @@
 //!
 //! Each entry is CONFIG DATA (a FULL endpoint URL + dialect + default model + a
 //! key-needed flag). The user fills a key and it works. Adding a provider = one
-//! struct literal, not code. The HTTP calling lives in `wire.rs`.
+//! catalog row, not a Driver. HTTP encode/decode lives in EngineDrivers.
 
-use crate::wire::ApiKind;
 use linguaray_contracts::{AuthKind, ProtocolKind};
 
 #[derive(Debug, Clone)]
@@ -15,7 +14,7 @@ pub struct ProviderPreset {
     /// Stored in full (not base_url + route) because Url::join with a leading-'/'
     /// route would drop /v1 or /v1beta/openai. (spec §Wire)
     pub endpoint: String,
-    pub api_kind: ApiKind,
+    pub protocol: ProtocolKind,
     pub default_model: String,
     pub needs_key: bool,
     pub auth: AuthKind,
@@ -30,10 +29,7 @@ pub fn presets() -> Vec<ProviderPreset> {
                     id: p.id,
                     label: p.label,
                     endpoint: p.endpoint,
-                    api_kind: match p.protocol {
-                        ProtocolKind::Anthropic => ApiKind::Anthropic,
-                        ProtocolKind::OpenaiChat => ApiKind::OpenAIChat,
-                    },
+                    protocol: p.protocol,
                     default_model: p.default_model,
                     needs_key: p.needs_key,
                     auth: p.auth,

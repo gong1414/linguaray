@@ -1,5 +1,6 @@
 use linguaray_kernel::ServiceKey;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 /// Domain traits live here so the kernel stays generic. Production hookup is
 /// PR-4+; K0 Go is required before any Fiber is activated from `lib.rs`.
@@ -7,8 +8,20 @@ pub trait TranslationService: Send + Sync {}
 pub trait SecretsService: Send + Sync {}
 pub trait DatabaseService: Send + Sync {}
 pub trait HttpTransport: Send + Sync {}
-pub trait EngineDriver: Send + Sync {}
-pub trait EngineDriverRegistry: Send + Sync {}
+pub trait ProviderService: Send + Sync {}
+
+/// One HTTP dialect. Implementations live in the host; this crate stays
+/// reqwest-free (`HttpRequestPlan` is headers + JSON).
+pub trait EngineDriver: Send + Sync {
+    fn id(&self) -> &'static str;
+    fn protocol(&self) -> ProtocolKind;
+    fn build_request(&self, input: &DriverInput<'_>) -> Result<HttpRequestPlan, DriverError>;
+    fn parse_response(&self, body: &serde_json::Value) -> Result<String, DriverError>;
+}
+
+pub trait EngineDriverRegistry: Send + Sync {
+    fn get(&self, protocol: ProtocolKind) -> Option<Arc<dyn EngineDriver>>;
+}
 
 pub static TRANSLATION: ServiceKey<dyn TranslationService> =
     ServiceKey::new("linguaray.translation");
@@ -16,8 +29,43 @@ pub static SECRETS: ServiceKey<dyn SecretsService> = ServiceKey::new("linguaray.
 pub static DATABASE: ServiceKey<dyn DatabaseService> = ServiceKey::new("linguaray.database");
 pub static HTTP: ServiceKey<dyn HttpTransport> = ServiceKey::new("linguaray.http");
 pub static DRIVERS: ServiceKey<dyn EngineDriverRegistry> = ServiceKey::new("linguaray.drivers");
+pub static PROVIDERS: ServiceKey<dyn ProviderService> = ServiceKey::new("linguaray.providers");
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// Snapshot the openai-chat / anthropic Driver reads. `key` is borrowed for
+/// the shortest window; the Driver must not store it.
+#[derive(Debug, Clone)]
+pub struct DriverInput<'a> {
+    pub endpoint: &'a str,
+    pub model: &'a str,
+    pub auth: AuthKind,
+    pub key: &'a str,
+    pub system: &'a str,
+    pub user: &'a str,
+    pub temperature: Option<f32>,
+    pub max_tokens: Option<u32>,
+    pub stream: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct HttpRequestPlan {
+    pub url: String,
+    pub headers: Vec<(String, String)>,
+    pub query: Vec<(String, String)>,
+    pub body: serde_json::Value,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DriverError(pub String);
+
+impl std::fmt::Display for DriverError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+impl std::error::Error for DriverError {}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum ProtocolKind {
     OpenaiChat,
@@ -52,6 +100,24 @@ impl AuthKind {
             AuthKind::XApiKey => Some("x-api-key"),
             AuthKind::AzureKey => Some("api-key"),
             AuthKind::Query | AuthKind::None => None,
+        }
+    }
+
+    /// Header pairs for a chat/models request. `Query` / `None` yield none;
+    /// callers that need `?key=` use [`query_pairs`].
+    pub fn http_headers(self, key: &str) -> Vec<(String, String)> {
+        match self {
+            AuthKind::Bearer => vec![("Authorization".into(), format!("Bearer {key}"))],
+            AuthKind::XApiKey => vec![("x-api-key".into(), key.into())],
+            AuthKind::AzureKey => vec![("api-key".into(), key.into())],
+            AuthKind::Query | AuthKind::None => vec![],
+        }
+    }
+
+    pub fn query_pairs(self, key: &str) -> Vec<(String, String)> {
+        match self {
+            AuthKind::Query => vec![("key".into(), key.into())],
+            _ => vec![],
         }
     }
 }
@@ -97,5 +163,17 @@ mod tests {
         assert_eq!(DATABASE.id.0, "linguaray.database");
         assert_eq!(HTTP.id.0, "linguaray.http");
         assert_eq!(DRIVERS.id.0, "linguaray.drivers");
+        assert_eq!(PROVIDERS.id.0, "linguaray.providers");
+    }
+
+    #[test]
+    fn auth_headers_do_not_invent_authorization_for_azure_key() {
+        let headers = AuthKind::AzureKey.http_headers("sk-az");
+        assert_eq!(headers, vec![("api-key".into(), "sk-az".into())]);
+        assert!(AuthKind::None.http_headers("x").is_empty());
+        assert_eq!(
+            AuthKind::Query.query_pairs("q"),
+            vec![("key".into(), "q".into())]
+        );
     }
 }
