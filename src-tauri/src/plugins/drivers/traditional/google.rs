@@ -3,8 +3,7 @@
 //! Response JSON: a nested array whose `[0]` is segments; each segment's `[0]`
 //! is the translated string. Concatenate those strings.
 //!
-//! This is not an official Google API and has no SLA. See engines.json notes
-//! and `docs/superpowers/archive/google-gtx-cleanroom.md`.
+//! This is not an official Google API and has no SLA. See engines.json notes.
 
 use async_trait::async_trait;
 

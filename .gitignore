@@ -16,3 +16,7 @@ src-tauri/.mimosa/
 
 # Local pnpm content-addressable store (never commit)
 .pnpm-store/
+
+# Internal design / implementation plans (not part of the product tree)
+docs/superpowers/
+design-system/

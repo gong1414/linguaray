@@ -9,7 +9,7 @@
  * the single source of truth.
  *
  * Provider strings ported from `apps/ui-lab/src/i18n/index.ts` (the `provider`
- * block), reconciled against `design-system/linguaray/pages/05-provider-center.md`.
+ * block).
  * Lab-only frame-marker keys (`frameMin`, `frameDefault`, `frameNarrow699`,
  * `frameBoundary700`) are dropped — they were lab scaffolding, not product copy.
  */

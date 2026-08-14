@@ -77,7 +77,7 @@ export type TranslationState =
 
 /**
  * i18n copy keys for Surface 01 (selection popup) + Surface 02 (input window).
- * Matches design-system/linguaray/pages/01-selection-popup.md and 02-input-window.md.
+ * Selection popup and input-window translation states.
  */
 export type CopyKey =
   // Surface 01

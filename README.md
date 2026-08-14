@@ -50,8 +50,7 @@ Three legs, decided in the design grilling:
 
 - **Tauri 2** + **Rust** backend, **SolidJS** + TypeScript frontend
 - **Platforms:** Windows + macOS (Linux out of scope for v1)
-- v1 official capabilities and protocol drivers are **in-tree plugins**
-  (see `docs/superpowers/specs/2026-08-14-linguaray-plugin-core-design.md`).
+- v1 official capabilities and protocol drivers are **in-tree plugins**.
   Third-party / WASM loading remains post-v1.
 
 ## Develop
