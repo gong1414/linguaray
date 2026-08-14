@@ -37,16 +37,18 @@ use tauri::Manager;
 use tauri_plugin_global_shortcut::{Builder as GlobalShortcutBuilder, ShortcutState};
 
 use crate::commands::{
-    a11y_status, archive_database, archive_keystore, get_data_readiness, get_settings,
-    history_clear_all, history_privacy_status, history_search, history_set_enabled,
-    history_set_retention, key_status, keystore_health, open_settings_window,
+    a11y_status, archive_database, archive_keystore, dict_list_packages, dict_lookup,
+    get_data_readiness, get_settings,
+    history_clear_all, history_delete_session, history_export, history_privacy_status,
+    history_search, history_set_enabled, history_set_retention, history_toggle_favorite,
+    key_status, keystore_health, open_settings_window,
     provider_confirm_and_set_active, provider_create, provider_delete, provider_duplicate,
     provider_get_active_selection, provider_get_models, provider_list, provider_list_presets,
     provider_reorder, provider_set_active, provider_set_key, provider_test_connection,
     provider_toggle, provider_update, reset_keystore, set_setting, shortcut_check_conflict,
     shortcut_list, shortcut_recording_begin, shortcut_recording_end, shortcut_reset_defaults,
     shortcut_save, translate, translate_clipboard, translate_default, translate_selection_ipc,
-    translate_session,
+    translate_session, vocabulary_add, vocabulary_delete, vocabulary_export_file, vocabulary_list,
 };
 use crate::db::migration::{run_migration, FailpointCell, MigrationError};
 use crate::db::providers::{self as db_providers};
@@ -1368,7 +1370,16 @@ pub fn run() {
             history_set_enabled,
             history_set_retention,
             history_clear_all,
-            history_search
+            history_search,
+            history_toggle_favorite,
+            history_delete_session,
+            history_export,
+            vocabulary_add,
+            vocabulary_list,
+            vocabulary_delete,
+            vocabulary_export_file,
+            dict_lookup,
+            dict_list_packages
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

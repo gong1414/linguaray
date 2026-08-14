@@ -29,6 +29,9 @@ type NavCopy = {
   keystoreRecovery: string;
   shortcuts: string;
   privacy: string;
+  history: string;
+  vocabulary: string;
+  dictionary: string;
   /** Tooltip shown for the disabled R3b placeholder items. */
   placeholderHint: string;
 };
@@ -263,7 +266,10 @@ const EN: SettingsCopy = {
     keystoreRecovery: "Keystore Recovery",
     shortcuts: "Shortcuts",
     privacy: "Privacy",
-    placeholderHint: "Coming in R3b",
+    history: "History",
+    vocabulary: "Vocabulary",
+    dictionary: "Dictionary",
+    placeholderHint: "Coming later",
   },
   a11y: {
     title: "Accessibility permission needed",
@@ -403,7 +409,10 @@ const ZH: SettingsCopy = {
     keystoreRecovery: "Keystore Recovery",
     shortcuts: "Shortcuts",
     privacy: "Privacy",
-    placeholderHint: "将在 R3b 中提供",
+    history: "历史",
+    vocabulary: "生词本",
+    dictionary: "词典",
+    placeholderHint: "即将推出",
   },
   a11y: {
     title: "需要辅助功能权限",

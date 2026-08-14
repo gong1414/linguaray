@@ -209,3 +209,59 @@ fn missing_preferences_singleton_fails_closed() {
         Err(DbError::NotFound(_))
     ));
 }
+
+#[test]
+fn toggle_favorite_flips_and_returns_new_state() {
+    let h = Harness::new();
+    h.insert_session("sess-a", 1_700_000_100, false);
+    let new_state = h
+        .db
+        .with_conn(|conn| db_history::toggle_favorite(conn, "sess-a"))
+        .unwrap();
+    assert!(new_state);
+    let db_val: i64 = h
+        .db
+        .with_conn(|conn| {
+            Ok(conn.query_row(
+                "SELECT is_favorite FROM history_sessions WHERE session_uuid='sess-a'",
+                [],
+                |r| r.get(0),
+            )?)
+        })
+        .unwrap();
+    assert_eq!(db_val, 1);
+    let new_state2 = h
+        .db
+        .with_conn(|conn| db_history::toggle_favorite(conn, "sess-a"))
+        .unwrap();
+    assert!(!new_state2);
+}
+
+#[test]
+fn delete_session_removes_session_and_cascades_results() {
+    let h = Harness::new();
+    h.insert_session("sess-del", 1_700_000_100, false);
+    assert_eq!(h.counts(), (1, 1));
+    h.db
+        .with_conn(|conn| db_history::delete_session(conn, "sess-del"))
+        .unwrap();
+    assert_eq!(h.counts(), (0, 0));
+}
+
+#[test]
+fn toggle_favorite_missing_uuid_returns_not_found() {
+    let h = Harness::new();
+    let result = h
+        .db
+        .with_conn(|conn| db_history::toggle_favorite(conn, "nonexistent"));
+    assert!(matches!(result, Err(DbError::NotFound(_))));
+}
+
+#[test]
+fn delete_session_missing_uuid_returns_not_found() {
+    let h = Harness::new();
+    let result = h
+        .db
+        .with_conn(|conn| db_history::delete_session(conn, "nonexistent"));
+    assert!(matches!(result, Err(DbError::NotFound(_))));
+}

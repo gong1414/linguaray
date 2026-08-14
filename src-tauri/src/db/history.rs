@@ -172,6 +172,42 @@ fn clear_all_in_transaction(conn: &Connection) -> Result<usize, DbError> {
     Ok(conn.execute("DELETE FROM history_sessions", [])?)
 }
 
+/// Toggle the favorite flag. Returns the NEW state (`true` = favorite).
+pub fn toggle_favorite(conn: &mut Connection, session_uuid: &str) -> Result<bool, DbError> {
+    let tx = conn.transaction()?;
+    let current: Option<i64> = tx
+        .query_row(
+            "SELECT is_favorite FROM history_sessions WHERE session_uuid=?1",
+            [session_uuid],
+            |row| row.get(0),
+        )
+        .optional()?;
+    let current = current.ok_or_else(|| {
+        DbError::NotFound(format!("history session {session_uuid}"))
+    })?;
+    let next = i64::from(current == 0);
+    tx.execute(
+        "UPDATE history_sessions SET is_favorite=?1 WHERE session_uuid=?2",
+        rusqlite::params![next, session_uuid],
+    )?;
+    tx.commit()?;
+    Ok(next == 1)
+}
+
+/// Delete one session. Result rows cascade.
+pub fn delete_session(conn: &mut Connection, session_uuid: &str) -> Result<(), DbError> {
+    let tx = conn.transaction()?;
+    let removed = tx.execute(
+        "DELETE FROM history_sessions WHERE session_uuid=?1",
+        [session_uuid],
+    )?;
+    if removed == 0 {
+        return Err(DbError::NotFound(format!("history session {session_uuid}")));
+    }
+    tx.commit()?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use std::{

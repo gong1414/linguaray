@@ -16,6 +16,9 @@ import ProviderCenter from "./features/settings/ProviderCenter";
 import KeystoreRecovery from "./features/settings/KeystoreRecovery";
 import Shortcuts from "./features/settings/Shortcuts";
 import PrivacyData from "./features/settings/PrivacyData";
+import HistoryView from "./features/settings/HistoryView";
+import VocabularyView from "./features/settings/VocabularyView";
+import DictionaryView from "./features/settings/DictionaryView";
 import { SETTINGS_COPY } from "./features/settings/copy";
 import { translateSelection, translateClipboard } from "./features/translation/selection-ipc";
 import { detectLocale } from "./i18n";
@@ -50,7 +53,10 @@ const App: Component = () => {
           page === "provider-center" ||
           page === "keystore-recovery" ||
           page === "shortcuts" ||
-          page === "privacy"
+          page === "privacy" ||
+          page === "history" ||
+          page === "vocabulary" ||
+          page === "dictionary"
         ) {
           setActivePage(page);
         }
@@ -72,6 +78,12 @@ const App: Component = () => {
         <Shortcuts />
       ) : activePage() === "privacy" ? (
         <PrivacyData />
+      ) : activePage() === "history" ? (
+        <HistoryView />
+      ) : activePage() === "vocabulary" ? (
+        <VocabularyView />
+      ) : activePage() === "dictionary" ? (
+        <DictionaryView />
       ) : (
         <section class="app__placeholder" aria-label={t.nav.placeholderHint}>
           <p>{t.nav.placeholderHint}</p>

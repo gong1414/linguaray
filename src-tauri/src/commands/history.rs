@@ -146,6 +146,69 @@ pub async fn history_search(
     .map_err(|error| error.to_string())?
 }
 
+#[tauri::command]
+pub async fn history_toggle_favorite(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, Arc<AppState>>,
+    session_uuid: String,
+) -> Result<bool, String> {
+    let history = lease_history(&app)?;
+    let app_state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        history
+            .with(|h| h.require_writable())
+            .map_err(map_lease)??;
+        let gate = app_state.data_gate.write();
+        let db = require_database_write(&app_state, &gate)?;
+        db.with_conn(|conn| crate::db::history::toggle_favorite(conn, &session_uuid))
+            .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|error| format!("history favorite worker failed: {error}"))?
+}
+
+#[tauri::command]
+pub async fn history_delete_session(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, Arc<AppState>>,
+    session_uuid: String,
+) -> Result<(), String> {
+    let history = lease_history(&app)?;
+    let app_state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        history
+            .with(|h| h.require_writable())
+            .map_err(map_lease)??;
+        let gate = app_state.data_gate.write();
+        let db = require_database_write(&app_state, &gate)?;
+        db.with_conn(|conn| crate::db::history::delete_session(conn, &session_uuid))
+            .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|error| format!("history delete worker failed: {error}"))?
+}
+
+#[tauri::command]
+pub async fn history_export(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, Arc<AppState>>,
+    file_path: String,
+    format: String,
+    filter: crate::history::export::HistoryFilter,
+) -> Result<String, String> {
+    let history = lease_history(&app)?;
+    let app_state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let gate = app_state.data_gate.read();
+        let db = require_database(&app_state, &gate)?;
+        history
+            .with(|h| h.export(&db, &file_path, &format, &filter))
+            .map_err(map_lease)?
+    })
+    .await
+    .map_err(|error| format!("history export worker failed: {error}"))?
+}
+
 #[cfg(test)]
 mod remnant {
     #[test]
