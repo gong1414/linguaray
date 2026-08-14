@@ -216,3 +216,86 @@ fn history_error_kind(error: &crate::error::Error) -> &'static str {
         crate::error::Error::LocalNoFallback => "local_no_fallback",
     }
 }
+
+use futures::future::BoxFuture;
+use linguaray_kernel::{
+    ActivationContext, CapabilityPlugin, KernelHandle, PluginDescriptor, PluginError, PluginId,
+    ServiceId, ServiceKey,
+};
+use std::sync::Arc;
+
+pub static HISTORY: ServiceKey<HistoryHub> = ServiceKey::new("linguaray.history");
+static PROVIDES: &[ServiceId] = &[ServiceId("linguaray.history")];
+static REQUIRED: &[ServiceId] = &[ServiceId("linguaray.database")];
+static OPTIONAL: &[ServiceId] = &[ServiceId("linguaray.secrets")];
+
+pub struct HistoryHub {
+    kernel: KernelHandle,
+}
+
+impl HistoryHub {
+    fn secrets(&self) -> Result<linguaray_kernel::ServiceLease<Keystore>, String> {
+        self.kernel
+            .optional(crate::plugins::secrets::SECRETS)
+            .ok_or_else(|| "keystore unavailable: startup init failed (recovery required)".into())
+    }
+
+    pub fn set_enabled(&self, db: &Database, enabled: bool) -> Result<(), String> {
+        let secrets = self.secrets()?;
+        secrets
+            .with(|ks| crate::db::history::set_enabled(db, ks, enabled))
+            .map_err(|e| e.to_string())?
+            .map_err(|e| e.to_string())
+    }
+
+    pub fn search(
+        &self,
+        db: &Database,
+        query: &str,
+        cursor: Option<&str>,
+    ) -> Result<search::HistoryPage, String> {
+        let secrets = self.secrets()?;
+        secrets
+            .with(|ks| search::search(db, ks, query, cursor))
+            .map_err(|e| e.to_string())?
+            .map_err(|e| e.to_string())
+    }
+
+    pub fn require_writable(&self) -> Result<(), String> {
+        let _ = self.secrets()?;
+        Ok(())
+    }
+}
+
+pub struct HistoryPlugin;
+
+impl CapabilityPlugin for HistoryPlugin {
+    fn descriptor(&self) -> PluginDescriptor {
+        PluginDescriptor {
+            id: PluginId("history"),
+            required: REQUIRED,
+            optional: OPTIONAL,
+            provides: PROVIDES,
+            manifest: None,
+            restart_on_optional_change: false,
+        }
+    }
+
+    fn config_fingerprint(&self) -> u64 {
+        1
+    }
+
+    fn activate(&self, ctx: ActivationContext) -> BoxFuture<'_, Result<(), PluginError>> {
+        Box::pin(async move {
+            let _db = ctx.require(crate::plugins::database::DATABASE)?;
+            let _ = ctx.optional(crate::plugins::secrets::SECRETS);
+            ctx.stage_provide(
+                HISTORY,
+                Arc::new(HistoryHub {
+                    kernel: ctx.handle(),
+                }),
+            )?;
+            Ok(())
+        })
+    }
+}

@@ -17,7 +17,7 @@ pub mod dict;
 pub mod engines;
 pub mod error;
 pub mod fs_acl;
-pub mod history;
+pub use crate::plugins::history;
 pub mod keystore;
 pub mod plugins;
 pub use crate::plugins::popup;
@@ -253,9 +253,9 @@ pub(crate) fn session_client(session: &Session) -> Result<&reqwest::Client, Stri
 }
 
 /// Resolve the optional `keystore` from the [`Session`] or return a clear error
-/// string. Used by the translate / key commands so a startup init failure
-/// (degraded `NeedsKeystoreRecovery`) surfaces consistently instead of
-/// panicking.
+/// string. History writes lease Secrets via HistoryHub; translate does not
+/// read Session.keystore.
+#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn session_keystore(session: &Session) -> Result<&keystore::Keystore, String> {
     session
         .keystore

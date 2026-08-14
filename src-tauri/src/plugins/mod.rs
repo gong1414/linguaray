@@ -3,6 +3,7 @@
 pub mod clipboard;
 pub mod database;
 pub mod drivers;
+pub mod history;
 pub mod http;
 pub mod popup;
 pub mod providers;
@@ -34,6 +35,7 @@ pub fn builtin_plugins(
         Arc::new(translation::TranslationPlugin),
         Arc::new(selection::SelectionPlugin),
         Arc::new(clipboard::ClipboardPlugin),
+        Arc::new(history::HistoryPlugin),
     ];
     if let Some(shortcuts) = shortcuts {
         out.push(shortcuts);
@@ -67,6 +69,7 @@ mod tests {
         assert!(ids.contains(&"translation"));
         assert!(ids.contains(&"selection"));
         assert!(ids.contains(&"clipboard"));
+        assert!(ids.contains(&"history"));
         assert!(!ids.contains(&"azure-openai"));
         assert!(!ids.contains(&"custom-http"));
         assert!(!ids.contains(&"ocr"));

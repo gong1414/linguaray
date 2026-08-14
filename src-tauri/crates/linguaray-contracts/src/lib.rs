@@ -13,6 +13,7 @@ pub trait SelectionService: Send + Sync {}
 pub trait ClipboardService: Send + Sync {}
 pub trait PopupService: Send + Sync {}
 pub trait TrayService: Send + Sync {}
+pub trait HistoryService: Send + Sync {}
 
 /// One HTTP dialect. Implementations live in the host; this crate stays
 /// reqwest-free (`HttpRequestPlan` is headers + JSON).
@@ -38,6 +39,7 @@ pub static SELECTION: ServiceKey<dyn SelectionService> = ServiceKey::new("lingua
 pub static CLIPBOARD: ServiceKey<dyn ClipboardService> = ServiceKey::new("linguaray.clipboard");
 pub static POPUP: ServiceKey<dyn PopupService> = ServiceKey::new("linguaray.popup");
 pub static TRAY: ServiceKey<dyn TrayService> = ServiceKey::new("linguaray.tray");
+pub static HISTORY: ServiceKey<dyn HistoryService> = ServiceKey::new("linguaray.history");
 
 /// Snapshot the openai-chat / anthropic Driver reads. `key` is borrowed for
 /// the shortest window; the Driver must not store it.
@@ -176,6 +178,7 @@ mod tests {
         assert_eq!(CLIPBOARD.id.0, "linguaray.clipboard");
         assert_eq!(POPUP.id.0, "linguaray.popup");
         assert_eq!(TRAY.id.0, "linguaray.tray");
+        assert_eq!(HISTORY.id.0, "linguaray.history");
     }
 
     #[test]
