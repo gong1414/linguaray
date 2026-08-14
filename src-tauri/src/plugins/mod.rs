@@ -92,7 +92,7 @@ mod tests {
     }
 
     #[test]
-    fn slot_stubs_declare_no_services_and_no_commands() {
+    fn shipped_slot_commands_are_registered() {
         use linguaray_kernel::CapabilityPlugin;
         for p in [
             &dictionary::DictionaryPlugin as &dyn CapabilityPlugin,
@@ -103,7 +103,7 @@ mod tests {
         ] {
             assert!(
                 p.descriptor().provides.is_empty(),
-                "{} stub must not provide a service until implemented",
+                "{} Fiber must not provide a lease until a service is staged",
                 p.descriptor().id.0
             );
         }
@@ -116,12 +116,12 @@ mod tests {
         for cmd in [
             "ocr_capture",
             "tts_speak",
-            "external_api_listen",
+            "external_api_enable",
             "updater_check",
         ] {
             assert!(
-                !handler.contains(cmd),
-                "unimplemented command {cmd} must not be registered"
+                handler.contains(cmd),
+                "shipped command {cmd} must be registered"
             );
         }
     }

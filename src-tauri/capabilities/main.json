@@ -53,6 +53,23 @@
     "allow-vocabulary-export-anki",
     "allow-dict-lookup",
     "allow-dict-list-packages",
-    "allow-dict-install-package"
+    "allow-dict-install-package",
+    "allow-ocr-capture",
+    "allow-ocr-capture-region",
+    "allow-ocr-from-image",
+    "allow-ocr-recognize-bytes",
+    "allow-ocr-from-clipboard",
+    "allow-tts-list-voices",
+    "allow-tts-speak",
+    "allow-tts-stop",
+    "allow-external-api-enable",
+    "allow-external-api-status",
+    "allow-external-api-disable",
+    "allow-external-api-regenerate-token",
+    "allow-updater-check",
+    "allow-onboarding-status",
+    "allow-onboarding-next",
+    "allow-onboarding-complete",
+    "allow-provider-get-balance"
   ]
 }

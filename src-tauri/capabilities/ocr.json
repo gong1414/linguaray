@@ -1,0 +1,15 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "ocr",
+  "description": "OCR overlay — capture region and send text to translate",
+  "windows": ["ocr"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-hide",
+    "allow-ocr-capture-region",
+    "allow-ocr-from-image",
+    "allow-ocr-recognize-bytes",
+    "allow-ocr-from-clipboard",
+    "allow-translate-selection-ipc"
+  ]
+}

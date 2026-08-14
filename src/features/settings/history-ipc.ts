@@ -19,3 +19,13 @@ export const historyExport = (
   filter: HistoryFilter,
 ): Promise<string> =>
   invoke<string>("history_export", { filePath, format, filter });
+
+export async function chooseExportPath(defaultName: string): Promise<string | null> {
+  try {
+    const mod = await import("@tauri-apps/plugin-dialog");
+    const picked = await mod.save({ defaultPath: defaultName });
+    return picked ?? null;
+  } catch {
+    return defaultName;
+  }
+}

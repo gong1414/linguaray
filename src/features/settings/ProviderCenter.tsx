@@ -79,6 +79,7 @@ import {
   providerTestConnection,
   providerGetModels,
   providerGetActiveSelection,
+  providerGetBalance,
 } from "./provider-ipc";
 import type { ProviderRole } from "@linguaray/ui";
 import { validateEndpoint } from "./provider-domain";
@@ -222,6 +223,8 @@ export type ProviderCenterViewProps = {
   onSaveKey: (uuid: string) => void;
   onFetchModels: (uuid: string) => void;
   onTestConnection: (uuid: string) => void;
+  onFetchBalance?: (uuid: string) => void;
+  balanceByUuid?: Record<string, string>;
   onResolveSaveConflict: (uuid: string) => void;
   // --- top-level error + dialog callbacks ---
   onReloadFromError: () => void;
@@ -772,13 +775,25 @@ export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element 
                     </Show>
                   </div>
 
-                  {/* Balance — R3a limitation: muted TODO note, no fetch. */}
                   <div class="pc__balance-section">
                     <span class="pc__balance-title">{t().balance.title}</span>
-                    <span class="pc__balance-note">
-                      {/* TODO(r3b): balance/quota IPC not yet implemented. */}
-                      {t().balance.unsupportedNote}
-                    </span>
+                    <Show
+                      when={!!d()?.provider?.capabilities?.balance}
+                      fallback={
+                        <span class="pc__balance-note">{t().balance.unsupportedNote}</span>
+                      }
+                    >
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => props.onFetchBalance?.(d().provider.uuid)}
+                      >
+                        {t().balance.fetch}
+                      </Button>
+                      <Show when={props.balanceByUuid?.[d().provider.uuid]}>
+                        <span class="pc__balance-note">{props.balanceByUuid?.[d().provider.uuid]}</span>
+                      </Show>
+                    </Show>
                   </div>
                 </div>
               );
@@ -901,6 +916,7 @@ const ProviderCenter: Component = () => {
   // the next name edit.
   const [nameErrorByUuid, setNameErrorByUuid] = createSignal<Record<string, string>>({});
   const [connByUuid, setConnByUuid] = createSignal<Record<string, ConnectionResult | "testing">>({});
+  const [balanceByUuid, setBalanceByUuid] = createSignal<Record<string, string>>({});
   // R6-P1-3: per-UUID request counter for connection tests. Each Test click
   // bumps the counter; the await resolution only applies if the counter is
   // unchanged (no newer Test started during the await). This prevents a stale
@@ -1492,6 +1508,25 @@ const ProviderCenter: Component = () => {
     }
   };
 
+  const handleFetchBalance = async (uuid: string) => {
+    const provider = providers().find((p) => p.uuid === uuid);
+    if (!provider?.capabilities.balance) return;
+    setBalanceByUuid((prev) => ({ ...prev, [uuid]: t.balance.loading }));
+    try {
+      const result = await providerGetBalance(uuid);
+      if (result.kind === "ok") {
+        const extra = result.quota ? ` / ${result.quota}` : "";
+        setBalanceByUuid((prev) => ({ ...prev, [uuid]: result.balance + extra }));
+      } else if (result.kind === "unsupported") {
+        setBalanceByUuid((prev) => ({ ...prev, [uuid]: t.balance.unsupportedNote }));
+      } else {
+        setBalanceByUuid((prev) => ({ ...prev, [uuid]: result.message }));
+      }
+    } catch (e) {
+      setBalanceByUuid((prev) => ({ ...prev, [uuid]: String(e) }));
+    }
+  };
+
   const handleTestConnection = async (uuid: string) => {
     // R9: `providerTestConnection` probes the BACKEND's stored config, NOT the
     // user's unsaved drafts. Capture the configEpoch at test start so a
@@ -1811,6 +1846,8 @@ const ProviderCenter: Component = () => {
       onSaveKey={(uuid) => void handleSaveKey(uuid)}
       onFetchModels={(uuid) => void handleFetchModels(uuid)}
       onTestConnection={(uuid) => void handleTestConnection(uuid)}
+      onFetchBalance={(uuid) => void handleFetchBalance(uuid)}
+      balanceByUuid={balanceByUuid()}
       onResolveSaveConflict={(uuid) => {
         // R5-P1-1: Reload race-condition fix. Set reloadingUuid BEFORE the await
         // so (a) a second Reload click is a no-op (re-entrancy guard) and (b) the

@@ -85,8 +85,11 @@ export const VocabularyView: Component = () => {
         setNotice(t.exportDone);
         return;
       }
+      const { chooseExportPath } = await import("./history-ipc");
+      const filePath = await chooseExportPath(`linguaray-vocabulary.${format}`);
+      if (!filePath) return;
       const path = await invoke<string>("vocabulary_export_file", {
-        filePath: `linguaray-vocabulary.${format}`,
+        filePath,
         format,
       });
       setNotice(path);

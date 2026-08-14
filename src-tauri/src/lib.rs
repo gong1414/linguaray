@@ -12,6 +12,12 @@ pub mod concurrency;
 pub mod cursor;
 pub mod db;
 pub mod dict;
+pub mod ocr;
+pub mod tts;
+pub mod external_api;
+pub mod onboarding;
+pub mod updater;
+pub mod balance;
 pub mod engines;
 pub mod error;
 pub mod fs_acl;
@@ -50,7 +56,10 @@ use crate::commands::{
     shortcut_list, shortcut_recording_begin, shortcut_recording_end, shortcut_reset_defaults,
     shortcut_save, translate, translate_clipboard, translate_default, translate_selection_ipc,
     translate_session, vocabulary_add, vocabulary_delete, vocabulary_export_anki,
-    vocabulary_export_file, vocabulary_list,
+    vocabulary_export_file, vocabulary_list, ocr_capture, ocr_capture_region, ocr_from_image,
+    ocr_recognize_bytes, ocr_from_clipboard, tts_list_voices, tts_speak, tts_stop, external_api_disable,
+    external_api_enable, external_api_regenerate_token, external_api_status, updater_check,
+    onboarding_complete, onboarding_next, onboarding_status, provider_get_balance,
 };
 use crate::db::migration::{run_migration, FailpointCell, MigrationError};
 use crate::db::providers::{self as db_providers};
@@ -737,21 +746,8 @@ async fn build_tray_menu(app: &tauri::AppHandle) -> tauri::Result<tauri::menu::M
     )?;
     let sep2 = PredefinedMenuItem::separator(app)?;
 
-    // Disabled "Coming later" items (P1-D).
-    let ocr = MenuItem::with_id(
-        app,
-        "tray.ocr-capture",
-        "OCR Translate (Coming later)",
-        false,
-        None::<&str>,
-    )?;
-    let history = MenuItem::with_id(
-        app,
-        "tray.history",
-        "History (Coming later)",
-        false,
-        None::<&str>,
-    )?;
+    let ocr = MenuItem::with_id(app, "tray.ocr-capture", "OCR Translate", true, None::<&str>)?;
+    let history = MenuItem::with_id(app, "tray.history", "History", true, None::<&str>)?;
     let sep3 = PredefinedMenuItem::separator(app)?;
 
     // Navigation + system group.
@@ -952,6 +948,13 @@ fn handle_tray_menu_event(app: &tauri::AppHandle, event: MenuEvent) {
         }
         "tray.ocr-capture" => {
             let _ = app.emit("tray-action", "ocr-capture");
+        }
+        "tray.history" => {
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.show();
+                let _ = w.set_focus();
+                let _ = w.emit("navigate", "history");
+            }
         }
         "tray.settings" => {
             if let Some(w) = app.get_webview_window("main") {
@@ -1231,6 +1234,7 @@ pub fn run() {
             }
 
             let startup_ready = readiness.is_ready();
+            app.manage(Arc::new(crate::commands::external_api::ExternalApiSlot::new()));
             app.manage(Arc::new(AppState {
                 db: parking_lot::RwLock::new(db_handle),
                 data_gate: parking_lot::RwLock::new(()),
@@ -1242,6 +1246,28 @@ pub fn run() {
                     tray_state::TrayStateController::new(app.handle().clone()),
                 )),
             }));
+
+            if startup_ready {
+                if let Some(w) = app.get_webview_window("onboarding") {
+                    let app_state = app.state::<Arc<AppState>>();
+                    let gate = app_state.data_gate.read();
+                    let show = require_database(&app_state, &gate).ok().and_then(|db| {
+                        db.with_conn(|conn| {
+                            crate::db::schema::ensure_preference_columns(conn)?;
+                            let complete: i64 = conn.query_row(
+                                "SELECT onboarding_complete FROM preferences WHERE id=1",
+                                [],
+                                |r| r.get(0),
+                            )?;
+                            Ok(complete == 0)
+                        })
+                        .ok()
+                    });
+                    if show == Some(true) {
+                        let _ = w.show();
+                    }
+                }
+            }
 
             // S2b retention is enforced at startup, independently of whether
             // history is currently enabled. Disabling history intentionally
@@ -1383,7 +1409,24 @@ pub fn run() {
             vocabulary_export_anki,
             dict_lookup,
             dict_list_packages,
-            dict_install_package
+            dict_install_package,
+            ocr_capture,
+            ocr_capture_region,
+            ocr_from_image,
+            ocr_recognize_bytes,
+            ocr_from_clipboard,
+            tts_list_voices,
+            tts_speak,
+            tts_stop,
+            external_api_enable,
+            external_api_status,
+            external_api_disable,
+            external_api_regenerate_token,
+            updater_check,
+            onboarding_status,
+            onboarding_next,
+            onboarding_complete,
+            provider_get_balance
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

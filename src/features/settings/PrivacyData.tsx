@@ -1,5 +1,6 @@
 import { createSignal, For, onMount, Show, type Component } from "solid-js";
 import { Banner, Button, Confirm, Select, Switch, Toast } from "@linguaray/ui";
+import { invoke } from "@tauri-apps/api/core";
 import { detectLocale } from "../../i18n";
 import { PRIVACY_COPY } from "./privacy-copy";
 import {
@@ -27,6 +28,63 @@ export type PrivacyDataViewProps = {
   onCloseClear: () => void;
   onConfirmClear: () => void;
   onDismissToast: (id: number) => void;
+};
+
+const ExternalApiControls: Component<{ t: typeof PRIVACY_COPY["en"] }> = (props) => {
+  const [status, setStatus] = createSignal<{ state: string; port?: number } | null>(null);
+  const [token, setToken] = createSignal("");
+  const refresh = async () => {
+    const s = await invoke<{ state: string; port?: number }>("external_api_status");
+    setStatus(s);
+  };
+  onMount(() => {
+    void refresh().catch(() => setStatus({ state: "disabled" }));
+  });
+  return (
+    <div>
+      <p>
+        {status()?.state === "enabled"
+          ? props.t.externalOn.replace("{port}", String(status()?.port ?? ""))
+          : props.t.externalOff}
+      </p>
+      <Button
+        onClick={() => {
+          void invoke<string>("external_api_enable", { port: null })
+            .then((tok) => {
+              setToken(tok);
+              return refresh();
+            })
+            .catch(() => refresh());
+        }}
+      >
+        {props.t.externalEnable}
+      </Button>
+      <Button
+        variant="ghost"
+        onClick={() => {
+          void invoke("external_api_disable").then(() => {
+            setToken("");
+            return refresh();
+          });
+        }}
+      >
+        {props.t.externalDisable}
+      </Button>
+      <Button
+        variant="ghost"
+        onClick={() => {
+          void invoke<string>("external_api_regenerate_token").then(setToken);
+        }}
+      >
+        {props.t.externalRegen}
+      </Button>
+      <Show when={token()}>
+        <p role="status">
+          {props.t.externalTokenOnce}: <code>{token()}</code>
+        </p>
+      </Show>
+    </div>
+  );
 };
 
 export const PrivacyDataView: Component<PrivacyDataViewProps> = (props) => {
@@ -93,7 +151,7 @@ export const PrivacyDataView: Component<PrivacyDataViewProps> = (props) => {
           </div>
         </div>
 
-        <div class="privacy-data__panel privacy-data__panel--deferred" aria-labelledby="privacy-external-title">
+        <div class="privacy-data__panel" aria-labelledby="privacy-external-title">
           <h2 id="privacy-external-title">{t.externalTitle}</h2>
           <p>{t.externalDeferred}</p>
         </div>
@@ -175,6 +233,7 @@ const PrivacyData: Component = () => {
   onMount(() => void load());
 
   return (
+    <>
     <PrivacyDataView
       status={status()}
       loading={loading()}
@@ -197,6 +256,12 @@ const PrivacyData: Component = () => {
       }}
       onDismissToast={(id) => setToasts((items) => items.filter((item) => item.id !== id))}
     />
+    <Show when={!loading() && !error()}>
+      <section aria-label={t.externalTitle}>
+        <ExternalApiControls t={t} />
+      </section>
+    </Show>
+    </>
   );
 };
 

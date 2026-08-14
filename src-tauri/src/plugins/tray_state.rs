@@ -185,7 +185,8 @@ pub fn tray_tooltip_text(state: TrayVisualState, locale: Locale) -> &'static str
         (TrayVisualState::Error, Locale::Zh) => "LinguaRay — 错误",
         // recompute never produces UpdateAvailable this stage; return a stable
         // placeholder so the match is exhaustive without driving a real tooltip.
-        (TrayVisualState::UpdateAvailable, _) => "LinguaRay",
+        (TrayVisualState::UpdateAvailable, Locale::En) => "Update available",
+        (TrayVisualState::UpdateAvailable, Locale::Zh) => "有可用更新",
     }
 }
 
@@ -380,6 +381,8 @@ pub struct TrayStateController {
     renderer: Arc<dyn TrayRenderer>,
     notify_tx: Option<std::sync::mpsc::Sender<PulseEvent>>,
     locale: Locale,
+    /// When true, `recompute` yields UpdateAvailable (below Error, above Active).
+    update_available: bool,
     /// rev-19-4: monotonic counter incremented each time `recompute` starts a
     /// new `PulseWorker` (asserted NOT to increase on an Active→Active bump).
     worker_start_count: u32,
@@ -438,6 +441,7 @@ impl TrayStateController {
             renderer,
             notify_tx,
             locale,
+            update_available: false,
             worker_start_count: 0,
         };
         c.render();
@@ -548,6 +552,11 @@ impl TrayStateController {
         self.recompute();
     }
 
+    pub fn set_update_available(&mut self, available: bool) {
+        self.update_available = available;
+        self.recompute();
+    }
+
     /// Resolve the highest-priority state, and ONLY if it differs from
     /// `current_state`: drop the old `PulseWorker` (if leaving Active), start a
     /// new one (if entering Active), update `current_state`, and `render()`.
@@ -610,10 +619,9 @@ impl TrayStateController {
                     .set_tooltip(tray_tooltip_text(self.current_state, self.locale));
             }
             TrayVisualState::UpdateAvailable => {
-                log::warn!(
-                    "render(UpdateAvailable) invoked — this state is deferred to R5/R6 per \
-                     user-approved scope decision and should not be reached this stage"
-                );
+                self.renderer.set_icon_dimmed();
+                self.renderer
+                    .set_tooltip(tray_tooltip_text(self.current_state, self.locale));
             }
         }
     }
@@ -713,6 +721,8 @@ impl Drop for PulseWorker {
 pub fn recompute_pure(c: &TrayStateController) -> TrayVisualState {
     if c.error_gen.is_some() || c.switch_error_rev.is_some() {
         TrayVisualState::Error
+    } else if c.update_available {
+        TrayVisualState::UpdateAvailable
     } else if c.active_translations > 0 {
         TrayVisualState::ActiveTranslation
     } else {

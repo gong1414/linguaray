@@ -18,7 +18,7 @@ const snapshot = (over: Partial<ShortcutSnapshot> = {}): ShortcutSnapshot => ({
     { action: "translate_selection", combo: "Alt+Space", available: true, registration_state: "registered", registration_error: null },
     { action: "translate_input", combo: "Ctrl+Space", available: true, registration_state: "registered", registration_error: null },
     { action: "translate_clipboard", combo: "Ctrl+Alt+Space", available: true, registration_state: "registered", registration_error: null },
-    { action: "ocr_translate", combo: "Alt+Shift+Space", available: false, registration_state: "unavailable", registration_error: null },
+    { action: "ocr_translate", combo: "Alt+Shift+Space", available: true, registration_state: "registered", registration_error: null },
   ],
   ...over,
 });
@@ -51,14 +51,14 @@ describe("Shortcuts", () => {
     expect(canonicalCombo(keyboard({}))).toBeNull();
   });
 
-  it("renders the four frozen actions and marks OCR unavailable", async () => {
+  it("renders the four frozen actions and OCR is changeable", async () => {
     render(() => <Shortcuts />);
     await waitFor(() => expect(screen.getByText("Translate Selection")).toBeTruthy());
     expect(screen.getByText("Translate Input")).toBeTruthy();
     expect(screen.getByText("Translate Clipboard")).toBeTruthy();
     expect(screen.getByText("OCR Translate")).toBeTruthy();
-    expect(screen.getByText("Available in R5")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Change OCR Translate" })).toBeDisabled();
+    expect(screen.queryByText("Available in R5")).toBeNull();
+    expect(screen.getByRole("button", { name: "Change OCR Translate" })).not.toBeDisabled();
   });
 
   it("records a canonical combo, checks conflict, and saves with expected revision", async () => {

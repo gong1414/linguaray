@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-onboarding-next"
+description = "Enables the onboarding_next command without any pre-configured scope."
+commands.allow = ["onboarding_next"]
+
+[[permission]]
+identifier = "deny-onboarding-next"
+description = "Denies the onboarding_next command without any pre-configured scope."
+commands.deny = ["onboarding_next"]
