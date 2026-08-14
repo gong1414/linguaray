@@ -316,8 +316,14 @@ impl TraditionalEngine for CountingFallback {
     fn id(&self) -> &str { "counting" }
     fn label(&self) -> &str { "Counting" }
     fn needs_key(&self) -> bool { false }
-    async fn translate(&self, _client: &reqwest::Client, _text: &str, _from: &str, _to: &str)
-        -> Result<String, Error> {
+    async fn translate(
+        &self,
+        _client: &reqwest::Client,
+        _text: &str,
+        _from: &str,
+        _to: &str,
+        _key: Option<&str>,
+    ) -> Result<String, Error> {
         self.calls.fetch_add(1, Ordering::SeqCst);
         Ok("fallback-text".into())
     }

@@ -733,35 +733,32 @@ fn build_profile_traditional_catalog_lookup() {
 }
 
 #[test]
-fn traditional_catalog_stays_google_only_until_pr6f_drivers() {
-    // PR-6f-schema opens the CHECK; it must not seed DeepL/etc rows or the
-    // fallback picker would list engines that cannot run.
+fn traditional_catalog_lists_all_six_engines() {
     let cat = providers::traditional_catalog();
-    assert_eq!(cat.len(), 1, "traditional_catalog must stay google-only");
-    assert_eq!(cat[0].template_id, "google");
-    for id in ["deepl", "microsoft", "baidu", "youdao", "tencent"] {
-        assert!(
-            providers::build_profile(&CandidateSource::LegacyId(id.into()))
-                .unwrap()
-                .protocol
-                == Protocol::CustomHttp,
-            "{id} must still be a repair shell, not a catalog row"
-        );
-    }
+    let ids: Vec<&str> = cat.iter().map(|c| c.template_id.as_str()).collect();
+    assert_eq!(
+        ids,
+        ["google", "deepl", "microsoft", "baidu", "youdao", "tencent"]
+    );
+    let deepl = providers::build_profile(&CandidateSource::LegacyId("deepl".into())).unwrap();
+    assert_eq!(deepl.protocol, Protocol::Deepl);
+    assert!(deepl.needs_key);
+    assert_eq!(deepl.secret_ref, "deepl");
 }
 
 #[test]
-fn engines_registry_does_not_expose_non_google_fallback() {
-    assert!(
-        linguaray_lib::engines::find("google").is_some(),
-        "google remains the only fallback picker entry"
-    );
-    for id in ["deepl", "microsoft", "baidu", "youdao", "tencent"] {
+fn engines_registry_exposes_traditional_fallback_picker() {
+    for id in ["google", "deepl", "microsoft", "baidu", "youdao", "tencent"] {
         assert!(
-            linguaray_lib::engines::find(id).is_none(),
-            "{id} must not appear in the fallback picker until PR-6f Drivers"
+            linguaray_lib::engines::find(id).is_some(),
+            "{id} must appear in the fallback picker"
         );
     }
+    assert!(linguaray_lib::engines::find("google")
+        .unwrap()
+        .needs_key()
+        == false);
+    assert!(linguaray_lib::engines::find("deepl").unwrap().needs_key());
 }
 
 #[test]

@@ -1,5 +1,6 @@
-//! EngineDriver registry: one openai-chat Fiber, one anthropic Fiber,
-//! traditional package is an empty shell. No azure-openai / custom-http Driver.
+//! EngineDriver registry: one openai-chat Fiber, one anthropic Fiber.
+//! Traditional MT lives in `traditional/` as TraditionalEngine impls (not
+//! ProtocolKind map entries). No azure-openai / custom-http Driver.
 
 pub mod anthropic;
 pub mod openai_chat;

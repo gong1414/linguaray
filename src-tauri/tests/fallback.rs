@@ -55,6 +55,7 @@ impl TraditionalEngine for FakeFallback {
         text: &str,
         _from: &str,
         _to: &str,
+        _key: Option<&str>,
     ) -> Result<String, Error> {
         self.called.store(true, Ordering::SeqCst);
         *self.seen_text.lock().unwrap() = Some(text.to_string());

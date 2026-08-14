@@ -51,6 +51,42 @@ pub fn get(id: &str) -> Option<CatalogProvider> {
     load().ok()?.providers.into_iter().find(|p| p.id == id)
 }
 
+/// Traditional MT metadata (`engines.json`). Not the 21 AI presets.
+#[derive(Debug, Clone, Deserialize)]
+pub struct EngineCatalogFile {
+    pub schema_version: u32,
+    pub engines: Vec<CatalogEngine>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CatalogEngine {
+    pub id: String,
+    pub label: String,
+    pub protocol: String,
+    pub endpoint: String,
+    pub needs_key: bool,
+    #[serde(default)]
+    pub unofficial_gtx: bool,
+    #[serde(default)]
+    pub docs: Option<String>,
+    #[serde(default)]
+    pub notes: Option<String>,
+}
+
+pub const REQUIRED_ENGINE_IDS: &[&str] =
+    &["google", "deepl", "microsoft", "baidu", "youdao", "tencent"];
+
+pub fn load_engines() -> Result<EngineCatalogFile, CatalogError> {
+    let raw = include_str!("../engines.json");
+    let file: EngineCatalogFile = serde_json::from_str(raw)?;
+    validate::validate_engines(&file)?;
+    Ok(file)
+}
+
+pub fn engine(id: &str) -> Option<CatalogEngine> {
+    load_engines().ok()?.engines.into_iter().find(|e| e.id == id)
+}
+
 pub const REQUIRED_IDS: &[&str] = &[
     "openai",
     "anthropic",
@@ -90,5 +126,16 @@ mod tests {
         let c = crate::load().expect("catalog");
         assert_eq!(c.providers.len(), 21);
         assert_eq!(c.schema_version, 1);
+    }
+
+    #[test]
+    fn shipped_engines_validate() {
+        let e = crate::load_engines().expect("engines");
+        assert_eq!(e.engines.len(), 6);
+        assert_eq!(e.schema_version, 1);
+        let google = e.engines.iter().find(|x| x.id == "google").unwrap();
+        assert!(google.unofficial_gtx);
+        assert!(!google.needs_key);
+        assert!(e.engines.iter().filter(|x| x.id != "google").all(|x| x.needs_key));
     }
 }
