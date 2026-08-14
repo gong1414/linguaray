@@ -26,7 +26,8 @@ Three legs, decided in the design grilling:
 
 ### Current capabilities (v1)
 
-- AI provider catalog (preset-based, fill-key-and-use)
+- AI provider catalog (21 official presets; only `ready` rows are
+  fill-key-and-use — Azure / Custom / Doubao require extra setup)
 - Self-encrypted keystore (machine-bound, fail-closed)
 - Selection translate (Alt+Space) with hybrid AX-first + sentinel-copy-fallback capture
 - Input translate (Ctrl+Space)
@@ -49,8 +50,9 @@ Three legs, decided in the design grilling:
 
 - **Tauri 2** + **Rust** backend, **SolidJS** + TypeScript frontend
 - **Platforms:** Windows + macOS (Linux out of scope for v1)
-- v1 has **no plugin system** — engines are built-in. Plugin/WASM extensibility is
-  deferred to post-v1.
+- v1 official capabilities and protocol drivers are **in-tree plugins**
+  (see `docs/superpowers/specs/2026-08-14-linguaray-plugin-core-design.md`).
+  Third-party / WASM loading remains post-v1.
 
 ## Develop
 
