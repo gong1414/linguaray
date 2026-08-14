@@ -20,7 +20,12 @@ export type ProviderProtocol =
   | "anthropic"
   | "gemini"
   | "google_translate"
-  | "custom_http";
+  | "custom_http"
+  | "deepl"
+  | "microsoft"
+  | "baidu"
+  | "youdao"
+  | "tencent";
 
 /** Row lifecycle status. Matches `ProviderStatus` enum. */
 export type ProviderStatus = "active" | "deleting" | "deleted";

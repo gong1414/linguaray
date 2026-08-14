@@ -16,18 +16,25 @@ use linguaray_contracts::{AuthKind, ProtocolKind};
 /// 把 DB wire 协议族映射到可调用的 Driver 协议。
 /// - OpenAIChat / Gemini → OpenaiChat（spec：Gemini 走 openai-chat Driver）
 /// - Anthropic           → Anthropic
-/// - GoogleTranslate / CustomHttp → None（不可调用，直到用户改 protocol）
+/// - GoogleTranslate / CustomHttp / 传统 MT → None
+///   （传统协议直到 PR-6f Drivers 才可调用；本 PR 只开 CHECK）
 pub fn protocol_to_kind(protocol: &Protocol) -> Option<ProtocolKind> {
     match protocol {
         Protocol::OpenaiChat | Protocol::Gemini => Some(ProtocolKind::OpenaiChat),
         Protocol::Anthropic => Some(ProtocolKind::Anthropic),
-        Protocol::GoogleTranslate | Protocol::CustomHttp => None,
+        Protocol::GoogleTranslate
+        | Protocol::CustomHttp
+        | Protocol::Deepl
+        | Protocol::Microsoft
+        | Protocol::Baidu
+        | Protocol::Youdao
+        | Protocol::Tencent => None,
     }
 }
 
 /// 把 DB-backed profile 转成 wire-layer preset。
 ///
-/// 失败条件：`protocol_to_kind` 返回 `None`（google_translate/custom_http）。
+/// 失败条件：`protocol_to_kind` 返回 `None`（google_translate/custom_http/传统 MT）。
 /// 此时该 profile 不是可调用的 AI 引擎，调用方应跳过它或把它标为失败结果。
 ///
 /// 字段映射（load-bearing）：
