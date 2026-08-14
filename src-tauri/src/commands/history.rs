@@ -1,12 +1,32 @@
-use crate::{require_database, require_database_write, session_keystore, AppState, Session};
+use crate::plugins::history::{HistoryHub, HISTORY};
+use crate::{require_database, require_database_write, AppState};
 use serde::Serialize;
 use std::sync::Arc;
+use tauri::Manager;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct HistoryPrivacyStatusWire {
     enabled: bool,
     retention_days: u32,
     record_count: u64,
+}
+
+fn map_lease(err: impl std::fmt::Display) -> String {
+    let text = err.to_string();
+    if text.contains("unloaded") {
+        "Database not available".into()
+    } else {
+        text
+    }
+}
+
+fn lease_history(
+    app: &tauri::AppHandle,
+) -> Result<linguaray_kernel::ServiceLease<HistoryHub>, String> {
+    let supervisor = app
+        .try_state::<linguaray_kernel::Supervisor>()
+        .ok_or_else(|| "Database not available".to_string())?;
+    supervisor.handle().lease(HISTORY).map_err(map_lease)
 }
 
 fn read_history_privacy_status(
@@ -30,10 +50,13 @@ fn read_history_privacy_status(
 
 #[tauri::command]
 pub async fn history_privacy_status(
+    app: tauri::AppHandle,
     state: tauri::State<'_, Arc<AppState>>,
 ) -> Result<HistoryPrivacyStatusWire, String> {
+    let history = lease_history(&app)?;
     let app_state = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
+        let _ = &history;
         let gate = app_state.data_gate.read();
         let db = require_database(&app_state, &gate)?;
         read_history_privacy_status(&db)
@@ -44,18 +67,18 @@ pub async fn history_privacy_status(
 
 #[tauri::command]
 pub async fn history_set_enabled(
+    app: tauri::AppHandle,
     app_state: tauri::State<'_, Arc<AppState>>,
-    session: tauri::State<'_, Arc<Session>>,
     enabled: bool,
 ) -> Result<HistoryPrivacyStatusWire, String> {
+    let history = lease_history(&app)?;
     let app_state = app_state.inner().clone();
-    let session = session.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         let gate = app_state.data_gate.read();
         let db = require_database(&app_state, &gate)?;
-        let keystore = session_keystore(&session)?;
-        crate::db::history::set_enabled(&db, keystore, enabled)
-            .map_err(|error| error.to_string())?;
+        history
+            .with(|h| h.set_enabled(&db, enabled))
+            .map_err(map_lease)??;
         read_history_privacy_status(&db)
     })
     .await
@@ -64,11 +87,14 @@ pub async fn history_set_enabled(
 
 #[tauri::command]
 pub async fn history_set_retention(
+    app: tauri::AppHandle,
     state: tauri::State<'_, Arc<AppState>>,
     days: u32,
 ) -> Result<HistoryPrivacyStatusWire, String> {
+    let history = lease_history(&app)?;
     let app_state = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
+        let _ = &history;
         let gate = app_state.data_gate.read();
         let db = require_database(&app_state, &gate)?;
         db.with_conn(|conn| crate::db::history::set_retention(conn, days))
@@ -81,12 +107,15 @@ pub async fn history_set_retention(
 
 #[tauri::command]
 pub async fn history_clear_all(
+    app: tauri::AppHandle,
     state: tauri::State<'_, Arc<AppState>>,
-    session: tauri::State<'_, Arc<Session>>,
 ) -> Result<HistoryPrivacyStatusWire, String> {
-    session_keystore(&session)?;
+    let history = lease_history(&app)?;
     let app_state = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
+        history
+            .with(|h| h.require_writable())
+            .map_err(map_lease)??;
         let gate = app_state.data_gate.write();
         let db = require_database_write(&app_state, &gate)?;
         db.with_conn(crate::db::history::clear_all)
@@ -99,21 +128,37 @@ pub async fn history_clear_all(
 
 #[tauri::command]
 pub async fn history_search(
-    state: tauri::State<'_, Arc<Session>>,
+    app: tauri::AppHandle,
     app_state: tauri::State<'_, Arc<AppState>>,
     query: String,
     cursor: Option<String>,
 ) -> Result<crate::history::search::HistoryPage, String> {
-    session_keystore(&state)?;
-    let session = state.inner().clone();
+    let history = lease_history(&app)?;
     let state = app_state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         let _gate = state.data_gate.read();
         let db = require_database(&state, &_gate)?;
-        let keystore = session_keystore(&session)?;
-        crate::history::search::search(&db, keystore, &query, cursor.as_deref())
-            .map_err(|error| error.to_string())
+        history
+            .with(|h| h.search(&db, &query, cursor.as_deref()))
+            .map_err(map_lease)?
     })
     .await
     .map_err(|error| error.to_string())?
+}
+
+#[cfg(test)]
+mod remnant {
+    #[test]
+    fn history_commands_do_not_read_session_keystore() {
+        let src = include_str!("history.rs");
+        let prod = src.split("mod remnant").next().unwrap();
+        assert!(
+            !prod.contains("session_keystore"),
+            "history writes must lease Secrets via HistoryHub"
+        );
+        assert!(
+            !prod.contains("State<'_, Arc<Session>>"),
+            "history commands no longer take Session"
+        );
+    }
 }
