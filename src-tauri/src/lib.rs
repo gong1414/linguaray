@@ -1,9 +1,8 @@
 //! LinguaRay — translation core.
 //!
 //! Thin host: Tauri commands live in `commands/`. Vendor rows live in
-//! `linguaray-catalog`. Official features are in-tree Capability/Driver plugins
-//! (kernel crate exists; production Fiber hookup waits on K0 Go).
-//! Traditional engines are compiled-in fallbacks (`plugins/drivers/traditional`).
+//! `linguaray-catalog`. Official features are in-tree Capability/Driver plugins.
+//! Traditional engines live in `plugins/drivers/traditional`.
 
 pub mod a11y;
 pub mod adapter;
