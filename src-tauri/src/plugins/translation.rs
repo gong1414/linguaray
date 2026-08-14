@@ -7,8 +7,8 @@ use crate::engines::TraditionalEngine;
 use crate::error::{ConfigKind, Error};
 use crate::providers::ProviderPreset;
 use crate::service::{
-    self, run_session_with_fallback, PrefetchedSecrets, TranslateInput, TranslateSessionResult,
-    Translation,
+    self, run_session_with_fallback, PrefetchedSecrets, SecretStore, TranslateInput,
+    TranslateSessionResult, Translation,
 };
 use crate::wire::AppOptions;
 use futures::future::BoxFuture;
@@ -116,6 +116,14 @@ impl TranslationHub {
         if preset.needs_key {
             secrets.insert(preset.id.clone(), self.prefetch_key(&preset.id).await?);
         }
+        if let Some(ref fb) = fallback {
+            if fb.needs_key() {
+                let id = fb.id().to_string();
+                if let Ok(k) = self.prefetch_key(&id).await {
+                    secrets.insert(id, k);
+                }
+            }
+        }
         let out = http
             .call(|_| async move {
                 let store = if secrets.is_empty() {
@@ -165,9 +173,9 @@ impl TranslationHub {
                 .map_err(|e| e.to_string())?
                 .into_iter()
                 .filter(|p| p.needs_key)
-                .map(|p| p.secret_ref)
+                .map(|p| (p.secret_ref, p.template_id))
                 .collect::<Vec<_>>();
-            for secret_ref in refs {
+            for (secret_ref, template_id) in refs {
                 match secrets
                     .call(|ks| {
                         let r = ks.get_key(&secret_ref);
@@ -175,8 +183,33 @@ impl TranslationHub {
                     })
                     .await
                 {
-                    Ok(Ok(Some(key))) => prefetched.insert(secret_ref, key),
+                    Ok(Ok(Some(key))) => {
+                        if crate::db::providers::TRADITIONAL_TEMPLATES.contains(&template_id.as_str())
+                        {
+                            prefetched.insert(template_id, key.clone());
+                        }
+                        prefetched.insert(secret_ref, key);
+                    }
                     Ok(Ok(None)) | Ok(Err(_)) | Err(_) => {}
+                }
+            }
+            for eng in crate::engines::registry() {
+                if !eng.needs_key() {
+                    continue;
+                }
+                let id = eng.id().to_string();
+                if prefetched.get_key(&id).ok().flatten().is_some() {
+                    continue;
+                }
+                match secrets
+                    .call(|ks| {
+                        let r = ks.get_key(&id);
+                        async move { r }
+                    })
+                    .await
+                {
+                    Ok(Ok(Some(key))) => prefetched.insert(id, key),
+                    _ => {}
                 }
             }
         }

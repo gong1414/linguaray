@@ -3,8 +3,7 @@
 //! Thin host: Tauri commands live in `commands/`. Vendor rows live in
 //! `linguaray-catalog`. Official features are in-tree Capability/Driver plugins
 //! (kernel crate exists; production Fiber hookup waits on K0 Go).
-//! Traditional engines are compiled-in fallbacks (`engines/`). Google GTX is
-//! isolated as `engines/google_legacy` until the clean-room rewrite.
+//! Traditional engines are compiled-in fallbacks (`plugins/drivers/traditional`).
 
 pub mod a11y;
 pub mod adapter;

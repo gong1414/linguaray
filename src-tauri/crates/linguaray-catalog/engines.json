@@ -1,11 +1,60 @@
 {
   "schema_version": 1,
   "engines": [
-    {"id":"google","label":"Google Translate","unofficial_gtx":true,"needs_key":false},
-    {"id":"deepl","label":"DeepL","needs_key":true},
-    {"id":"microsoft","label":"Microsoft Translator","needs_key":true},
-    {"id":"baidu","label":"百度翻译","needs_key":true},
-    {"id":"youdao","label":"有道","needs_key":true},
-    {"id":"tencent","label":"腾讯","needs_key":true}
+    {
+      "id": "google",
+      "label": "Google Translate",
+      "protocol": "google_translate",
+      "endpoint": "https://translate.google.com",
+      "needs_key": false,
+      "unofficial_gtx": true,
+      "docs": "https://translate.google.com",
+      "notes": "Unofficial GTX (translate_a/single?client=gtx). No SLA; may stop working without notice."
+    },
+    {
+      "id": "deepl",
+      "label": "DeepL",
+      "protocol": "deepl",
+      "endpoint": "https://api-free.deepl.com/v2/translate",
+      "needs_key": true,
+      "docs": "https://developers.deepl.com/docs/api-reference/translate",
+      "notes": "Free keys end with :fx and use api-free.deepl.com; Pro keys use api.deepl.com. Authorization: DeepL-Auth-Key."
+    },
+    {
+      "id": "microsoft",
+      "label": "Microsoft Translator",
+      "protocol": "microsoft",
+      "endpoint": "https://api.cognitive.microsofttranslator.com",
+      "needs_key": true,
+      "docs": "https://learn.microsoft.com/azure/ai-services/translator/reference/v3-0-translate",
+      "notes": "Azure Translator v3. Key is the subscription key. Optional region as key|region (Ocp-Apim-Subscription-Region)."
+    },
+    {
+      "id": "baidu",
+      "label": "百度翻译",
+      "protocol": "baidu",
+      "endpoint": "https://fanyi-api.baidu.com/api/trans/vip/translate",
+      "needs_key": true,
+      "docs": "https://api.fanyi.baidu.com/doc/21",
+      "notes": "通用翻译 API. Store the key as appid:secret. sign = md5(appid+q+salt+secret)."
+    },
+    {
+      "id": "youdao",
+      "label": "有道",
+      "protocol": "youdao",
+      "endpoint": "https://openapi.youdao.com/api",
+      "needs_key": true,
+      "docs": "https://ai.youdao.com/DOCSIRMA/html/trans/api/wbfy/index.html",
+      "notes": "有道智云文本翻译. Store the key as appKey:appSecret. signType=v3."
+    },
+    {
+      "id": "tencent",
+      "label": "腾讯",
+      "protocol": "tencent",
+      "endpoint": "https://tmt.tencentcloudapi.com",
+      "needs_key": true,
+      "docs": "https://cloud.tencent.com/document/api/551/15619",
+      "notes": "腾讯云 TMT TextTranslate 2018-03-21. Store the key as secretId:secretKey. TC3-HMAC-SHA256."
+    }
   ]
 }

@@ -67,7 +67,7 @@ impl Protocol {
 
     /// Parse a DB TEXT value back into the enum. Unknown strings → Integrity
     /// error (the CHECK constraint should already prevent this, but fail-closed).
-    fn from_db_str(s: &str) -> Result<Self, DbError> {
+    pub(crate) fn from_db_str(s: &str) -> Result<Self, DbError> {
         match s {
             "openai_chat" => Ok(Protocol::OpenaiChat),
             "anthropic" => Ok(Protocol::Anthropic),
@@ -1083,28 +1083,43 @@ pub fn read_consent_version(conn: &Connection) -> Result<Option<i64>, DbError> {
 
 // ─── TraditionalProviderCatalog ───────────────────────────────────────────
 
-/// Catalog entry for a traditional (non-AI, keyless) translation engine. These
-/// are the built-in MT providers used as AI-failure fallback (spec §G) and as
-/// the always-available `fallback_uuid` slot.
-#[derive(Debug, Clone, Copy)]
+/// Catalog entry for a traditional MT engine. Source of truth is
+/// `linguaray-catalog` `engines.json` (id / label / endpoint / needs_key /
+/// protocol). Used as AI-failure fallback (spec §G) and the `fallback_uuid` slot.
+#[derive(Debug, Clone)]
 pub struct TraditionalProviderCatalog {
-    pub template_id: &'static str,
-    pub label: &'static str,
-    pub endpoint: &'static str,
-    /// Always `false` for traditional engines — they're free and keyless.
+    pub template_id: String,
+    pub label: String,
+    pub endpoint: String,
     pub needs_key: bool,
+    pub protocol: Protocol,
 }
 
-/// The traditional-engine catalog. One row per built-in MT provider. Adding a
-/// traditional engine = one struct literal here.
+/// The traditional-engine catalog. One row per built-in MT provider, loaded
+/// from the compiled-in `engines.json`.
 pub fn traditional_catalog() -> &'static [TraditionalProviderCatalog] {
-    static CATALOG: &[TraditionalProviderCatalog] = &[TraditionalProviderCatalog {
-        template_id: "google",
-        label: "Google Translate",
-        endpoint: "https://translate.google.com",
-        needs_key: false,
-    }];
+    static CATALOG: std::sync::OnceLock<Vec<TraditionalProviderCatalog>> = std::sync::OnceLock::new();
     CATALOG
+        .get_or_init(|| {
+            linguaray_catalog::load_engines()
+                .map(|file| {
+                    file.engines
+                        .into_iter()
+                        .filter_map(|e| {
+                            let protocol = Protocol::from_db_str(&e.protocol).ok()?;
+                            Some(TraditionalProviderCatalog {
+                                template_id: e.id,
+                                label: e.label,
+                                endpoint: e.endpoint,
+                                needs_key: e.needs_key,
+                                protocol,
+                            })
+                        })
+                        .collect()
+                })
+                .unwrap_or_default()
+        })
+        .as_slice()
 }
 
 /// Lookup helper: find a traditional catalog entry by `template_id`.
@@ -1377,13 +1392,17 @@ pub fn build_profile(source: &CandidateSource) -> Result<ProviderProfile, DbErro
             // 2. Traditional catalog match?
             if let Some(c) = traditional_lookup(id) {
                 let uuid = source.deterministic_uuid().to_string();
-                let secret_ref = format!("provider/{uuid}");
+                let secret_ref = if c.needs_key {
+                    id.clone()
+                } else {
+                    format!("provider/{uuid}")
+                };
                 return Ok(ProviderProfile {
                     uuid,
-                    template_id: c.template_id.to_string(),
-                    name: c.label.to_string(),
-                    protocol: Protocol::GoogleTranslate,
-                    endpoint: c.endpoint.to_string(),
+                    template_id: c.template_id.clone(),
+                    name: c.label.clone(),
+                    protocol: c.protocol,
+                    endpoint: c.endpoint.clone(),
                     model: None,
                     enabled: true,
                     sort_order: 0,

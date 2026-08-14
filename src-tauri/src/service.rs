@@ -189,20 +189,43 @@ pub async fn translate_with_fallback_ref(
                 None => Err(Error::LocalNoFallback),
                 // Single fallback attempt over the whole text; tag the result with
                 // the FALLBACK engine id (not the primary).
-                Some(eng) => {
-                    let fb_id = eng.id().to_string();
-                    eng.translate(client, input.text, input.from, input.to)
-                        .await
-                        .map(|text| Translation {
-                            text,
-                            engine: fb_id,
-                        })
-                }
+                Some(eng) => run_traditional(client, keystore, eng, input.text, input.from, input.to).await,
             }
         }
         // Config/Auth/Keystore → propagate, do NOT fall back.
         Err(other) => Err(other),
     }
+}
+
+async fn run_traditional(
+    client: &reqwest::Client,
+    keystore: Option<&dyn SecretStore>,
+    eng: &dyn TraditionalEngine,
+    text: &str,
+    from: &str,
+    to: &str,
+) -> Result<Translation, Error> {
+    let fb_id = eng.id().to_string();
+    let key = if eng.needs_key() {
+        let store = keystore.ok_or_else(|| {
+            Error::Config(ConfigKind::MissingKey {
+                provider: fb_id.clone(),
+            })
+        })?;
+        Some(store.get_key(&fb_id)?.ok_or_else(|| {
+            Error::Config(ConfigKind::MissingKey {
+                provider: fb_id.clone(),
+            })
+        })?)
+    } else {
+        None
+    };
+    eng.translate(client, text, from, to, key.as_deref())
+        .await
+        .map(|text| Translation {
+            text,
+            engine: fb_id,
+        })
 }
 
 // ─── R2a: 并行翻译编排 ────────────────────────────────────────────────────
@@ -431,13 +454,8 @@ pub async fn translate_parallel(
     if eligible {
         if let Some(eng) = fallback.as_deref() {
             let fb_id = eng.id().to_string();
-            let fb_result = eng
-                .translate(client, text, from, to)
-                .await
-                .map(|text| Translation {
-                    text,
-                    engine: fb_id.clone(),
-                });
+            let fb_result =
+                run_traditional(client, keystore, eng, text, from, to).await;
             outcomes.push(TranslationOutcome {
                 uuid: fb_id,
                 result: fb_result,

@@ -1,4 +1,7 @@
-use crate::{CatalogFile, CatalogProvider, RELAY_HOST_DENY, REQUIRED_IDS};
+use crate::{
+    CatalogFile, CatalogProvider, EngineCatalogFile, RELAY_HOST_DENY, REQUIRED_ENGINE_IDS,
+    REQUIRED_IDS,
+};
 use linguaray_contracts::{AuthKind, SupportTier};
 use thiserror::Error;
 
@@ -92,6 +95,47 @@ fn validate_one(p: &CatalogProvider) -> Result<(), CatalogError> {
             "{} is keyless but is not loopback / auth=none",
             p.id
         )));
+    }
+    Ok(())
+}
+
+pub fn validate_engines(file: &EngineCatalogFile) -> Result<(), CatalogError> {
+    if file.schema_version != 1 {
+        return Err(CatalogError::Invalid(format!(
+            "engines schema_version must be 1, got {}",
+            file.schema_version
+        )));
+    }
+    if file.engines.len() != REQUIRED_ENGINE_IDS.len() {
+        return Err(CatalogError::Invalid(format!(
+            "expected {} engines, got {}",
+            REQUIRED_ENGINE_IDS.len(),
+            file.engines.len()
+        )));
+    }
+    let mut seen = std::collections::BTreeSet::new();
+    for e in &file.engines {
+        if e.id.is_empty() || e.id.contains('_') || e.id.chars().any(|c| c.is_ascii_uppercase()) {
+            return Err(CatalogError::Invalid(format!(
+                "engine id {} must be kebab-case",
+                e.id
+            )));
+        }
+        if e.endpoint.is_empty() {
+            return Err(CatalogError::Invalid(format!(
+                "engine {} needs an endpoint",
+                e.id
+            )));
+        }
+        validate_endpoint(&e.endpoint)?;
+        if !seen.insert(e.id.as_str()) {
+            return Err(CatalogError::Invalid(format!("duplicate engine id {}", e.id)));
+        }
+    }
+    for id in REQUIRED_ENGINE_IDS {
+        if !seen.contains(id) {
+            return Err(CatalogError::Invalid(format!("missing required engine {id}")));
+        }
     }
     Ok(())
 }
