@@ -1,4 +1,4 @@
-use linguaray_lib::engines::google::Google;
+use linguaray_lib::engines::google_legacy::Google;
 use linguaray_lib::engines::TraditionalEngine;
 use wiremock::{MockServer, Mock, ResponseTemplate};
 use serde_json::json;

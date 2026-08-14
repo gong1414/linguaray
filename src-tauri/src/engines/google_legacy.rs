@@ -1,4 +1,8 @@
-//! Google Translate (free, keyless) — ported from pot's google plugin logic.
+//! Isolated Google GTX client. Not covered by the root MIT LICENSE.
+//!
+//! provenance: pot-desktop GPL-3.0 lineage; do not copy into new modules.
+//! Isolated per plugin-core spec §12.4 pending a clean-room rewrite.
+//!
 //! Endpoint: translate.google.com/translate_a/single (client=gtx, dt=t).
 //! Response: nested JSON array; translated segments are at [0][*][0].
 use async_trait::async_trait;

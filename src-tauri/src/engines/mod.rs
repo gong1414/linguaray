@@ -1,9 +1,7 @@
-//! Built-in traditional MT engines (spec: AI-failure fallback + system-dict).
-//! Each engine is a Rust module ported from the corresponding pot-app plugin's
-//! JS (leverage ①: turn reversing into JS→Rust porting). v1 ships Google first;
-//! others (DeepL/百度/有道/…) follow the same pattern.
+//! Built-in traditional MT engines (AI-failure fallback).
+//! Google is isolated as `google_legacy` until the §12.4 clean-room rewrite.
 
-pub mod google;
+pub mod google_legacy;
 
 /// A built-in traditional MT engine. Unlike providers (config-driven), these are
 /// compiled-in Rust modules implementing their own request construction.
@@ -25,7 +23,7 @@ pub trait TraditionalEngine: Send + Sync {
 
 /// The static registry of built-in traditional engines.
 pub fn registry() -> Vec<Box<dyn TraditionalEngine>> {
-    vec![Box::new(google::Google::new())]
+    vec![Box::new(google_legacy::Google::new())]
 }
 
 pub fn find(id: &str) -> Option<Box<dyn TraditionalEngine>> {

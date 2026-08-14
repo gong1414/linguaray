@@ -1,14 +1,10 @@
 //! LinguaRay — translation core.
 //!
-//! Architecture decided in the grill-me session (2026-07-30):
-//! - Unified translate contract: `translate(text, from, to, options) -> text`.
-//! - Two layers of engines, both sharing that contract:
-//!     * `providers` — AI preset catalog (cc-switch-style "fill key, instant use").
-//!       These are OpenAI/Anthropic-compatible HTTP callers, driven by CONFIG DATA.
-//!     * `engines`   — built-in traditional MT engines (DeepL/Google/百度/有道/...),
-//!       ported from pot's `.potext` JS source. Role: AI-failure fallback +
-//!       system-dictionary integration. Built-in Rust modules, NOT plugins.
-//! - No WASM, no plugin system in v1 (deferred to post-v1).
+//! Thin host: Tauri commands live in `commands/`. Vendor rows live in
+//! `linguaray-catalog`. Official features are in-tree Capability/Driver plugins
+//! (kernel crate exists; production Fiber hookup waits on K0 Go).
+//! Traditional engines are compiled-in fallbacks (`engines/`). Google GTX is
+//! isolated as `engines/google_legacy` until the clean-room rewrite.
 
 pub mod a11y;
 pub mod adapter;
@@ -44,13 +40,13 @@ use tauri_plugin_global_shortcut::{
 };
 
 use crate::commands::{
-    a11y_status, archive_database, archive_keystore, delete_key, get_data_readiness, get_settings,
+    a11y_status, archive_database, archive_keystore, get_data_readiness, get_settings,
     history_clear_all, history_privacy_status, history_search, history_set_enabled,
-    history_set_retention, key_status, keystore_health, list_engines, open_settings_window,
+    history_set_retention, key_status, keystore_health, open_settings_window,
     provider_confirm_and_set_active, provider_create, provider_delete, provider_duplicate,
     provider_get_active_selection, provider_get_models, provider_list, provider_list_presets,
     provider_reorder, provider_set_active, provider_set_key, provider_test_connection,
-    provider_toggle, provider_update, reset_keystore, set_key, set_setting,
+    provider_toggle, provider_update, reset_keystore, set_setting,
     shortcut_check_conflict, shortcut_list, shortcut_recording_begin, shortcut_recording_end,
     shortcut_reset_defaults, shortcut_save, translate, translate_clipboard, translate_default,
     translate_selection_ipc, translate_session,
@@ -74,7 +70,7 @@ pub use crate::commands::providers::{
 };
 pub use crate::commands::translate::{
     decide_clipboard_popup, resolve_target_language, run_translate_session_no_settings,
-    ClipboardPopupDecision, EngineInfo, TranslateRequest, TranslateResult, TranslateSessionRequest,
+    ClipboardPopupDecision, TranslateRequest, TranslateResult, TranslateSessionRequest,
     TranslateSessionResult,
 };
 
@@ -1384,15 +1380,11 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            // commands/* (PR-3) + remaining in-crate handlers
             translate,
             translate_default,
             translate_clipboard,
             translate_session,
             translate_selection_ipc,
-            list_engines,
-            set_key,
-            delete_key,
             key_status,
             get_settings,
             set_setting,

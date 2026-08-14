@@ -44,12 +44,6 @@ pub fn set_setting(app: tauri::AppHandle, key: String, value: String) -> Result<
     crate::settings::save(&app, &s)
 }
 
-#[allow(dead_code)]
-#[tauri::command]
-pub fn lookup_dictionary(word: String) -> Option<String> {
-    crate::dict::lookup(&word)
-}
-
 #[tauri::command]
 pub fn a11y_status() -> bool {
     crate::a11y::enabled()
