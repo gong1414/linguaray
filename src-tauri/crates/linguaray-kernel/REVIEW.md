@@ -4,7 +4,8 @@ Spec: `docs/superpowers/specs/2026-08-14-linguaray-plugin-core-design.md` §14.4
 
 Crate-level gates were verified when PR-4 hooked Shortcuts (branch
 `feat/plugin-core-pr1-closeout-pr2`). Production compose is
-`plugins::builtin_plugins` — shortcuts only, no stub Fibers.
+`plugins::builtin_plugins` — database, secrets, http, drivers, providers,
+shortcuts; no stub Fibers.
 
 ## Gate
 

@@ -45,10 +45,10 @@ use crate::commands::{
     provider_confirm_and_set_active, provider_create, provider_delete, provider_duplicate,
     provider_get_active_selection, provider_get_models, provider_list, provider_list_presets,
     provider_reorder, provider_set_active, provider_set_key, provider_test_connection,
-    provider_toggle, provider_update, reset_keystore, set_setting,
-    shortcut_check_conflict, shortcut_list, shortcut_recording_begin, shortcut_recording_end,
-    shortcut_reset_defaults, shortcut_save, translate, translate_clipboard, translate_default,
-    translate_selection_ipc, translate_session,
+    provider_toggle, provider_update, reset_keystore, set_setting, shortcut_check_conflict,
+    shortcut_list, shortcut_recording_begin, shortcut_recording_end, shortcut_reset_defaults,
+    shortcut_save, translate, translate_clipboard, translate_default, translate_selection_ipc,
+    translate_session,
 };
 use crate::db::migration::{run_migration, FailpointCell, MigrationError};
 use crate::db::providers::{self as db_providers};
@@ -1585,7 +1585,7 @@ mod tests {
             id: "evil".into(),
             label: "Evil".into(),
             endpoint: "ftp://evil.example/x".into(),
-            api_kind: crate::wire::ApiKind::OpenAIChat,
+            protocol: linguaray_contracts::ProtocolKind::OpenaiChat,
             default_model: "x".into(),
             needs_key: true,
             auth: linguaray_contracts::AuthKind::Bearer,

@@ -625,8 +625,8 @@ pub async fn provider_confirm_and_set_active(
         tauri::async_runtime::spawn_blocking(move || -> Result<i64, ProviderCommandError> {
             // Acquire the gate FIRST (see provider_list).
             let _gate = app_state.data_gate.write();
-            let db = require_database_write(&app_state, &_gate)
-                .map_err(ProviderCommandError::from)?;
+            let db =
+                require_database_write(&app_state, &_gate).map_err(ProviderCommandError::from)?;
             let outcome = db.with_conn(|conn| -> Result<ConfirmActiveOutcome, DbErr> {
                 let tx = conn.transaction()?;
                 let active = db_providers::list(&tx)?;
@@ -761,15 +761,10 @@ pub async fn provider_get_models(
         .unwrap_or(linguaray_contracts::AuthKind::Bearer);
     let mut req = client.get(&url);
     if profile.needs_key {
-        req = match auth {
-            linguaray_contracts::AuthKind::Bearer => req.bearer_auth(&key),
-            linguaray_contracts::AuthKind::AzureKey => req.header("api-key", &key),
-            linguaray_contracts::AuthKind::XApiKey => req
-                .header("x-api-key", &key)
-                .header("anthropic-version", "2023-06-01"),
-            linguaray_contracts::AuthKind::None => req,
-            linguaray_contracts::AuthKind::Query => req.query(&[("key", key.as_str())]),
-        };
+        req = crate::plugins::drivers::apply_auth(req, auth, &key);
+        if profile.protocol == db_providers::Protocol::Anthropic {
+            req = req.header("anthropic-version", "2023-06-01");
+        }
     }
     let resp = req.send().await.map_err(|e| e.to_string())?;
     let status = resp.status().as_u16();

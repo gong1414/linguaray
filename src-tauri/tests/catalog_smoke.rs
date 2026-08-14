@@ -6,7 +6,7 @@
 use linguaray_catalog::load;
 use linguaray_contracts::AuthKind;
 use linguaray_lib::providers::ProviderPreset;
-use linguaray_lib::wire::{build_prompt, call, ApiKind, AppOptions, WireParams};
+use linguaray_lib::wire::{build_prompt, call, AppOptions, WireParams};
 
 #[tokio::test]
 #[ignore]
@@ -36,10 +36,7 @@ async fn smoke_rows_with_env_keys() {
             id: row.id.clone(),
             label: row.label.clone(),
             endpoint: row.endpoint.clone(),
-            api_kind: match row.protocol {
-                linguaray_contracts::ProtocolKind::Anthropic => ApiKind::Anthropic,
-                linguaray_contracts::ProtocolKind::OpenaiChat => ApiKind::OpenAIChat,
-            },
+            protocol: row.protocol,
             default_model: row.default_model.clone(),
             needs_key: row.needs_key,
             auth: row.auth,

@@ -23,11 +23,11 @@
 //!   tests/keystore.rs. This keeps these tests focused on the §G branches.
 
 use async_trait::async_trait;
+use linguaray_contracts::ProtocolKind;
 use linguaray_lib::engines::TraditionalEngine;
 use linguaray_lib::error::Error;
 use linguaray_lib::providers::ProviderPreset;
 use linguaray_lib::service::{translate_with_fallback, TranslateInput};
-use linguaray_lib::wire::ApiKind;
 use serde_json::json;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -43,8 +43,12 @@ struct FakeFallback {
 
 #[async_trait]
 impl TraditionalEngine for FakeFallback {
-    fn id(&self) -> &str { "fake" }
-    fn label(&self) -> &str { "Fake" }
+    fn id(&self) -> &str {
+        "fake"
+    }
+    fn label(&self) -> &str {
+        "Fake"
+    }
     async fn translate(
         &self,
         _client: &reqwest::Client,
@@ -75,7 +79,7 @@ fn primary_preset(endpoint: &str) -> ProviderPreset {
         id: "test-primary".into(),
         label: "Test Primary".into(),
         endpoint: endpoint.into(),
-        api_kind: ApiKind::OpenAIChat,
+        protocol: ProtocolKind::OpenaiChat,
         default_model: "m".into(),
         needs_key: false,
         auth: linguaray_contracts::AuthKind::Bearer,
@@ -135,8 +139,14 @@ async fn fallback_eligible_tries_fallback() {
 
     // Fallback ran and returned its marker, tagged with the FALLBACK engine id.
     assert_eq!(out.text, "[fb]hello world");
-    assert_eq!(out.engine, "fake", "result tagged with the fallback engine id, not primary");
-    assert!(called.load(Ordering::SeqCst), "fallback engine must be called");
+    assert_eq!(
+        out.engine, "fake",
+        "result tagged with the fallback engine id, not primary"
+    );
+    assert!(
+        called.load(Ordering::SeqCst),
+        "fallback engine must be called"
+    );
     // Whole-text fallback (no chunk mixing): it saw the entire input verbatim.
     assert_eq!(
         seen_text.lock().unwrap().as_deref(),
@@ -292,7 +302,10 @@ async fn primary_success_skips_fallback() {
         .await
         .expect("primary success");
     assert_eq!(out.text, "你好");
-    assert_eq!(out.engine, preset.id, "primary success tagged with primary id");
+    assert_eq!(
+        out.engine, preset.id,
+        "primary success tagged with primary id"
+    );
     assert!(
         !called.load(Ordering::SeqCst),
         "fallback must not be called when the primary succeeds"
