@@ -68,7 +68,11 @@ impl Saved {
         let text = clip.get_text().ok();
         // Image: best-effort; errors → None.
         let image = clip.get_image().unwrap_or(None);
-        Ok(Saved { text, image, owned_sequence: 0 })
+        Ok(Saved {
+            text,
+            image,
+            owned_sequence: 0,
+        })
     }
 
     /// Restore the snapshot ONLY if the clipboard sequence still equals owned. Per
@@ -115,8 +119,8 @@ pub fn capture<C: ClipboardLike, F: FnMut() -> std::result::Result<(), String>>(
     let sentinel = format!("__linguaray_sel_{}__", clip.sequence());
     clip.set_text(&sentinel)?;
     saved.owned_sequence = clip.sequence(); // the state WE left the clipboard in
-    // 3. Simulate copy. On failure: restore (if still owned); propagate the copy error,
-    //    combined with a restore error if restore also failed.
+                                            // 3. Simulate copy. On failure: restore (if still owned); propagate the copy error,
+                                            //    combined with a restore error if restore also failed.
     if let Err(e) = copy() {
         let restore_err = saved.restore_if_owned(clip).err();
         return Err(match restore_err {
