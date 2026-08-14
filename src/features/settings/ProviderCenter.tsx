@@ -56,6 +56,7 @@ import {
   type ProviderRowLabels,
   type SelectOption,
 } from "@linguaray/ui";
+import { invoke } from "@tauri-apps/api/core";
 import { SETTINGS_COPY, type SettingsCopy } from "./copy";
 import { detectLocale } from "../../i18n";
 import type {
@@ -87,19 +88,53 @@ import "./ProviderCenter.css";
 // `name` may be null to signal "use the localized Ollama label" at render.
 // R2/C2: only the 4 supported AI presets are exposed. Traditional MT engines
 // (google / deepl) are no longer offered as presets.
-export type Preset = { templateId: string; name: string | null; endpoint: string; model: string | null };
+export type SupportTier = "ready" | "setup_required" | "unverified";
+export type Preset = {
+  templateId: string;
+  name: string | null;
+  endpoint: string;
+  model: string | null;
+  needsKey: boolean;
+  auth: string;
+  requiresUserEndpoint: boolean;
+  notes: string | null;
+  supportTier: SupportTier;
+  icon: string | null;
+};
+
+type CatalogPresetDto = {
+  id: string;
+  label: string;
+  endpoint: string;
+  default_model: string;
+  needs_key: boolean;
+  auth: string;
+  requires_user_endpoint: boolean;
+  notes: string | null;
+  console_url: string | null;
+  support_tier: SupportTier;
+  icon: string | null;
+};
+
+export function catalogDtoToPreset(dto: CatalogPresetDto): Preset {
+  return {
+    templateId: dto.id,
+    name: dto.id === "ollama" ? null : dto.label,
+    endpoint: dto.endpoint,
+    model: dto.default_model || null,
+    needsKey: dto.needs_key,
+    auth: dto.auth,
+    requiresUserEndpoint: dto.requires_user_endpoint,
+    notes: dto.notes,
+    supportTier: dto.support_tier,
+    icon: dto.icon,
+  };
+}
 
 /** Escape a literal string for use inside a CSS attribute selector. Provider
  *  names may contain characters that break `button[aria-label="..."]` otherwise. */
 const cssEscape = (s: string): string =>
   s.replace(/["\\]/g, (c) => `\\${c}`);
-
-export const PRESETS: Preset[] = [
-  { templateId: "openai", name: "OpenAI", endpoint: "https://api.openai.com/v1/chat/completions", model: "gpt-4o-mini" },
-  { templateId: "anthropic", name: "Anthropic", endpoint: "https://api.anthropic.com/v1/messages", model: "claude-sonnet-4-5" },
-  { templateId: "gemini", name: "Gemini", endpoint: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", model: "gemini-3.6-flash" },
-  { templateId: "ollama", name: null, endpoint: "http://localhost:11434/v1/chat/completions", model: "qwen2.5:7b" },
-];
 
 export type ToastVariant = "info" | "success" | "warning" | "destructive";
 export type ToastEntry = { id: number; variant: ToastVariant; message: string };
@@ -427,9 +462,17 @@ export function ProviderCenterView(props: ProviderCenterViewProps): JSX.Element 
                   class="pc__preset"
                   disabled={locked()}
                   onClick={() => props.onAddPreset(preset)}
+                  title={preset.notes ?? undefined}
                 >
                   <Plus size={12} />
                   <span>{preset.name ?? "Ollama"}</span>
+                  <Show when={preset.supportTier !== "ready"}>
+                    <span class="pc__preset-tier">
+                      {preset.supportTier === "setup_required"
+                        ? t().tier.setupRequired
+                        : t().tier.unverified}
+                    </span>
+                  </Show>
                 </button>
               )}
             </For>
@@ -780,6 +823,7 @@ const ProviderCenter: Component = () => {
   onCleanup(() => { disposed = true; });
 
   // --- Core state ---
+  const [presets, setPresets] = createSignal<Preset[]>([]);
   const [providers, setProviders] = createSignal<ProviderProfileFE[]>([]);
   // Active selection is cold-loaded via `provider_get_active_selection` and then
   // kept in sync as a session mirror. Fail-closed: while loading or after a
@@ -988,6 +1032,9 @@ const ProviderCenter: Component = () => {
   const refresh = (): Promise<boolean> => runExclusive(() => refreshCore());
 
   onMount(() => {
+    void invoke<CatalogPresetDto[]>("provider_list_presets")
+      .then((rows) => setPresets(rows.map(catalogDtoToPreset)))
+      .catch(() => setPresets([]));
     // R10: reloadFailed for cold-load failure (a READ failure, not a save).
     void refresh().then((ok) => {
       if (!ok) pushToast("destructive", t.reloadFailed);
@@ -1217,7 +1264,9 @@ const ProviderCenter: Component = () => {
       const provider = providers().find((p) => p.uuid === uuid);
       if (!provider) return;
       const effectiveEndpoint = draft ?? provider.endpoint;
-      const epCheck = validateEndpoint(effectiveEndpoint);
+      const allowEmpty =
+        provider.template_id === "custom" || provider.template_id === "azure-openai";
+      const epCheck = validateEndpoint(effectiveEndpoint, { allowEmpty });
       if (!epCheck.ok) {
         // The reactive epError memo will surface the message; abort the save.
         return;
@@ -1605,7 +1654,7 @@ const ProviderCenter: Component = () => {
       deletingUuid={deletingUuid()}
       reloadingUuid={reloadingUuid()}
       exclusiveBusy={exclusiveBusy()}
-      presets={PRESETS}
+      presets={presets()}
       detail={detail()}
       deleteConfirmUuid={deleteConfirmUuid()}
       deleteError={deleteError()}

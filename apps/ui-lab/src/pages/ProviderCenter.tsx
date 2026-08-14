@@ -6,7 +6,7 @@ import { type Component } from "solid-js";
 // this import; the lab no longer owns a provider-center stylesheet.
 import {
   ProviderCenterView,
-  PRESETS,
+  catalogDtoToPreset,
   type ProviderCenterViewProps,
   type ProviderDetailState,
 } from "@app/features/settings/ProviderCenter";
@@ -17,6 +17,22 @@ import type {
   ConnectionResult,
 } from "@app/features/settings/provider-types";
 import type { ProviderState } from "../i18n";
+
+const LAB_PRESETS = [
+  catalogDtoToPreset({
+    id: "openai",
+    label: "OpenAI",
+    endpoint: "https://api.openai.com/v1/chat/completions",
+    default_model: "gpt-4o-mini",
+    needs_key: true,
+    auth: "bearer",
+    requires_user_endpoint: false,
+    notes: null,
+    console_url: null,
+    support_tier: "ready",
+    icon: "openai",
+  }),
+];
 
 export type ProviderCenterProps = {
   state: ProviderState;
@@ -110,7 +126,7 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
         deletingUuid: null,
         reloadingUuid: null,
         exclusiveBusy: false,
-        presets: PRESETS,
+        presets: LAB_PRESETS,
         detail: null,
         deleteConfirmUuid: null,
         deleteError: false,
@@ -210,7 +226,7 @@ const ProviderCenter: Component<ProviderCenterProps> = (props) => {
       deletingUuid,
       reloadingUuid: null,
       exclusiveBusy: false,
-      presets: PRESETS,
+      presets: LAB_PRESETS,
       detail,
       deleteConfirmUuid,
       deleteError,

@@ -134,7 +134,7 @@
 /* Preset grid (add-provider). */
 .pc__preset-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
   gap: var(--space-sm, 8px);
   padding: var(--space-sm, 8px) 0;
 }
@@ -163,6 +163,12 @@
 .pc__preset:focus-visible {
   outline: 2px solid var(--color-brand-default, #4f46e5);
   outline-offset: 2px;
+}
+
+.pc__preset-tier {
+  font-size: var(--text-xs, 0.7rem);
+  color: var(--color-text-secondary, #64748b);
+  margin-left: auto;
 }
 
 /* Detail panel. */

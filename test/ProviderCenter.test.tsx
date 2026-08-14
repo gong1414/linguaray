@@ -60,6 +60,9 @@ const TWO_PROFILES: ProviderProfile[] = [
 /** Wire `invoke` to a route table keyed by command name. */
 function routeInvoke(routes: Record<string, (args?: unknown) => unknown>): void {
   invokeMock.mockImplementation(async (cmd: string, args?: unknown) => {
+    if (cmd === "provider_list_presets" && !routes[cmd]) {
+      return OFFICIAL_PRESET_DTOS;
+    }
     const fn = routes[cmd];
     if (!fn) throw new Error(`unexpected invoke ${cmd}`);
     return fn(args);
@@ -73,8 +76,11 @@ function routeInvoke(routes: Record<string, (args?: unknown) => unknown>): void 
  * the selection read makes `refresh()` reject and never populate the list.
  * Tests that need a custom route pass `{ ...DEFAULT_ROUTES, ...custom }`.
  */
+import { OFFICIAL_PRESET_DTOS } from "./catalogPresets";
+
 const DEFAULT_ROUTES: Record<string, (args?: unknown) => unknown> = {
   provider_list: () => [],
+  provider_list_presets: () => OFFICIAL_PRESET_DTOS,
   key_status: () => ({}),
   provider_get_active_selection: () => ({ primary: null, parallel: [], fallback: null }),
 };
@@ -132,6 +138,7 @@ describe("ProviderCenter (Surface 05)", () => {
       calls.push(cmd);
       const map: Record<string, () => unknown> = {
         provider_list: () => (created ? [profile()] : []),
+        provider_list_presets: () => OFFICIAL_PRESET_DTOS,
         key_status: () => ({}),
         provider_create: () => {
           created = true;
@@ -1033,6 +1040,7 @@ describe("ProviderCenter (Surface 05)", () => {
           return { balance: 1.23 };
         },
       };
+      if (cmd === "provider_list_presets") return OFFICIAL_PRESET_DTOS;
       const fn = map[cmd];
       if (!fn) throw new Error(`unexpected invoke ${cmd}`);
       return fn(args);
@@ -1184,6 +1192,7 @@ describe("ProviderCenter (Surface 05)", () => {
           return [];
         },
       };
+      if (cmd === "provider_list_presets") return OFFICIAL_PRESET_DTOS;
       const fn = map[cmd];
       if (!fn) throw new Error(`unexpected invoke ${cmd}`);
       return fn(args);
@@ -1336,6 +1345,7 @@ describe("ProviderCenter (Surface 05)", () => {
         },
         provider_get_active_selection: () => ({ primary: null, parallel: [], fallback: null }),
       };
+      if (cmd === "provider_list_presets") return OFFICIAL_PRESET_DTOS;
       const fn = map[cmd];
       if (!fn) throw new Error(`unexpected invoke ${cmd}`);
       return fn();
@@ -1357,14 +1367,12 @@ describe("ProviderCenter (Surface 05)", () => {
     expect((labeled!.getAttribute("aria-label") ?? "").length).toBeGreaterThan(0);
   });
 
-  it("preset grid contains only the 4 supported AI presets (no Google/DeepL)", async () => {
+  it("preset grid lists official catalog ids and no traditional engines", async () => {
     routeInvoke({ ...DEFAULT_ROUTES });
     const { findByText } = render(() => <ProviderCenter />);
     expect(await findByText("OpenAI")).toBeTruthy();
-    expect(await findByText("Anthropic")).toBeTruthy();
-    expect(await findByText("Gemini")).toBeTruthy();
-    expect(await findByText("Ollama")).toBeTruthy();
-    // Google Translate + DeepL presets are gone.
+    expect(await findByText("DeepSeek")).toBeTruthy();
+    expect(await findByText("Azure OpenAI")).toBeTruthy();
     expect(screen.queryByText(/Google Translate/)).toBeNull();
     expect(screen.queryByText(/^DeepL$/)).toBeNull();
   });

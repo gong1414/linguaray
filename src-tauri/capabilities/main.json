@@ -19,6 +19,7 @@
     "allow-archive-keystore",
     "allow-reset-keystore",
     "allow-get-data-readiness",
+    "allow-provider-list-presets",
     "allow-provider-list",
     "allow-provider-create",
     "allow-provider-update",

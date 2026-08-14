@@ -219,6 +219,8 @@ describe("validateEndpoint", () => {
     expect(r.ok === false && r.code).toBe("endpoint-must-https");
   });
   it("rejects empty → endpoint-required", () => {
+    const emptyOk = validateEndpoint("", { allowEmpty: true });
+    expect(emptyOk.ok).toBe(true);
     const r = validateEndpoint("");
     expect(r.ok === false && r.code).toBe("endpoint-required");
   });
