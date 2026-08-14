@@ -2508,6 +2508,7 @@ dependencies = [
  "image",
  "linguaray-catalog",
  "linguaray-contracts",
+ "linguaray-kernel",
  "log",
  "mouse_position",
  "objc2 0.6.4",

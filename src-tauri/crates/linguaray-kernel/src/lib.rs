@@ -1,7 +1,7 @@
 //! Generic capability supervisor (spec §5).
 //!
 //! This crate has **no** Tauri / reqwest / rusqlite / vendor strings.
-//! Production `builtin_plugins()` must not exist until K0 Go (PR-4+).
+//! Production compose lives in the host (`plugins::builtin_plugins`).
 //! There is no `HostEffect` type: plugins capture host in their constructor.
 
 mod context;
