@@ -160,6 +160,18 @@ impl<T: ?Sized + Send + Sync + 'static> ServiceLease<T> {
         }
     }
 
+    /// Synchronous borrow. Capture / clipboard adapters must not `.await`
+    /// under `selection_lock`.
+    pub fn with<F, R>(&self, f: F) -> Result<R, LeaseError>
+    where
+        F: FnOnce(&T) -> R,
+    {
+        self.classify()?;
+        let r = f(&self.value);
+        self.classify()?;
+        Ok(r)
+    }
+
     pub fn service_id(&self) -> ServiceId {
         self.slot.service_id
     }

@@ -20,10 +20,18 @@ struct OsClipboard {
     owner: OwnerHwnd,
 }
 impl ClipboardLike for OsClipboard {
-    fn get_text(&self) -> Result<String, String> { clipboard::get_text() }
-    fn set_text(&self, s: &str) -> Result<(), String> { clipboard::set_text(s) }
-    fn get_image(&self) -> Result<Option<selection_engine::ImageBlob>, String> { clipboard::get_image() }
-    fn set_image(&self, img: &selection_engine::ImageBlob) -> Result<(), String> { clipboard::set_image(img) }
+    fn get_text(&self) -> Result<String, String> {
+        clipboard::get_text()
+    }
+    fn set_text(&self, s: &str) -> Result<(), String> {
+        clipboard::set_text(s)
+    }
+    fn get_image(&self) -> Result<Option<selection_engine::ImageBlob>, String> {
+        clipboard::get_image()
+    }
+    fn set_image(&self, img: &selection_engine::ImageBlob) -> Result<(), String> {
+        clipboard::set_image(img)
+    }
     fn restore_snapshot(
         &self,
         text: Option<&str>,
@@ -31,11 +39,18 @@ impl ClipboardLike for OsClipboard {
     ) -> Result<(), String> {
         // Windows: compound write needs the owner HWND. macOS/other: 2-arg restore.
         #[cfg(target_os = "windows")]
-        { clipboard::restore_snapshot(self.owner, text, image) }
+        {
+            clipboard::restore_snapshot(self.owner, text, image)
+        }
         #[cfg(not(target_os = "windows"))]
-        { let _ = self; clipboard::restore_snapshot(text, image) }
+        {
+            let _ = self;
+            clipboard::restore_snapshot(text, image)
+        }
     }
-    fn sequence(&self) -> u64 { clipboard::sequence() }
+    fn sequence(&self) -> u64 {
+        clipboard::sequence()
+    }
 }
 
 /// Simulate the platform copy keystroke: Cmd+C on macOS, Ctrl+C elsewhere.
@@ -92,4 +107,48 @@ pub fn capture_selection_with_ax<A: FnOnce() -> Option<String>>(
     #[cfg(not(target_os = "windows"))]
     let clip = OsClipboard {};
     selection_engine::capture(&clip, simulate_copy, iters)
+}
+
+use futures::future::BoxFuture;
+use linguaray_kernel::{
+    ActivationContext, CapabilityPlugin, PluginDescriptor, PluginError, PluginId, ServiceId,
+    ServiceKey,
+};
+use std::sync::Arc;
+
+pub static SELECTION: ServiceKey<SelectionHub> = ServiceKey::new("linguaray.selection");
+static PROVIDES: &[ServiceId] = &[ServiceId("linguaray.selection")];
+
+pub struct SelectionHub;
+
+impl SelectionHub {
+    pub fn capture_selection(&self, timeout_ms: u64, owner: OwnerHwnd) -> Result<Capture, String> {
+        capture_selection(timeout_ms, owner)
+    }
+}
+
+pub struct SelectionPlugin;
+
+impl CapabilityPlugin for SelectionPlugin {
+    fn descriptor(&self) -> PluginDescriptor {
+        PluginDescriptor {
+            id: PluginId("selection"),
+            required: &[],
+            optional: &[],
+            provides: PROVIDES,
+            manifest: None,
+            restart_on_optional_change: false,
+        }
+    }
+
+    fn config_fingerprint(&self) -> u64 {
+        1
+    }
+
+    fn activate(&self, ctx: ActivationContext) -> BoxFuture<'_, Result<(), PluginError>> {
+        Box::pin(async move {
+            ctx.stage_provide(SELECTION, Arc::new(SelectionHub))?;
+            Ok(())
+        })
+    }
 }

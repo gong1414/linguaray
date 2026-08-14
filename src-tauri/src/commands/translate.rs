@@ -1,11 +1,13 @@
 //! Translate IPC commands and session helpers (plugin-core PR-3).
 
 use crate::db::Database;
+use crate::plugins::clipboard::{ClipboardHub, CLIPBOARD};
+use crate::plugins::selection::{SelectionHub, SELECTION};
 use crate::plugins::translation::{PersistSpec, TranslationHub, TRANSLATION};
 use crate::service::{self, TranslateSessionResult};
 use crate::{
-    a11y, clipboard, cursor, engines, popup, providers, require_database, selection,
-    selection_engine, settings, tray_state, AppState, Session,
+    a11y, cursor, engines, popup, providers, require_database, selection_engine, settings,
+    tray_state, AppState, Session,
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -53,6 +55,24 @@ where
         })
         .await
         .map_err(map_lease)?
+}
+
+fn lease_clipboard(
+    app: &tauri::AppHandle,
+) -> Result<linguaray_kernel::ServiceLease<ClipboardHub>, String> {
+    let supervisor = app
+        .try_state::<linguaray_kernel::Supervisor>()
+        .ok_or_else(|| "clipboard unavailable".to_string())?;
+    supervisor.handle().lease(CLIPBOARD).map_err(map_lease)
+}
+
+fn lease_selection(
+    app: &tauri::AppHandle,
+) -> Result<linguaray_kernel::ServiceLease<SelectionHub>, String> {
+    let supervisor = app
+        .try_state::<linguaray_kernel::Supervisor>()
+        .ok_or_else(|| "selection unavailable".to_string())?;
+    supervisor.handle().lease(SELECTION).map_err(map_lease)
 }
 
 #[tauri::command]
@@ -129,7 +149,9 @@ pub async fn translate_clipboard(
     let gen = state.gen.next();
     let text = {
         let _g = state.gen.selection_lock();
-        clipboard::get_text()?
+        lease_clipboard(&app)?
+            .with(|cb| cb.get_text())
+            .map_err(map_lease)??
     };
     if text.trim().is_empty() {
         return Err("clipboard empty".into());
@@ -495,14 +517,18 @@ pub(crate) async fn capture_and_translate(
                 };
                 #[cfg(not(target_os = "windows"))]
                 let owner = ();
-                match selection::capture_selection(800, owner) {
-                    Ok(selection_engine::Capture::Selected(t)) => {
-                        CaptureOutcome::Selected(t, cx, cy)
-                    }
-                    Ok(selection_engine::Capture::NoSelection) => {
-                        CaptureOutcome::NoSelection(cx, cy)
-                    }
+                match lease_selection(app) {
                     Err(e) => CaptureOutcome::CaptureError(e, cx, cy),
+                    Ok(lease) => match lease.with(|sel| sel.capture_selection(800, owner)) {
+                        Ok(Ok(selection_engine::Capture::Selected(t))) => {
+                            CaptureOutcome::Selected(t, cx, cy)
+                        }
+                        Ok(Ok(selection_engine::Capture::NoSelection)) => {
+                            CaptureOutcome::NoSelection(cx, cy)
+                        }
+                        Ok(Err(e)) => CaptureOutcome::CaptureError(e, cx, cy),
+                        Err(e) => CaptureOutcome::CaptureError(e.to_string(), cx, cy),
+                    },
                 }
             };
             // Stale-run guard BEFORE any popup UI: a superseded capture must never
