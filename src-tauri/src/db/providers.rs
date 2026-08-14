@@ -428,7 +428,8 @@ pub fn create(
                 let md = model.map(String::from).or(d.default_model);
                 let caps = ProviderCapabilities {
                     auth: Some(d.auth),
-                    models_url: d.models_url,
+                    models_url: d.models_url.clone(),
+                    model_list: d.models_url.is_some(),
                     ..Default::default()
                 };
                 (d.protocol, ep, md, d.needs_key, caps)

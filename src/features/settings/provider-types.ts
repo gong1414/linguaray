@@ -31,6 +31,8 @@ export type ProviderCapabilities = {
   balance: boolean;
   quota: boolean;
   model_list: boolean;
+  auth?: string;
+  models_url?: string | null;
 };
 
 /**
@@ -69,6 +71,7 @@ export type ProviderPatch = {
   enabled?: boolean;
   sort_order?: number;
   expected_version: number;
+  protocol?: ProviderProtocol;
 };
 
 // --- Frontend-augmented profile -----------------------------------------

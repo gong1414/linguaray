@@ -1996,9 +1996,9 @@ async fn provider_confirm_and_set_active(
     Ok(version)
 }
 
-/// One selectable model for a provider. The full HTTP model-list fetch is S3
-/// scope; for now [`provider_get_models`] returns a preset-derived list so the
-/// UI has something to render.
+/// One selectable model for a provider. Assembled from the local profile
+/// (current model + catalog default) then extended by an HTTP GET to
+/// `models_request_url` when the origin matches.
 #[derive(Debug, Clone, Serialize)]
 pub struct ModelInfo {
     pub id: String,
@@ -2028,53 +2028,128 @@ pub fn measure_latency_ms(start: std::time::Instant) -> u32 {
     u32::try_from(start.elapsed().as_millis()).unwrap_or(u32::MAX)
 }
 
-/// List the models a provider can use (P1 #8).
+/// List the models a provider can use (P1 #8 + plugin-core §7.4).
 ///
-/// Reads the provider profile snapshot in `spawn_blocking` (so the async
-/// runtime isn't held by rusqlite), then returns a preset-derived model list.
-/// The preset catalog is the source of the default model; the profile's own
-/// `model` (if set) is surfaced first as the "current" choice. The full HTTP
-/// `/models` fetch is S3 scope.
+/// Local list (current model + catalog default) is always assembled first.
+/// HTTP GET uses `models_request_url`: if that URL's origin differs from
+/// `profile.endpoint`, we return an error and **never** attach a key.
 #[tauri::command]
 async fn provider_get_models(
     state: tauri::State<'_, Arc<AppState>>,
+    session: tauri::State<'_, Arc<Session>>,
     uuid: String,
 ) -> Result<Vec<ModelInfo>, String> {
     let app = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        // Acquire the gate FIRST (see provider_list).
-        let _gate = app.data_gate.read();
-        let db = require_ready_gated(&app, &_gate)?;
-        let profile = db
-            .with_conn(|conn| db_providers::get(conn, &uuid))
-            .map_err(|e| e.to_string())?;
-        let mut out: Vec<ModelInfo> = Vec::new();
-        // The profile's configured model is the "current" entry, surfaced first.
-        if let Some(m) = &profile.model {
-            if !m.is_empty() {
-                out.push(ModelInfo {
-                    id: m.clone(),
-                    label: m.clone(),
-                });
-            }
-        }
-        // Append the preset default model as a secondary option when it differs
-        // from the configured one (so the UI can offer "reset to default").
-        if let Some(p) = providers::presets()
-            .into_iter()
-            .find(|p| p.id == profile.template_id)
-        {
-            if profile.model.as_deref() != Some(p.default_model.as_str()) {
-                out.push(ModelInfo {
-                    id: p.default_model.clone(),
-                    label: format!("{} (default)", p.default_model),
-                });
-            }
-        }
-        Ok(out)
-    })
+    let profile = tauri::async_runtime::spawn_blocking(
+        move || -> Result<db_providers::ProviderProfile, String> {
+            let _gate = app.data_gate.read();
+            let db = require_ready_gated(&app, &_gate)?;
+            db.with_conn(|conn| db_providers::get(conn, &uuid))
+                .map_err(|e| e.to_string())
+        },
+    )
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())??;
+
+    let mut out = local_model_list(&profile);
+    // Empty Azure/Custom endpoints have no origin to fetch from. Resolve
+    // `models_request_url` only after this check — `Url::parse("")` would
+    // otherwise fail and hide the local list behind an error.
+    if profile.endpoint.is_empty() {
+        return Ok(out);
+    }
+    let url = match db_providers::models_request_url(&profile) {
+        Ok(u) => u,
+        Err(e) => return Err(e),
+    };
+    let Some(client) = session.client.clone() else {
+        return Ok(out);
+    };
+    let key = if profile.needs_key {
+        let ks = session.keystore.as_ref().ok_or("keystore unavailable")?;
+        match ks.get_key(&profile.secret_ref).map_err(|e| e.to_string())? {
+            Some(k) => k,
+            None => return Ok(out),
+        }
+    } else {
+        String::new()
+    };
+    let auth = profile
+        .capabilities
+        .auth
+        .unwrap_or(linguaray_contracts::AuthKind::Bearer);
+    let mut req = client.get(&url);
+    if profile.needs_key {
+        req = match auth {
+            linguaray_contracts::AuthKind::Bearer => req.bearer_auth(&key),
+            linguaray_contracts::AuthKind::AzureKey => req.header("api-key", &key),
+            linguaray_contracts::AuthKind::XApiKey => req
+                .header("x-api-key", &key)
+                .header("anthropic-version", "2023-06-01"),
+            linguaray_contracts::AuthKind::None => req,
+            linguaray_contracts::AuthKind::Query => req.query(&[("key", key.as_str())]),
+        };
+    }
+    let resp = req.send().await.map_err(|e| e.to_string())?;
+    let status = resp.status().as_u16();
+    if status == 401 || status == 403 {
+        return Err(format!("auth failed ({status})"));
+    }
+    if !resp.status().is_success() {
+        return Err(format!("models endpoint returned {status}"));
+    }
+    let body: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
+    for id in parse_model_ids(&body) {
+        if !out.iter().any(|m| m.id == id) {
+            out.push(ModelInfo {
+                id: id.clone(),
+                label: id,
+            });
+        }
+    }
+    Ok(out)
+}
+
+fn local_model_list(profile: &db_providers::ProviderProfile) -> Vec<ModelInfo> {
+    let mut out = Vec::new();
+    if let Some(m) = &profile.model {
+        if !m.is_empty() {
+            out.push(ModelInfo {
+                id: m.clone(),
+                label: m.clone(),
+            });
+        }
+    }
+    if let Some(p) = providers::presets()
+        .into_iter()
+        .find(|p| p.id == profile.template_id)
+    {
+        if !p.default_model.is_empty()
+            && profile.model.as_deref() != Some(p.default_model.as_str())
+        {
+            out.push(ModelInfo {
+                id: p.default_model.clone(),
+                label: format!("{} (default)", p.default_model),
+            });
+        }
+    }
+    out
+}
+
+fn parse_model_ids(body: &serde_json::Value) -> Vec<String> {
+    if let Some(arr) = body.get("data").and_then(|v| v.as_array()) {
+        return arr
+            .iter()
+            .filter_map(|m| m.get("id").and_then(|id| id.as_str()).map(str::to_string))
+            .collect();
+    }
+    if let Some(arr) = body.as_array() {
+        return arr
+            .iter()
+            .filter_map(|m| m.get("id").and_then(|id| id.as_str()).map(str::to_string))
+            .collect();
+    }
+    Vec::new()
 }
 
 /// Probe whether a provider is reachable (P1 #8).
@@ -4177,5 +4252,41 @@ mod tests {
         };
         let d = decide_clipboard_popup(&result);
         assert!(matches!(d, ClipboardPopupDecision::Error(_)));
+    }
+
+    #[test]
+    fn parse_model_ids_openai_data_array() {
+        let body = serde_json::json!({
+            "data": [
+                {"id": "gpt-4o-mini", "object": "model"},
+                {"id": "gpt-4o", "object": "model"},
+                {"object": "model"}
+            ]
+        });
+        assert_eq!(
+            parse_model_ids(&body),
+            vec!["gpt-4o-mini".to_string(), "gpt-4o".to_string()]
+        );
+    }
+
+    #[test]
+    fn parse_model_ids_anthropic_top_level_array() {
+        let body = serde_json::json!([
+            {"id": "claude-sonnet-4-5", "type": "model"},
+            {"id": "claude-haiku-4-5"}
+        ]);
+        assert_eq!(
+            parse_model_ids(&body),
+            vec![
+                "claude-sonnet-4-5".to_string(),
+                "claude-haiku-4-5".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn parse_model_ids_unknown_shape_is_empty() {
+        let body = serde_json::json!({"models": [{"name": "x"}]});
+        assert!(parse_model_ids(&body).is_empty());
     }
 }

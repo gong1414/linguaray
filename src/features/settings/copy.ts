@@ -137,6 +137,9 @@ type ProviderCopy = {
   empty: EmptyCopy;
   addProvider: string;
   tier: { setupRequired: string; unverified: string };
+  insertAzureTemplate: string;
+  useKimiGlobal: string;
+  customAnthropic: string;
   models: string;
   fetchModels: string;
   modelFetchError: string;
@@ -290,6 +293,9 @@ const EN: SettingsCopy = {
     },
     addProvider: "Add provider",
     tier: { setupRequired: "Setup", unverified: "Unverified" },
+    insertAzureTemplate: "Insert Azure URL template",
+    useKimiGlobal: "Use global endpoint",
+    customAnthropic: "Anthropic Messages API",
     models: "Model",
     fetchModels: "Fetch models",
     modelFetchError: "Failed to fetch models — enter manually",
@@ -427,6 +433,9 @@ const ZH: SettingsCopy = {
     },
     addProvider: "添加服务商",
     tier: { setupRequired: "需配置", unverified: "未认证" },
+    insertAzureTemplate: "插入 Azure URL 模板",
+    useKimiGlobal: "改用全球端点",
+    customAnthropic: "Anthropic Messages API",
     models: "模型",
     fetchModels: "获取模型",
     modelFetchError: "获取模型失败 —— 请手动输入",

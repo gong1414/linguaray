@@ -171,6 +171,14 @@
   margin-left: auto;
 }
 
+.pc__anthropic-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm, 8px);
+  margin-top: var(--space-xs, 4px);
+  font-size: var(--text-sm, 0.85rem);
+}
+
 /* Detail panel. */
 .pc__detail {
   display: flex;
