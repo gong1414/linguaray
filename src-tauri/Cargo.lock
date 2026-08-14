@@ -2506,6 +2506,8 @@ dependencies = [
  "fs2",
  "futures",
  "image",
+ "linguaray-catalog",
+ "linguaray-contracts",
  "log",
  "mouse_position",
  "objc2 0.6.4",
@@ -2535,6 +2537,25 @@ dependencies = [
  "windows-sys 0.59.0",
  "wiremock",
  "zeroize",
+]
+
+[[package]]
+name = "linguaray-catalog"
+version = "0.1.0"
+dependencies = [
+ "linguaray-contracts",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "url",
+]
+
+[[package]]
+name = "linguaray-contracts"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

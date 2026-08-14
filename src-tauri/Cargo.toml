@@ -1,3 +1,7 @@
+[workspace]
+members = [".", "crates/linguaray-contracts", "crates/linguaray-catalog"]
+resolver = "2"
+
 [package]
 name = "linguaray"
 version = "0.1.0"
@@ -41,6 +45,8 @@ tauri-build = { version = "2", features = [] }
 image = { version = "0.25", default-features = false, features = ["png"] }
 
 [dependencies]
+linguaray-contracts = { path = "crates/linguaray-contracts" }
+linguaray-catalog = { path = "crates/linguaray-catalog" }
 tauri = { version = "2", features = ["macos-private-api", "tray-icon", "image-png"] }
 tauri-plugin-opener = "2"
 tauri-plugin-store = "2"
