@@ -8,7 +8,7 @@
 
 pub mod a11y;
 pub mod adapter;
-pub mod clipboard;
+pub use crate::plugins::clipboard;
 pub mod commands;
 pub mod concurrency;
 pub mod cursor;
@@ -22,8 +22,8 @@ pub mod keystore;
 pub mod plugins;
 pub mod popup;
 pub mod providers;
-pub mod selection;
-pub mod selection_engine;
+pub use crate::plugins::selection;
+pub use crate::plugins::selection_engine;
 pub mod service;
 pub mod settings;
 pub mod shortcuts;

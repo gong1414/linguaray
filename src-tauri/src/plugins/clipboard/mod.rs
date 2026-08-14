@@ -27,7 +27,8 @@ pub use windows::restore_snapshot;
 // arboard::Clipboard is not safe to share raw across threads; guard it.
 static CLIP: Mutex<Option<arboard::Clipboard>> = Mutex::new(None);
 
-fn clip() -> std::result::Result<std::sync::MutexGuard<'static, Option<arboard::Clipboard>>, String> {
+fn clip() -> std::result::Result<std::sync::MutexGuard<'static, Option<arboard::Clipboard>>, String>
+{
     let mut g = CLIP.lock().map_err(|e| e.to_string())?;
     if g.is_none() {
         *g = Some(arboard::Clipboard::new().map_err(|e| e.to_string())?);
@@ -66,7 +67,10 @@ pub fn set_image(img: &crate::selection_engine::ImageBlob) -> std::result::Resul
         height: img.height,
         bytes: std::borrow::Cow::Borrowed(&img.bytes),
     };
-    g.as_mut().unwrap().set_image(data).map_err(|e| e.to_string())
+    g.as_mut()
+        .unwrap()
+        .set_image(data)
+        .map_err(|e| e.to_string())
 }
 
 /// Restore BOTH text and image in a SINGLE platform-level write (round-3 review
@@ -94,10 +98,14 @@ pub fn restore_snapshot(
         (None, Some(img)) => {
             let mut g = clip()?;
             let data = arboard::ImageData {
-                width: img.width, height: img.height,
+                width: img.width,
+                height: img.height,
                 bytes: std::borrow::Cow::Borrowed(&img.bytes),
             };
-            g.as_mut().unwrap().set_image(data).map_err(|e| e.to_string())
+            g.as_mut()
+                .unwrap()
+                .set_image(data)
+                .map_err(|e| e.to_string())
         }
         (Some(t), Some(img)) => {
             // Delegate to the testable inner fn with the system pasteboard.
@@ -147,13 +155,12 @@ fn restore_compound_to(
     text: &str,
     img: &crate::selection_engine::ImageBlob,
 ) -> std::result::Result<(), String> {
-    use objc2_app_kit::{
-        NSBitmapImageRep, NSPasteboardItem,
-        NSPasteboardTypeString, NSPasteboardTypeTIFF,
-    };
-    use objc2_foundation::{NSArray, NSString};
     use objc2::rc::Retained;
     use objc2::AnyThread;
+    use objc2_app_kit::{
+        NSBitmapImageRep, NSPasteboardItem, NSPasteboardTypeString, NSPasteboardTypeTIFF,
+    };
+    use objc2_foundation::{NSArray, NSString};
 
     // Step 1: full FFI preflight. These values feed a designated initializer that
     // takes NSInteger (isize); a negative/overflowed dimension or stride would be
@@ -162,14 +169,18 @@ fn restore_compound_to(
     // `width as isize` wrapped negative and `w*4` overflowed. Reject zero dims and
     // use checked conversions for EVERY value that crosses into Cocoa.
     if img.width == 0 || img.height == 0 {
-        return Err(format!("image has zero dimension ({}x{})", img.width, img.height));
+        return Err(format!(
+            "image has zero dimension ({}x{})",
+            img.width, img.height
+        ));
     }
     // isize/NSInteger range — also bounds width so bytes_per_row can't overflow.
     let w = isize::try_from(img.width)
         .map_err(|_| format!("image width {} exceeds isize range", img.width))?;
     let h = isize::try_from(img.height)
         .map_err(|_| format!("image height {} exceeds isize range", img.height))?;
-    let bytes_per_row = w.checked_mul(4)
+    let bytes_per_row = w
+        .checked_mul(4)
         .ok_or_else(|| "row stride (width*4) overflows isize".to_string())?;
     // Total bytes, validated against the actual slice length. Use u64 to avoid any
     // platform-dependent usize overflow on the intermediate product.
@@ -177,11 +188,13 @@ fn restore_compound_to(
         .checked_mul(img.height as u64)
         .and_then(|n| n.checked_mul(4))
         .ok_or_else(|| "image byte count overflows u64".to_string())?;
-    let expected = usize::try_from(total)
-        .map_err(|_| "image byte count exceeds usize".to_string())?;
+    let expected =
+        usize::try_from(total).map_err(|_| "image byte count exceeds usize".to_string())?;
     if img.bytes.len() != expected {
         return Err(format!(
-            "image bytes {} != width*height*4 ({})", img.bytes.len(), expected
+            "image bytes {} != width*height*4 ({})",
+            img.bytes.len(),
+            expected
         ));
     }
 
@@ -231,8 +244,9 @@ fn restore_compound_to(
 
     // Step 4-5: all conversions succeeded — now clearContents + writeObjects.
     pb.clearContents();
-    let writing_item: Retained<objc2::runtime::ProtocolObject<dyn objc2_app_kit::NSPasteboardWriting>> =
-        objc2::runtime::ProtocolObject::from_retained(item);
+    let writing_item: Retained<
+        objc2::runtime::ProtocolObject<dyn objc2_app_kit::NSPasteboardWriting>,
+    > = objc2::runtime::ProtocolObject::from_retained(item);
     let items = NSArray::arrayWithObject(&*writing_item);
     if !pb.writeObjects(&items) {
         return Err("writeObjects failed".into());
@@ -258,7 +272,8 @@ pub fn restore_snapshot(
     }
     if let Some(img) = image {
         let data = arboard::ImageData {
-            width: img.width, height: img.height,
+            width: img.width,
+            height: img.height,
             bytes: std::borrow::Cow::Borrowed(&img.bytes),
         };
         let _ = c.set_image(data);
@@ -284,7 +299,9 @@ pub fn sequence() -> u64 {
 }
 
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-pub fn sequence() -> u64 { 0 }
+pub fn sequence() -> u64 {
+    0
+}
 
 #[cfg(all(test, target_os = "macos"))]
 mod tests {
@@ -308,7 +325,9 @@ mod tests {
         let img = ImageBlob {
             width: 2,
             height: 2,
-            bytes: vec![255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255],
+            bytes: vec![
+                255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255,
+            ],
         };
 
         restore_compound_to(&pb, "hello world", &img).expect("compound restore should succeed");
@@ -318,7 +337,8 @@ mod tests {
         assert_eq!(items.count(), 1, "exactly one pasteboard item");
 
         // Assert: can read text.
-        let text = pb.stringForType(unsafe { NSPasteboardTypeString })
+        let text = pb
+            .stringForType(unsafe { NSPasteboardTypeString })
             .expect("stringForType should return");
         assert_eq!(text.to_string(), "hello world", "text flavor present");
 
@@ -329,7 +349,8 @@ mod tests {
         // wrong stride would still read red. All 4 pixels are checked (so a stride
         // bug that read garbage from padding would be caught), but a definitive
         // stride test needs a non-uniform image (deferred — not a round-7 blocker).
-        let tiff = pb.dataForType(unsafe { NSPasteboardTypeTIFF })
+        let tiff = pb
+            .dataForType(unsafe { NSPasteboardTypeTIFF })
             .expect("dataForType(TIFF) should return");
         assert!(!tiff.is_empty(), "TIFF data is non-empty");
 
@@ -371,10 +392,12 @@ mod tests {
         assert!(result.is_err(), "invalid RGBA should return error");
 
         // The pasteboard should be UNCHANGED — clearContents never ran.
-        let text = pb.stringForType(unsafe { NSPasteboardTypeString })
+        let text = pb
+            .stringForType(unsafe { NSPasteboardTypeString })
             .expect("marker should still be readable");
         assert_eq!(
-            text.to_string(), "marker-before",
+            text.to_string(),
+            "marker-before",
             "pasteboard unchanged after failed conversion (clearContents not called)"
         );
     }
@@ -392,13 +415,22 @@ mod tests {
         pb.setString_forType(&marker, unsafe { NSPasteboardTypeString });
 
         let check = |w: usize, h: usize, bytes: Vec<u8>, label: &str| {
-            let img = ImageBlob { width: w, height: h, bytes };
+            let img = ImageBlob {
+                width: w,
+                height: h,
+                bytes,
+            };
             let res = restore_compound_to(&pb, "x", &img);
             assert!(res.is_err(), "{label}: expected preflight rejection");
             // Pasteboard untouched — the unsafe initializer never ran.
-            let t = pb.stringForType(unsafe { NSPasteboardTypeString })
+            let t = pb
+                .stringForType(unsafe { NSPasteboardTypeString })
                 .expect("marker readable");
-            assert_eq!(t.to_string(), "marker-before", "{label}: pasteboard changed");
+            assert_eq!(
+                t.to_string(),
+                "marker-before",
+                "{label}: pasteboard changed"
+            );
         };
 
         // The case that defeated the old check: huge width, zero height, empty bytes
@@ -437,7 +469,8 @@ mod tests {
         let sentinel = NSString::from_str("__linguaray_sel_test__");
         pb.setString_forType(&sentinel, unsafe { NSPasteboardTypeString });
         // Confirm it's there before the restore.
-        let before = pb.stringForType(unsafe { NSPasteboardTypeString })
+        let before = pb
+            .stringForType(unsafe { NSPasteboardTypeString })
             .expect("sentinel readable before restore");
         assert_eq!(before.to_string(), "__linguaray_sel_test__");
 
@@ -456,7 +489,71 @@ mod tests {
             ),
             None => { /* expected: cleared pasteboard has no String-typed item */ }
         }
-        assert_eq!(pb.pasteboardItems().map(|i| i.count()).unwrap_or(0), 0,
-            "no items remain after clearing the empty snapshot");
+        assert_eq!(
+            pb.pasteboardItems().map(|i| i.count()).unwrap_or(0),
+            0,
+            "no items remain after clearing the empty snapshot"
+        );
+    }
+}
+
+use crate::selection_engine::ImageBlob;
+use futures::future::BoxFuture;
+use linguaray_kernel::{
+    ActivationContext, CapabilityPlugin, PluginDescriptor, PluginError, PluginId, ServiceId,
+    ServiceKey,
+};
+use std::sync::Arc;
+
+pub static CLIPBOARD: ServiceKey<ClipboardHub> = ServiceKey::new("linguaray.clipboard");
+static PROVIDES: &[ServiceId] = &[ServiceId("linguaray.clipboard")];
+
+pub struct ClipboardHub;
+
+impl ClipboardHub {
+    pub fn get_text(&self) -> Result<String, String> {
+        get_text()
+    }
+
+    pub fn set_text(&self, s: &str) -> Result<(), String> {
+        set_text(s)
+    }
+
+    pub fn get_image(&self) -> Result<Option<ImageBlob>, String> {
+        get_image()
+    }
+
+    pub fn set_image(&self, img: &ImageBlob) -> Result<(), String> {
+        set_image(img)
+    }
+
+    pub fn sequence(&self) -> u64 {
+        sequence()
+    }
+}
+
+pub struct ClipboardPlugin;
+
+impl CapabilityPlugin for ClipboardPlugin {
+    fn descriptor(&self) -> PluginDescriptor {
+        PluginDescriptor {
+            id: PluginId("clipboard"),
+            required: &[],
+            optional: &[],
+            provides: PROVIDES,
+            manifest: None,
+            restart_on_optional_change: false,
+        }
+    }
+
+    fn config_fingerprint(&self) -> u64 {
+        1
+    }
+
+    fn activate(&self, ctx: ActivationContext) -> BoxFuture<'_, Result<(), PluginError>> {
+        Box::pin(async move {
+            ctx.stage_provide(CLIPBOARD, Arc::new(ClipboardHub))?;
+            Ok(())
+        })
     }
 }

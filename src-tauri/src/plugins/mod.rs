@@ -1,10 +1,13 @@
 //! In-tree Capability plugins. Production compose list lives here.
 
+pub mod clipboard;
 pub mod database;
 pub mod drivers;
 pub mod http;
 pub mod providers;
 pub mod secrets;
+pub mod selection;
+pub mod selection_engine;
 pub mod shortcuts;
 pub mod translation;
 
@@ -25,6 +28,8 @@ pub fn builtin_plugins(
         Arc::new(drivers::DriversPlugin::new()),
         Arc::new(providers::ProvidersPlugin),
         Arc::new(translation::TranslationPlugin),
+        Arc::new(selection::SelectionPlugin),
+        Arc::new(clipboard::ClipboardPlugin),
     ];
     if let Some(shortcuts) = shortcuts {
         out.push(shortcuts);
@@ -48,6 +53,8 @@ mod tests {
         assert!(ids.contains(&"drivers"));
         assert!(ids.contains(&"providers"));
         assert!(ids.contains(&"translation"));
+        assert!(ids.contains(&"selection"));
+        assert!(ids.contains(&"clipboard"));
         assert!(!ids.contains(&"azure-openai"));
         assert!(!ids.contains(&"custom-http"));
         assert!(!ids.contains(&"ocr"));
