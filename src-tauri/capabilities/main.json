@@ -50,7 +50,9 @@
     "allow-vocabulary-list",
     "allow-vocabulary-delete",
     "allow-vocabulary-export-file",
+    "allow-vocabulary-export-anki",
     "allow-dict-lookup",
-    "allow-dict-list-packages"
+    "allow-dict-list-packages",
+    "allow-dict-install-package"
   ]
 }

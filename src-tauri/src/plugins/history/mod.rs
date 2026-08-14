@@ -313,6 +313,16 @@ impl HistoryHub {
             .map_err(|e| e.to_string())?
     }
 
+    pub fn vocabulary_collect(
+        &self,
+        db: &Database,
+    ) -> Result<Vec<crate::plugins::vocabulary::VocabularyItem>, String> {
+        let secrets = self.secrets()?;
+        secrets
+            .with(|ks| crate::plugins::vocabulary::collect_all(db, ks))
+            .map_err(|e| e.to_string())?
+    }
+
     pub fn export(
         &self,
         db: &Database,

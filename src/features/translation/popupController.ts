@@ -194,5 +194,5 @@ export function createPopupController() {
   /** Whether a saved SOURCE text is available for Retry (P1-3). Reactive (P1-8). */
   const hasSource = () => lastSource().length > 0;
 
-  return { state, pinned, pin, unpin, dismiss, retrySelection, hasSource, engineLabel };
+  return { state, pinned, pin, unpin, dismiss, retrySelection, hasSource, lastSource, engineLabel };
 }

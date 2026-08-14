@@ -1,5 +1,5 @@
-//! Dictionary slot Fiber. `dict.rs` stays the lookup module; R4 fills UI.
-//! No commands registered from this stub.
+//! Dictionary slot Fiber. Parsers and package install live in `crate::dict`.
+//! This Fiber only requires the database; commands stay in `commands/dict`.
 
 use futures::future::BoxFuture;
 use linguaray_kernel::{

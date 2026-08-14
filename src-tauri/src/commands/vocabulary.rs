@@ -67,7 +67,9 @@ pub async fn vocabulary_delete(
     let history = lease_history(&app)?;
     let app_state = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        history.with(|h| h.require_writable()).map_err(map_lease)??;
+        history
+            .with(|h| h.require_writable())
+            .map_err(map_lease)??;
         let gate = app_state.data_gate.write();
         let db = require_database_write(&app_state, &gate)?;
         vocabulary::delete_word(&db, &item_uuid)
@@ -94,4 +96,26 @@ pub async fn vocabulary_export_file(
     })
     .await
     .map_err(|e| format!("vocabulary export worker failed: {e}"))?
+}
+
+#[tauri::command]
+pub async fn vocabulary_export_anki(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, Arc<AppState>>,
+    deck_name: String,
+) -> Result<(), String> {
+    let history = lease_history(&app)?;
+    let app_state = state.inner().clone();
+    let items = tauri::async_runtime::spawn_blocking(move || {
+        let gate = app_state.data_gate.read();
+        let db = require_database(&app_state, &gate)?;
+        history
+            .with(|h| h.vocabulary_collect(&db))
+            .map_err(map_lease)?
+    })
+    .await
+    .map_err(|e| format!("vocabulary anki collect worker failed: {e}"))??;
+    vocabulary::export_anki_from_items(&items, &deck_name)
+        .await
+        .map_err(|e| e.to_string())
 }

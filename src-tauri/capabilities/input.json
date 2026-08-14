@@ -6,6 +6,7 @@
   "permissions": [
     "core:default",
     "allow-translate-session",
-    "allow-provider-list"
+    "allow-provider-list",
+    "allow-vocabulary-add"
   ]
 }

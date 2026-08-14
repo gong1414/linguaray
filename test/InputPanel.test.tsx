@@ -261,4 +261,29 @@ describe("InputPanel (Surface 02)", () => {
     expect(clearBtn.disabled).toBe(false);
     cleanup();
   });
+
+  it("Favorite on a result card saves the source and translation", async () => {
+    routeInputInvoke({
+      provider_list: () => [],
+      translate_session: () => ({
+        outcomes: [{ uuid: "u1", ok: true, text: "你好", engine: "deepseek/u1" }],
+        actual_engine: "deepseek/u1",
+      }),
+      vocabulary_add: () => ({ item_uuid: "v1" }),
+    });
+    const { getByRole, findByLabelText } = render(() => <InputPanel />);
+    const ta = getByRole("textbox") as HTMLTextAreaElement;
+    fireEvent.input(ta, { target: { value: "hello" } });
+    fireEvent.keyDown(ta, { key: "Enter", shiftKey: false });
+    const favorite = await findByLabelText(/收藏到生词本|Save to vocabulary/);
+    await fireEvent.click(favorite);
+    expect(inputInvokeMock).toHaveBeenCalledWith(
+      "vocabulary_add",
+      expect.objectContaining({
+        word: "hello",
+        definition: "你好",
+      }),
+    );
+    cleanup();
+  });
 });

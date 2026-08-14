@@ -48,8 +48,10 @@ fn main() {
             "vocabulary_list",
             "vocabulary_delete",
             "vocabulary_export_file",
+            "vocabulary_export_anki",
             "dict_lookup",
             "dict_list_packages",
+            "dict_install_package",
         ]),
     ))
     .expect("failed to run tauri build");
