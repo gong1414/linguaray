@@ -2,9 +2,12 @@
 
 pub mod clipboard;
 pub mod database;
+pub mod dictionary;
 pub mod drivers;
+pub mod external_api;
 pub mod history;
 pub mod http;
+pub mod ocr;
 pub mod popup;
 pub mod providers;
 pub mod secrets;
@@ -13,11 +16,14 @@ pub mod selection_engine;
 pub mod shortcuts;
 pub mod translation;
 pub mod tray_state;
+pub mod tts;
+pub mod updater;
 
 use linguaray_kernel::CapabilityPlugin;
 use std::sync::Arc;
 
-/// Official plugins. No dictionary/ocr/tts stub Fibers.
+/// Official plugins. Slot Fibers (dictionary/ocr/tts/external-api/updater)
+/// are stubs: descriptor + empty activate, no commands.
 pub fn builtin_plugins(
     database: Arc<database::DatabasePlugin>,
     secrets: Arc<secrets::SecretsPlugin>,
@@ -36,6 +42,11 @@ pub fn builtin_plugins(
         Arc::new(selection::SelectionPlugin),
         Arc::new(clipboard::ClipboardPlugin),
         Arc::new(history::HistoryPlugin),
+        Arc::new(dictionary::DictionaryPlugin),
+        Arc::new(ocr::OcrPlugin),
+        Arc::new(tts::TtsPlugin),
+        Arc::new(external_api::ExternalApiPlugin),
+        Arc::new(updater::UpdaterPlugin),
     ];
     if let Some(shortcuts) = shortcuts {
         out.push(shortcuts);
@@ -70,9 +81,48 @@ mod tests {
         assert!(ids.contains(&"selection"));
         assert!(ids.contains(&"clipboard"));
         assert!(ids.contains(&"history"));
+        assert!(ids.contains(&"dictionary"));
+        assert!(ids.contains(&"ocr"));
+        assert!(ids.contains(&"tts"));
+        assert!(ids.contains(&"external-api"));
+        assert!(ids.contains(&"updater"));
         assert!(!ids.contains(&"azure-openai"));
         assert!(!ids.contains(&"custom-http"));
-        assert!(!ids.contains(&"ocr"));
-        assert!(!ids.contains(&"dictionary"));
+    }
+
+    #[test]
+    fn slot_stubs_declare_no_services_and_no_commands() {
+        use linguaray_kernel::CapabilityPlugin;
+        for p in [
+            &dictionary::DictionaryPlugin as &dyn CapabilityPlugin,
+            &ocr::OcrPlugin,
+            &tts::TtsPlugin,
+            &external_api::ExternalApiPlugin,
+            &updater::UpdaterPlugin,
+        ] {
+            assert!(
+                p.descriptor().provides.is_empty(),
+                "{} stub must not provide a service until implemented",
+                p.descriptor().id.0
+            );
+        }
+        let host = include_str!("../lib.rs");
+        let handler = host
+            .split("generate_handler![")
+            .nth(1)
+            .and_then(|s| s.split(']').next())
+            .unwrap_or("");
+        for cmd in [
+            "dict_lookup",
+            "ocr_capture",
+            "tts_speak",
+            "external_api_listen",
+            "updater_check",
+        ] {
+            assert!(
+                !handler.contains(cmd),
+                "unimplemented command {cmd} must not be registered"
+            );
+        }
     }
 }
