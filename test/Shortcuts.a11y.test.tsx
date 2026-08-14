@@ -25,7 +25,7 @@ const snapshot = (registrationFailed = false): ShortcutSnapshot => ({
     },
     { action: "translate_input", combo: "Ctrl+Space", available: true, registration_state: "registered", registration_error: null },
     { action: "translate_clipboard", combo: "Ctrl+Alt+Space", available: true, registration_state: "registered", registration_error: null },
-    { action: "ocr_translate", combo: "Alt+Shift+Space", available: false, registration_state: "unavailable", registration_error: null },
+    { action: "ocr_translate", combo: "Alt+Shift+Space", available: true, registration_state: "registered", registration_error: null },
   ],
 });
 

@@ -104,7 +104,10 @@ pub fn create_all_tables(conn: &Connection) -> Result<(), DbError> {
             parallel_consent_version INTEGER,
             parallel_consent_scope TEXT,
             history_enabled INTEGER NOT NULL DEFAULT 0 CHECK (history_enabled IN (0,1)),
-            history_retention_days INTEGER NOT NULL DEFAULT 30
+            history_retention_days INTEGER NOT NULL DEFAULT 30,
+            external_api_enabled INTEGER NOT NULL DEFAULT 0 CHECK (external_api_enabled IN (0,1)),
+            external_api_port INTEGER NOT NULL DEFAULT 61742,
+            onboarding_complete INTEGER NOT NULL DEFAULT 0 CHECK (onboarding_complete IN (0,1))
         );",
     )?;
 
@@ -198,6 +201,27 @@ pub fn create_all_tables(conn: &Connection) -> Result<(), DbError> {
         );",
     )?;
 
+    ensure_preference_columns(conn)?;
+    Ok(())
+}
+
+/// Additive columns for DBs created before External API / onboarding.
+pub fn ensure_preference_columns(conn: &Connection) -> Result<(), DbError> {
+    for sql in [
+        "ALTER TABLE preferences ADD COLUMN external_api_enabled INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE preferences ADD COLUMN external_api_port INTEGER NOT NULL DEFAULT 61742",
+        "ALTER TABLE preferences ADD COLUMN onboarding_complete INTEGER NOT NULL DEFAULT 0",
+    ] {
+        match conn.execute(sql, []) {
+            Ok(_) => {}
+            Err(e) => {
+                let msg = e.to_string().to_lowercase();
+                if !msg.contains("duplicate column") {
+                    return Err(DbError::Sqlite(e));
+                }
+            }
+        }
+    }
     Ok(())
 }
 

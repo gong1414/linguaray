@@ -65,6 +65,8 @@ export type PopupViewProps = {
   onOpenSettings: (section?: string) => void;
   /** Save the translation (and its source) to vocabulary. */
   onFavorite?: (translation: string) => void | Promise<void>;
+  onSpeak?: (text: string) => void | Promise<void>;
+  onStopSpeak?: () => void | Promise<void>;
 };
 
 export function PopupView(props: PopupViewProps): JSX.Element {
@@ -76,6 +78,7 @@ export function PopupView(props: PopupViewProps): JSX.Element {
   // write is delegated to props.onCopy.
   const [copiedUuid, setCopiedUuid] = createSignal<string | null>(null);
   const [favoritedUuid, setFavoritedUuid] = createSignal<string | null>(null);
+  const [speakingUuid, setSpeakingUuid] = createSignal<string | null>(null);
   let copiedTimer: ReturnType<typeof setTimeout> | undefined;
   onCleanup(() => {
     if (copiedTimer) clearTimeout(copiedTimer);
@@ -145,10 +148,23 @@ export function PopupView(props: PopupViewProps): JSX.Element {
         },
       },
       {
-        label: t("selection.action.comingTts"),
+        label: speakingUuid() === uuid ? t("selection.action.stop") : t("selection.action.speak"),
         icon: <Volume2 size={14} />,
-        ariaDisabled: true,
-        onClick: () => { /* TTS: not yet shipped */ },
+        active: speakingUuid() === uuid,
+        onClick: async () => {
+          if (speakingUuid() === uuid) {
+            await props.onStopSpeak?.();
+            setSpeakingUuid(null);
+            return;
+          }
+          const translation = textFor(uuid) ?? "";
+          try {
+            await props.onSpeak?.(translation);
+            setSpeakingUuid(uuid);
+          } catch {
+            setSpeakingUuid(null);
+          }
+        },
       },
       {
         label: isPinned ? t("selection.action.unpin") : t("selection.action.pin"),
@@ -336,6 +352,10 @@ const Popup: Component = () => {
       onOpenSettings={(section) =>
         void invoke("open_settings_window", section ? { section } : {})
       }
+      onSpeak={async (text) => {
+        await invoke("tts_speak", { text, voiceId: null });
+      }}
+      onStopSpeak={() => invoke("tts_stop")}
       onFavorite={async (translation) => {
         const source = ctrl.lastSource();
         await invoke("vocabulary_add", {

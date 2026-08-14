@@ -832,6 +832,31 @@ impl Keystore {
         self.get_or_create_history_key_with(Identity::Machine)
     }
 
+    pub fn get_external_api_token(&self) -> Result<Option<String>, KeystoreError> {
+        self.with_locks(|ks| {
+            let value = ks.load_locked_core(Identity::Machine)?;
+            Ok(payload_to_v2(&value)?.external_api_token)
+        })
+    }
+
+    pub fn set_external_api_token(&self, token: &str) -> Result<(), KeystoreError> {
+        self.update_data_core(
+            |data| {
+                data.external_api_token = Some(token.to_string());
+            },
+            Identity::Machine,
+        )
+    }
+
+    pub fn clear_external_api_token(&self) -> Result<(), KeystoreError> {
+        self.update_data_core(
+            |data| {
+                data.external_api_token = None;
+            },
+            Identity::Machine,
+        )
+    }
+
     /// Remove the typed history key atomically. This is intentionally separate
     /// from disabling history, which preserves the key and encrypted records.
     pub fn clear_history_key(&self) -> Result<(), KeystoreError> {

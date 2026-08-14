@@ -986,7 +986,7 @@ describe("ProviderCenter (Surface 05)", () => {
     expect(screen.queryByText(/· \d+ms/)).toBeNull();
   });
 
-  it("balance section: renders TODO note, no fetch button", async () => {
+  it("balance section: unsupported providers show placeholder and no fetch button", async () => {
     routeInvoke({
       ...DEFAULT_ROUTES,
       provider_list: () => [profile({ uuid: "u1", name: "TestProvider", secret_ref: "provider/u1" })],
@@ -996,12 +996,11 @@ describe("ProviderCenter (Surface 05)", () => {
     await waitFor(() => expect(screen.getByText("TestProvider")).toBeTruthy());
     fireEvent.click(screen.getByLabelText("Edit TestProvider"));
     await flush();
-    // The muted TODO note renders; no balance-fetch button.
-    expect(screen.getByText("Balance and quota are not yet available.")).toBeTruthy();
+    expect(screen.getByText("Balance and quota are not supported by this provider.")).toBeTruthy();
     expect(screen.queryByText("Fetch balance")).toBeNull();
   });
 
-  it("balance capability true: shows 'not yet available' placeholder and never calls provider_get_balance", async () => {
+  it("balance capability true: fetch button calls provider_get_balance", async () => {
     const invokedCmds: string[] = [];
     routeInvoke({
       ...DEFAULT_ROUTES,
@@ -1014,46 +1013,20 @@ describe("ProviderCenter (Surface 05)", () => {
         }),
       ],
       key_status: () => ({ "provider/u1": true }),
-      // If the component ever tried to fetch balance, this route would record
-      // the call. It MUST never be invoked.
       provider_get_balance: () => {
         invokedCmds.push("provider_get_balance");
-        return { balance: 1.23 };
+        return { kind: "ok", balance: "1.23", quota: null };
       },
-    });
-    // Also record every invoke so we can assert no balance IPC at all.
-    invokeMock.mockImplementation(async (cmd: string, args?: unknown) => {
-      invokedCmds.push(cmd);
-      const map: Record<string, (a?: unknown) => unknown> = {
-        provider_list: () => [
-          profile({
-            uuid: "u1",
-            name: "BalancedProv",
-            secret_ref: "provider/u1",
-            capabilities: { balance: true, quota: false, model_list: true },
-          }),
-        ],
-        key_status: () => ({ "provider/u1": true }),
-        provider_get_active_selection: () => ({ primary: null, parallel: [], fallback: null }),
-        provider_get_balance: () => {
-          invokedCmds.push("provider_get_balance");
-          return { balance: 1.23 };
-        },
-      };
-      if (cmd === "provider_list_presets") return OFFICIAL_PRESET_DTOS;
-      const fn = map[cmd];
-      if (!fn) throw new Error(`unexpected invoke ${cmd}`);
-      return fn(args);
     });
     render(() => <ProviderCenter />);
     await waitFor(() => expect(screen.getByText("BalancedProv")).toBeTruthy());
     fireEvent.click(screen.getByLabelText("Edit BalancedProv"));
     await flush();
-    // The static placeholder renders (NOT a balance value).
-    expect(screen.getByText("Balance and quota are not yet available.")).toBeTruthy();
-    expect(screen.queryByText(/1\.23/)).toBeNull();
-    // Hard assertion: NO balance IPC was ever invoked.
-    expect(invokedCmds.some((c) => c === "provider_get_balance")).toBe(false);
+    const fetchBtn = screen.getByText("Fetch balance");
+    fireEvent.click(fetchBtn);
+    await flush();
+    expect(invokedCmds).toContain("provider_get_balance");
+    expect(screen.getByText(/1\.23/)).toBeTruthy();
   });
 
   it("model fetch error: provider_get_models throws → falls back to manual input", async () => {

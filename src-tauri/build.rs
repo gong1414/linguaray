@@ -52,9 +52,41 @@ fn main() {
             "dict_lookup",
             "dict_list_packages",
             "dict_install_package",
+            "ocr_capture",
+            "ocr_capture_region",
+            "ocr_from_image",
+            "ocr_recognize_bytes",
+            "ocr_from_clipboard",
+            "tts_list_voices",
+            "tts_speak",
+            "tts_stop",
+            "external_api_enable",
+            "external_api_status",
+            "external_api_disable",
+            "external_api_regenerate_token",
+            "updater_check",
+            "onboarding_status",
+            "onboarding_next",
+            "onboarding_complete",
+            "provider_get_balance",
         ]),
     ))
     .expect("failed to run tauri build");
+
+    #[cfg(target_os = "macos")]
+    {
+        println!("cargo:rerun-if-changed=src/ocr/macos.m");
+        println!("cargo:rerun-if-changed=src/tts/macos.m");
+        cc::Build::new()
+            .file("src/ocr/macos.m")
+            .file("src/tts/macos.m")
+            .flag("-fobjc-arc")
+            .compile("linguaray_apple");
+        println!("cargo:rustc-link-lib=framework=Vision");
+        println!("cargo:rustc-link-lib=framework=AppKit");
+        println!("cargo:rustc-link-lib=framework=Foundation");
+        println!("cargo:rustc-link-lib=framework=CoreGraphics");
+    }
 
     // rev-12 / Task A5: write the tray red-dot-overlay + dimmed-pulse PNGs to OUT_DIR.
     let out_dir = std::path::PathBuf::from(std::env::var("OUT_DIR").expect("OUT_DIR"));

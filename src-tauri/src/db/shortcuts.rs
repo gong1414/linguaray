@@ -45,7 +45,7 @@ impl ShortcutAction {
     }
 
     pub const fn available(self) -> bool {
-        !matches!(self, Self::Ocr)
+        true
     }
 
     fn parse(value: &str) -> Result<Self, DbError> {

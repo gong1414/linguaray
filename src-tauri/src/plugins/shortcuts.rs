@@ -44,6 +44,9 @@ impl TauriShortcutRegistrar {
                     ShortcutAction::Clipboard if event.state == ShortcutState::Pressed => {
                         let _ = app.emit("tray-action", "translate-clipboard");
                     }
+                    ShortcutAction::Ocr if event.state == ShortcutState::Pressed => {
+                        let _ = app.emit("tray-action", "ocr-capture");
+                    }
                     ShortcutAction::Clipboard | ShortcutAction::Ocr => {}
                 }
             })

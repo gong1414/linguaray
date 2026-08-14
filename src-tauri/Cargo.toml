@@ -38,6 +38,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
+cc = "1"
 # rev-11/rev-12 / Task A5: generate the tray PNGs at build time. Build-only,
 # NOT a runtime dep — the bytes are embedded via include_bytes!(env!("OUT_DIR").
 # rev-12: produces TWO icons — tray-error-32.png (red-dot overlay on the base
@@ -58,6 +59,8 @@ serde_json = "1"
 anyhow = "1"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
 flate2 = "1"
+tiny_http = "0.12"
+image = { version = "0.25", default-features = false, features = ["png"] }
 async-trait = "0.1"
 aes-gcm = "0.10"
 argon2 = "0.5"

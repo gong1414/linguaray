@@ -1,0 +1,17 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "onboarding",
+  "description": "First-launch onboarding",
+  "windows": ["onboarding"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-hide",
+    "allow-onboarding-status",
+    "allow-onboarding-next",
+    "allow-onboarding-complete",
+    "allow-history-set-enabled",
+    "allow-a11y-status",
+    "allow-open-settings-window",
+    "opener:allow-open-url"
+  ]
+}

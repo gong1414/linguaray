@@ -1,5 +1,6 @@
 //! Provider CRUD / diagnostics IPC (plugin-core PR-3).
 
+use crate::balance::{self, BalanceResult};
 use crate::db::providers::{self as db_providers, ActiveSelection, ProviderPatch, ProviderProfile};
 use crate::db::readiness::DataReadiness;
 use crate::{keystore, require_database, require_database_write, AppState, Session};
@@ -898,6 +899,44 @@ pub async fn provider_test_connection(
             latency_ms: None,
         }),
     }
+}
+
+#[tauri::command]
+pub async fn provider_get_balance(
+    state: tauri::State<'_, Arc<AppState>>,
+    session: tauri::State<'_, Arc<Session>>,
+    uuid: String,
+) -> Result<BalanceResult, String> {
+    let app = state.inner().clone();
+    let profile = tauri::async_runtime::spawn_blocking(move || {
+        let gate = app.data_gate.read();
+        let db = require_database(&app, &gate)?;
+        db.with_conn(|conn| db_providers::get(conn, &uuid))
+            .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+
+    if !balance::should_fetch(profile.capabilities.balance) {
+        return Ok(BalanceResult::Unsupported);
+    }
+    let keystore = session
+        .keystore
+        .as_ref()
+        .ok_or_else(|| "keystore unavailable".to_string())?;
+    let key = keystore
+        .get_key(&profile.secret_ref)
+        .map_err(|e| e.to_string())?
+        .unwrap_or_default();
+    let url = profile
+        .capabilities
+        .models_url
+        .as_deref()
+        .and_then(|u| url::Url::parse(u).ok())
+        .and_then(|u| u.origin().ascii_serialization().parse::<url::Url>().ok())
+        .map(|o| format!("{}/v1/dashboard/billing/credit_grants", o))
+        .unwrap_or_else(|| format!("{}/../dashboard/billing/credit_grants", profile.endpoint));
+    Ok(balance::fetch_balance_url(&url, &key).await)
 }
 
 /// User-initiated database recovery (P1 #8).

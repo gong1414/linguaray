@@ -11,6 +11,9 @@
     "allow-translate-selection-ipc",
     "allow-open-settings-window",
     "allow-vocabulary-add",
+    "allow-tts-speak",
+    "allow-tts-stop",
+    "allow-tts-list-voices",
     "clipboard-manager:allow-write-text"
   ]
 }

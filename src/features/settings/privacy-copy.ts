@@ -21,6 +21,12 @@ export type PrivacyCopy = {
   records: string;
   externalTitle: string;
   externalDeferred: string;
+  externalOff: string;
+  externalOn: string;
+  externalEnable: string;
+  externalDisable: string;
+  externalRegen: string;
+  externalTokenOnce: string;
 };
 
 export const PRIVACY_COPY: Record<Locale, PrivacyCopy> = {
@@ -44,7 +50,13 @@ export const PRIVACY_COPY: Record<Locale, PrivacyCopy> = {
     cleared: "History cleared",
     records: "{count} encrypted records",
     externalTitle: "External API",
-    externalDeferred: "External API controls use the shared system service delivered with Surface 15.",
+    externalDeferred: "Local HTTP API for scripts. Off by default.",
+    externalOff: "External API: Off",
+    externalOn: "External API: On (port {port})",
+    externalEnable: "Enable",
+    externalDisable: "Disable",
+    externalRegen: "Regenerate token",
+    externalTokenOnce: "Copy now — you won't see it again",
   },
   zh: {
     title: "隐私与数据",
@@ -66,6 +78,12 @@ export const PRIVACY_COPY: Record<Locale, PrivacyCopy> = {
     cleared: "历史已清除",
     records: "{count} 条加密记录",
     externalTitle: "外部 API",
-    externalDeferred: "外部 API 控制将复用 Surface 15 交付的系统服务。",
+    externalDeferred: "供本地脚本使用的 HTTP API，默认关闭。",
+    externalOff: "外部 API：关",
+    externalOn: "外部 API：开（端口 {port}）",
+    externalEnable: "启用",
+    externalDisable: "停用",
+    externalRegen: "重新生成令牌",
+    externalTokenOnce: "请立即复制 — 之后不会再显示",
   },
 };

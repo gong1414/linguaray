@@ -36,6 +36,8 @@ export default defineConfig(async () => ({
         main: "index.html",
         popup: "popup.html",
         input: "input.html",
+        ocr: "ocr.html",
+        onboarding: "onboarding.html",
       },
     },
   },

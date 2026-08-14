@@ -4,6 +4,7 @@ import { Search, Star } from "lucide-solid";
 import { detectLocale } from "../../i18n";
 import { HISTORY_COPY } from "./history-copy";
 import {
+  chooseExportPath,
   historyDeleteSession,
   historyExport,
   historySearch,
@@ -78,7 +79,8 @@ export const HistoryView: Component = () => {
   };
 
   const exportFile = async (format: "csv" | "json") => {
-    const filePath = `linguaray-history.${format}`;
+    const filePath = await chooseExportPath(`linguaray-history.${format}`);
+    if (!filePath) return;
     try {
       const written = await historyExport(filePath, format, {
         query: query().trim() || null,

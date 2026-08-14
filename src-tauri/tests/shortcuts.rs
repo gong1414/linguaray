@@ -73,7 +73,7 @@ fn canonical_modifier_order_and_aliases_are_stable() {
 }
 
 #[test]
-fn seeds_exactly_four_defaults_and_marks_ocr_unavailable() {
+fn seeds_exactly_four_defaults_and_registers_ocr() {
     let (db, registrar, controller) = controller();
     let snapshot = controller.snapshot().unwrap();
 
@@ -87,10 +87,10 @@ fn seeds_exactly_four_defaults_and_marks_ocr_unavailable() {
     );
     assert_eq!(snapshot.combo(ShortcutAction::Ocr), Some("Alt+Shift+Space"));
     let ocr = snapshot.entry(ShortcutAction::Ocr).unwrap();
-    assert!(!ocr.available);
+    assert!(ocr.available);
     assert_eq!(
         ocr.registration_state,
-        ShortcutRegistrationState::Unavailable
+        ShortcutRegistrationState::Registered
     );
     assert_eq!(ocr.registration_error, None);
     assert_eq!(
@@ -103,8 +103,8 @@ fn seeds_exactly_four_defaults_and_marks_ocr_unavailable() {
     assert_eq!(shortcut_db::load(&db).unwrap().len(), 4);
     assert_eq!(
         registrar.registered().len(),
-        3,
-        "unavailable OCR is not registered"
+        4,
+        "OCR is registered"
     );
 }
 
@@ -156,12 +156,7 @@ fn recording_flag_is_ephemeral_and_single_action() {
         .entries
         .iter()
         .all(|entry| !entry.recording));
-    assert_eq!(
-        controller.recording_begin(ShortcutAction::Ocr),
-        Err(ShortcutError::Unavailable {
-            action: ShortcutAction::Ocr,
-        }),
-    );
+    assert!(controller.recording_begin(ShortcutAction::Ocr).is_ok());
 }
 
 #[test]

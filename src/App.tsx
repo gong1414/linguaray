@@ -5,11 +5,10 @@
  * tray / popup CTAs can drive navigation.
  *
  * Surface 04 scope (rev-10): normal icon, provider name status,
- * translate-selection/clipboard/switch-provider/settings/quit are live. OCR +
- * History are disabled with "Coming later". Update badge, active-translation
- * pulse, and Balance are not implemented (see Surface status table).
+ * translate-selection/clipboard/switch-provider/settings/quit/OCR/History are live.
  */
 import { createSignal, onCleanup, onMount, type Component } from "solid-js";
+import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import SettingsShell, { type SettingsSection } from "./features/settings/SettingsShell";
 import ProviderCenter from "./features/settings/ProviderCenter";
@@ -40,7 +39,9 @@ const App: Component = () => {
         } else if (action === "translate-selection") {
           void translateSelection();
         } else if (action === "ocr-capture") {
-          // Disabled in the menu (Coming later); no-op here.
+          void invoke("ocr_capture");
+        } else if (action === "history") {
+          setActivePage("history");
         } else if (action === "switch-provider" || action === "settings") {
           setActivePage("provider-center");
         }

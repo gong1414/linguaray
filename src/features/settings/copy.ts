@@ -92,8 +92,9 @@ type RoleCopy = {
  *  implemented, so the section renders a muted TODO note. */
 type BalanceCopy = {
   title: string;
-  /** Muted note shown instead of a balance value (R3a limitation). */
   unsupportedNote: string;
+  fetch: string;
+  loading: string;
 };
 
 /** Provider endpoint field labels + error-code → localized message map. */
@@ -392,8 +393,9 @@ const EN: SettingsCopy = {
     },
     balance: {
       title: "Balance",
-      // TODO(r3b): balance/quota IPC not yet implemented — render this muted note.
-      unsupportedNote: "Balance and quota are not yet available.",
+      unsupportedNote: "Balance and quota are not supported by this provider.",
+      fetch: "Fetch balance",
+      loading: "Loading balance…",
     },
   },
 };
@@ -535,8 +537,9 @@ const ZH: SettingsCopy = {
     },
     balance: {
       title: "余额",
-      // TODO(r3b): balance/quota IPC not yet implemented — render this muted note.
-      unsupportedNote: "余额与配额暂不可用。",
+      unsupportedNote: "此服务商不支持余额与配额。",
+      fetch: "查询余额",
+      loading: "正在查询余额…",
     },
   },
 };

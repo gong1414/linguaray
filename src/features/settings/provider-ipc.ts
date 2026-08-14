@@ -73,6 +73,14 @@ export const providerReorder = (uuids: string[]): Promise<void> =>
 export const providerToggle = (uuid: string, enabled: boolean): Promise<void> =>
   invoke<void>("provider_toggle", { uuid, enabled });
 
+export type BalanceResultFE =
+  | { kind: "unsupported" }
+  | { kind: "ok"; balance: string; quota?: string | null }
+  | { kind: "error"; message: string };
+
+export const providerGetBalance = (uuid: string): Promise<BalanceResultFE> =>
+  invoke<BalanceResultFE>("provider_get_balance", { uuid });
+
 /** Set the API key. Rejects if the provider is not `status="active"`. */
 export const providerSetKey = (uuid: string, key: string): Promise<void> =>
   invoke<void>("provider_set_key", { uuid, key });
