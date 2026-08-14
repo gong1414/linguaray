@@ -70,8 +70,8 @@ pub use crate::commands::providers::{
 pub use crate::commands::translate::{
     decide_clipboard_popup, resolve_target_language, run_translate_session_no_settings,
     ClipboardPopupDecision, TranslateRequest, TranslateResult, TranslateSessionRequest,
-    TranslateSessionResult,
 };
+pub use crate::service::TranslateSessionResult;
 
 /// Shared application state.
 ///
@@ -244,6 +244,9 @@ pub fn startup_migration_guard<'a>(
 /// Resolve the optional `client` from the [`Session`] or return a clear error
 /// string. Used by the translate commands so a startup build failure surfaces
 /// consistently instead of panicking.
+/// Catalog fail-closed tests still drive this façade. Translate commands lease
+/// `linguaray.http` instead.
+#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn session_client(session: &Session) -> Result<&reqwest::Client, String> {
     session.client.as_ref().ok_or_else(|| {
         "HTTP client unavailable: startup build failed (recovery required)".to_string()

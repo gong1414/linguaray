@@ -122,6 +122,9 @@ impl<T: ?Sized + Send + Sync + 'static> ServiceLease<T> {
     }
 
     /// Run `f` for the lifetime of the future. `f` receives `&T` only.
+    ///
+    /// The future must not capture `&T` (the bound is not higher-ranked).
+    /// Use [`scope`] when the business future needs the borrowed service.
     pub async fn call<F, Fut, R>(&self, f: F) -> Result<R, LeaseError>
     where
         F: FnOnce(&T) -> Fut,
@@ -130,6 +133,23 @@ impl<T: ?Sized + Send + Sync + 'static> ServiceLease<T> {
         self.classify()?;
         let fut = f(&self.value);
         tokio::pin!(fut);
+        tokio::select! {
+            biased;
+            _ = self.slot.force_notify.notified() => Err(LeaseError::ForcedStop),
+            r = &mut fut => {
+                self.classify()?;
+                Ok(r)
+            }
+        }
+    }
+
+    /// Like [`call`], but the future may borrow `&T` for its whole lifetime.
+    pub async fn scope<F, R>(&self, f: F) -> Result<R, LeaseError>
+    where
+        F: for<'a> FnOnce(&'a T) -> BoxFuture<'a, R>,
+    {
+        self.classify()?;
+        let mut fut = f(&self.value);
         tokio::select! {
             biased;
             _ = self.slot.force_notify.notified() => Err(LeaseError::ForcedStop),
