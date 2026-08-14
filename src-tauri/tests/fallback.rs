@@ -78,6 +78,7 @@ fn primary_preset(endpoint: &str) -> ProviderPreset {
         api_kind: ApiKind::OpenAIChat,
         default_model: "m".into(),
         needs_key: false,
+        auth: linguaray_contracts::AuthKind::Bearer,
     }
 }
 

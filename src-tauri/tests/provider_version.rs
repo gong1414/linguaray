@@ -61,7 +61,8 @@ fn normal_update_bumps_version_to_2() {
         enabled: None,
         sort_order: None,
         expected_version: 1,
-    };
+                protocol: None,
+        };
     let updated = match db
         .with_conn(|conn| providers::update(conn, &p.uuid, &patch))
         .unwrap()
@@ -86,7 +87,8 @@ fn stale_version_yields_stale_outcome() {
         enabled: None,
         sort_order: None,
         expected_version: 1,
-    };
+                protocol: None,
+        };
     let first = match db
         .with_conn(|conn| providers::update(conn, &p.uuid, &patch1))
         .unwrap()
@@ -105,7 +107,8 @@ fn stale_version_yields_stale_outcome() {
         enabled: None,
         sort_order: None,
         expected_version: 1,
-    };
+                protocol: None,
+        };
     let outcome = db
         .with_conn(|conn| providers::update(conn, &p.uuid, &patch2))
         .unwrap();
@@ -134,7 +137,8 @@ fn nonexistent_uuid_yields_not_found_outcome() {
         enabled: None,
         sort_order: None,
         expected_version: 1,
-    };
+                protocol: None,
+        };
     let outcome = db
         .with_conn(|conn| providers::update(conn, "no-such-uuid", &patch))
         .unwrap();
@@ -153,7 +157,8 @@ fn second_write_with_correct_version_succeeds() {
         enabled: None,
         sort_order: None,
         expected_version: 1,
-    };
+                protocol: None,
+        };
     let v2 = match db
         .with_conn(|conn| providers::update(conn, &p.uuid, &patch1))
         .unwrap()
@@ -171,7 +176,8 @@ fn second_write_with_correct_version_succeeds() {
         enabled: None,
         sort_order: None,
         expected_version: 2,
-    };
+                protocol: None,
+        };
     let v3 = match db
         .with_conn(|conn| providers::update(conn, &p.uuid, &patch2))
         .unwrap()
@@ -378,7 +384,8 @@ fn cas_update_works_after_migration() {
         enabled: None,
         sort_order: None,
         expected_version: 1,
-    };
+                protocol: None,
+        };
     let updated = match db
         .with_conn(|conn| providers::update(conn, "legacy-uuid", &patch))
         .unwrap()
@@ -462,7 +469,8 @@ fn stale_version_reports_actual_not_default() {
         enabled: None,
         sort_order: None,
         expected_version: 1,
-    };
+                protocol: None,
+        };
     match db
         .with_conn(|conn| providers::update(conn, &p.uuid, &patch))
         .unwrap()
@@ -487,7 +495,8 @@ fn update_returns_outcome_not_dberror_on_not_found() {
         enabled: None,
         sort_order: None,
         expected_version: 1,
-    };
+                protocol: None,
+        };
     let res = db.with_conn(|conn| providers::update(conn, "missing", &patch));
     // Must be Ok(NotFound), NOT Err(DbError::NotFound).
     assert!(
@@ -663,7 +672,8 @@ fn full_pipeline_v1_to_v2_migration_via_run_migration() {
         enabled: None,
         sort_order: None,
         expected_version: 1,
-    };
+                protocol: None,
+        };
     let updated = match db
         .with_conn(|conn| providers::update(conn, "legacy-uuid", &patch))
         .unwrap()
@@ -801,7 +811,8 @@ fn full_pipeline_v1_providers_no_version_with_missing_singleton() {
         enabled: None,
         sort_order: None,
         expected_version: 1,
-    };
+                protocol: None,
+        };
     let updated = match db
         .with_conn(|conn| providers::update(conn, "legacy-uuid", &patch))
         .unwrap()
@@ -1059,7 +1070,8 @@ fn concurrent_same_version_only_one_wins_via_update() {
                     enabled: None,
                     sort_order: None,
                     expected_version: 1,
-                })
+                            protocol: None,
+        })
             })
         }));
     }
