@@ -1,3 +1,5 @@
+Archived-on: 2026-08-14 · reason: superseded by linguaray-plugin-core-design / completed, see git history
+
 # Phase 3: Built-in Traditional Engine + Fallback Chain + System Dictionary — Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

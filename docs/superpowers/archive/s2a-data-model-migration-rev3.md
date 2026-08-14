@@ -1,3 +1,5 @@
+Archived-on: 2026-08-14 · reason: superseded by linguaray-plugin-core-design / completed, see git history
+
 # S2a — Data Model + Migration: Implementation Plan (rev-3)
 
 **Branch:** `codex/s2a-data-model-migration` (from main `ef7b378`)

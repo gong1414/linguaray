@@ -1,3 +1,5 @@
+Archived-on: 2026-08-14 · reason: superseded by linguaray-plugin-core-design / completed, see git history
+
 # Phase 4: Windows Parity + Cross-Platform Packaging — Implementation Plan (rev 14)
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development. Steps use checkbox (`- [ ]`) syntax for tracking.

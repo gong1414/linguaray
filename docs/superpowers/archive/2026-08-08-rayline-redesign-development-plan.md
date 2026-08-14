@@ -1,3 +1,5 @@
+Archived-on: 2026-08-14 · reason: superseded by linguaray-plugin-core-design / completed, see git history
+
 # LinguaRay Rayline Redesign — Design & Development Plan
 
 **Status:** R0 frozen · R1 complete (rev-4.3.2) · **Date:** 2026-08-08

@@ -1,3 +1,5 @@
+Archived-on: 2026-08-14 · reason: superseded by linguaray-plugin-core-design / completed, see git history
+
 # R2a 并行翻译编排 + 类型化失败分类 实施计划
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

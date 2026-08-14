@@ -1,3 +1,5 @@
+Archived-on: 2026-08-14 · reason: superseded by linguaray-plugin-core-design / completed, see git history
+
 # R2/R3a Contract Audit Fixes Implementation Plan (rev-23 — fix extract_function_body lifetime E0106 + reconfirm SYNC core/wrapper + 33 tests + exact tooltip + no .bak)
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Each task is strict TDD: write the failing test (RED) → implement (GREEN) → commit.

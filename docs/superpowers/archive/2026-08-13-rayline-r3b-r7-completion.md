@@ -1,3 +1,5 @@
+Archived-on: 2026-08-14 · reason: superseded by linguaray-plugin-core-design / completed, see git history
+
 # Rayline R3b–R7 Completion Plan
 
 **Status:** in progress  

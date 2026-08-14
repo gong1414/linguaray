@@ -1,5 +1,7 @@
+Archived-on: 2026-08-14 · reason: superseded by linguaray-plugin-core-design / completed, see git history
+
 > ⚠️ **SUPERSEDED** — This v1 translation-core spec is replaced by the full product baseline:
-> [**2026-08-01-linguaray-product-baseline.md**](./2026-08-01-linguaray-product-baseline.md)
+> [**2026-08-01-linguaray-product-baseline.md**](../specs/2026-08-01-linguaray-product-baseline.md)
 >
 > The security, clipboard, CI, and signing implementations described here are **retained**
 > as the engineering base for the new spec. The product scope (translation-only v1) is
