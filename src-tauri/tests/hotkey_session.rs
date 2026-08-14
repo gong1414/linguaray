@@ -122,6 +122,7 @@ fn on_hotkey_does_not_hold_selection_lock_and_helper_reads_cursor_under_lock() {
     //     region (from `selection_lock()` to the matching drop at the `};` that
     //     closes the `let captured` block) and assert `cursor::position()` is
     //     textually within that region.
+    let src = include_str!("../src/commands/translate.rs");
     let cap_start = src.find("async fn capture_and_translate").expect("capture_and_translate fn not found");
     let cap_body = &src[cap_start..];
     let cap_end = cap_body[1..]
@@ -147,7 +148,7 @@ fn on_hotkey_does_not_hold_selection_lock_and_helper_reads_cursor_under_lock() {
 
 #[test]
 fn capture_lock_block_excludes_ui_operations() {
-    let src = include_str!("../src/lib.rs");
+    let src = include_str!("../src/commands/translate.rs");
     let cap_start = src.find("async fn capture_and_translate")
         .expect("capture_and_translate fn not found");
     let cap_body = &src[cap_start..];

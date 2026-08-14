@@ -674,10 +674,11 @@ fn switch_arm_source_has_no_gen_next_call() {
     }
 
     let src = include_str!("../src/lib.rs");
+    let providers_src = include_str!("../src/commands/providers.rs");
 
     let handler_body = extract_function_body(src, "fn handle_tray_menu_event(");
-    let core_body = extract_function_body(src, "pub fn handle_switch_provider_core(");
-    let wrapper_body = extract_function_body(src, "pub fn handle_switch_provider(");
+    let core_body = extract_function_body(providers_src, "pub fn handle_switch_provider_core(");
+    let wrapper_body = extract_function_body(providers_src, "pub fn handle_switch_provider(");
 
     let handler_preview: String = handler_body.chars().take(500).collect();
     let core_preview: String = core_body.chars().take(500).collect();
