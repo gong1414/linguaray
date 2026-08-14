@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "crates/linguaray-contracts", "crates/linguaray-catalog"]
+members = [".", "crates/linguaray-kernel", "crates/linguaray-contracts", "crates/linguaray-catalog"]
 resolver = "2"
 
 [package]
