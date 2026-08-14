@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "engines": [
+    {"id":"google","label":"Google Translate","unofficial_gtx":true,"needs_key":false},
+    {"id":"deepl","label":"DeepL","needs_key":true},
+    {"id":"microsoft","label":"Microsoft Translator","needs_key":true},
+    {"id":"baidu","label":"百度翻译","needs_key":true},
+    {"id":"youdao","label":"有道","needs_key":true},
+    {"id":"tencent","label":"腾讯","needs_key":true}
+  ]
+}
