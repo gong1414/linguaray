@@ -3,6 +3,17 @@
 **Status:** Approved — S0 Frozen · **Date:** 2026-08-01
 **Supersedes:** [2026-07-30-linguaray-v1-design.md](./2026-07-30-linguaray-v1-design.md) (the v1 translation-core scope; its security/clipboard/CI/signing implementations are retained as the engineering base)
 
+**Erratum (2026-08-14, plugin-core rev-4):**
+
+1. Official in-tree Capability/Driver plugins supersede the sentence
+   “v1 has no plugin system” for *first-party* code. Third-party SDK,
+   Bob/Pot plugin compatibility, and WASM remain 🔜.
+2. Official AI catalog is the 21 ids in
+   `docs/superpowers/specs/2026-08-14-linguaray-plugin-core-design.md` §7.3,
+   with support tiers `ready` / `setup_required` / `unverified`.
+   The 8-name list below is historical. 30+ relay long-tail remains 🔜.
+   Custom still covers user-supplied OpenAI-compatible / Anthropic endpoints.
+
 ---
 
 ## 1. Product Goal & Release Rule
