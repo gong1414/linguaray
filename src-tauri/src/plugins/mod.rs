@@ -18,6 +18,7 @@ pub mod translation;
 pub mod tray_state;
 pub mod tts;
 pub mod updater;
+pub mod vocabulary;
 
 use linguaray_kernel::CapabilityPlugin;
 use std::sync::Arc;
@@ -113,7 +114,6 @@ mod tests {
             .and_then(|s| s.split(']').next())
             .unwrap_or("");
         for cmd in [
-            "dict_lookup",
             "ocr_capture",
             "tts_speak",
             "external_api_listen",

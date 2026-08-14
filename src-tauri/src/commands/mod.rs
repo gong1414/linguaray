@@ -6,6 +6,8 @@ pub mod providers;
 pub mod settings;
 pub mod shortcuts;
 pub mod translate;
+pub mod vocabulary;
+pub mod dict;
 
 pub use history::*;
 pub use keystore::*;
@@ -13,3 +15,5 @@ pub use providers::*;
 pub use settings::*;
 pub use shortcuts::*;
 pub use translate::*;
+pub use vocabulary::*;
+pub use dict::*;

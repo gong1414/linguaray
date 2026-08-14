@@ -41,6 +41,15 @@ fn main() {
             "history_set_retention",
             "history_clear_all",
             "history_search",
+            "history_toggle_favorite",
+            "history_delete_session",
+            "history_export",
+            "vocabulary_add",
+            "vocabulary_list",
+            "vocabulary_delete",
+            "vocabulary_export_file",
+            "dict_lookup",
+            "dict_list_packages",
         ]),
     ))
     .expect("failed to run tauri build");

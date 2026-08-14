@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-vocabulary-add"
+description = "Enables the vocabulary_add command without any pre-configured scope."
+commands.allow = ["vocabulary_add"]
+
+[[permission]]
+identifier = "deny-vocabulary-add"
+description = "Denies the vocabulary_add command without any pre-configured scope."
+commands.deny = ["vocabulary_add"]

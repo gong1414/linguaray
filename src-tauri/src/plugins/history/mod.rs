@@ -1,6 +1,7 @@
 //! Encrypted-history service surface.
 
 pub mod crypto;
+pub mod export;
 pub mod search;
 
 pub use crate::db::history::{
@@ -264,6 +265,72 @@ impl HistoryHub {
     pub fn require_writable(&self) -> Result<(), String> {
         let _ = self.secrets()?;
         Ok(())
+    }
+
+    pub fn vocabulary_add(
+        &self,
+        db: &Database,
+        word: &str,
+        definition: &str,
+        source_language: &str,
+        target_language: &str,
+    ) -> Result<crate::plugins::vocabulary::VocabularyItem, String> {
+        let secrets = self.secrets()?;
+        secrets
+            .with(|ks| {
+                crate::plugins::vocabulary::add_word(
+                    db,
+                    ks,
+                    word,
+                    definition,
+                    source_language,
+                    target_language,
+                )
+            })
+            .map_err(|e| e.to_string())?
+    }
+
+    pub fn vocabulary_list(
+        &self,
+        db: &Database,
+        cursor: Option<&str>,
+    ) -> Result<crate::plugins::vocabulary::VocabularyPage, String> {
+        let secrets = self.secrets()?;
+        secrets
+            .with(|ks| crate::plugins::vocabulary::list_words(db, ks, cursor))
+            .map_err(|e| e.to_string())?
+    }
+
+    pub fn vocabulary_export(
+        &self,
+        db: &Database,
+        file_path: &str,
+        format: &str,
+    ) -> Result<String, String> {
+        let secrets = self.secrets()?;
+        secrets
+            .with(|ks| crate::plugins::vocabulary::export_file(db, ks, file_path, format))
+            .map_err(|e| e.to_string())?
+    }
+
+    pub fn export(
+        &self,
+        db: &Database,
+        file_path: &str,
+        format: &str,
+        filter: &export::HistoryFilter,
+    ) -> Result<String, String> {
+        let secrets = self.secrets()?;
+        let fmt = export::ExportFormat::parse(format).map_err(|e| e.to_string())?;
+        secrets
+            .with(|ks| export::export_all(db, ks, filter))
+            .map_err(|e| e.to_string())?
+            .map_err(|e| e.to_string())
+            .and_then(|sessions| {
+                export::write_export_file(&sessions, std::path::Path::new(file_path), fmt)
+                    .map_err(|e| e.to_string())?;
+                Ok(file_path.to_string())
+            })
     }
 }
 

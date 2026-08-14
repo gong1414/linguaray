@@ -42,6 +42,15 @@
     "allow-history-set-enabled",
     "allow-history-set-retention",
     "allow-history-clear-all",
-    "allow-history-search"
+    "allow-history-search",
+    "allow-history-toggle-favorite",
+    "allow-history-delete-session",
+    "allow-history-export",
+    "allow-vocabulary-add",
+    "allow-vocabulary-list",
+    "allow-vocabulary-delete",
+    "allow-vocabulary-export-file",
+    "allow-dict-lookup",
+    "allow-dict-list-packages"
   ]
 }

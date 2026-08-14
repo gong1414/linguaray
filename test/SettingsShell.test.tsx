@@ -106,7 +106,7 @@ describe("SettingsShell", () => {
     installMatchMedia(false);
     const { container } = render(() => <SettingsShell>body</SettingsShell>);
     const buttons = container.querySelectorAll("nav button");
-    expect(buttons.length).toBe(4);
+    expect(buttons.length).toBe(7);
     for (const btn of Array.from(buttons)) {
       const label = (btn.getAttribute("aria-label") ?? "").trim();
       const text = (btn.textContent ?? "").trim();

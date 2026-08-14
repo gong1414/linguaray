@@ -26,6 +26,7 @@ pub mod readiness;
 pub mod recovery;
 pub mod schema;
 pub mod shortcuts;
+pub mod vocabulary;
 
 // Re-export the readiness type at the crate root (lib.rs uses `readiness::`).
 pub use readiness::DataReadiness;
