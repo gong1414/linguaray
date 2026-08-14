@@ -5,6 +5,7 @@
 //! struct literal, not code. The HTTP calling lives in `wire.rs`.
 
 use crate::wire::ApiKind;
+use linguaray_contracts::{AuthKind, ProtocolKind};
 
 #[derive(Debug, Clone)]
 pub struct ProviderPreset {
@@ -17,32 +18,29 @@ pub struct ProviderPreset {
     pub api_kind: ApiKind,
     pub default_model: String,
     pub needs_key: bool,
+    pub auth: AuthKind,
 }
 
 pub fn presets() -> Vec<ProviderPreset> {
-    vec![
-        ProviderPreset {
-            id: "openai".into(), label: "OpenAI".into(),
-            endpoint: "https://api.openai.com/v1/chat/completions".into(),
-            api_kind: ApiKind::OpenAIChat, default_model: "gpt-4o-mini".into(), needs_key: true,
-        },
-        ProviderPreset {
-            id: "anthropic".into(), label: "Anthropic Claude".into(),
-            endpoint: "https://api.anthropic.com/v1/messages".into(),
-            api_kind: ApiKind::Anthropic, default_model: "claude-sonnet-4-5".into(), needs_key: true,
-        },
-        ProviderPreset {
-            id: "gemini".into(), label: "Google Gemini".into(),
-            // OpenAI-compatible path (spec §Wire): /v1beta/openai/chat/completions
-            endpoint: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions".into(),
-            api_kind: ApiKind::OpenAIChat, default_model: "gemini-3.6-flash".into(), needs_key: true,
-        },
-        ProviderPreset {
-            id: "ollama".into(), label: "Ollama (local)".into(),
-            endpoint: "http://localhost:11434/v1/chat/completions".into(),
-            api_kind: ApiKind::OpenAIChat, default_model: "qwen2.5:7b".into(), needs_key: false,
-        },
-    ]
+    linguaray_catalog::load()
+        .map(|file| {
+            file.providers
+                .into_iter()
+                .map(|p| ProviderPreset {
+                    id: p.id,
+                    label: p.label,
+                    endpoint: p.endpoint,
+                    api_kind: match p.protocol {
+                        ProtocolKind::Anthropic => ApiKind::Anthropic,
+                        ProtocolKind::OpenaiChat => ApiKind::OpenAIChat,
+                    },
+                    default_model: p.default_model,
+                    needs_key: p.needs_key,
+                    auth: p.auth,
+                })
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 /// Spec §Privacy: remote endpoints must be HTTPS; HTTP allowed only for loopback

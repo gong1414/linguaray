@@ -6,6 +6,7 @@
 //! - WireParams (model/temperature/max_tokens/stream) is a strong-typed whitelist
 //!   for top-level body fields.
 
+use linguaray_contracts::AuthKind;
 use serde::Serialize;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -78,10 +79,15 @@ pub async fn call(
                     {"role": "user", "content": user},
                 ],
             });
-            client.post(&preset.endpoint)
-                .bearer_auth(key)
-                .json(&body)
-                .send().await
+            let mut req = client.post(&preset.endpoint);
+            req = match preset.auth {
+                AuthKind::Bearer => req.bearer_auth(key),
+                AuthKind::AzureKey => req.header("api-key", key),
+                AuthKind::XApiKey => req.header("x-api-key", key),
+                AuthKind::None => req,
+                AuthKind::Query => req.query(&[("key", key)]),
+            };
+            req.json(&body).send().await
         }
         ApiKind::Anthropic => {
             let body = serde_json::json!({

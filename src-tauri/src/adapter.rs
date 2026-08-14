@@ -12,6 +12,7 @@
 use crate::db::providers::{Protocol, ProviderProfile};
 use crate::providers::ProviderPreset;
 use crate::wire::ApiKind;
+use linguaray_contracts::AuthKind;
 
 /// 把 DB wire 协议族映射到 `wire::call` 支持的 API kind。
 /// - OpenAIChat / Gemini → OpenAIChat（spec §Wire：Gemini 走 OpenAI-compatible 路径）
@@ -39,6 +40,7 @@ pub fn profile_to_preset(profile: &ProviderProfile) -> Result<ProviderPreset, St
     let api_kind = protocol_to_api_kind(&profile.protocol).ok_or_else(|| {
         format!("unsupported protocol for provider {}: {:?}", profile.uuid, profile.protocol)
     })?;
+    let auth = profile.capabilities.auth.unwrap_or(AuthKind::Bearer);
     Ok(ProviderPreset {
         id: profile.secret_ref.clone(),
         label: profile.name.clone(),
@@ -46,6 +48,7 @@ pub fn profile_to_preset(profile: &ProviderProfile) -> Result<ProviderPreset, St
         api_kind,
         default_model: profile.model.clone().unwrap_or_default(),
         needs_key: profile.needs_key,
+        auth,
     })
 }
 

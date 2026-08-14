@@ -127,7 +127,8 @@ fn update_valid_patch_changes_fields() {
         sort_order: Some(5),
         endpoint: None,
         expected_version: 1,
-    };
+                protocol: None,
+        };
     let updated = expect_written(db.with_conn(|conn| providers::update(conn, &p.uuid, &patch)).unwrap());
     assert_eq!(updated.name, "Renamed");
     assert_eq!(updated.model.as_deref(), Some("gpt-4o"));
@@ -150,7 +151,8 @@ fn update_recomputes_is_local_on_endpoint_change() {
         enabled: None,
         sort_order: None,
         expected_version: 1,
-    };
+                protocol: None,
+        };
     let updated = expect_written(db.with_conn(|conn| providers::update(conn, &p.uuid, &patch)).unwrap());
     assert!(updated.is_local, "localhost endpoint flips is_local to true");
     assert!(!p.is_local, "originally remote");
@@ -175,7 +177,8 @@ fn update_invalid_endpoint_rejected() {
         enabled: None,
         sort_order: None,
         expected_version: 1,
-    };
+                protocol: None,
+        };
     let err = db
         .with_conn(|conn| providers::update(conn, &p.uuid, &patch))
         .unwrap_err();
@@ -192,7 +195,8 @@ fn update_unknown_uuid_not_found() {
         enabled: None,
         sort_order: None,
         expected_version: 1,
-    };
+                protocol: None,
+        };
     // R2-E: a missing row is a typed NotFound OUTCOME (not a DbError) so the
     // command layer can map it to a structured Validation error.
     let outcome = db
@@ -223,7 +227,8 @@ fn update_same_origin_preserves_consent() {
         enabled: None,
         sort_order: None,
         expected_version: 1,
-    };
+                protocol: None,
+        };
     expect_written(db.with_conn(|conn| providers::update(conn, &p.uuid, &patch)).unwrap());
 
     db.with_conn(|conn| {
@@ -266,7 +271,8 @@ fn update_different_origin_invalidates_consent() {
         enabled: None,
         sort_order: None,
         expected_version: 1,
-    };
+                protocol: None,
+        };
     expect_written(db.with_conn(|conn| providers::update(conn, &p.uuid, &patch)).unwrap());
 
     db.with_conn(|conn| {
@@ -306,7 +312,8 @@ fn update_different_origin_not_in_slot_keeps_consent() {
         enabled: None,
         sort_order: None,
         expected_version: 1,
-    };
+                protocol: None,
+        };
     expect_written(db.with_conn(|conn| providers::update(conn, &p.uuid, &patch)).unwrap());
 
     db.with_conn(|conn| {
@@ -1071,7 +1078,8 @@ fn update_endpoint_change_with_corrupt_parallel_uuids_errors() {
         enabled: None,
         sort_order: None,
         expected_version: 1,
-    };
+                protocol: None,
+        };
     let err = db
         .with_conn(|conn| providers::update(conn, &p.uuid, &patch))
         .unwrap_err();
@@ -1174,4 +1182,141 @@ fn read_active_selection_empty_parallel_json_yields_empty_vec() {
     // 默认 '[]' → 空 vec（不是 None，因为 parallel 本就是 Vec）。
     let sel = db.with_conn(|conn| providers::read_active_selection(conn)).unwrap();
     assert!(sel.parallel.is_empty());
+}
+
+fn empty_patch(expected_version: i64) -> ProviderPatch {
+    ProviderPatch {
+        name: None,
+        endpoint: None,
+        model: None,
+        enabled: None,
+        sort_order: None,
+        expected_version,
+        protocol: None,
+    }
+}
+
+#[test]
+fn create_custom_allows_empty_endpoint() {
+    let (_dir, db) = fresh_db();
+    let p = db
+        .with_conn(|conn| providers::create(conn, "custom", "My custom", "", None))
+        .unwrap();
+    assert_eq!(p.endpoint, "");
+    assert_eq!(p.protocol, Protocol::OpenaiChat);
+    assert_eq!(p.capabilities.auth, Some(linguaray_contracts::AuthKind::Bearer));
+    assert!(p.capabilities.models_url.is_none());
+}
+
+#[test]
+fn create_azure_allows_empty_endpoint() {
+    let (_dir, db) = fresh_db();
+    let p = db
+        .with_conn(|conn| providers::create(conn, "azure-openai", "Az", "", None))
+        .unwrap();
+    assert_eq!(p.endpoint, "");
+    assert_eq!(
+        p.capabilities.auth,
+        Some(linguaray_contracts::AuthKind::AzureKey)
+    );
+}
+
+#[test]
+fn create_openai_empty_endpoint_uses_catalog_default() {
+    let (_dir, db) = fresh_db();
+    let p = db
+        .with_conn(|conn| providers::create(conn, "openai", "O", "", None))
+        .unwrap();
+    assert_eq!(p.endpoint, "https://api.openai.com/v1/chat/completions");
+    let err = db
+        .with_conn(|conn| providers::create(conn, "openai", "O2", "ftp://evil.example/x", None))
+        .unwrap_err();
+    assert!(matches!(err, DbError::Integrity(_)));
+}
+
+#[test]
+fn create_xiaomi_copies_azure_key_auth() {
+    let (_dir, db) = fresh_db();
+    let p = db
+        .with_conn(|conn| providers::create(conn, "xiaomi-mimo", "Mi", "", None))
+        .unwrap();
+    assert_eq!(
+        p.capabilities.auth,
+        Some(linguaray_contracts::AuthKind::AzureKey)
+    );
+    assert!(p.endpoint.starts_with("https://api.xiaomimimo.com"));
+}
+
+#[test]
+fn unknown_template_still_custom_http_repair() {
+    let (_dir, db) = fresh_db();
+    let p = db
+        .with_conn(|conn| providers::create(conn, "not-a-real-id", "X", "", None))
+        .unwrap();
+    assert_eq!(p.protocol, Protocol::CustomHttp);
+}
+
+#[test]
+fn custom_protocol_patch_derives_auth() {
+    let (_dir, db) = fresh_db();
+    let p = db
+        .with_conn(|conn| {
+            providers::create(
+                conn,
+                "custom",
+                "C",
+                "https://example.com/v1/messages",
+                None,
+            )
+        })
+        .unwrap();
+    let mut patch = empty_patch(p.version);
+    patch.protocol = Some(Protocol::Anthropic);
+    let written = expect_written(
+        db.with_conn(|conn| providers::update(conn, &p.uuid, &patch))
+            .unwrap(),
+    );
+    assert_eq!(written.protocol, Protocol::Anthropic);
+    assert_eq!(
+        written.capabilities.auth,
+        Some(linguaray_contracts::AuthKind::XApiKey)
+    );
+}
+
+#[test]
+fn non_custom_protocol_patch_rejected() {
+    let (_dir, db, p) = fresh_with_one_openai();
+    let mut patch = empty_patch(p.version);
+    patch.protocol = Some(Protocol::Anthropic);
+    let err = db
+        .with_conn(|conn| providers::update(conn, &p.uuid, &patch))
+        .unwrap_err();
+    assert!(matches!(err, DbError::Integrity(_)));
+}
+
+#[test]
+fn models_url_origin_mismatch_is_error() {
+    let mut p = providers::ProviderProfile {
+        uuid: "u".into(),
+        template_id: "kimi".into(),
+        name: "Kimi".into(),
+        protocol: Protocol::OpenaiChat,
+        endpoint: "https://api.moonshot.ai/v1/chat/completions".into(),
+        model: None,
+        enabled: true,
+        sort_order: 0,
+        is_local: false,
+        needs_key: true,
+        secret_ref: "provider/u".into(),
+        capabilities: providers::ProviderCapabilities {
+            models_url: Some("https://api.moonshot.cn/v1/models".into()),
+            ..Default::default()
+        },
+        status: "active".into(),
+        version: 1,
+    };
+    let err = providers::models_request_url(&p).unwrap_err();
+    assert!(err.contains("origin"), "{err}");
+    p.capabilities.models_url = Some("https://api.moonshot.ai/v1/models".into());
+    assert!(providers::models_request_url(&p).unwrap().contains("moonshot.ai"));
 }

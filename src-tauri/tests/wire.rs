@@ -5,7 +5,7 @@ use serde_json::json;
 
 fn preset(endpoint: &str, kind: ApiKind) -> ProviderPreset {
     ProviderPreset { id: "test".into(), label: "Test".into(), endpoint: endpoint.into(),
-        api_kind: kind, default_model: "m".into(), needs_key: true }
+        api_kind: kind, default_model: "m".into(), needs_key: true, auth: linguaray_contracts::AuthKind::Bearer }
 }
 
 #[tokio::test]

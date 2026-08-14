@@ -1269,6 +1269,12 @@ fn validate_all_preset_endpoints() -> Vec<String> {
 fn validate_preset_endpoints(list: &[providers::ProviderPreset]) -> Vec<String> {
     let mut invalid = Vec::new();
     for p in list {
+        // setup_required rows (Azure / Custom) ship with an empty endpoint.
+        // They are uncallable until the user pastes a URL; they must not fail
+        // the whole client gate.
+        if p.endpoint.is_empty() {
+            continue;
+        }
         if let Err(e) = providers::validate_endpoint(&p.endpoint) {
             log::error!(
                 "preset '{}' endpoint '{}' failed scheme validation ({e}); engine disabled",
@@ -3997,6 +4003,7 @@ mod tests {
             api_kind: crate::wire::ApiKind::OpenAIChat,
             default_model: "x".into(),
             needs_key: true,
+            auth: linguaray_contracts::AuthKind::Bearer,
         };
         let good = providers::presets()
             .into_iter()

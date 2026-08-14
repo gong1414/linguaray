@@ -26,12 +26,13 @@ use serde::{Deserialize, Serialize};
 
 use crate::uuid_util;
 use crate::db::DbError;
+use linguaray_contracts::{AuthKind, ProtocolKind};
 
 // ─── Protocol ─────────────────────────────────────────────────────────────
 
 /// Wire protocol family. Stored as TEXT in the `providers` table; the serde
 /// snake_case names are exactly the CHECK-constraint whitelist in schema.rs.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Protocol {
     OpenaiChat,
@@ -103,6 +104,10 @@ pub struct ProviderCapabilities {
     pub balance: bool,
     pub quota: bool,
     pub model_list: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auth: Option<AuthKind>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub models_url: Option<String>,
 }
 
 /// One row of the `providers` table.
@@ -150,6 +155,8 @@ pub struct ProviderPatch {
     pub enabled: Option<bool>,
     pub sort_order: Option<i32>,
     pub expected_version: i64,
+    #[serde(default)]
+    pub protocol: Option<Protocol>,
 }
 
 // ─── Row ↔ value helpers ──────────────────────────────────────────────────
@@ -322,38 +329,66 @@ pub fn insert_or_ignore(
 /// doesn't carry the flag itself): the Ollama preset's loopback endpoint → true,
 /// everything else → false.
 fn preset_lookup(template_id: &str) -> Option<PresetDerived> {
-    crate::providers::presets()
-        .into_iter()
-        .find(|p| p.id == template_id)
-        .map(|p| {
-            // Compute is_local BEFORE moving p.endpoint into the struct.
-            let is_local = endpoint_is_local(&p.endpoint);
-            PresetDerived {
-                protocol: preset_protocol(&p.id),
-                endpoint: p.endpoint,
-                default_model: Some(p.default_model),
-                needs_key: p.needs_key,
-                is_local,
-            }
-        })
+    linguaray_catalog::get(template_id).map(|row| PresetDerived {
+        protocol: match row.protocol {
+            ProtocolKind::OpenaiChat => Protocol::OpenaiChat,
+            ProtocolKind::Anthropic => Protocol::Anthropic,
+        },
+        auth: row.auth,
+        models_url: row.models_url,
+        endpoint: row.endpoint,
+        default_model: if row.default_model.is_empty() {
+            None
+        } else {
+            Some(row.default_model)
+        },
+        needs_key: row.needs_key,
+        requires_user_endpoint: row.requires_user_endpoint,
+    })
 }
 
 struct PresetDerived {
     protocol: Protocol,
+    auth: AuthKind,
+    models_url: Option<String>,
     endpoint: String,
     default_model: Option<String>,
     needs_key: bool,
-    is_local: bool,
+    requires_user_endpoint: bool,
 }
 
-/// Map a preset id to its wire protocol. OpenAI-compatible presets (openai,
-/// gemini, ollama) share `OpenaiChat`; anthropic → `Anthropic`. An unknown id
-/// falls back to `CustomHttp` (the repair protocol).
-fn preset_protocol(preset_id: &str) -> Protocol {
-    match preset_id {
-        "anthropic" => Protocol::Anthropic,
-        "openai" | "gemini" | "ollama" => Protocol::OpenaiChat,
-        _ => Protocol::CustomHttp,
+/// Derive a same-origin `/models` URL from a chat/messages endpoint.
+pub fn derive_models_url(endpoint: &str) -> Option<String> {
+    let mut out = url::Url::parse(endpoint).ok()?;
+    {
+        let mut segs: Vec<String> = out.path_segments()?.map(|s| s.to_string()).collect();
+        if segs
+            .last()
+            .is_some_and(|s| s == "completions" || s == "messages")
+        {
+            segs.pop();
+        }
+        if segs.last().is_some_and(|s| s != "models") {
+            segs.push("models".into());
+        }
+        out.set_path(&segs.join("/"));
+    }
+    Some(out.to_string())
+}
+
+/// Same-origin check for model-list fetches. Mismatch → caller must not attach a key.
+pub fn models_request_url(profile: &ProviderProfile) -> Result<String, String> {
+    let ep = url::Url::parse(&profile.endpoint).map_err(|e| e.to_string())?;
+    match profile
+        .capabilities
+        .models_url
+        .as_deref()
+        .and_then(|s| url::Url::parse(s).ok())
+    {
+        Some(u) if u.origin() == ep.origin() => Ok(u.to_string()),
+        Some(_) => Err("models_url origin mismatch".into()),
+        None => derive_models_url(&profile.endpoint)
+            .ok_or_else(|| "cannot derive models url".into()),
     }
 }
 
@@ -378,23 +413,27 @@ pub fn create(
     let secret_ref = format!("provider/{uuid_str}");
 
     // Derive protocol/needs_key/default-model from the preset if we recognise it.
-    let (protocol, final_endpoint, final_model, needs_key) =
+    let (protocol, final_endpoint, final_model, needs_key, caps) =
         match preset_lookup(template_id) {
             Some(d) => {
-                // Caller-supplied endpoint/model win over preset defaults.
-                let ep = if endpoint.is_empty() { d.endpoint } else { endpoint.to_string() };
-                // P1.2: validate the FINAL endpoint for preset rows too. The preset
-                // catalog's own endpoints are trusted (asserted at startup), but a
-                // caller-supplied override on a known preset must be checked —
-                // otherwise a remote HTTP / FTP override sneaks through unvalidated.
-                crate::providers::validate_endpoint(&ep).map_err(DbError::Integrity)?;
+                let ep = if endpoint.is_empty() {
+                    d.endpoint
+                } else {
+                    endpoint.to_string()
+                };
+                let skip_validate = d.requires_user_endpoint && ep.is_empty();
+                if !skip_validate {
+                    crate::providers::validate_endpoint(&ep).map_err(DbError::Integrity)?;
+                }
                 let md = model.map(String::from).or(d.default_model);
-                (d.protocol, ep, md, d.needs_key)
+                let caps = ProviderCapabilities {
+                    auth: Some(d.auth),
+                    models_url: d.models_url,
+                    ..Default::default()
+                };
+                (d.protocol, ep, md, d.needs_key, caps)
             }
             None => {
-                // Unknown template → repair-shaped row. Validate the caller endpoint
-                // (if any); empty endpoint is allowed (the row is disabled-by-default
-                // in spirit, but `enabled=true` is the documented contract).
                 if !endpoint.is_empty() {
                     crate::providers::validate_endpoint(endpoint)
                         .map_err(DbError::Integrity)?;
@@ -404,6 +443,7 @@ pub fn create(
                     endpoint.to_string(),
                     model.map(String::from),
                     true,
+                    ProviderCapabilities::default(),
                 )
             }
         };
@@ -423,7 +463,7 @@ pub fn create(
         is_local,
         needs_key,
         secret_ref,
-        capabilities: ProviderCapabilities::default(),
+        capabilities: caps,
         status: ProviderStatus::Active.as_str().to_string(),
         version: 1,
     };
@@ -479,7 +519,9 @@ pub fn update(
     patch: &ProviderPatch,
 ) -> Result<UpdateOutcome, DbError> {
     if let Some(ep) = &patch.endpoint {
-        crate::providers::validate_endpoint(ep).map_err(DbError::Integrity)?;
+        if !ep.is_empty() {
+            crate::providers::validate_endpoint(ep).map_err(DbError::Integrity)?;
+        }
     }
 
     let tx = conn.transaction()?;
@@ -514,6 +556,30 @@ pub fn update(
     let origin_changed = patch.endpoint.as_deref().is_some_and(|new_ep| {
         normalize_origin(new_ep) != old_origin
     });
+
+    let mut protocol = existing.protocol;
+    let mut capabilities = existing.capabilities.clone();
+    if let Some(new_proto) = patch.protocol {
+        if existing.template_id != "custom" {
+            return Err(DbError::Integrity(
+                "protocol patch only allowed on template_id=custom".into(),
+            ));
+        }
+        capabilities.auth = Some(match new_proto {
+            Protocol::Anthropic => AuthKind::XApiKey,
+            Protocol::OpenaiChat | Protocol::Gemini => AuthKind::Bearer,
+            other => {
+                return Err(DbError::Integrity(format!(
+                    "custom cannot use {other:?}"
+                )));
+            }
+        });
+        protocol = new_proto;
+    }
+    if origin_changed {
+        capabilities.models_url = derive_models_url(&endpoint);
+    }
+
     if origin_changed && provider_in_primary_or_parallel(&tx, uuid)? {
         invalidate_consent(&tx)?;
     }
@@ -532,10 +598,11 @@ pub fn update(
     // version moved (another writer committed first), this matches 0 rows. All
     // consent-invalidation writes above live in the SAME tx, so a 0-row match
     // rolls them back on drop — a stale attempt has NO side effects.
+    let caps_json = caps_to_json(&capabilities);
     let affected = tx.execute(
         "UPDATE providers SET name=?1, endpoint=?2, model=?3, enabled=?4, \
-         sort_order=?5, is_local=?6, version=version+1 \
-         WHERE uuid=?7 AND version=?8",
+         sort_order=?5, is_local=?6, protocol=?7, capabilities=?8, version=version+1 \
+         WHERE uuid=?9 AND version=?10",
         params![
             name,
             endpoint,
@@ -543,6 +610,8 @@ pub fn update(
             enabled as i64,
             sort_order,
             is_local as i64,
+            protocol.as_db_str(),
+            caps_json,
             uuid,
             patch.expected_version,
         ],
@@ -1253,6 +1322,7 @@ pub fn build_profile(source: &CandidateSource) -> Result<ProviderProfile, DbErro
                     // Keyless preset (ollama) → no secret to reference.
                     format!("provider/{uuid}")
                 };
+                let is_local = endpoint_is_local(&d.endpoint);
                 return Ok(ProviderProfile {
                     uuid,
                     template_id: id.clone(),
@@ -1262,13 +1332,14 @@ pub fn build_profile(source: &CandidateSource) -> Result<ProviderProfile, DbErro
                     model: d.default_model,
                     enabled: true,
                     sort_order: 0,
-                    // Inherit is_local from the preset (e.g. Ollama's loopback
-                    // endpoint → local). Setting false unconditionally would mark
-                    // every migrated Ollama profile as remote.
-                    is_local: d.is_local,
+                    is_local,
                     needs_key: d.needs_key,
                     secret_ref,
-                    capabilities: ProviderCapabilities::default(),
+                    capabilities: ProviderCapabilities {
+                        auth: Some(d.auth),
+                        models_url: d.models_url,
+                        ..Default::default()
+                    },
                     status: ProviderStatus::Active.as_str().to_string(),
                     version: 1,
                 });
@@ -1350,10 +1421,7 @@ fn parse_provider_uuid(sr: &str) -> Option<uuid::Uuid> {
 /// Human label for a preset id, for migration-built rows. Mirrors the preset
 /// catalog labels so a migrated "openai" row is named "OpenAI", not "openai".
 fn preset_label(preset_id: &str) -> Option<String> {
-    crate::providers::presets()
-        .into_iter()
-        .find(|p| p.id == preset_id)
-        .map(|p| p.label)
+    linguaray_catalog::get(preset_id).map(|p| p.label)
 }
 
 // ─── tests (in-module, for the pure helpers) ─────────────────────────────
