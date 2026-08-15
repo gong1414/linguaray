@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { assembleLatestJson } from "../scripts/assemble-latest-json.mjs";
+import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { assembleLatestJson, collectArtifacts } from "../scripts/assemble-latest-json.mjs";
 
 const base = {
   tag: "v0.2.0",
@@ -69,5 +72,38 @@ describe("assembleLatestJson", () => {
     expect(() => assembleLatestJson({ ...base, tag: "nightly", files: goodFiles })).toThrow(
       /does not look like/,
     );
+  });
+});
+
+describe("collectArtifacts", () => {
+  it("walks nested bundle dirs (download-artifact preserves dmg/macos/msi/nsis layout)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "r5-artifacts-"));
+    // Mirror the real merged layout: one subdir per bundle format.
+    mkdirSync(join(dir, "macos"));
+    mkdirSync(join(dir, "nsis"));
+    writeFileSync(join(dir, "macos", "LinguaRay_0.2.0_aarch64.app.tar.gz"), "payload");
+    writeFileSync(join(dir, "macos", "LinguaRay_0.2.0_aarch64.app.tar.gz.sig"), "sig-arm==");
+    writeFileSync(join(dir, "nsis", "LinguaRay_0.2.0_x64-setup.exe"), "payload");
+    // No .sig for the exe — must surface as null, not throw.
+
+    const files = collectArtifacts(dir);
+    expect(files.get("LinguaRay_0.2.0_aarch64.app.tar.gz")).toBe("sig-arm==");
+    expect(files.get("LinguaRay_0.2.0_x64-setup.exe")).toBeNull();
+
+    // And the full pipeline works on the nested layout.
+    writeFileSync(join(dir, "macos", "LinguaRay_0.2.0_x64.app.tar.gz"), "p");
+    writeFileSync(join(dir, "macos", "LinguaRay_0.2.0_x64.app.tar.gz.sig"), "sig-intel==");
+    writeFileSync(join(dir, "nsis", "LinguaRay_0.2.0_x64-setup.exe.sig"), "sig-win==");
+    const manifest = assembleLatestJson({
+      files: collectArtifacts(dir),
+      tag: "v0.2.0",
+      repo: "gong1414/linguaray",
+      pubDate: "2026-08-14T12:00:00Z",
+    });
+    expect(Object.keys(manifest.platforms).sort()).toEqual([
+      "darwin-aarch64",
+      "darwin-x86_64",
+      "windows-x86_64",
+    ]);
   });
 });

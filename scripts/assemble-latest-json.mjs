@@ -65,19 +65,29 @@ export function assembleLatestJson({ files, tag, repo, pubDate, notes }) {
   };
 }
 
-/** Read every file in `dir` into the filename → sig-content map the pure
- *  assembler consumes (.sig files attach to their base artifact). */
+/** Read every file under `dir` (recursively — download-artifact preserves the
+ *  bundle subdirectory layout: dmg/, macos/, msi/, nsis/) into the
+ *  filename → sig-content map the pure assembler consumes (.sig files attach
+ *  to their base artifact). Filenames are unique after the macOS rename. */
 export function collectArtifacts(dir) {
-  const names = readdirSync(dir);
-  const sigs = new Map(
-    names
-      .filter((n) => n.endsWith(".sig"))
-      .map((n) => [n.slice(0, -".sig".length), readFileSync(join(dir, n), "utf8")]),
-  );
+  const sigs = new Map();
   const files = new Map();
-  for (const n of names) {
-    if (n.endsWith(".sig")) continue;
-    files.set(n, sigs.has(n) ? sigs.get(n) : null);
+  const walk = (d) => {
+    for (const entry of readdirSync(d, { withFileTypes: true })) {
+      if (entry.isDirectory()) {
+        walk(join(d, entry.name));
+        continue;
+      }
+      if (entry.name.endsWith(".sig")) {
+        sigs.set(entry.name.slice(0, -".sig".length), readFileSync(join(d, entry.name), "utf8"));
+      } else {
+        files.set(entry.name, null);
+      }
+    }
+  };
+  walk(dir);
+  for (const [base, sig] of sigs) {
+    if (files.has(base)) files.set(base, sig);
   }
   return files;
 }
