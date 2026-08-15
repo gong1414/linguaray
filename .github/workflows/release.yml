@@ -311,6 +311,27 @@ jobs:
           fi
           echo "✓ updater artifacts + $sigs signature file(s) present"
 
+      # ── Normalize macOS updater artifact names ────────────────────────────────
+      # Tauri names the macOS updater payload `LinguaRay.app.tar.gz` WITHOUT
+      # version/arch — both matrix targets would collide in the merged
+      # artifacts dir (and as duplicate Release assets), and the latest.json
+      # assembler matches `*_aarch64.app.tar.gz` / `*_x64.app.tar.gz`.
+      # Rename to the versioned convention BEFORE upload.
+      - name: Normalize macOS updater artifact names
+        if: startsWith(matrix.os, 'macos')
+        working-directory: src-tauri
+        run: |
+          VERSION=$(node -p "require('./tauri.conf.json').version")
+          case "${{ matrix.target }}" in
+            aarch64-apple-darwin) ARCH=aarch64 ;;
+            *) ARCH=x64 ;;
+          esac
+          DIR="target/${{ matrix.target }}/release/bundle/macos"
+          [ -f "$DIR/LinguaRay.app.tar.gz" ] || { echo "::error::$DIR/LinguaRay.app.tar.gz missing"; exit 1; }
+          mv "$DIR/LinguaRay.app.tar.gz"     "$DIR/LinguaRay_${VERSION}_${ARCH}.app.tar.gz"
+          mv "$DIR/LinguaRay.app.tar.gz.sig" "$DIR/LinguaRay_${VERSION}_${ARCH}.app.tar.gz.sig"
+          ls -la "$DIR"
+
       # ── Artifact upload ─────────────────────────────────────────────────────────
       # Installers + updater payloads (.app.tar.gz / -setup.exe + .sig) in every
       # mode. Do NOT upload bare .app directories — upload-artifact loses file
