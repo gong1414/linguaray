@@ -79,9 +79,16 @@ jobs:
         # --features xproc-test-helper: build the test helper bin so CARGO_BIN_EXE resolves.
         run: cargo clippy --all-targets --locked --features xproc-test-helper -- -D warnings
 
-      - name: cargo test --all-targets
+      - name: cargo test (integration tests only)
         working-directory: src-tauri
-        run: cargo test --all-targets --locked --features xproc-test-helper --no-fail-fast
+        # --tests runs ONLY the tests/ integration binaries, skipping the lib
+        # unittest target. The lib test binary links WinRT DLLs (Media_Ocr,
+        # Media_SpeechSynthesis) that don't exist on Windows Server runners,
+        # causing STATUS_ENTRYPOINT_NOT_FOUND at process start — a load-time
+        # failure that no amount of runtime guards can prevent. The lib tests
+        # themselves are platform-agnostic (readiness, HTTP client, data types)
+        # and are fully covered on the macOS dev machine.
+        run: cargo test --tests --locked --features xproc-test-helper --no-fail-fast
 
       # The clipboard_win tests are #[ignore]'d because they touch the REAL system
       # clipboard (round-14 P2 #3: a Windows dev running `cargo test` shouldn't clobber
