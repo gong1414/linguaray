@@ -401,8 +401,11 @@ jobs:
       - name: Publish GitHub Release (prerelease — promote manually)
         uses: softprops/action-gh-release@v2
         with:
+          # `artifacts/*` matches only the top-level dirs download-artifact
+          # preserves (dmg/, macos/, msi/, nsis/) — v0.1.0 shipped latest.json
+          # alone that way. `**/*` reaches the files inside them.
           files: |
-            artifacts/*
+            artifacts/**/*
             latest.json
           generate_release_notes: true
           draft: false
