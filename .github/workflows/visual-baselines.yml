@@ -47,7 +47,10 @@ jobs:
         run: pnpm test:visual
       - name: Regenerate baselines (artifact only — never auto-commit)
         if: ${{ inputs.regenerate }}
-        run: pnpm test:visual -- --update-snapshots --retries=2
+        # `|| true`: generation is best-effort — a single unstable story must
+        # not discard the other 124 written baselines. The VERIFICATION run
+        # (regenerate=false) is the gate that must pass.
+        run: pnpm test:visual -- --update-snapshots || true
       - name: Upload regenerated baselines
         if: ${{ inputs.regenerate }}
         uses: actions/upload-artifact@v4
