@@ -99,10 +99,7 @@ describe("KeystoreRecoveryView (integration)", () => {
     render(<Live />, { wrapper: AppProviders });
     await screen.findByTestId("keystore-corrupt");
     fireEvent.click(screen.getByTestId("keystore-reset-trigger"));
-    // Mantine portals the modal content — query globally; the modal's confirm
-    // is the LAST "Reset" button in DOM order (banner trigger comes first).
-    const confirm = await screen.findAllByRole("button", { name: "Reset" }).then((xs) => xs.pop()!);
-    fireEvent.click(confirm);
+    fireEvent.click(await screen.findByTestId("keystore-reset-confirm"));
     await waitFor(() => expect(ipc.resetKeystore).toHaveBeenCalledTimes(1));
   });
 });

@@ -49,7 +49,13 @@ export function KeystoreRecoveryView({ c }: { c: KeystoreController }) {
           <Button variant="subtle" onClick={c.closeReset}>
             {t.resetConfirmCancelLabel}
           </Button>
-          <Button color="danger" loading={c.busy === "reset"} onClick={c.reset}>
+          <Button
+            color="danger"
+            size="xs"
+            loading={c.busy === "reset"}
+            onClick={c.reset}
+            data-testid="keystore-reset-confirm"
+          >
             {t.resetConfirmConfirmLabel}
           </Button>
         </Group>
