@@ -8,7 +8,7 @@ import {
 } from "solid-js";
 import { invoke } from "@tauri-apps/api/core";
 import { Server, ShieldCheck, Keyboard, ShieldAlert, History, BookOpen, BookMarked, RefreshCw } from "lucide-solid";
-import { WindowChrome, SidebarItem, Tooltip } from "@linguaray/ui";
+import { SidebarItem, Tooltip } from "@linguaray/ui";
 import { SETTINGS_COPY } from "./copy";
 import { detectLocale } from "../../i18n";
 import "./SettingsShell.css";
@@ -46,11 +46,12 @@ type NavDef = {
 };
 
 /**
- * Settings shell: WindowChrome frame + a SidebarItem nav. The sidebar is
- * full-label at >=700px (`data-layout="full"`) and collapses to an icon rail
- * at 600-699px (`data-layout="rail"`), driven by matchMedia. Rail items are
- * wrapped in a Tooltip so their label remains reachable by hover or keyboard
- * focus. R3b promotes Shortcuts and Privacy to live settings destinations.
+ * Settings shell: sidebar nav + content slot inside the OS-native title bar
+ * (the window keeps system decorations; custom chrome on a decorated window
+ * produced a double title bar). The sidebar is full-label at >=700px
+ * (`data-layout="full"`) and collapses to an icon rail at 600-699px
+ * (`data-layout="rail"`), driven by matchMedia. Rail items are wrapped in a
+ * Tooltip so their label remains reachable by hover or keyboard focus.
  */
 const SettingsShell: Component<SettingsShellProps> = (props) => {
   const locale = detectLocale();
@@ -172,19 +173,6 @@ const SettingsShell: Component<SettingsShellProps> = (props) => {
     );
   };
 
-  // Window controls: lazily import the Tauri window API so jsdom tests do not
-  // require the bridge. Swallow any throw in a non-Tauri context.
-  const handleClose = () => {
-    import("@tauri-apps/api/window")
-      .then(({ getCurrentWindow }) => getCurrentWindow().close())
-      .catch(() => {});
-  };
-  const handleMinimize = () => {
-    import("@tauri-apps/api/window")
-      .then(({ getCurrentWindow }) => getCurrentWindow().minimize())
-      .catch(() => {});
-  };
-
   return (
     <div
       class="settings-shell"
@@ -192,14 +180,10 @@ const SettingsShell: Component<SettingsShellProps> = (props) => {
       data-testid="shell"
       data-page={active()}
     >
-      <WindowChrome
-        title={t.window.title}
-        labels={{ minimize: t.window.minimize, close: t.window.close }}
-        onClose={handleClose}
-        onMinimize={handleMinimize}
-        sidebar={<nav class="settings-shell__nav" aria-label={t.window.title}>{navItems.map(renderItem)}</nav>}
-      >
-        <div class="settings-shell__content">
+      <nav class="settings-shell__nav" aria-label={t.window.title}>
+        {navItems.map(renderItem)}
+      </nav>
+      <div class="settings-shell__content">
           <Show when={a11yGranted() === false}>
             <div
               class="settings-shell__a11y-banner"
@@ -242,7 +226,6 @@ const SettingsShell: Component<SettingsShellProps> = (props) => {
           </Show>
           {props.children}
         </div>
-      </WindowChrome>
     </div>
   );
 };

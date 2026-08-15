@@ -79,9 +79,13 @@ afterEach(() => {
 });
 
 describe("SettingsShell", () => {
-  it("renders WindowChrome with title LinguaRay", () => {
-    const { getByText } = render(() => <SettingsShell>body</SettingsShell>);
-    expect(getByText("LinguaRay")).toBeInTheDocument();
+  it("renders the shell nav labeled LinguaRay (native title bar, no WindowChrome)", () => {
+    // Double-title-bar regression lock: the shell must NOT mount the custom
+    // WindowChrome header; the window relies on the OS-native title bar and
+    // the shell only renders its sidebar nav + content.
+    const { container } = render(() => <SettingsShell>body</SettingsShell>);
+    expect(container.querySelector(".window-chrome")).toBeNull();
+    expect(container.querySelector('nav[aria-label="LinguaRay"]')).not.toBeNull();
   });
 
   it("renders all four nav items", () => {

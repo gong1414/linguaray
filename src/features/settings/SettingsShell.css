@@ -1,33 +1,43 @@
-/* SettingsShell — WindowChrome sidebar nav + content slot.
+/* SettingsShell — sidebar nav + content slot inside the OS-native title bar.
  * Layout only, token-based. Sidebar collapses from full-label to icon-rail
  * below 700px via the [data-layout] attribute the component sets on the root. */
 
 .settings-shell {
-  /* The WindowChrome sidebar aside is `flex: 0 0 auto`. We drive its width
-   * from here so the rail collapse reflows the whole frame. The two widths
-   * are local custom properties derived from the spacing scale. */
-  --settings-sidebar-full: calc(var(--space-md) * 12 + var(--space-xs) * 4);
-  --settings-sidebar-rail: calc(var(--space-md) * 3 + var(--space-sm));
+  /* Root is a plain row: the window keeps its system title bar, so the shell
+   * owns the whole client area. Sidebar widths are local custom properties
+   * derived from the spacing scale. */
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+  background: var(--color-canvas);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
 }
 
-/* Sidebar nav fills the WindowChrome sidebar aside. */
+/* Sidebar nav column: full-label at >=700px, icon rail below. */
 .settings-shell__nav {
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
+  flex: 0 0 auto;
   width: 100%;
+  height: 100%;
   padding: var(--space-sm);
   box-sizing: border-box;
+  background: var(--color-surface-subtle);
+  border-right: 1px solid var(--color-border-subtle);
+  overflow: auto;
 }
 
-/* Drive the WindowChrome sidebar aside width from the active layout. */
-.settings-shell[data-layout="full"] .window-chrome__sidebar {
-  flex-basis: var(--settings-sidebar-full);
-  width: var(--settings-sidebar-full);
+.settings-shell[data-layout="full"] .settings-shell__nav {
+  flex-basis: calc(var(--space-md) * 12 + var(--space-xs) * 4);
+  width: calc(var(--space-md) * 12 + var(--space-xs) * 4);
 }
-.settings-shell[data-layout="rail"] .window-chrome__sidebar {
-  flex-basis: var(--settings-sidebar-rail);
-  width: var(--settings-sidebar-rail);
+.settings-shell[data-layout="rail"] .settings-shell__nav {
+  flex-basis: calc(var(--space-md) * 3 + var(--space-sm));
+  width: calc(var(--space-md) * 3 + var(--space-sm));
 }
 
 /* In rail mode, hide the visible label text. The label text stays in the DOM
@@ -36,8 +46,10 @@
   display: none;
 }
 
-/* Content slot padding. */
+/* Content slot takes the remaining width. */
 .settings-shell__content {
+  flex: 1 1 auto;
+  min-width: 0;
   height: 100%;
   padding: var(--space-md);
   box-sizing: border-box;

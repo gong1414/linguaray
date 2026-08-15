@@ -38,8 +38,8 @@ afterEach(() => cleanup());
 describe("App mount (R3a)", () => {
   it("renders SettingsShell with Provider Center active by default", async () => {
     render(() => <App />);
-    // Window title.
-    await waitFor(() => expect(screen.getByText("LinguaRay")).toBeTruthy());
+    // Shell mounted (the OS-native title bar owns the visible window title).
+    await waitFor(() => expect(screen.getByTestId("shell")).toBeTruthy());
     // Provider Center nav button has aria-current="page".
     const pcBtn = screen.getByText("Provider Center").closest("button")!;
     expect(pcBtn.getAttribute("aria-current")).toBe("page");
@@ -47,7 +47,7 @@ describe("App mount (R3a)", () => {
 
   it("clicking Keystore Recovery nav swaps content to KeystoreRecovery", async () => {
     render(() => <App />);
-    await waitFor(() => expect(screen.getByText("LinguaRay")).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId("shell")).toBeTruthy());
     // Click Keystore Recovery nav.
     fireEvent.click(screen.getByText("Keystore Recovery").closest("button")!);
     await flush();
@@ -59,7 +59,7 @@ describe("App mount (R3a)", () => {
 
   it("mounts the live Shortcuts and Privacy destinations", async () => {
     render(() => <App />);
-    await waitFor(() => expect(screen.getByText("LinguaRay")).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId("shell")).toBeTruthy());
     fireEvent.click(screen.getByText("Shortcuts").closest("button")!);
     await waitFor(() => expect(screen.getByRole("heading", { name: "Keyboard Shortcuts" })).toBeTruthy());
     fireEvent.click(screen.getByText("Privacy").closest("button")!);

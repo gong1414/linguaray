@@ -16,11 +16,9 @@
 
 export type Locale = "zh" | "en";
 
-/** Window chrome labels. */
+/** Window shell labels. */
 type WindowCopy = {
   title: string;
-  minimize: string;
-  close: string;
 };
 
 /** Sidebar navigation labels + the placeholder tooltip for disabled items. */
@@ -260,8 +258,6 @@ export type SettingsCopy = {
 const EN: SettingsCopy = {
   window: {
     title: "LinguaRay",
-    minimize: "Minimize",
-    close: "Close",
   },
   nav: {
     providerCenter: "Provider Center",
@@ -405,8 +401,6 @@ const EN: SettingsCopy = {
 const ZH: SettingsCopy = {
   window: {
     title: "LinguaRay",
-    minimize: "最小化",
-    close: "关闭",
   },
   nav: {
     providerCenter: "Provider Center",
