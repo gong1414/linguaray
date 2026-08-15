@@ -26,11 +26,14 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
+  # Windows linking debuginfo dominates wall-clock; line tables keep
+  # useful backtraces without a full PDB for every crate.
+  RUSTFLAGS: "-C debuginfo=line-tables-only"
 
 jobs:
   windows:
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 75
 
     steps:
       - uses: actions/checkout@v7
@@ -68,16 +71,12 @@ jobs:
       - name: Frontend type-check (tsc)
         run: pnpm exec tsc --noEmit
 
-      # Rust steps run from src-tauri (where Cargo.toml lives). --all-targets
-      # covers lib, bins, tests, benches so the Task 2b windows::tests and the
-      # real clipboard_win integration test are compiled/run on Windows.
-      - name: cargo check --all-targets
-        working-directory: src-tauri
-        # --features xproc-test-helper: build the test helper bin so CARGO_BIN_EXE resolves.
-        run: cargo check --all-targets --locked --features xproc-test-helper
-
+      # Clippy typechecks --all-targets; a separate cargo check on Windows
+      # roughly doubles compile time and was causing the 30-minute job
+      # timeout before tests started.
       - name: cargo clippy --all-targets (-D warnings)
         working-directory: src-tauri
+        # --features xproc-test-helper: build the test helper bin so CARGO_BIN_EXE resolves.
         run: cargo clippy --all-targets --locked --features xproc-test-helper -- -D warnings
 
       - name: cargo test --all-targets
