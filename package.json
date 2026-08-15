@@ -10,6 +10,8 @@
     "build": "vite build",
     "serve": "vite preview",
     "tauri": "tauri",
+    "dev:app": "tauri dev --config src-tauri/tauri.debug.conf.json",
+    "build:local": "tauri build --config src-tauri/tauri.noupdater.conf.json",
     "typecheck": "tsc --noEmit && pnpm -r typecheck",
     "test": "vitest run",
     "test:watch": "vitest",

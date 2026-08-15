@@ -1,0 +1,53 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "LinguaRay Dev",
+  "identifier": "io.github.gong1414.linguaray.debug",
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "LinguaRay Dev",
+        "width": 800,
+        "height": 600,
+        "minWidth": 600,
+        "minHeight": 400,
+        "visible": false
+      },
+      {
+        "label": "popup",
+        "title": "",
+        "url": "popup.html",
+        "width": 360,
+        "height": 180,
+        "decorations": false,
+        "transparent": true,
+        "visible": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "focus": true
+      },
+      {
+        "label": "input",
+        "title": "LinguaRay Dev — Translate",
+        "url": "input.html",
+        "width": 420,
+        "height": 280,
+        "visible": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": false,
+        "resizable": true,
+        "focus": true
+      },
+      {
+        "label": "onboarding",
+        "title": "LinguaRay Dev",
+        "url": "onboarding.html",
+        "width": 600,
+        "height": 400,
+        "visible": false,
+        "center": true
+      }
+    ]
+  }
+}
