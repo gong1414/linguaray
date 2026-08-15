@@ -214,7 +214,6 @@ mod windows_tts {
                 if voice
                     .Id()
                     .map_err(|e| TtsError::Message(format!("speech voice id: {e}")))?
-                    .to_string()
                     == wanted
                 {
                     synth
