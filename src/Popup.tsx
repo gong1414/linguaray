@@ -1,7 +1,7 @@
 import { For, Show, createMemo, createSignal, onCleanup, type Component, type JSX } from "solid-js";
 import { Copy, Volume2, Pin, PinOff, Star, AlertTriangle } from "lucide-solid";
-import { invoke } from "@tauri-apps/api/core";
-import { writeText } from "@tauri-apps/plugin-clipboard-manager";
+import { invoke } from "./bridge/invoke";
+import { writeText } from "./bridge/clipboard";
 import {
   Button,
   EmptyState,

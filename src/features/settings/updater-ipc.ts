@@ -2,7 +2,7 @@
  * Updater IPC wrappers. All Tauri bridges are lazily imported so jsdom tests
  * and non-Tauri contexts never touch the native layer at module load.
  */
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../../bridge/invoke";
 import { isUpdateCheck, isUpdaterProgress, type UpdateCheck, type UpdaterProgress } from "./updater-types";
 
 const requireCheck = (value: unknown): UpdateCheck => {
@@ -44,7 +44,7 @@ export const setUpdaterStartupCheck = async (enabled: boolean): Promise<void> =>
 export const onUpdaterProgress = (
   cb: (progress: UpdaterProgress) => void,
 ): Promise<() => void> =>
-  import("@tauri-apps/api/event")
+  import("../../bridge/event")
     .then(({ listen }) =>
       listen<unknown>("updater-progress", (event) => {
         if (isUpdaterProgress(event.payload)) cb(event.payload);
@@ -54,6 +54,6 @@ export const onUpdaterProgress = (
 
 /** Relaunch after an in-place update (macOS/Linux path). */
 export const relaunchApp = (): Promise<void> =>
-  import("@tauri-apps/plugin-process")
+  import("../../bridge/process")
     .then(({ relaunch }) => relaunch())
     .catch(() => {});

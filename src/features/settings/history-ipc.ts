@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../../bridge/invoke";
 import type { HistoryFilter, HistoryPage } from "./history-types";
 
 export const historySearch = (
@@ -22,7 +22,7 @@ export const historyExport = (
 
 export async function chooseExportPath(defaultName: string): Promise<string | null> {
   try {
-    const mod = await import("@tauri-apps/plugin-dialog");
+    const mod = await import("../../bridge/dialog");
     const picked = await mod.save({ defaultPath: defaultName });
     return picked ?? null;
   } catch {

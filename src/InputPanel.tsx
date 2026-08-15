@@ -1,5 +1,5 @@
 import { createSignal, createMemo, createEffect, Show, For, onMount, onCleanup, type Component, type JSX } from "solid-js";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "./bridge/invoke";
 import { AlertTriangle, Star } from "lucide-solid";
 import { Button, InlineError, ResultCard, TextArea, type ResultAction, type ResultOutcome } from "@linguaray/ui";
 import { decodeSessionResult } from "./features/translation/decode";

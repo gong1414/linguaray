@@ -8,8 +8,8 @@
  * translate-selection/clipboard/switch-provider/settings/quit/OCR/History are live.
  */
 import { createSignal, onCleanup, onMount, type Component } from "solid-js";
-import { invoke } from "@tauri-apps/api/core";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { invoke } from "./bridge/invoke";
+import { listen, type UnlistenFn } from "./bridge/event";
 import SettingsShell, { type SettingsSection } from "./features/settings/SettingsShell";
 import ProviderCenter from "./features/settings/ProviderCenter";
 import KeystoreRecovery from "./features/settings/KeystoreRecovery";

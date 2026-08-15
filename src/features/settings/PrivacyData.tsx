@@ -1,6 +1,6 @@
 import { createSignal, For, onMount, Show, type Component } from "solid-js";
 import { Banner, Button, Confirm, Select, Switch, Toast } from "@linguaray/ui";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../../bridge/invoke";
 import { detectLocale } from "../../i18n";
 import { PRIVACY_COPY } from "./privacy-copy";
 import {

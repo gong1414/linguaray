@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../../bridge/invoke";
 
 const nameMap = new Map<string, string>();
 let loaded = false;

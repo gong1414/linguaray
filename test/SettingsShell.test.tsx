@@ -31,6 +31,19 @@ vi.mock("@tauri-apps/api/window", () => ({
     minimize: vi.fn(async () => {}),
   }),
 }));
+// The component dynamically imports the bridge seam (not the raw Tauri
+// module). Mocking the seam itself keeps the dynamic import resolving on the
+// mock registry's microtask clock; leaving it real makes the module-load
+// promise resolve late and registrations from earlier tests' components
+// arrive in a burst, breaking the "exactly one listener" count.
+vi.mock("../src/bridge/window", () => ({
+  getCurrentWindow: () => ({
+    onFocusChanged: onFocusChangedMock,
+    close: vi.fn(async () => {}),
+    minimize: vi.fn(async () => {}),
+  }),
+}));
+vi.mock("../src/bridge/opener", () => ({ openUrl: openUrlMock }));
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: openUrlMock }));
 
 // matchMedia is stubbed globally in test/setup.ts (matches:false). Per-test we

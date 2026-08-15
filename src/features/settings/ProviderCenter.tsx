@@ -56,7 +56,7 @@ import {
   type ProviderRowLabels,
   type SelectOption,
 } from "@linguaray/ui";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../../bridge/invoke";
 import { SETTINGS_COPY, type SettingsCopy } from "./copy";
 import { detectLocale } from "../../i18n";
 import type {

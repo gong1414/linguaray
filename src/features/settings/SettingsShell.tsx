@@ -6,7 +6,7 @@ import {
   type Component,
   type JSX,
 } from "solid-js";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../../bridge/invoke";
 import { Server, ShieldCheck, Keyboard, ShieldAlert, History, BookOpen, BookMarked, RefreshCw } from "lucide-solid";
 import { SidebarItem, Tooltip } from "@linguaray/ui";
 import { SETTINGS_COPY } from "./copy";
@@ -119,7 +119,7 @@ const SettingsShell: Component<SettingsShellProps> = (props) => {
     // this component's recheckA11y). `cancelled` lets the resolve path tear
     // down a listener that arrived after teardown.
     let cancelled = false;
-    import("@tauri-apps/api/window")
+    import("../../bridge/window")
       .then(({ getCurrentWindow }) =>
         getCurrentWindow().onFocusChanged(({ payload: focused }) => {
           if (focused) void recheckA11y();
@@ -210,7 +210,7 @@ const SettingsShell: Component<SettingsShellProps> = (props) => {
                   onClick={() =>
                     // Lazy-import so a non-Tauri context (or a test that doesn't
                     // mock the plugin) never touches the opener bridge.
-                    import("@tauri-apps/plugin-opener")
+                    import("../../bridge/opener")
                       .then(({ openUrl }) =>
                         openUrl(
                           "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",

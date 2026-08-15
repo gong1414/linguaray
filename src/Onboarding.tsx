@@ -14,8 +14,8 @@ import {
   Show,
   type Component,
 } from "solid-js";
-import { invoke } from "@tauri-apps/api/core";
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import { invoke } from "./bridge/invoke";
+import { getCurrentWindow } from "./bridge/window";
 import { Button } from "@linguaray/ui";
 import { detectLocale, type Locale } from "./i18n";
 import { ONBOARDING_COPY, type OnboardingStepName } from "./onboarding-copy";
@@ -341,7 +341,7 @@ const Onboarding: Component = () => {
     // Re-check when the window regains focus: the user likely just toggled
     // the grants in System Settings (SettingsShell pattern).
     let unlisten: (() => void) | undefined;
-    import("@tauri-apps/api/window")
+    import("./bridge/window")
       .then(({ getCurrentWindow: gw }) =>
         gw().onFocusChanged(({ payload: focused }) => {
           if (focused && !cancelled) void refreshPermissions();
@@ -394,7 +394,7 @@ const Onboarding: Component = () => {
   };
 
   const openUrl = (url: string) =>
-    import("@tauri-apps/plugin-opener")
+    import("./bridge/opener")
       .then(({ openUrl: open }) => open(url))
       .catch(() => {});
 
@@ -418,7 +418,7 @@ const Onboarding: Component = () => {
   });
   // Provider count also refreshes when returning from the settings window.
   let providersUnlisten: (() => void) | undefined;
-  import("@tauri-apps/api/window")
+  import("./bridge/window")
     .then(({ getCurrentWindow: gw }) =>
       gw().onFocusChanged(({ payload: focused }) => {
         if (focused && !cancelled && step() === "provider") void refreshProviders();

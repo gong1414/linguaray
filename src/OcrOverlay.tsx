@@ -1,6 +1,6 @@
 import { createSignal, onCleanup, onMount, Show, type Component } from "solid-js";
-import { invoke } from "@tauri-apps/api/core";
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import { invoke } from "./bridge/invoke";
+import { getCurrentWindow } from "./bridge/window";
 import { detectLocale } from "./i18n";
 import { OCR_COPY } from "./ocr-copy";
 import "./OcrOverlay.css";

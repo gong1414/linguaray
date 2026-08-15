@@ -6,7 +6,7 @@ import {
   For,
   type Component,
 } from "solid-js";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../../bridge/invoke";
 import { Banner, Confirm, Button, Toast } from "@linguaray/ui";
 import { SETTINGS_COPY } from "./copy";
 import { detectLocale } from "../../i18n";

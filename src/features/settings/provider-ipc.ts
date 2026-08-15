@@ -10,7 +10,7 @@
  * "stale_scope"`. Document this at the call site.
  */
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../../bridge/invoke";
 import type {
   ProviderProfile,
   ProviderProfileFE,

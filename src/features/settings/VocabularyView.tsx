@@ -1,7 +1,7 @@
 import { createSignal, For, onMount, Show, type Component } from "solid-js";
 import { Button, EmptyState, TextField } from "@linguaray/ui";
 import { BookMarked } from "lucide-solid";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../../bridge/invoke";
 import { detectLocale } from "../../i18n";
 import "./VocabularyView.css";
 

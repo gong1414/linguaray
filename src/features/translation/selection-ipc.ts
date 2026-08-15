@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../../bridge/invoke";
 
 /**
  * Translate the live OS selection (fresh capture) OR a caller-supplied SOURCE

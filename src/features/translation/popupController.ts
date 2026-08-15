@@ -1,7 +1,7 @@
 import { createSignal, onCleanup, onMount } from "solid-js";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { getCurrentWindow } from "@tauri-apps/api/window";
-import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "../../bridge/event";
+import { getCurrentWindow } from "../../bridge/window";
+import { invoke } from "../../bridge/invoke";
 import { decodePopupMultiResult, decodePopupState } from "./decode";
 import { translateSelection } from "./selection-ipc";
 import type { PopupMultiPayload, PopupStatePayload, TranslationState } from "./types";
