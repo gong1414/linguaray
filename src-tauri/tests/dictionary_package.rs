@@ -82,7 +82,7 @@ fn install_package_rejects_symlinks() {
     let h = Harness::new();
     let src = tempfile::tempdir().unwrap();
     build_valid_dict(src.path());
-    std::os::unix::fs::symlink("/etc/passwd", src.path().join("evil.link")).unwrap();
+    create_forbidden_link(&src.path().join("evil.link")).expect("create link for installer to reject");
     let dest_root = h._dir.path().join("dictionaries");
     let result = package::install_package(
         &h.db,
@@ -93,6 +93,39 @@ fn install_package_rejects_symlinks() {
         "1.0",
     );
     assert!(result.is_err());
+}
+
+fn create_forbidden_link(link: &std::path::Path) -> std::io::Result<()> {
+    #[cfg(unix)]
+    {
+        std::os::unix::fs::symlink("/etc/passwd", link)
+    }
+    #[cfg(windows)]
+    {
+        // Junctions do not need SeCreateSymbolicLinkPrivilege. The installer
+        // must reject any reparse point, not only POSIX-style symlinks.
+        let target = link.with_extension("junction-src");
+        std::fs::create_dir_all(&target)?;
+        let status = std::process::Command::new("cmd")
+            .args([
+                "/C",
+                "mklink",
+                "/J",
+                &link.to_string_lossy(),
+                &target.to_string_lossy(),
+            ])
+            .status()?;
+        if status.success() {
+            Ok(())
+        } else {
+            Err(std::io::Error::other("mklink /J failed"))
+        }
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        let _ = link;
+        Err(std::io::Error::other("no symlink API on this host"))
+    }
 }
 
 #[test]

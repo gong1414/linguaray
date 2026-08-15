@@ -163,7 +163,7 @@ fn collect_files_recursive(
         let entry = entry?;
         let path = entry.path();
         let meta = std::fs::symlink_metadata(&path)?;
-        if meta.file_type().is_symlink() {
+        if is_forbidden_link(&meta) {
             return Err(PackageError::Symlink(path));
         }
         if meta.is_dir() {
@@ -185,11 +185,29 @@ fn collect_files_recursive(
 fn validate_no_symlinks(files: &[(PathBuf, PathBuf)]) -> Result<(), PackageError> {
     for (src, _) in files {
         let meta = std::fs::symlink_metadata(src)?;
-        if meta.file_type().is_symlink() {
+        if is_forbidden_link(&meta) {
             return Err(PackageError::Symlink(src.clone()));
         }
     }
     Ok(())
+}
+
+fn is_forbidden_link(meta: &std::fs::Metadata) -> bool {
+    if meta.file_type().is_symlink() {
+        return true;
+    }
+    // Windows junctions / mount points are reparse points, not POSIX
+    // symlinks. Rust's `is_symlink()` is false for them, but they are
+    // the same class of install-time escape and must be rejected.
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
+        if meta.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
+            return true;
+        }
+    }
+    false
 }
 
 fn validate_sizes(files: &[(PathBuf, PathBuf)]) -> Result<u64, PackageError> {
