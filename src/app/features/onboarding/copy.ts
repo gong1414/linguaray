@@ -5,18 +5,8 @@
  * is explicitly "later" rather than a fake Continue.
  */
 
-export type Locale = "zh" | "en";
-
-/** Same resolution order as the legacy src/i18n.ts (storage → navigator → en). */
-export function detectLocale(): Locale {
-  const stored =
-    typeof localStorage !== "undefined" ? localStorage.getItem("linguaray.locale") : null;
-  if (stored === "zh" || stored === "en") return stored;
-  if (typeof navigator !== "undefined" && navigator.language?.toLowerCase().startsWith("zh")) {
-    return "zh";
-  }
-  return "en";
-}
+import type { Locale } from "../../i18n";
+export type { Locale };
 
 export type OnboardingCopy = {
   brand: string;

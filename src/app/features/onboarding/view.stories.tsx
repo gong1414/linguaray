@@ -3,7 +3,6 @@ import { MantineProvider } from "@mantine/core";
 import { linguaTheme } from "../../ui/theme";
 import { OnboardingView, type OnboardingViewProps } from "./view";
 import { STEP_ORDER } from "./model";
-
 /**
  * Production OnboardingView (pure props) across the required state matrix
  * (default / loading / empty / populated / error / disabled / long CJK /

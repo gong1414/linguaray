@@ -3,7 +3,7 @@ import "@mantine/core/styles.css";
 import { AppProviders } from "../app/providers";
 import { OnboardingView } from "../features/onboarding/view";
 import { useOnboardingController } from "../features/onboarding/controller";
-import { detectLocale } from "../features/onboarding/copy";
+import { detectLocale } from "../i18n";
 
 function OnboardingWindow() {
   const c = useOnboardingController();

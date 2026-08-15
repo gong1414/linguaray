@@ -50,6 +50,7 @@ export default defineConfig({
         test: {
           name: "react",
           include: ["src/app/**/*.test.{ts,tsx}"],
+          setupFiles: ["test/setup.ts", "src/app/test-setup.ts"],
         },
         plugins: [react()],
       },
