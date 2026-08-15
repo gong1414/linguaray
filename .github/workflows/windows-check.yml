@@ -79,16 +79,36 @@ jobs:
         # --features xproc-test-helper: build the test helper bin so CARGO_BIN_EXE resolves.
         run: cargo clippy --all-targets --locked --features xproc-test-helper -- -D warnings
 
-      - name: cargo test (integration tests only)
+      - name: cargo test (integration tests only, skip lib binary)
         working-directory: src-tauri
-        # --tests runs ONLY the tests/ integration binaries, skipping the lib
-        # unittest target. The lib test binary links WinRT DLLs (Media_Ocr,
+        # The lib unittest binary links WinRT DLLs (Media_Ocr,
         # Media_SpeechSynthesis) that don't exist on Windows Server runners,
-        # causing STATUS_ENTRYPOINT_NOT_FOUND at process start — a load-time
-        # failure that no amount of runtime guards can prevent. The lib tests
-        # themselves are platform-agnostic (readiness, HTTP client, data types)
-        # and are fully covered on the macOS dev machine.
-        run: cargo test --tests --locked --features xproc-test-helper --no-fail-fast
+        # causing STATUS_ENTRYPOINT_NOT_FOUND at process start. Cargo's
+        # --tests flag still includes the lib target, so we enumerate the
+        # integration test binaries explicitly instead. The lib tests are
+        # platform-agnostic (readiness, HTTP, data types) and fully covered
+        # on the macOS dev machine.
+        run: >
+          cargo test --locked --features xproc-test-helper --no-fail-fast
+          --test adapter --test backup_fault --test balance_fetch
+          --test capabilities --test catalog_smoke
+          --test connection_latency --test db_schema
+          --test delete_state_machine --test dictionary_lookup
+          --test dictionary_mdx --test dictionary_package
+          --test dictionary_stardict --test export_path
+          --test external_api --test fallback --test google
+          --test history_crypto --test history_export
+          --test history_persistence --test history_repository
+          --test history_search --test hotkey_session
+          --test keystore --test keystore_v2 --test migration
+          --test ocr_recognize --test popup_geometry
+          --test provider_crud --test provider_set_key
+          --test provider_version --test recovery
+          --test selection_engine --test shortcuts
+          --test startup_readiness --test switch_concurrency
+          --test translate_parallel --test translate_session
+          --test tray_refresh --test tray_state --test tts_voices
+          --test url --test vocabulary_anki --test wire
 
       # The clipboard_win tests are #[ignore]'d because they touch the REAL system
       # clipboard (round-14 P2 #3: a Windows dev running `cargo test` shouldn't clobber
