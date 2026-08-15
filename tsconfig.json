@@ -30,6 +30,8 @@
   "include": ["src", "test"],
   // Migration (2026-08-16): the React 19 tree (jsx: react-jsx) has its own
   // project file — this config stays jsx: preserve + solid-js until Phase 5.
+  // Not a project reference: noEmit projects cannot be referenced. The
+  // typecheck script typechecks both configs explicitly.
   "exclude": ["src/app"],
-  "references": [{ "path": "./tsconfig.node.json" }, { "path": "./src/app" }]
+  "references": [{ "path": "./tsconfig.node.json" }]
 }

@@ -72,7 +72,6 @@ export type LabStrings = {
     ocrOverlay: string;
     history: string;
     trayMenubar: string;
-    onboarding: string;
     multiResult: string;
     shortcuts: string;
     privacy: string;
@@ -339,7 +338,6 @@ export const strings: Record<Locale, LabStrings> = {
       ocrOverlay: "OCR Overlay",
       history: "History",
       trayMenubar: "Tray / Menu-bar",
-      onboarding: "Onboarding",
       multiResult: "Multi-Result Panel",
       shortcuts: "Shortcuts",
       privacy: "Privacy & Data",
@@ -552,7 +550,6 @@ export const strings: Record<Locale, LabStrings> = {
       ocrOverlay: "OCR 覆盖层",
       history: "历史记录",
       trayMenubar: "托盘 / 菜单栏",
-      onboarding: "新手引导",
       multiResult: "多引擎结果面板",
       shortcuts: "快捷键",
       privacy: "隐私与数据",

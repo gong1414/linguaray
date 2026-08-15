@@ -23,12 +23,14 @@ import { describe, expect, it } from "vitest";
 
 const ROOT = join(__dirname, "..");
 
-/** Entry-file → window-label map (mirrors the tauri.conf.json windows). */
+/** Entry-file → window-label map (mirrors the tauri.conf.json windows).
+ * Onboarding migrated to the React tree (src/app) — its window calls live in
+ * the feature controller. */
 const WINDOW_FILES: Record<string, string[]> = {
   main: ["src/App.tsx", "src/features/settings/SettingsShell.tsx"],
   popup: ["src/Popup.tsx", "src/features/translation/popupController.ts"],
   input: ["src/InputPanel.tsx", "src/features/translation/inputController.ts"],
-  onboarding: ["src/Onboarding.tsx"],
+  onboarding: ["src/app/features/onboarding/controller.ts"],
   ocr: ["src/OcrOverlay.tsx"],
 };
 

@@ -92,7 +92,7 @@ export default tseslint.config(
         "error",
         {
           patterns: [
-            { group: ["**/bridge/*", "**/bridge/**", "**/controller", "**/controller.ts", "../../bridge/*", "../../../bridge/*"], message: "view.tsx is pure UI — bridge/IPC access belongs in controller.ts." },
+            { group: ["**/bridge/*", "**/bridge/**", "**/controller", "**/controller.ts", "../../bridge/*", "../../../bridge/*", "#bridge/*"], message: "view.tsx is pure UI — bridge/IPC access belongs in controller.ts." },
           ],
         },
       ],

@@ -1,21 +1,26 @@
 /**
- * Onboarding copy (zh/en). Status strings are HONEST by design: an
- * ungranted permission is never labeled as done, and the escape hatch is
- * explicitly named "later" rather than a fake Continue.
+ * Onboarding copy (zh/en), migrated 1:1 from the frozen Solid tree so no user
+ * -visible string changes during the React migration. Status strings stay
+ * HONEST: an ungranted permission is never labeled done, and the escape hatch
+ * is explicitly "later" rather than a fake Continue.
  */
-import type { Locale } from "./i18n";
 
-export type OnboardingStepName =
-  | "welcome"
-  | "accessibility"
-  | "provider"
-  | "history"
-  | "shortcuts"
-  | "done";
+export type Locale = "zh" | "en";
+
+/** Same resolution order as the legacy src/i18n.ts (storage → navigator → en). */
+export function detectLocale(): Locale {
+  const stored =
+    typeof localStorage !== "undefined" ? localStorage.getItem("linguaray.locale") : null;
+  if (stored === "zh" || stored === "en") return stored;
+  if (typeof navigator !== "undefined" && navigator.language?.toLowerCase().startsWith("zh")) {
+    return "zh";
+  }
+  return "en";
+}
 
 export type OnboardingCopy = {
   brand: string;
-  stepLabels: Record<OnboardingStepName, string>;
+  stepLabels: Record<import("./model").OnboardingStepName, string>;
   welcome: { title: string; body: string; start: string };
   a11y: {
     title: string;
