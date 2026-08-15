@@ -20,3 +20,4 @@ src-tauri/.mimosa/
 # Internal design / implementation plans (not part of the product tree)
 docs/superpowers/
 design-system/
+storybook-static/

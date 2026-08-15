@@ -223,7 +223,7 @@ const PrivacyData: Component = () => {
     try {
       const next = await operation();
       if (epoch === requestEpoch) setStatus(next);
-    } catch (reason) {
+    } catch (_reason) {
       if (epoch === requestEpoch) pushToast("destructive", t.updateFailed);
     } finally {
       if (epoch === requestEpoch) setBusy(null);
