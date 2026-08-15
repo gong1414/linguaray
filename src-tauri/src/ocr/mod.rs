@@ -165,6 +165,12 @@ mod windows_ocr {
             let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
         }
 
+        // Check engine availability BEFORE any bitmap/stream work. On systems
+        // without an OCR language pack (GitHub Actions windows-latest), this
+        // returns an error instead of crashing later with ACCESS_VIOLATION.
+        let engine = OcrEngine::TryCreateFromUserProfileLanguages()
+            .map_err(|e| OcrError::Message(format!("Windows.Media.Ocr engine unavailable: {e}")))?;
+
         let stream = InMemoryRandomAccessStream::new()
             .map_err(|e| OcrError::Message(format!("ocr stream: {e}")))?;
         let writer = DataWriter::CreateDataWriter(&stream)
@@ -199,9 +205,6 @@ mod windows_ocr {
         let bitmap = SoftwareBitmap::Convert(&bitmap, BitmapPixelFormat::Gray8)
             .map_err(|e| OcrError::Message(format!("ocr convert: {e}")))?;
 
-        let engine = OcrEngine::TryCreateFromUserProfileLanguages().map_err(|e| {
-            OcrError::Message(format!("Windows.Media.Ocr engine unavailable: {e}"))
-        })?;
         let result = engine
             .RecognizeAsync(&bitmap)
             .map_err(|e| OcrError::Message(format!("ocr recognize: {e}")))?

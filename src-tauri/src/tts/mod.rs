@@ -155,14 +155,9 @@ fn platform_stop() {}
 #[cfg(target_os = "windows")]
 mod windows_tts {
     use super::{SpeechVoice, TtsError};
-    use std::sync::Mutex;
     use windows::core::HSTRING;
-    use windows::Media::Core::MediaSource;
-    use windows::Media::Playback::MediaPlayer;
     use windows::Media::SpeechSynthesis::SpeechSynthesizer;
     use windows::Win32::System::Com::{CoInitializeEx, COINIT_MULTITHREADED};
-
-    static PLAYER: Mutex<Option<MediaPlayer>> = Mutex::new(None);
 
     fn ensure_com() {
         unsafe {
@@ -195,9 +190,19 @@ mod windows_tts {
         Ok(out)
     }
 
+    /// Write the synthesized WAV to a temp file, then play it via `PlaySoundW`.
+    ///
+    /// The previous implementation used `MediaPlayer` (Windows.Media.Playback),
+    /// which does not exist on Windows Server (GitHub Actions `windows-latest`
+    /// runners) and caused STATUS_ENTRYPOINT_NOT_FOUND at test-binary load.
+    /// `PlaySoundW` from winmm.dll is available on every Windows edition.
     pub fn speak(text: &str, voice_id: Option<&str>) -> Result<(), TtsError> {
-        ensure_com();
+        use windows::Storage::Streams::DataReader;
+        use windows::Win32::Media::Audio::{PlaySoundW, SND_FILENAME, SND_NODEFAULT};
+        use windows::core::PCWSTR;
+
         stop();
+        ensure_com();
         let synth = SpeechSynthesizer::new()
             .map_err(|e| TtsError::Message(format!("speech synthesizer: {e}")))?;
         if let Some(wanted) = voice_id.filter(|id| !id.is_empty()) {
@@ -232,30 +237,51 @@ mod windows_tts {
             .map_err(|e| TtsError::Message(format!("synthesize: {e}")))?
             .get()
             .map_err(|e| TtsError::Message(format!("synthesize: {e}")))?;
-        let content_type = stream
-            .ContentType()
-            .map_err(|e| TtsError::Message(format!("speech content type: {e}")))?;
-        let source = MediaSource::CreateFromStream(&stream, &content_type)
-            .map_err(|e| TtsError::Message(format!("speech source: {e}")))?;
-        let player = MediaPlayer::new()
-            .map_err(|e| TtsError::Message(format!("media player: {e}")))?;
-        player
-            .SetSource(&source)
-            .map_err(|e| TtsError::Message(format!("speech set source: {e}")))?;
-        player
-            .Play()
-            .map_err(|e| TtsError::Message(format!("speech play: {e}")))?;
-        *PLAYER
-            .lock()
-            .map_err(|_| TtsError::Message("speech player lock poisoned".into()))? = Some(player);
+
+        // Read the synthesized WAV bytes via DataReader.
+        let size = stream
+            .Size()
+            .map_err(|e| TtsError::Message(format!("speech stream size: {e}")))? as u32;
+        let reader = DataReader::CreateDataReader(&stream)
+            .map_err(|e| TtsError::Message(format!("speech reader: {e}")))?;
+        reader
+            .LoadAsync(size)
+            .map_err(|e| TtsError::Message(format!("speech load: {e}")))?
+            .get()
+            .map_err(|e| TtsError::Message(format!("speech load: {e}")))?;
+        let mut wav = vec![0u8; size as usize];
+        reader
+            .ReadBytes(&mut wav)
+            .map_err(|e| TtsError::Message(format!("speech read: {e}")))?;
+
+        // Write to a temp file and play via PlaySoundW (winmm.dll).
+        let path = std::env::temp_dir().join(format!(
+            "linguaray-tts-{}-{}.wav",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_millis())
+                .unwrap_or(0)
+        ));
+        std::fs::write(&path, &wav)
+            .map_err(|e| TtsError::Message(format!("speech temp write: {e}")))?;
+
+        let wide: Vec<u16> = path
+            .as_os_str()
+            .to_string_lossy()
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect();
+        let played = unsafe {
+            PlaySoundW(PCWSTR(wide.as_ptr()), None, SND_FILENAME | SND_NODEFAULT)
+        };
+        let _ = std::fs::remove_file(&path);
+        if !played.as_bool() {
+            return Err(TtsError::Message("speech play failed".into()));
+        }
         Ok(())
     }
 
-    pub fn stop() {
-        if let Ok(mut slot) = PLAYER.lock() {
-            if let Some(player) = slot.take() {
-                let _ = player.Pause();
-            }
-        }
-    }
+    /// PlaySoundW is synchronous, so stop is a no-op. Kept for API parity.
+    pub fn stop() {}
 }
