@@ -27,7 +27,7 @@ const ROOT = join(__dirname, "..");
  * Onboarding migrated to the React tree (src/app) — its window calls live in
  * the feature controller. */
 const WINDOW_FILES: Record<string, string[]> = {
-  main: ["src/App.tsx", "src/features/settings/SettingsShell.tsx"],
+  main: ["src/App.tsx", "src/features/settings/SettingsShell.tsx", "src/app/features/shell/controller.ts"],
   popup: ["src/Popup.tsx", "src/features/translation/popupController.ts"],
   input: ["src/InputPanel.tsx", "src/features/translation/inputController.ts"],
   onboarding: ["src/app/features/onboarding/controller.ts"],
