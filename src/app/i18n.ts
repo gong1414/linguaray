@@ -2,6 +2,9 @@
  * React-tree locale (shared resolution order with the legacy tree until it
  * is deleted: localStorage("linguaray.locale") → navigator.language → en).
  */
+import { COPY } from "./features/translation/copy";
+import type { CopyKey } from "./features/translation/types";
+
 export type Locale = "zh" | "en";
 
 export function detectLocale(): Locale {
@@ -12,4 +15,9 @@ export function detectLocale(): Locale {
     return "zh";
   }
   return "en";
+}
+
+/** Translation-surface copy lookup (popup + input window). */
+export function t(key: CopyKey): string {
+  return COPY[detectLocale()][key];
 }

@@ -12,21 +12,17 @@
     "tauri": "tauri",
     "dev:app": "tauri dev --config src-tauri/tauri.debug.conf.json",
     "build:local": "tauri build --config src-tauri/tauri.noupdater.conf.json",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p src/app && pnpm -r typecheck",
-    "lint": "eslint src test",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src test e2e",
     "storybook": "storybook dev -p 6007",
     "build-storybook": "storybook build",
     "test-storybook": "test-storybook",
+    "test:visual": "playwright test",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "test:src": "vitest run",
-    "test:ui": "pnpm --filter @linguaray/ui test",
-    "test:ui-lab": "pnpm --filter @linguaray/ui-lab test",
-    "test:all": "pnpm test && pnpm test:ui && pnpm test:ui-lab"
+    "test:watch": "vitest"
   },
   "license": "MIT",
   "dependencies": {
-    "@linguaray/ui": "workspace:*",
     "@mantine/core": "^9.5.1",
     "@mantine/hooks": "^9.5.1",
     "@mantine/notifications": "^9.5.1",
@@ -36,14 +32,12 @@
     "@tauri-apps/plugin-opener": "^2",
     "@tauri-apps/plugin-process": "^2",
     "lucide-react": "^1.31.0",
-    "lucide-solid": "^1.28.0",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8",
-    "solid-js": "^1.9.3"
+    "react-dom": "^19.2.8"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@solidjs/testing-library": "^0.6.1",
+    "@playwright/test": "^1.62.1",
     "@storybook/addon-a11y": "^9.1.20",
     "@storybook/react-vite": "^9.1.20",
     "@storybook/test-runner": "^0.24.4",
@@ -56,6 +50,7 @@
     "@vitejs/plugin-react": "^4.7.0",
     "axe-core": "^4.12.1",
     "eslint": "^10.8.1",
+    "http-server": "^14.1.1",
     "jsdom": "^25.0.1",
     "postcss": "^8.5.26",
     "postcss-nesting": "^14.0.1",
@@ -65,7 +60,6 @@
     "typescript": "~5.6.2",
     "typescript-eslint": "^8.67.0",
     "vite": "^6.0.3",
-    "vite-plugin-solid": "^2.11.0",
     "vitest": "^4.1.10"
   }
 }

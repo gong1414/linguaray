@@ -24,19 +24,17 @@ import { describe, expect, it } from "vitest";
 const ROOT = join(__dirname, "..");
 
 /** Entry-file → window-label map (mirrors the tauri.conf.json windows).
- * Onboarding + Settings migrated to the React tree (src/app) — their window
- * calls live in the feature controllers. */
+ * All windows are React (src/app) after the Phase 4/5 migration. */
 const WINDOW_FILES: Record<string, string[]> = {
   main: ["src/app/features/shell/controller.ts"],
-  popup: ["src/Popup.tsx", "src/features/translation/popupController.ts"],
-  input: ["src/InputPanel.tsx", "src/features/translation/inputController.ts"],
+  popup: ["src/app/features/translation/popupController.ts"],
+  input: [],
   onboarding: ["src/app/features/onboarding/controller.ts"],
-  ocr: ["src/OcrOverlay.tsx"],
+  ocr: ["src/app/features/ocr/controller.ts"],
 };
 
-/** Solid leftovers still mounted ONLY inside the ui-lab (browser fixture) —
- *  they no longer run in a Tauri window. Deleted wholesale in Phase 5. */
-const LEGACY_LAB_ONLY = new Set(["src/features/settings/SettingsShell.tsx"]);
+/** (Legacy ui-lab-only leftovers were deleted wholesale in Phase 5.) */
+const LEGACY_LAB_ONLY = new Set<string>();
 
 /** Window ops that map 1:1 to a `core:window:allow-<kebab>` permission. */
 const WINDOW_OPS = new Set([
