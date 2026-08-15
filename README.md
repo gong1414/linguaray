@@ -5,7 +5,7 @@ actively-maintained successor to [pot-desktop](https://github.com/pot-app/pot-de
 (which stopped updating), and the open answer to its author's later closed-source
 paid version ([manggo](https://manggo.pylogmon.cn/)).
 
-**Status:** v1 in progress. Heads-down build before open-source.
+**Status:** v1 feature-complete. Internal testing before public open-source release.
 
 ## What makes it different
 
@@ -24,26 +24,44 @@ Three legs, decided in the design grilling:
    machine-bound keystore (AES-256-GCM + Argon2id).
 3. **Continuously-maintained open source** — will never go closed/paid.
 
-### Current capabilities (v1)
+## Current capabilities
 
+### Translation
 - AI provider catalog (21 official presets; only `ready` rows are
   fill-key-and-use — Azure / Custom / Doubao require extra setup)
-- Self-encrypted keystore (machine-bound, fail-closed)
 - Selection translate (Alt+Space) with hybrid AX-first + sentinel-copy-fallback capture
-- Input translate (Ctrl+Space)
+- Input translate (Ctrl+Space) with draft autosave/restore
 - User-initiated clipboard translate
-- Cursor-anchored popup with latest-wins generation token
+- Cursor-anchored popup with latest-wins generation token (multi-monitor Retina-safe)
 - Built-in Google traditional engine as AI-fallback (§G classified fallback)
-- Compound clipboard restore (text + image, single platform-level write)
-- Windows + macOS cross-platform parity (keystore atomic replace + ACL, compound clipboard)
+- Configurable custom shortcuts (conflict detection, one-click reset)
+
+### Privacy & Security
+- Self-encrypted keystore (machine-bound, AES-256-GCM + Argon2id, fail-closed)
 - CSP-hardened WebView, per-window least-privilege capabilities
+- Compound clipboard restore (text + image, single platform-level write)
 
-### Planned (v1.x, before public open-source)
+### Knowledge
+- History (AES-256-GCM encrypted, NFKC casefold search, cursor pagination,
+  favorites, streaming export to CSV/JSON)
+- Vocabulary (encrypted CRUD, CSV/JSON/AnkiConnect export)
+- Dictionary (StarDict offline packages + macOS system dictionary, atomic install)
 
-- PaddleOCR screenshot/OCR translate · TTS · external invocation
+### System
+- System tray (Switch Provider submenu, Active-pulse + Error red-dot states)
+- OCR (macOS Vision / Windows.Media.Ocr, region capture)
+- TTS (macOS AVSpeechSynthesizer / Windows SpeechSynthesizer)
+- External invocation API
+- Update checker
+- Onboarding flow
+- Windows + macOS cross-platform parity
+
+## Planned (v1.x)
+
 - Long-text segmentation/chunking
 - Additional traditional engines (DeepL / 百度 / 有道 / …)
-- Dictionary lookup product UI (select-word → definition popup; backend groundwork exists, no v1 user entry point)
+- Dictionary select-word → definition popup (backend ready, needs product UI entry point)
+- MDX dictionary format support
 - Plugin/WASM extensibility
 
 ## Tech stack
@@ -76,23 +94,21 @@ pnpm tauri build    # production bundle
   - macOS Intel: `x86_64-apple-darwin`
   - Windows x64: `x86_64-pc-windows-msvc`
 
-## Project layout
+### Running tests
 
-```
-src/                        # SolidJS frontend (main settings, popup, input)
-src-tauri/src/
-  lib.rs                    # Tauri commands + hotkey wiring
-  clipboard/                # OS clipboard abstraction + compound restore
-    mod.rs                  #   macOS (objc2) + non-mac/non-win (arboard)
-    fsm.rs                  #   platform-neutral ownership state machine (always compiled)
-    windows.rs              #   Win32 adapter (cfg(windows)): build_blobs + Win32ClipOps
-  selection.rs              # §B hybrid selection capture wiring
-  selection_engine.rs       # §B sentinel state machine (pure, unit-testable)
-  keystore.rs               # self-encrypted JSON keystore (AES-256-GCM, Argon2id, machine-bound)
-  providers.rs              # AI provider catalog (the core differentiator)
-  service.rs                # §G classified fallback orchestration
-  wire.rs                   # provider wire contract (HTTP, error classification)
-  a11y.rs                   # macOS Accessibility AX-first read
+```bash
+# Rust (backend)
+cargo test --manifest-path src-tauri/Cargo.toml --features xproc-test-helper
+
+# Frontend
+pnpm test:all          # root + ui package + ui-lab
+pnpm typecheck
+
+# Visual regression (Playwright)
+pnpm --filter @linguaray/ui-lab exec playwright test
+
+# Lint
+cargo clippy --manifest-path src-tauri/Cargo.toml --features xproc-test-helper --all-targets -- -D warnings
 ```
 
 ## CI workflows
@@ -101,9 +117,9 @@ src-tauri/src/
 
 Runs on every push and pull request to `main`. Windows runner only — validates
 that the Windows-specific code compiles and tests pass on the real platform
-(macOS code is tested locally). Steps: `cargo check`, `cargo clippy -D warnings`,
-`cargo test` (including the real-clipboard `#[ignore]` tests via `--ignored`),
-frontend build + `tsc --noEmit`.
+(macOS code is tested locally). Steps: `cargo clippy -D warnings`,
+`cargo test` (integration tests + the real-clipboard `#[ignore]` tests via
+`--ignored`), frontend build + `tsc --noEmit`.
 
 ### `release.yml` — release workflow (dual mode)
 
@@ -197,18 +213,31 @@ Get-AuthenticodeSignature "C:\Program Files\LinguaRay\LinguaRay.exe"
 # Status should be "Valid"
 ```
 
-## Roadmap (solo, ~1hr/day, must-ship)
+## Roadmap
 
-**v1 — translation core:**
-- **Phase 0 — foundation** ✅ Tauri 2 + SolidJS scaffold, translate contract wired
-- **Phase 1 — AI provider catalog + keystore + unified pipeline** ✅ (the headline feature)
-- **Phase 2 — selection/input translate + user-initiated clipboard translate + cursor-anchored popup** ✅
-- **Phase 3 — built-in traditional engines** (Google ✅; DeepL/百度/有道/… follow the pattern) + §G fallback chain ✅ (dictionary backend groundwork exists; product UI deferred to v1.x)
-- **Phase 4 — cross-platform parity + packaging** — Windows keystore (atomic replace + ACL), Windows compound clipboard restore, CSP hardening, per-window capabilities, release/signing CI ✅
+**v1 — core:**
+- ✅ Foundation (Tauri 2 + SolidJS scaffold, translate contract)
+- ✅ AI provider catalog + keystore + unified pipeline (the headline feature)
+- ✅ Selection/input/clipboard translate + cursor-anchored popup
+- ✅ Built-in Google engine + §G classified fallback chain
+- ✅ Cross-platform parity (Windows keystore, compound clipboard, CSP, capabilities)
+- ✅ Shortcuts settings (conflict detection, reset defaults)
+- ✅ History (encrypted, searchable, exportable)
+- ✅ Vocabulary (encrypted CRUD, AnkiConnect export)
+- ✅ Dictionary (StarDict + macOS system)
+- ✅ OCR (region capture + image paste)
+- ✅ TTS (list/speak/stop)
+- ✅ External invocation API
+- ✅ Update checker
+- ✅ Onboarding
+- ✅ Release CI (dual-mode: unsigned dry-run / signed tag)
 
-**v1.x (before public open-source release):**
-- PaddleOCR screenshot/OCR translate · TTS · external invocation
-- polish, then open-source.
+**v1.x (before public open-source):**
+- Long-text segmentation
+- More traditional engines (DeepL / 百度 / 有道)
+- Dictionary select-word popup
+- MDX format support
+- Polish + open-source
 
 ## License
 
