@@ -7,6 +7,33 @@ paid version ([manggo](https://manggo.pylogmon.cn/)).
 
 **Status:** v1 feature-complete. Internal testing before public open-source release.
 
+## Install / 安装
+
+Once the repository goes public, installers live on the Releases page
+(`.dmg` on macOS, `.msi` on Windows).
+
+LinguaRay 的首个公开版本将以**未签名**形式分发 — 这是开源桌面软件零成本分发的
+常见做法（pot-desktop、Upscayl、ChatBox 等均如此）。只有**首次打开**会出现系统
+警告，处理方式如下：
+
+- **macOS**「无法打开"LinguaRay"，因为无法验证开发者」/
+  *"LinguaRay" can't be opened because it is from an unidentified developer*:
+  系统设置 → 隐私与安全性 → 点「**仍要打开**」；或对 App 右键 →「打开」→ 再点「打开」。
+  System Settings → Privacy & Security → **Open Anyway**; or right-click the app → Open → Open.
+- **macOS**「"LinguaRay"已损坏，无法打开」/
+  *"LinguaRay" is damaged and can't be opened*:
+  打开终端执行（Open Terminal.app and run）:
+  ```bash
+  sudo xattr -d com.apple.quarantine /Applications/LinguaRay.app
+  ```
+- **Windows** SmartScreen「Windows 已保护你的电脑」/
+  *Windows protected your PC*:
+  点「**更多信息**」→「**仍要运行**」。Click **More info** → **Run anyway**.
+
+更新包完整性将由独立的 minisign 签名保证（见 Roadmap），与安装器是否签名无关。
+Signed installers (Gatekeeper/SmartScreen with zero warnings) are an optional
+later step once certificates are acquired — see Roadmap.
+
 ## What makes it different
 
 The headline feature is a **cc-switch-style AI provider catalog**: the user picks
@@ -233,10 +260,13 @@ Get-AuthenticodeSignature "C:\Program Files\LinguaRay\LinguaRay.exe"
 - ✅ Release CI (dual-mode: unsigned dry-run / signed tag)
 
 **v1.x (before public open-source):**
+- In-app auto-update (minisign-signed updater artifacts + `latest.json`)
 - Long-text segmentation
 - More traditional engines (DeepL / 百度 / 有道)
 - Dictionary select-word popup
 - MDX format support
+- Signed installers (optional — eliminates first-launch warnings; requires
+  Apple Developer Program / Authenticode certificates)
 - Polish + open-source
 
 ## License
