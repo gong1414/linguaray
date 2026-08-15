@@ -9,7 +9,15 @@ import { expect, test } from "@playwright/test";
 type StoryIndex = { entries: Record<string, { id: string; name: string; importPath: string }> };
 
 test.beforeEach(async ({ page }) => {
-  await page.goto("http://localhost:6008/index.json");
+  // Freeze animations/transitions and hide carets BEFORE any script runs —
+  // animated progress bars and blinking text carets make screenshots
+  // non-deterministic between the two internal captures Playwright takes.
+  await page.addInitScript(() => {
+    const style = document.createElement("style");
+    style.textContent =
+      "*, *::before, *::after { animation: none !important; transition: none !important; caret-color: transparent !important; }";
+    document.addEventListener("DOMContentLoaded", () => document.head.appendChild(style));
+  });
 });
 
 test.setTimeout(600_000);
