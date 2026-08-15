@@ -1374,6 +1374,16 @@ pub fn run() {
             if let Err(e) = build_tray(app.handle()) {
                 log::error!("tray init failed: {e}");
             }
+
+            // Testability hook (hygiene-6): the screenshot-baseline script
+            // launches the packaged app with this env var to surface the
+            // normally tray-hidden main window without UI automation.
+            if std::env::var_os("LINGUARAY_AUTOSHOW_MAIN").is_some() {
+                if let Some(w) = app.get_webview_window("main") {
+                    let _ = w.show();
+                    let _ = w.set_focus();
+                }
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
