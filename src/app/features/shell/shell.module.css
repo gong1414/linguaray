@@ -1,0 +1,33 @@
+/* Settings shell layout ONLY — component look comes from the Mantine theme.
+ * The navbar collapses from full-label (>=700px) to an icon rail (600-699px)
+ * via the [data-layout] attribute on the AppShell root. */
+
+.shell {
+  height: 100vh;
+  background: var(--mantine-color-body);
+}
+
+/* Drive the navbar width from OUR 700px breakpoint (matchMedia in the view),
+ * not Mantine's sm breakpoint, so 600-699px collapses to the icon rail. */
+.shell[data-layout="rail"] {
+  --app-shell-navbar-width: 64px;
+}
+.shell[data-layout="full"] {
+  --app-shell-navbar-width: 220px;
+}
+
+.main {
+  min-width: 0;
+}
+
+/* Icon rail: navbar width already switches via AppShell {base:64, sm:220};
+ * hide nothing — NavLink keeps its accessible name via aria-label. */
+.nav :global(.mantine-NavLink-label) {
+  white-space: nowrap;
+}
+
+/* A11y banner actions styled as links, not fake buttons. */
+.a11y a.lr-link-styled {
+  color: var(--mantine-color-warning-filled, inherit);
+  text-decoration: underline;
+}
