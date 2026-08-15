@@ -219,21 +219,28 @@ jobs:
 
       - name: Verify bundle executable identity (Windows)
         if: matrix.os == 'windows-latest'
+        working-directory: src-tauri
         run: |
           # Assert cargo metadata default_run == linguaray (strongest regression guard
           # against the P0 wrong-binary bug). Then verify the binary exists.
+          # Must run from src-tauri so packages[0] is the linguaray package.
           $meta = cargo metadata --no-deps --format-version 1 2>$null | ConvertFrom-Json
-          $defaultRun = $meta.packages[0].default_run
+          $pkg = $meta.packages | Where-Object { $_.name -eq "linguaray" } | Select-Object -First 1
+          if ($null -eq $pkg) {
+            Write-Error "linguaray package not found in cargo metadata"
+            exit 1
+          }
+          $defaultRun = $pkg.default_run
           if ($defaultRun -ne "linguaray") {
             Write-Error "cargo metadata default_run is '$defaultRun', expected 'linguaray'"
             exit 1
           }
           Write-Host "✓ cargo default_run = linguaray"
           # Also verify linguaray.exe exists in the release dir.
-          $releaseDir = "src-tauri\target\${{ matrix.target }}\release"
+          $releaseDir = "target\${{ matrix.target }}\release"
           $mainExe = Join-Path $releaseDir "linguaray.exe"
           if (-not (Test-Path $mainExe)) {
-            Write-Error "linguaray.exe not found in release dir"
+            Write-Error "linguaray.exe not found in release dir: $mainExe"
             exit 1
           }
           Write-Host "✓ linguaray.exe is the main binary"
