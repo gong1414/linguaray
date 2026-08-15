@@ -40,7 +40,9 @@ const App: Component = () => {
         } else if (action === "translate-selection") {
           void translateSelection();
         } else if (action === "ocr-capture") {
-          void invoke("ocr_capture");
+          void invoke("ocr_capture", { source: "tray" });
+        } else if (action === "ocr-capture-shortcut") {
+          void invoke("ocr_capture", { source: "shortcut" });
         } else if (action === "history") {
           setActivePage("history");
         } else if (action === "switch-provider" || action === "settings") {

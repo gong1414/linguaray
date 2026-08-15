@@ -11,6 +11,9 @@
     "allow-onboarding-complete",
     "allow-history-set-enabled",
     "allow-a11y-status",
+    "allow-screen-capture-status",
+    "allow-provider-list",
+    "allow-shortcut-list",
     "allow-open-settings-window",
     "opener:allow-open-url"
   ]

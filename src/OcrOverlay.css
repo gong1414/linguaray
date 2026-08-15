@@ -1,0 +1,82 @@
+.ocr-overlay {
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+  background: rgba(0, 0, 0, 0.15);
+  color: var(--color-text-primary);
+  font-family: var(--font-ui, system-ui);
+  font-size: var(--text-sm);
+}
+
+.ocr-overlay__toolbar {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-raised);
+  color: var(--color-text-primary);
+  cursor: default;
+}
+
+.ocr-overlay__action {
+  appearance: none;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-default);
+  color: var(--color-text-primary);
+  font: inherit;
+  padding: var(--space-2xs, 2px) var(--space-md);
+  cursor: pointer;
+}
+
+.ocr-overlay__action:hover:not(:disabled) {
+  background: var(--color-surface-hover, var(--color-surface-raised));
+}
+
+.ocr-overlay__action:focus-visible {
+  outline: 2px solid var(--color-accent-default, currentColor);
+  outline-offset: 1px;
+}
+
+.ocr-overlay__action:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.ocr-overlay__hint {
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+}
+
+.ocr-overlay__error {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  max-width: 80vw;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-raised);
+  color: var(--color-text-danger, currentColor);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+  word-break: break-word;
+}
+
+.ocr-overlay__region {
+  position: fixed;
+  border: 1px solid var(--color-accent-default, #38bdf8);
+  background: rgba(56, 189, 248, 0.15);
+  pointer-events: none;
+}

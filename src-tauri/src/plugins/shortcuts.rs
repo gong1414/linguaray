@@ -45,7 +45,10 @@ impl TauriShortcutRegistrar {
                         let _ = app.emit("tray-action", "translate-clipboard");
                     }
                     ShortcutAction::Ocr if event.state == ShortcutState::Pressed => {
-                        let _ = app.emit("tray-action", "ocr-capture");
+                        // Distinct from the tray's "ocr-capture" so the main
+                        // window can attribute the trigger source in
+                        // ocr_capture's logs.
+                        let _ = app.emit("tray-action", "ocr-capture-shortcut");
                     }
                     ShortcutAction::Clipboard | ShortcutAction::Ocr => {}
                 }

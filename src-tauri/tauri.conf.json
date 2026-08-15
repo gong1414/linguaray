@@ -47,19 +47,6 @@
         "focus": true
       },
       {
-        "label": "ocr",
-        "title": "",
-        "url": "ocr.html",
-        "fullscreen": true,
-        "decorations": false,
-        "transparent": true,
-        "visible": false,
-        "alwaysOnTop": true,
-        "skipTaskbar": true,
-        "resizable": false,
-        "focus": true
-      },
-      {
         "label": "onboarding",
         "title": "LinguaRay",
         "url": "onboarding.html",

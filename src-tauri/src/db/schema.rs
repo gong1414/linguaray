@@ -211,6 +211,9 @@ pub fn ensure_preference_columns(conn: &Connection) -> Result<(), DbError> {
         "ALTER TABLE preferences ADD COLUMN external_api_enabled INTEGER NOT NULL DEFAULT 0",
         "ALTER TABLE preferences ADD COLUMN external_api_port INTEGER NOT NULL DEFAULT 61742",
         "ALTER TABLE preferences ADD COLUMN onboarding_complete INTEGER NOT NULL DEFAULT 0",
+        // R6: persist the CURRENT onboarding step so closing the window
+        // mid-flow resumes where the user left off instead of restarting.
+        "ALTER TABLE preferences ADD COLUMN onboarding_step TEXT NOT NULL DEFAULT 'welcome'",
     ] {
         match conn.execute(sql, []) {
             Ok(_) => {}

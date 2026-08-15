@@ -45,6 +45,7 @@ use tauri_plugin_global_shortcut::{Builder as GlobalShortcutBuilder, ShortcutSta
 
 use crate::commands::{
     a11y_status, archive_database, archive_keystore, dict_install_package, dict_list_packages,
+    screen_capture_status,
     dict_lookup, get_data_readiness, get_settings,
     history_clear_all, history_delete_session, history_export, history_privacy_status,
     history_search, history_set_enabled, history_set_retention, history_toggle_favorite,
@@ -1385,6 +1386,7 @@ pub fn run() {
             get_settings,
             set_setting,
             a11y_status,
+            screen_capture_status,
             keystore_health,
             archive_keystore,
             reset_keystore,

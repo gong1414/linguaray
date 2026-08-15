@@ -25,6 +25,9 @@ import { PrivacyDataView } from "@app/features/settings/PrivacyData";
 import { ShortcutsView } from "@app/features/settings/Shortcuts";
 import { UpdaterPanelView } from "@app/features/settings/UpdaterPanel";
 import type { UpdaterPhase } from "@app/features/settings/updater-types";
+import { OnboardingView } from "@app/Onboarding";
+import type { OnboardingStepName, PermissionState } from "@app/Onboarding";
+import OcrOverlay from "@app/OcrOverlay";
 import { SHORTCUTS_COPY } from "@app/features/settings/shortcuts-copy";
 import type { ShortcutSnapshot } from "@app/features/settings/shortcut-types";
 import "./App.css";
@@ -125,7 +128,7 @@ const NAV_ITEMS: {
 ];
 
 // Implemented surfaces.
-const IMPLEMENTED: NavKey[] = ["selection-popup", "input-window", "provider-center", "shortcuts", "privacy", "keystore", "component-gallery", "sidebar-isolated", "confirm-isolated", "settings-keyboard"];
+const IMPLEMENTED: NavKey[] = ["selection-popup", "input-window", "provider-center", "shortcuts", "privacy", "keystore", "component-gallery", "sidebar-isolated", "confirm-isolated", "settings-keyboard", "onboarding", "ocr-overlay"];
 
 const SHORTCUT_FIXTURE: ShortcutSnapshot = {
   revision: 1,
@@ -185,7 +188,11 @@ const App: Component = () => {
       ? (params.get("theme") as Theme)
       : "light";
 
-  const [locale, setLocale] = createSignal<Locale>("en");
+  // R6: ?locale= seeds the lab locale so the surfaces visual spec can
+  // snapshot both languages of locale-sensitive surfaces (onboarding).
+  const [locale, setLocale] = createSignal<Locale>(
+    params.get("locale") === "zh" ? "zh" : "en",
+  );
   const [theme, setTheme] = createSignal<Theme>(initialTheme);
   const [motion, setMotion] = createSignal<Motion>("full");
   const [nav, setNav] = createSignal<NavKey>(initialNav);
@@ -469,6 +476,56 @@ const App: Component = () => {
                   : "800×600"} ·{" "}
                 {t().provider.states[provState()]}
               </span>
+            </Match>
+
+            <Match when={nav() === "onboarding"}>
+              <div class="lab__frame" style={{ width: "600px", height: "400px" }}>
+                <OnboardingView
+                  step={(params.get("fixture") ?? "welcome") as OnboardingStepName}
+                  locale={locale()}
+                  a11y={
+                    (params.get("fixture") === "a11y-denied"
+                      ? "denied"
+                      : params.get("fixture") === "a11y-granted"
+                        ? "granted"
+                        : "checking") as PermissionState
+                  }
+                  screenCapture={
+                    (params.get("fixture") === "a11y-denied"
+                      ? "denied"
+                      : params.get("fixture") === "a11y-granted"
+                        ? "granted"
+                        : "checking") as PermissionState
+                  }
+                  providerCount={params.get("fixture") === "provider" ? 2 : 0}
+                  historyBusy={false}
+                  shortcuts={[
+                    { action: "translate_selection", combo: "Alt+Space" },
+                    { action: "translate_input", combo: "Ctrl+Space" },
+                    { action: "translate_clipboard", combo: "Ctrl+Alt+Space" },
+                    { action: "ocr_translate", combo: "Alt+Shift+Space" },
+                  ]}
+                  advancing={false}
+                  error={params.get("fixture") === "error" ? "onboarding_next: db locked" : null}
+                  onOpenA11ySettings={() => {}}
+                  onOpenScreenCaptureSettings={() => {}}
+                  onRecheckPermissions={() => {}}
+                  onOpenProviderSettings={() => {}}
+                  onOpenShortcutsSettings={() => {}}
+                  onEnableHistory={() => {}}
+                  onAdvance={() => {}}
+                  onFinish={() => {}}
+                />
+              </div>
+            </Match>
+
+            <Match when={nav() === "ocr-overlay"}>
+              {/* The REAL overlay component (region-select surface created on
+                  demand by ocr_capture). Inert in the lab: window bridge calls
+                  no-op in a plain browser. */}
+              <div class="lab__frame" style={{ width: "800px", height: "500px" }}>
+                <OcrOverlay />
+              </div>
             </Match>
 
             <Match when={nav() === "component-gallery"}>

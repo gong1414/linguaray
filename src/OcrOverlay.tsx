@@ -1,6 +1,9 @@
-import { createSignal, type Component } from "solid-js";
+import { createSignal, onCleanup, onMount, Show, type Component } from "solid-js";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { detectLocale } from "./i18n";
+import { OCR_COPY } from "./ocr-copy";
+import "./OcrOverlay.css";
 
 export type ScreenRect = { x: number; y: number; w: number; h: number };
 
@@ -55,18 +58,48 @@ async function fileToBytes(file: File): Promise<Uint8Array> {
 }
 
 const OcrOverlay: Component = () => {
+  const t = OCR_COPY[detectLocale()];
   const [origin, setOrigin] = createSignal<{ x: number; y: number } | null>(null);
   const [rect, setRect] = createSignal<ScreenRect | null>(null);
-  const [notice, setNotice] = createSignal("");
+  const [notice, setNotice] = createSignal<string | null>(null);
+  const [busy, setBusy] = createSignal(false);
 
   const resetDrag = () => {
     setOrigin(null);
     setRect(null);
   };
 
-  const hide = async () => {
+  /**
+   * This window is created ON DEMAND by `ocr_capture` and must not linger:
+   * every terminal path (success, cancel, unrecoverable error) destroys it.
+   * Recognition runs BEFORE destroying so failures stay visible here with a
+   * retry — hiding first would write the error into a window nobody sees.
+   */
+  const endSession = async () => {
     resetDrag();
-    await getCurrentWindow().hide();
+    await getCurrentWindow().destroy();
+  };
+
+  const cancel = () => {
+    if (!busy()) void endSession();
+  };
+
+  const runOcr = async (fn: () => Promise<void>) => {
+    if (busy()) return;
+    setBusy(true);
+    setNotice(null);
+    try {
+      await fn();
+      await endSession();
+    } catch (e) {
+      // Keep the overlay open: the error is actionable here (retry / cancel).
+      setNotice(String(e));
+    } finally {
+      // Reset even on success — if destroy() itself failed on a dying
+      // window bridge, the lingering overlay must stay actionable, not
+      // dead-lock on busy.
+      setBusy(false);
+    }
   };
 
   const onDown = (e: MouseEvent) => {
@@ -81,112 +114,120 @@ const OcrOverlay: Component = () => {
     const y = Math.min(o.y, e.screenY);
     setRect({ x, y, w: Math.abs(e.screenX - o.x), h: Math.abs(e.screenY - o.y) });
   };
-  const onUp = async (e: MouseEvent) => {
+  const onUp = (e: MouseEvent) => {
     if ((e.target as HTMLElement).closest("[data-ocr-toolbar]")) return;
     const dragging = origin();
     const r = rect();
     resetDrag();
     if (!dragging || !r || r.w < 4 || r.h < 4) return;
-    await hide();
-    try {
+    void runOcr(async () => {
       const result = await invoke<{ text: string }>("ocr_capture_region", captureArgs(r));
       await translateOcrText(result.text);
-    } catch (err) {
-      setNotice(String(err));
-    }
+    });
   };
 
-  const runBytes = async (file: File) => {
-    try {
+  const runBytes = (file: File) =>
+    void runOcr(async () => {
       await ocrBytesThenTranslate(await fileToBytes(file));
-      await hide();
-    } catch (e) {
-      setNotice(String(e));
-    }
-  };
+    });
 
   const onDrop = (e: DragEvent) => {
     e.preventDefault();
     const file = e.dataTransfer?.files?.[0];
-    if (file) void runBytes(file);
+    if (file) runBytes(file);
   };
 
   const onFile = (e: Event) => {
     const input = e.currentTarget as HTMLInputElement;
     const file = input.files?.[0];
     input.value = "";
-    if (file) void runBytes(file);
+    if (file) runBytes(file);
   };
 
-  const onClipboard = async () => {
-    try {
+  const onClipboard = () =>
+    void runOcr(async () => {
       await ocrClipboardThenTranslate();
-      await hide();
-    } catch (e) {
-      setNotice(String(e));
-    }
-  };
+    });
+
+  onMount(() => {
+    // The window is built hidden (ocr_capture) — show only once this DOM
+    // exists, so a cold WebView never flashes gray before content. The catch
+    // keeps the ui-lab page (plain browser, no window bridge) quiet.
+    void getCurrentWindow()
+      .show()
+      .catch(() => {});
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        cancel();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    const onContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+      cancel();
+    };
+    window.addEventListener("contextmenu", onContextMenu);
+    onCleanup(() => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("contextmenu", onContextMenu);
+    });
+  });
 
   const r = () => rect();
   return (
     <div
-      style={{
-        width: "100%",
-        height: "100%",
-        cursor: "crosshair",
-        background: "rgba(0,0,0,0.15)",
-      }}
+      class="ocr-overlay"
+      role="application"
+      aria-label={t.overlayRole}
       onMouseDown={onDown}
       onMouseMove={onMove}
       onMouseUp={(e) => void onUp(e)}
       onDragOver={(e) => e.preventDefault()}
       onDrop={onDrop}
     >
-      <div
-        data-ocr-toolbar
-        style={{
-          position: "fixed",
-          top: "16px",
-          left: "50%",
-          transform: "translateX(-50%)",
-          display: "flex",
-          gap: "8px",
-          padding: "8px 12px",
-          background: "rgba(15,23,42,0.9)",
-          color: "#fff",
-          "border-radius": "8px",
-          "font-family": "system-ui",
-          "font-size": "13px",
-          cursor: "default",
-        }}
-      >
-        <label>
-          Open image
-          <input type="file" accept="image/*" hidden onChange={onFile} />
-        </label>
-        <button type="button" onClick={() => void onClipboard()}>
-          Clipboard image
-        </button>
-        <span>Draw a region, drop a file, or paste</span>
-      </div>
-      {notice() && (
-        <p role="alert" style={{ position: "fixed", bottom: "16px", left: "16px", color: "#fecaca" }}>
-          {notice()}
-        </p>
-      )}
-      {r() && (
-        <div
-          style={{
-            position: "fixed",
-            left: `${r()!.x - window.screenX}px`,
-            top: `${r()!.y - window.screenY}px`,
-            width: `${r()!.w}px`,
-            height: `${r()!.h}px`,
-            border: "1px solid #38bdf8",
-            background: "rgba(56,189,248,0.15)",
-          }}
+      <div class="ocr-overlay__toolbar" data-ocr-toolbar>
+        <input
+          class="ocr-overlay__action"
+          type="file"
+          accept="image/*"
+          aria-label={t.openImage}
+          disabled={busy()}
+          onChange={onFile}
         />
-      )}
+        <button
+          type="button"
+          class="ocr-overlay__action"
+          disabled={busy()}
+          onClick={() => onClipboard()}
+        >
+          {t.clipboardImage}
+        </button>
+        <button type="button" class="ocr-overlay__action" disabled={busy()} onClick={cancel}>
+          {t.cancel}
+        </button>
+        <span class="ocr-overlay__hint" role="status">
+          {busy() ? t.recognizing : t.hint}
+        </span>
+      </div>
+      <Show when={notice()}>
+        <p class="ocr-overlay__error" role="alert">
+          {t.errorPrefix}: {notice()}
+        </p>
+      </Show>
+      <Show when={r()}>
+        {(box) => (
+          <div
+            class="ocr-overlay__region"
+            style={{
+              left: `${box().x - window.screenX}px`,
+              top: `${box().y - window.screenY}px`,
+              width: `${box().w}px`,
+              height: `${box().h}px`,
+            }}
+          />
+        )}
+      </Show>
     </div>
   );
 };

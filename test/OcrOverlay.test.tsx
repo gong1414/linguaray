@@ -7,22 +7,29 @@ import OcrOverlay, {
   ocrPathThenTranslate,
 } from "../src/OcrOverlay";
 
-const { invokeMock, hideMock } = vi.hoisted(() => ({
+const { invokeMock, destroyMock, showMock } = vi.hoisted(() => ({
   invokeMock: vi.fn(async (cmd: string) => {
     if (cmd.startsWith("ocr_")) return { text: "HELLO" };
     return undefined;
   }),
-  hideMock: vi.fn(async () => undefined),
+  destroyMock: vi.fn(async () => undefined),
+  showMock: vi.fn(async () => undefined),
 }));
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: invokeMock }));
 vi.mock("@tauri-apps/api/window", () => ({
-  getCurrentWindow: () => ({ hide: hideMock }),
+  getCurrentWindow: () => ({
+    destroy: destroyMock,
+    show: showMock,
+    hide: destroyMock,
+  }),
 }));
 
 beforeEach(() => {
+  localStorage.setItem("linguaray.locale", "en");
   invokeMock.mockClear();
-  hideMock.mockClear();
+  destroyMock.mockClear();
+  showMock.mockClear();
 });
 afterEach(() => cleanup());
 
@@ -86,6 +93,9 @@ describe("OCR overlay", () => {
         expect.objectContaining({ x: 10, y: 20, width: 70, height: 70 }),
       ),
     );
+    // Wait for the session chain to finish (destroy) before re-triggering —
+    // runOcr is busy-gated while a capture is in flight.
+    await waitFor(() => expect(destroyMock).toHaveBeenCalled());
     invokeMock.mockClear();
     fireEvent.mouseUp(root, { screenX: 80, screenY: 90 });
     fireEvent.click(getByText("Clipboard image"));
@@ -117,5 +127,52 @@ describe("OCR overlay", () => {
         expect.objectContaining({ bytes: expect.any(Array) }),
       ),
     );
+  });
+
+  it("mount shows the on-demand window (built hidden by ocr_capture)", async () => {
+    render(() => <OcrOverlay />);
+    await waitFor(() => expect(showMock).toHaveBeenCalled());
+  });
+
+  it("Esc destroys the overlay session (cancel is quiet)", async () => {
+    render(() => <OcrOverlay />);
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() => expect(destroyMock).toHaveBeenCalled());
+  });
+
+  it("right-click cancels the session", async () => {
+    const { container } = render(() => <OcrOverlay />);
+    fireEvent.contextMenu(container.firstChild as Element);
+    await waitFor(() => expect(destroyMock).toHaveBeenCalled());
+  });
+
+  it("failed region OCR keeps the overlay open with a visible error", async () => {
+    invokeMock.mockImplementation(async (cmd: string) => {
+      if (cmd === "ocr_capture_region") throw new Error("no OCR language pack");
+      if (cmd.startsWith("ocr_")) return { text: "HELLO" };
+      return undefined;
+    });
+    const { container, findByRole } = render(() => <OcrOverlay />);
+    const root = container.firstChild as HTMLElement;
+    fireEvent.mouseDown(root, { screenX: 10, screenY: 20 });
+    fireEvent.mouseMove(root, { screenX: 80, screenY: 90 });
+    fireEvent.mouseUp(root, { screenX: 80, screenY: 90 });
+    expect(await findByRole("alert")).toHaveTextContent("no OCR language pack");
+    expect(destroyMock).not.toHaveBeenCalled();
+  });
+
+  it("successful region OCR destroys the session window", async () => {
+    // The previous test replaced the implementation; mockClear does not
+    // restore it — reinstall the default success behavior explicitly.
+    invokeMock.mockImplementation(async (cmd: string) => {
+      if (cmd.startsWith("ocr_")) return { text: "HELLO" };
+      return undefined;
+    });
+    const { container } = render(() => <OcrOverlay />);
+    const root = container.firstChild as HTMLElement;
+    fireEvent.mouseDown(root, { screenX: 10, screenY: 20 });
+    fireEvent.mouseMove(root, { screenX: 80, screenY: 90 });
+    fireEvent.mouseUp(root, { screenX: 80, screenY: 90 });
+    await waitFor(() => expect(destroyMock).toHaveBeenCalled());
   });
 });

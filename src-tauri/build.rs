@@ -10,6 +10,7 @@ fn main() {
             "get_settings",
             "set_setting",
             "a11y_status",
+            "screen_capture_status",
             "keystore_health",
             "archive_keystore",
             "reset_keystore",

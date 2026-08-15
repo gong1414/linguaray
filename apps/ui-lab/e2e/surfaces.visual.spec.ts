@@ -46,6 +46,18 @@ const SETTINGS_SURFACES = [
   { nav: "updater", fixture: "error", label: "updater-error" },
 ] as const;
 
+// R6: the redesigned onboarding (600×400 window) in both locales, plus the
+// rewritten OCR overlay toolbar. Sampled at the window's native width and one
+// wide breakpoint instead of the full 4-width matrix.
+const ONBOARDING_SURFACES = [
+  { fixture: "welcome", locale: "en", label: "onboarding-welcome-en" },
+  { fixture: "welcome", locale: "zh", label: "onboarding-welcome-zh" },
+  { fixture: "a11y-denied", locale: "en", label: "onboarding-a11y-denied-en" },
+  { fixture: "a11y-denied", locale: "zh", label: "onboarding-a11y-denied-zh" },
+] as const;
+
+const ONBOARDING_WIDTHS = [600, 800] as const;
+
 const POPUP_SURFACES = [
   { state: "loading", label: "popup-loading" },
   { state: "success-single", label: "popup-single" },
@@ -112,6 +124,43 @@ for (const width of WIDTHS) {
         });
       });
     }
+  }
+}
+
+// R6 onboarding baselines: sampled widths × themes × locales, outside the
+// main WIDTHS×THEMES loop (own width set + a locale query param).
+for (const width of ONBOARDING_WIDTHS) {
+  for (const theme of THEMES) {
+    for (const s of ONBOARDING_SURFACES) {
+      test(`visual: ${s.label} @ ${width}px ${theme}`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 800 });
+        await page.goto(
+          `${BASE}/?nav=onboarding&fixture=${s.fixture}&locale=${s.locale}&theme=${theme}`,
+        );
+        await page.evaluate(() => document.fonts.ready);
+        await page.evaluate((tt) => {
+          document.documentElement.setAttribute("data-theme", tt);
+        }, theme);
+        await page.waitForSelector('[data-testid="onboarding"]', { timeout: 10_000 });
+        await expect(page).toHaveScreenshot(`${s.label}-${width}-${theme}.png`, {
+          maxDiffPixelRatio: 0.01,
+          fullPage: true,
+        });
+      });
+    }
+    test(`visual: ocr-overlay @ ${width}px ${theme}`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto(`${BASE}/?nav=ocr-overlay&theme=${theme}`);
+      await page.evaluate(() => document.fonts.ready);
+      await page.evaluate((tt) => {
+        document.documentElement.setAttribute("data-theme", tt);
+      }, theme);
+      await page.waitForSelector(".ocr-overlay", { timeout: 10_000 });
+      await expect(page).toHaveScreenshot(`ocr-overlay-${width}-${theme}.png`, {
+        maxDiffPixelRatio: 0.01,
+        fullPage: true,
+      });
+    });
   }
 }
 

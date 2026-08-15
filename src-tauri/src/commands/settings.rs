@@ -51,3 +51,21 @@ pub fn set_setting(app: tauri::AppHandle, key: String, value: String) -> Result<
 pub fn a11y_status() -> bool {
     crate::a11y::enabled()
 }
+
+/// macOS Screen Recording permission (needed by region OCR). Preflighted —
+/// never prompts. Non-macOS has no such gate and reports `true`.
+#[cfg(target_os = "macos")]
+#[tauri::command]
+pub fn screen_capture_status() -> bool {
+    #[link(name = "CoreGraphics", kind = "framework")]
+    unsafe extern "C" {
+        fn CGPreflightScreenCaptureAccess() -> bool;
+    }
+    unsafe { CGPreflightScreenCaptureAccess() }
+}
+
+#[cfg(not(target_os = "macos"))]
+#[tauri::command]
+pub fn screen_capture_status() -> bool {
+    true
+}
