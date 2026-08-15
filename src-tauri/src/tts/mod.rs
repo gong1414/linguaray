@@ -124,15 +124,139 @@ fn platform_stop() {
     }
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(target_os = "windows")]
+fn platform_list() -> Result<Vec<SpeechVoice>, TtsError> {
+    windows_tts::list()
+}
+
+#[cfg(target_os = "windows")]
+fn platform_speak(text: &str, voice_id: Option<&str>) -> Result<(), TtsError> {
+    windows_tts::speak(text, voice_id)
+}
+
+#[cfg(target_os = "windows")]
+fn platform_stop() {
+    windows_tts::stop();
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 fn platform_list() -> Result<Vec<SpeechVoice>, TtsError> {
     Ok(Vec::new())
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 fn platform_speak(_text: &str, _voice_id: Option<&str>) -> Result<(), TtsError> {
     Err(TtsError::Message("No system voices found".into()))
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 fn platform_stop() {}
+
+#[cfg(target_os = "windows")]
+mod windows_tts {
+    use super::{SpeechVoice, TtsError};
+    use std::sync::Mutex;
+    use windows::core::HSTRING;
+    use windows::Media::Core::MediaSource;
+    use windows::Media::Playback::MediaPlayer;
+    use windows::Media::SpeechSynthesis::SpeechSynthesizer;
+    use windows::Win32::System::Com::{CoInitializeEx, COINIT_MULTITHREADED};
+
+    static PLAYER: Mutex<Option<MediaPlayer>> = Mutex::new(None);
+
+    fn ensure_com() {
+        unsafe {
+            let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+        }
+    }
+
+    pub fn list() -> Result<Vec<SpeechVoice>, TtsError> {
+        ensure_com();
+        let voices = SpeechSynthesizer::AllVoices()
+            .map_err(|e| TtsError::Message(format!("Windows speech voices unavailable: {e}")))?;
+        let n = voices
+            .Size()
+            .map_err(|e| TtsError::Message(format!("speech voice count: {e}")))?;
+        let mut out = Vec::with_capacity(n as usize);
+        for i in 0..n {
+            let voice = voices
+                .GetAt(i)
+                .map_err(|e| TtsError::Message(format!("speech voice {i}: {e}")))?;
+            let id = voice
+                .Id()
+                .map_err(|e| TtsError::Message(format!("speech voice id: {e}")))?
+                .to_string();
+            let name = voice
+                .DisplayName()
+                .map_err(|e| TtsError::Message(format!("speech voice name: {e}")))?
+                .to_string();
+            out.push(SpeechVoice { id, name });
+        }
+        Ok(out)
+    }
+
+    pub fn speak(text: &str, voice_id: Option<&str>) -> Result<(), TtsError> {
+        ensure_com();
+        stop();
+        let synth = SpeechSynthesizer::new()
+            .map_err(|e| TtsError::Message(format!("speech synthesizer: {e}")))?;
+        if let Some(wanted) = voice_id.filter(|id| !id.is_empty()) {
+            let voices = SpeechSynthesizer::AllVoices()
+                .map_err(|e| TtsError::Message(format!("Windows speech voices unavailable: {e}")))?;
+            let n = voices
+                .Size()
+                .map_err(|e| TtsError::Message(format!("speech voice count: {e}")))?;
+            let mut found = false;
+            for i in 0..n {
+                let voice = voices
+                    .GetAt(i)
+                    .map_err(|e| TtsError::Message(format!("speech voice {i}: {e}")))?;
+                if voice
+                    .Id()
+                    .map_err(|e| TtsError::Message(format!("speech voice id: {e}")))?
+                    .to_string()
+                    == wanted
+                {
+                    synth
+                        .SetVoice(&voice)
+                        .map_err(|e| TtsError::Message(format!("set speech voice: {e}")))?;
+                    found = true;
+                    break;
+                }
+            }
+            if !found {
+                return Err(TtsError::Message("unknown voice".into()));
+            }
+        }
+        let stream = synth
+            .SynthesizeTextToStreamAsync(&HSTRING::from(text))
+            .map_err(|e| TtsError::Message(format!("synthesize: {e}")))?
+            .get()
+            .map_err(|e| TtsError::Message(format!("synthesize: {e}")))?;
+        let content_type = stream
+            .ContentType()
+            .map_err(|e| TtsError::Message(format!("speech content type: {e}")))?;
+        let source = MediaSource::CreateFromStream(&stream, &content_type)
+            .map_err(|e| TtsError::Message(format!("speech source: {e}")))?;
+        let player = MediaPlayer::new()
+            .map_err(|e| TtsError::Message(format!("media player: {e}")))?;
+        player
+            .SetSource(&source)
+            .map_err(|e| TtsError::Message(format!("speech set source: {e}")))?;
+        player
+            .Play()
+            .map_err(|e| TtsError::Message(format!("speech play: {e}")))?;
+        *PLAYER
+            .lock()
+            .map_err(|_| TtsError::Message("speech player lock poisoned".into()))? = Some(player);
+        Ok(())
+    }
+
+    pub fn stop() {
+        if let Ok(mut slot) = PLAYER.lock() {
+            if let Some(player) = slot.take() {
+                let _ = player.Pause();
+            }
+        }
+    }
+}

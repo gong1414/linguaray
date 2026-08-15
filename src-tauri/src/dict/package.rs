@@ -98,7 +98,19 @@ pub fn install_package(
             if dest.exists() {
                 let _ = std::fs::remove_dir_all(&dest);
             }
-            std::fs::rename(&temp_dest, &dest)?;
+            if let Err(e) = std::fs::rename(&temp_dest, &dest) {
+                // The row is already visible. Roll it back so a failed
+                // publish cannot leave "installed in DB, files missing".
+                let _ = db.with_conn(|conn| {
+                    conn.execute(
+                        "DELETE FROM dict_packages WHERE package_id = ?1",
+                        [package_id],
+                    )?;
+                    Ok(())
+                });
+                let _ = std::fs::remove_dir_all(&temp_dest);
+                return Err(PackageError::Io(e));
+            }
             Ok(())
         }
         Err(e) => {
