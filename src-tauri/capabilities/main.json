@@ -73,6 +73,10 @@
     "allow-onboarding-status",
     "allow-onboarding-next",
     "allow-onboarding-complete",
-    "allow-provider-get-balance"
+    "allow-provider-get-balance",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [{ "url": "x-apple.systempreferences:*" }]
+    }
   ]
 }
