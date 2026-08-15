@@ -24,15 +24,19 @@ import { describe, expect, it } from "vitest";
 const ROOT = join(__dirname, "..");
 
 /** Entry-file → window-label map (mirrors the tauri.conf.json windows).
- * Onboarding migrated to the React tree (src/app) — its window calls live in
- * the feature controller. */
+ * Onboarding + Settings migrated to the React tree (src/app) — their window
+ * calls live in the feature controllers. */
 const WINDOW_FILES: Record<string, string[]> = {
-  main: ["src/App.tsx", "src/features/settings/SettingsShell.tsx", "src/app/features/shell/controller.ts"],
+  main: ["src/app/features/shell/controller.ts"],
   popup: ["src/Popup.tsx", "src/features/translation/popupController.ts"],
   input: ["src/InputPanel.tsx", "src/features/translation/inputController.ts"],
   onboarding: ["src/app/features/onboarding/controller.ts"],
   ocr: ["src/OcrOverlay.tsx"],
 };
+
+/** Solid leftovers still mounted ONLY inside the ui-lab (browser fixture) —
+ *  they no longer run in a Tauri window. Deleted wholesale in Phase 5. */
+const LEGACY_LAB_ONLY = new Set(["src/features/settings/SettingsShell.tsx"]);
 
 /** Window ops that map 1:1 to a `core:window:allow-<kebab>` permission. */
 const WINDOW_OPS = new Set([
@@ -86,7 +90,9 @@ describe("window permission gate (hygiene-2)", () => {
   it("every src file calling window APIs is registered in WINDOW_FILES", () => {
     const mapped = new Set(Object.values(WINDOW_FILES).flat());
     const unmapped = [...new Set(
-      tracked.filter((c) => !mapped.has(c.rel)).map((c) => `${c.rel}: ${c.method}()`),
+      tracked
+        .filter((c) => !mapped.has(c.rel) && !LEGACY_LAB_ONLY.has(c.rel))
+        .map((c) => `${c.rel}: ${c.method}()`),
     )];
     expect(
       unmapped,
