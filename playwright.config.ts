@@ -17,7 +17,15 @@ export default defineConfig({
     colorScheme: "light",
   },
   expect: {
-    toHaveScreenshot: { maxDiffPixelRatio: 0.01 },
+    // 0.03 absorbs cross-run font antialiasing jitter (long-CJK line-clamp
+    // text wobbles ~2% of pixels between Playwright's two internal captures
+    // on CI font sets) while still failing real layout regressions.
+    toHaveScreenshot: {
+      maxDiffPixelRatio: 0.03,
+      threshold: 0.2,
+      animations: "disabled",
+      caret: "hide",
+    },
   },
   webServer: {
     command: "npx http-server storybook-static -p 6008 --silent",

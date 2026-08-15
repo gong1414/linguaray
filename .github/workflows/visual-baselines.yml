@@ -47,7 +47,7 @@ jobs:
         run: pnpm test:visual
       - name: Regenerate baselines (artifact only — never auto-commit)
         if: ${{ inputs.regenerate }}
-        run: pnpm test:visual -- --update-snapshots
+        run: pnpm test:visual -- --update-snapshots --retries=2
       - name: Upload regenerated baselines
         if: ${{ inputs.regenerate }}
         uses: actions/upload-artifact@v4
