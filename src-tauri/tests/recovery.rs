@@ -57,6 +57,7 @@ impl Harness {
             keystore_dir: dir.path().join("keystore"),
             settings_path: Some(dir.path().join("settings.json")),
             tray: Arc::new(parking_lot::Mutex::new(test_tray())),
+            update_install_in_flight: std::sync::atomic::AtomicBool::new(false),
         });
         Self {
             _dir: dir,
@@ -264,6 +265,7 @@ fn r7_unresolved_settings_path_refuses_before_destructive_ops() {
         keystore_dir: dir.path().join("keystore"),
         settings_path: None, // unresolved — preflight must refuse.
         tray: Arc::new(parking_lot::Mutex::new(test_tray())),
+        update_install_in_flight: std::sync::atomic::AtomicBool::new(false),
     });
 
     let err = archive_database_core(&app, ArchiveFailpoint::None).unwrap_err();

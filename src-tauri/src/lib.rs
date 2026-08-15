@@ -59,6 +59,7 @@ use crate::commands::{
     vocabulary_export_file, vocabulary_list, ocr_capture, ocr_capture_region, ocr_from_image,
     ocr_recognize_bytes, ocr_from_clipboard, tts_list_voices, tts_speak, tts_stop, external_api_disable,
     external_api_enable, external_api_regenerate_token, external_api_status, updater_check,
+    updater_download_install,
     onboarding_complete, onboarding_next, onboarding_status, provider_get_balance,
 };
 use crate::db::migration::{run_migration, FailpointCell, MigrationError};
@@ -130,6 +131,9 @@ pub struct AppState {
     /// Tray plugin owns the controller; this is the sync façade so
     /// `TranslationGuard::drop` can `finish_translation` on the calling thread.
     pub tray: Arc<parking_lot::Mutex<tray_state::TrayStateController>>,
+    /// R5: single-flight guard for `updater_download_install` — swap-to-acquire,
+    /// Drop-to-release (see `commands::updater::InstallGuard`).
+    pub update_install_in_flight: std::sync::atomic::AtomicBool,
 }
 
 /// Gating check for provider commands that ALREADY hold the `data_gate` guard.
@@ -733,6 +737,8 @@ async fn build_tray_menu(app: &tauri::AppHandle) -> tauri::Result<tauri::menu::M
     let sep3 = PredefinedMenuItem::separator(app)?;
 
     // Navigation + system group.
+    let check_updates =
+        MenuItem::with_id(app, "tray.check-updates", "Check for Updates…", true, None::<&str>)?;
     let settings = MenuItem::with_id(app, "tray.settings", "Settings", true, None::<&str>)?;
     let sep4 = PredefinedMenuItem::separator(app)?;
     let quit = MenuItem::with_id(app, "tray.quit", "Quit", true, None::<&str>)?;
@@ -749,6 +755,7 @@ async fn build_tray_menu(app: &tauri::AppHandle) -> tauri::Result<tauri::menu::M
             &ocr,
             &history,
             &sep3,
+            &check_updates,
             &settings,
             &sep4,
             &quit,
@@ -938,6 +945,15 @@ fn handle_tray_menu_event(app: &tauri::AppHandle, event: MenuEvent) {
                 let _ = w.emit("navigate", "history");
             }
         }
+        "tray.check-updates" => {
+            // R5: open the settings Updater section (it runs a fresh check on
+            // mount) rather than firing the network call from the menu thread.
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.show();
+                let _ = w.set_focus();
+                let _ = w.emit("navigate", "updater");
+            }
+        }
         "tray.settings" => {
             if let Some(w) = app.get_webview_window("main") {
                 let _ = w.show();
@@ -985,6 +1001,8 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .setup(|app| {
             // Resolve the app-local data dir. Review P1 #2: this MUST NOT crash
             // setup — if the platform path is unavailable, fall back to a temp
@@ -1228,7 +1246,26 @@ pub fn run() {
                 tray: Arc::new(parking_lot::Mutex::new(
                     tray_state::TrayStateController::new(app.handle().clone()),
                 )),
+                update_install_in_flight: std::sync::atomic::AtomicBool::new(false),
             }));
+
+            // R5: unattended startup update check. The only unsolicited network
+            // request the app makes (documented in the README privacy section,
+            // disable via check_updates_on_startup). Failure maps onto
+            // UpdateCheck::Error, which never disturbs the user.
+            {
+                let state: Arc<AppState> = app.state::<Arc<AppState>>().inner().clone();
+                let handle = app.handle().clone();
+                if crate::settings::load(&handle).check_updates_on_startup {
+                    tauri::async_runtime::spawn(async move {
+                        let check = crate::updater::check_remote(&handle).await;
+                        state.tray.lock().set_update_available(
+                            crate::updater::tray_should_show_update(&check),
+                        );
+                        log::info!("startup update check: {check:?}");
+                    });
+                }
+            }
 
             if startup_ready {
                 if let Some(w) = app.get_webview_window("onboarding") {
@@ -1406,6 +1443,7 @@ pub fn run() {
             external_api_disable,
             external_api_regenerate_token,
             updater_check,
+            updater_download_install,
             onboarding_status,
             onboarding_next,
             onboarding_complete,
@@ -1477,6 +1515,7 @@ mod tests {
             keystore_dir: dir.path().join("keystore"),
             settings_path: Some(dir.path().join("settings.json")),
             tray: Arc::new(parking_lot::Mutex::new(test_tray_controller())),
+            update_install_in_flight: std::sync::atomic::AtomicBool::new(false),
         });
 
         apply_keystore_recovery_db_cleanup(&app).unwrap();
@@ -1517,6 +1556,7 @@ mod tests {
             keystore_dir: dir.path().join("keystore"),
             settings_path: Some(dir.path().join("settings.json")),
             tray: Arc::new(parking_lot::Mutex::new(test_tray_controller())),
+            update_install_in_flight: std::sync::atomic::AtomicBool::new(false),
         };
         let got = state.readiness.read().clone();
         assert_eq!(got, DataReadiness::Ready);
@@ -1543,6 +1583,7 @@ mod tests {
             keystore_dir: dir.path().join("keystore"),
             settings_path: Some(dir.path().join("settings.json")),
             tray: Arc::new(parking_lot::Mutex::new(test_tray_controller())),
+            update_install_in_flight: std::sync::atomic::AtomicBool::new(false),
         };
         let got = state.readiness.read().clone();
         let json = serde_json::to_string(&got).unwrap();
@@ -1709,6 +1750,7 @@ mod tests {
             keystore_dir: dir.path().join("keystore"),
             settings_path: Some(dir.path().join("settings.json")),
             tray: Arc::new(parking_lot::Mutex::new(test_tray_controller())),
+            update_install_in_flight: std::sync::atomic::AtomicBool::new(false),
         };
         let gate = state.data_gate.read();
         assert!(
@@ -1728,6 +1770,7 @@ mod tests {
             keystore_dir: dir.path().join("keystore"),
             settings_path: Some(dir.path().join("settings.json")),
             tray: Arc::new(parking_lot::Mutex::new(test_tray_controller())),
+            update_install_in_flight: std::sync::atomic::AtomicBool::new(false),
         };
         let gate = state.data_gate.read();
         assert!(require_database(&state, &gate).is_err());

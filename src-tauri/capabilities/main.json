@@ -68,6 +68,8 @@
     "allow-external-api-disable",
     "allow-external-api-regenerate-token",
     "allow-updater-check",
+    "allow-updater-download-install",
+    "process:allow-restart",
     "allow-onboarding-status",
     "allow-onboarding-next",
     "allow-onboarding-complete",

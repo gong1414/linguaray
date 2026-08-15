@@ -148,31 +148,64 @@ that the Windows-specific code compiles and tests pass on the real platform
 `cargo test` (integration tests + the real-clipboard `#[ignore]` tests via
 `--ignored`), frontend build + `tsc --noEmit`.
 
-### `release.yml` — release workflow (dual mode)
+### `release.yml` — release workflow (three modes)
 
 **Trigger 1: `workflow_dispatch` → UNSIGNED dry-run.**
 
 - Runs the full 3-platform matrix (macos-latest arm64, macos-15-intel,
-  windows-latest x64).
-- Builds **unsigned** bundles. No secrets required.
-- Uploads artifacts tagged `linguaray-UNSIGNED-*`.
-- Does **NOT** create a GitHub Release.
-- **UNSIGNED artifacts must NOT be distributed to end users** — they lack macOS
-  codesign/notarization (Gatekeeper will block them) and Windows Authenticode
-  (SmartScreen will warn). Use this mode only to validate the build matrix.
+  windows-latest x64), including the minisign updater artifacts.
+- Requires the `TAURI_SIGNING_PRIVATE_KEY` secrets (see below).
+- Uploads artifacts tagged `linguaray-UNSIGNED-*`. Does **NOT** create a
+  GitHub Release.
+- Dry-run artifacts are for build-matrix validation only — they are not
+  release assets. The official distribution channel is the tag path below.
 
-**Trigger 2: `push tag v*` → SIGNED official release.**
+**Trigger 2: `push tag v*` → OFFICIAL UNSIGNED release (default).**
 
-- Same 3-platform matrix, but with signing.
-- **Fail-closed**: if any signing secret is missing, the build **fails immediately**
-  with a clear error — it NEVER silently produces an unsigned bundle on a tag release.
+- Installers ship **unsigned** (first-launch OS warnings — see Install); the
+  updater payloads are **minisign-signed**, and auto-update integrity is
+  guaranteed by the embedded updater pubkey, not by installer signing.
+- Fail-closed gates before any build minute: the tag MUST match
+  `tauri.conf.json` `version`, the updater key MUST be configured, and every
+  platform MUST produce its updater payload + `.sig`.
+- After all 3 platforms pass, a job assembles `latest.json` (fails if ANY
+  platform/signature is missing) and publishes the release as a
+  **prerelease**. Promote to stable manually — the updater endpoint
+  (`releases/latest/download/latest.json`) only serves promoted releases, so
+  clients never see an unreviewed build.
+
+**Trigger 3: `push tag v*` + repository variable `OS_SIGNING=true` → OFFICIAL SIGNED release.**
+
 - macOS: cert import → keychain → codesign → notarization → stapling.
-- Windows: PFX import → Authenticode (`certificateThumbprint` overlay).
-- A GitHub Release is created **only after all 3 platforms succeed**.
+- Windows: PFX import → Authenticode (`certificateThumbprint` overlay) +
+  signature verification.
+- Fail-closed: missing ANY of the 9 OS-signing secrets fails the build —
+  a signing-enabled repo never silently produces unsigned installers.
 
 ## Release: signing secrets
 
-### macOS (7 secrets)
+### Tauri updater key (REQUIRED — all modes)
+
+| Secret | Purpose |
+|--------|---------|
+| `TAURI_SIGNING_PRIVATE_KEY` | Minisign private key (`pnpm tauri signer generate`) — signs the auto-update payloads |
+| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Password for that key (empty if generated without one) |
+
+These sign the **updater bundle**, NOT the installer. The matching public key
+is compiled into the app (`plugins.updater.pubkey` in `tauri.conf.json`).
+Losing the private key means no more updates for released clients — back it
+up. Do NOT conflate with the OS-signing certificates below.
+
+### OS signing (OPTIONAL — only when `OS_SIGNING=true`)
+
+Enables Gatekeeper/SmartScreen-free installs. macOS (7 secrets):
+`APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `KEYCHAIN_PASSWORD`,
+`APPLE_SIGNING_IDENTITY`, `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID`.
+Windows (2): `WINDOWS_CERTIFICATE_PFX`, `WINDOWS_CERTIFICATE_PASSWORD`.
+All 9 are required together in signed mode (fail-closed). See the tables
+further down for their exact meanings.
+
+### macOS OS-signing secrets (reference)
 
 | Secret | Purpose |
 |--------|---------|
@@ -184,42 +217,38 @@ that the Windows-specific code compiles and tests pass on the real platform
 | `APPLE_PASSWORD` | App-specific password for notarization |
 | `APPLE_TEAM_ID` | Apple Developer Team ID |
 
-### Windows (2 secrets)
+### Windows OS-signing secrets (reference)
 
 | Secret | Purpose |
 |--------|---------|
 | `WINDOWS_CERTIFICATE_PFX` | Base64-encoded PFX Authenticode certificate |
-| `WINDOWS_CERTIFICATE_PASSWORD` | Password for the PFX file |
-
-### Tauri updater key (separate, not for release signing)
-
-`TAURI_SIGNING_PRIVATE_KEY` / `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` sign the
-**updater bundle** (the auto-update mechanism), NOT the installer. They are a
-completely separate key pair from the Apple/Windows signing certificates above.
-Do NOT conflate them.
+| `WINDOWS_CERTIFICATE_PASSWORD` | Password for the PFX |
 
 ## Release: artifact types
 
-| Platform | Target | Artifacts |
-|----------|--------|-----------|
-| macOS arm64 | `aarch64-apple-darwin` | `.dmg` (disk image), `.app` (inside the DMG) |
-| macOS Intel | `x86_64-apple-darwin` | `.dmg`, `.app` |
-| Windows x64 | `x86_64-pc-windows-msvc` | `.msi` (installer), `.exe` (NSIS installer) |
+| Platform | Target | Download assets | Updater payload (in `latest.json`) |
+|----------|--------|-----------------|------------------------------------|
+| macOS arm64 | `aarch64-apple-darwin` | `.dmg` | `*_aarch64.app.tar.gz` + `.sig` |
+| macOS Intel | `x86_64-apple-darwin` | `.dmg` | `*_x64.app.tar.gz` + `.sig` |
+| Windows x64 | `x86_64-pc-windows-msvc` | `.msi`, `*_x64-setup.exe` (NSIS per-user) | `*_x64-setup.exe` + `.sig` |
 
-## Release: commands and verification
-
-### Triggering a release
+## Release: runbook
 
 ```bash
-# Unsigned dry-run (validates the build matrix, no Release created):
-# GitHub → Actions → "release" → "Run workflow"
-
-# Signed official release (creates a GitHub Release with signed artifacts):
+# 1. Bump version in src-tauri/tauri.conf.json, commit to main.
+# 2. Tag + push (tag MUST equal the config version):
 git tag v0.1.0
 git push origin v0.1.0
+# 3. CI publishes a PRERELEASE with installers + updater payloads + latest.json.
+# 4. Verify the artifacts (download .dmg/.msi, launch, check Settings → Updater
+#    reports "up to date"), then promote the release to stable in the GitHub UI.
+#    Promotion is what serves latest.json to auto-updating clients.
 ```
 
-### Verifying signatures
+Unsigned dry-run (matrix validation, no Release created):
+GitHub → Actions → "release" → "Run workflow".
+
+### Verifying signatures (signed mode only)
 
 **macOS** (after downloading the `.dmg`):
 

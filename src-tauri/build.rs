@@ -65,6 +65,7 @@ fn main() {
             "external_api_disable",
             "external_api_regenerate_token",
             "updater_check",
+            "updater_download_install",
             "onboarding_status",
             "onboarding_next",
             "onboarding_complete",

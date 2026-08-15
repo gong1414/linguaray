@@ -575,6 +575,7 @@ fn switch_handler_does_not_call_gen_next() {
         tray: Arc::new(parking_lot::Mutex::new(
             TrayStateController::with_renderer(renderer.clone(), Locale::En),
         )),
+        update_install_in_flight: std::sync::atomic::AtomicBool::new(false),
     });
 
     let token = GenerationToken::new();

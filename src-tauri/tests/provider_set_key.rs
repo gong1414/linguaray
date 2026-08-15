@@ -73,6 +73,7 @@ impl Harness {
             keystore_dir: keystore_dir.clone(),
             settings_path: None,
             tray: Arc::new(parking_lot::Mutex::new(test_tray())),
+            update_install_in_flight: std::sync::atomic::AtomicBool::new(false),
         });
         Self {
             _dir: dir,

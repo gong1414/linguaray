@@ -1,14 +1,22 @@
-# Release workflow — dual mode (Task 5):
+# Release workflow — three modes (R5):
 #
-# 1. workflow_dispatch → UNSIGNED dry-run: builds all three platforms, uploads artifacts
-#    tagged UNSIGNED, no GitHub Release, no secrets required. For validating the matrix.
+# 1. workflow_dispatch → UNSIGNED dry-run: validates the full 3-platform
+#    matrix INCLUDING the minisign updater artifacts. No GitHub Release.
 #
-# 2. push tag v* → SIGNED official release: Apple codesign + notarization + stapling,
-#    Windows Authenticode. Fail-closed if secrets missing — NEVER silently downgrade to
-#    unsigned on a tag release. Creates a GitHub Release only after all platforms pass.
+# 2. push tag v* (default) → OFFICIAL UNSIGNED release: unsigned installers +
+#    minisign-signed updater payloads + latest.json, published as a PRERELEASE
+#    for manual promotion. Unsigned installers trigger first-launch OS
+#    warnings (README Install documents the exact click-through).
 #
-# Tauri's macOS distribution REQUIRES signing + notarization for off-App-Store distribution.
-# TAURI_SIGNING_PRIVATE_KEY* (updater key) is separate from Authenticode — do NOT conflate.
+# 3. push tag v* with repository variable OS_SIGNING=true → OFFICIAL SIGNED
+#    release: Apple codesign + notarization + stapling, Windows Authenticode.
+#    Fail-closed if ANY OS-signing secret is missing — never a silent
+#    downgrade on a signing-enabled repo.
+#
+# In EVERY mode the Tauri updater key is REQUIRED (createUpdaterArtifacts is
+# on — the build fails without it) and publishing fails unless every platform
+# produced a .sig. The updater key is separate from OS signing: it protects
+# auto-update integrity, which does not depend on installer signing.
 
 name: release
 
@@ -31,18 +39,28 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  # Determine mode: tag push = signed release; workflow_dispatch = unsigned dry-run.
+  # Mode resolution:
+  #   official = tag push (dry-run dispatch publishes nothing)
+  #   signed   = tag push AND vars.OS_SIGNING == 'true'
   mode:
     runs-on: ubuntu-latest
     outputs:
+      official: ${{ steps.set-mode.outputs.official }}
       signed: ${{ steps.set-mode.outputs.signed }}
     steps:
       - id: set-mode
         run: |
           if [ "${{ github.event_name }}" = "push" ]; then
-            echo "signed=true" >> "$GITHUB_OUTPUT"
-            echo "Mode: SIGNED release (tag push)"
+            echo "official=true" >> "$GITHUB_OUTPUT"
+            if [ "${{ vars.OS_SIGNING }}" = "true" ]; then
+              echo "signed=true" >> "$GITHUB_OUTPUT"
+              echo "Mode: OFFICIAL SIGNED release (tag + OS_SIGNING)"
+            else
+              echo "signed=false" >> "$GITHUB_OUTPUT"
+              echo "Mode: OFFICIAL UNSIGNED release (tag; installers unsigned, updater minisign-signed)"
+            fi
           else
+            echo "official=false" >> "$GITHUB_OUTPUT"
             echo "signed=false" >> "$GITHUB_OUTPUT"
             echo "Mode: UNSIGNED dry-run (workflow_dispatch)"
           fi
@@ -64,6 +82,11 @@ jobs:
             label: windows-x64
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
+    env:
+      # Updater key: required in ALL modes (see header). Consumed by
+      # `tauri build` itself when it signs the updater artifacts.
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
     steps:
       - uses: actions/checkout@v4
@@ -92,18 +115,39 @@ jobs:
       - name: Install frontend deps
         run: pnpm install --frozen-lockfile
 
-      # ── UNSIGNED dry-run path (workflow_dispatch) ──────────────────────────────
-      # Builds unsigned; no secrets needed. Artifacts tagged UNSIGNED.
-      # Do NOT set APPLE_SIGNING_IDENTITY (even to "") — Tauri interprets an empty-but-set
-      # value as "sign with empty identity" and fails codesign. Leaving it unset lets Tauri
-      # skip macOS signing entirely.
-      - name: Build (unsigned dry-run)
+      # ── Fail-closed gates (before any build minute is spent) ──────────────────
+      - name: "Gate: tag must match tauri.conf.json version"
+        if: needs.mode.outputs.official == 'true'
+        working-directory: src-tauri
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          CONF_VERSION=$(node -p "require('./tauri.conf.json').version")
+          if [ "$TAG_VERSION" != "$CONF_VERSION" ]; then
+            echo "::error::tag ${GITHUB_REF_NAME} (version ${TAG_VERSION}) != tauri.conf.json version ${CONF_VERSION} — bump the config, then re-tag"
+            exit 1
+          fi
+          echo "✓ tag matches tauri.conf.json version ${CONF_VERSION}"
+
+      - name: "Gate: Tauri updater key configured"
+        shell: bash
+        run: |
+          if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            echo "::error::TAURI_SIGNING_PRIVATE_KEY secret is missing — createUpdaterArtifacts is enabled, so every build mode needs the updater key"
+            exit 1
+          fi
+          echo "✓ updater signing key present"
+
+      # ── Build: dry-run + official-unsigned share this step ────────────────────
+      # Do NOT set APPLE_SIGNING_IDENTITY (even to "") — Tauri interprets an
+      # empty-but-set value as "sign with empty identity" and fails codesign.
+      # Leaving it unset lets Tauri skip macOS OS signing entirely; the updater
+      # artifacts still get minisign-signed via the env above.
+      - name: Build (unsigned — dry-run or official unsigned)
         if: needs.mode.outputs.signed != 'true'
         working-directory: src-tauri
         run: pnpm tauri build --target ${{ matrix.target }}
 
-      # ── SIGNED release path (tag push) ──────────────────────────────────────────
-      # macOS: import cert → keychain → codesign → notarize → staple. Secrets required.
+      # ── SIGNED path (tag + OS_SIGNING=true) ───────────────────────────────────
       - name: Import signing cert + build (macOS, signed)
         if: needs.mode.outputs.signed == 'true' && startsWith(matrix.os, 'macos')
         env:
@@ -115,11 +159,11 @@ jobs:
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
-          # Fail-closed: tag release MUST have all macOS secrets.
+          # Fail-closed: signed mode MUST have all macOS secrets.
           for var in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD KEYCHAIN_PASSWORD \
                      APPLE_SIGNING_IDENTITY APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
             if [ -z "${!var}" ]; then
-              echo "::error::$var secret is missing — tag releases MUST be signed (fail-closed)"
+              echo "::error::$var secret is missing — OS_SIGNING=true demands full OS signing (fail-closed)"
               exit 1
             fi
           done
@@ -146,25 +190,25 @@ jobs:
           security delete-keychain build.keychain || true
           rm -f "$RUNNER_TEMP/linguaray-cert.p12"
 
-      # Windows: import PFX → Authenticode via certificateThumbprint overlay. Secrets required.
+      # Windows: import PFX → Authenticode via certificateThumbprint overlay.
       - name: Import PFX + build (Windows, signed)
         if: needs.mode.outputs.signed == 'true' && matrix.os == 'windows-latest'
         env:
           WINDOWS_CERTIFICATE_PFX: ${{ secrets.WINDOWS_CERTIFICATE_PFX }}
           WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
         run: |
-          # Fail-closed: tag release MUST have BOTH Windows signing secrets.
+          # Fail-closed: signed mode MUST have BOTH Windows signing secrets.
           if (-not $env:WINDOWS_CERTIFICATE_PFX) {
-            Write-Error "WINDOWS_CERTIFICATE_PFX secret is missing — tag releases MUST be signed (fail-closed)"
+            Write-Error "WINDOWS_CERTIFICATE_PFX secret is missing — OS_SIGNING=true demands full OS signing (fail-closed)"
             exit 1
           }
           if (-not $env:WINDOWS_CERTIFICATE_PASSWORD) {
-            Write-Error "WINDOWS_CERTIFICATE_PASSWORD secret is missing — tag releases MUST be signed (fail-closed)"
+            Write-Error "WINDOWS_CERTIFICATE_PASSWORD secret is missing — OS_SIGNING=true demands full OS signing (fail-closed)"
             exit 1
           }
           $certPath = "$env:RUNNER_TEMP\linguaray-cert.pfx"
           [System.Convert]::FromBase64String("$env:WINDOWS_CERTIFICATE_PFX") | Set-Content $certPath -AsByteStream
-          $imported = Import-PfxCertificate -CertStoreLocation Cert:\CurrentUser\My -FilePath $certPath -Password (ConvertTo-SecureString -String $env:WINDOWS_CERTIFICATE_PASSWORD -AsPlainText -Force)
+          $imported = Import-PfxCertificate -CertStoreLocation Cert:\CurrentUser\My -FilePath $certPath -Password (ConvertTo-SecureString -String "$env:WINDOWS_CERTIFICATE_PASSWORD" -AsPlainText -Force)
           $thumbprint = $imported.Thumbprint
           # Write overlay config to a FILE (no inline JSON quoting issues).
           $config = @{ bundle = @{ windows = @{ certificateThumbprint = $thumbprint; digestAlgorithm = "sha256"; timestampUrl = "http://timestamp.digicert.com" } } }
@@ -245,12 +289,35 @@ jobs:
           }
           Write-Host "✓ linguaray.exe is the main binary"
 
+      # ── Updater artifact gate: every platform must produce its minisign
+      # payloads (.app.tar.gz on macOS, -setup.exe on Windows) + .sig files.
+      # A platform that silently skipped signing must fail HERE, not at users.
+      - name: Verify updater artifacts (all modes)
+        shell: bash
+        run: |
+          BUNDLE="src-tauri/target/${{ matrix.target }}/release/bundle"
+          sigs=$(find "$BUNDLE" -name "*.sig" -type f | wc -l | tr -d ' ')
+          if [ "$sigs" -eq 0 ]; then
+            echo "::error::no .sig updater signatures under $BUNDLE — the updater key step passed but Tauri produced no signed artifacts"
+            exit 1
+          fi
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            find "$BUNDLE" -name "*.app.tar.gz" -type f | grep -q . \
+              || { echo "::error::macOS build produced no .app.tar.gz updater payload"; exit 1; }
+          fi
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            find "$BUNDLE" -name "*-setup.exe" -type f | grep -q . \
+              || { echo "::error::Windows build produced no NSIS -setup.exe updater payload"; exit 1; }
+          fi
+          echo "✓ updater artifacts + $sigs signature file(s) present"
+
       # ── Artifact upload ─────────────────────────────────────────────────────────
-      # Upload ONLY installers (.dmg on macOS, .msi/.exe on Windows). Do NOT upload
-      # bare .app directories — upload-artifact loses file permissions, making the app
-      # un-runnable. Users get the .app inside the .dmg.
+      # Installers + updater payloads (.app.tar.gz / -setup.exe + .sig) in every
+      # mode. Do NOT upload bare .app directories — upload-artifact loses file
+      # permissions, making the app un-runnable. Users get the .app inside the
+      # .dmg; the updater fetches the .tar.gz by itself.
       - name: Upload artifacts (UNSIGNED dry-run)
-        if: needs.mode.outputs.signed != 'true'
+        if: needs.mode.outputs.official != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: linguaray-UNSIGNED-${{ matrix.label }}
@@ -258,40 +325,63 @@ jobs:
             src-tauri/target/${{ matrix.target }}/release/bundle/**/*.dmg
             src-tauri/target/${{ matrix.target }}/release/bundle/**/*.msi
             src-tauri/target/${{ matrix.target }}/release/bundle/**/*.exe
+            src-tauri/target/${{ matrix.target }}/release/bundle/**/*.app.tar.gz
+            src-tauri/target/${{ matrix.target }}/release/bundle/**/*.sig
           if-no-files-found: error
 
-      - name: Upload artifacts (signed release)
-        if: needs.mode.outputs.signed == 'true'
+      - name: Upload artifacts (official release)
+        if: needs.mode.outputs.official == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: linguaray-signed-${{ matrix.label }}
+          name: linguaray-official-${{ matrix.label }}
           path: |
             src-tauri/target/${{ matrix.target }}/release/bundle/**/*.dmg
             src-tauri/target/${{ matrix.target }}/release/bundle/**/*.msi
             src-tauri/target/${{ matrix.target }}/release/bundle/**/*.exe
+            src-tauri/target/${{ matrix.target }}/release/bundle/**/*.app.tar.gz
+            src-tauri/target/${{ matrix.target }}/release/bundle/**/*.sig
           if-no-files-found: error
 
-  # ── GitHub Release (tag push only, after ALL platforms pass) ─────────────────────
-  release:
+  # ── Publish (tag push only, after ALL platforms pass) ─────────────────────────
+  # 1. Assemble latest.json — fail-closed on ANY missing platform/signature
+  #    (scripts/assemble-latest-json.mjs, unit-tested in-repo).
+  # 2. Publish everything as a PRELEASE. Promotion to a stable release is a
+  #    HUMAN step — and the updater endpoint is releases/latest/download/, so
+  #    clients only ever see promoted releases.
+  publish:
     needs: [mode, build]
-    if: needs.mode.outputs.signed == 'true'
+    if: needs.mode.outputs.official == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download all signed artifacts
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Download all official artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: linguaray-signed-*
+          pattern: linguaray-official-*
           merge-multiple: true
           path: artifacts
 
-      - name: Create GitHub Release
+      - name: Assemble latest.json (fail-closed)
+        run: |
+          ls -la artifacts
+          node scripts/assemble-latest-json.mjs \
+            artifacts "$GITHUB_REF_NAME" "$GITHUB_REPOSITORY" latest.json
+          cat latest.json
+
+      - name: Publish GitHub Release (prerelease — promote manually)
         uses: softprops/action-gh-release@v2
         with:
-          files: artifacts/**
+          files: |
+            artifacts/*
+            latest.json
           generate_release_notes: true
           draft: false
-          prerelease: ${{ contains(github.ref_name, '-') }}
+          prerelease: true

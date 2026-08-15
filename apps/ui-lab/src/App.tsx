@@ -23,6 +23,8 @@ import SettingsShell, {
 } from "@app/features/settings/SettingsShell";
 import { PrivacyDataView } from "@app/features/settings/PrivacyData";
 import { ShortcutsView } from "@app/features/settings/Shortcuts";
+import { UpdaterPanelView } from "@app/features/settings/UpdaterPanel";
+import type { UpdaterPhase } from "@app/features/settings/updater-types";
 import { SHORTCUTS_COPY } from "@app/features/settings/shortcuts-copy";
 import type { ShortcutSnapshot } from "@app/features/settings/shortcut-types";
 import "./App.css";
@@ -58,9 +60,27 @@ type NavKey =
   | "confirm-isolated"
   | "settings-keyboard";
 
+// R5 updater prototype: every phase of the production machine as a fixture
+// (URL ?fixture=<key>; "autocheck-off" also exercises the toggle error path).
+const UPDATER_AVAILABLE = {
+  state: "available" as const,
+  current: "0.1.0",
+  next: "0.2.0",
+  notes: "• In-app auto-update (minisign-signed)\n• New Updater settings section\n• Tray Check-for-Updates entry",
+};
+const UPDATER_FIXTURES: Record<string, UpdaterPhase> = {
+  available: { kind: "available", update: UPDATER_AVAILABLE },
+  "up-to-date": { kind: "upToDate", version: "0.1.0" },
+  downloading: { kind: "downloading", update: UPDATER_AVAILABLE, percent: 62, downloaded: 6_200_000 },
+  installing: { kind: "installing", update: UPDATER_AVAILABLE },
+  ready: { kind: "readyToRelaunch", update: UPDATER_AVAILABLE },
+  error: { kind: "error", message: "update check failed: network unreachable" },
+  checking: { kind: "checking" },
+  "autocheck-off": { kind: "upToDate", version: "0.1.0" },
+};
+
 // Complete S0 §4.1 state matrix.
-const SELECTION_STATES: SelectionState[] = [
-  "initial-hidden",
+const SELECTION_STATES: SelectionState[] = [  "initial-hidden",
   "loading",
   "success-single",
   "success-dual",
@@ -486,6 +506,27 @@ const App: Component = () => {
                   onCloseClear={() => {}}
                   onConfirmClear={() => {}}
                   onDismissToast={() => {}}
+                />
+              </div>
+            </Match>
+
+            <Match when={nav() === "updater"}>
+              <div
+                class="lab__frame lab__frame--settings"
+                style={{ width: "800px", height: "600px" }}
+              >
+                <UpdaterPanelView
+                  phase={UPDATER_FIXTURES[params.get("fixture") ?? "available"]}
+                  autoCheck={params.get("fixture") !== "autocheck-off"}
+                  autoCheckError={
+                    params.get("fixture") === "autocheck-off"
+                      ? "set_setting: store locked"
+                      : null
+                  }
+                  onCheck={() => {}}
+                  onInstall={() => {}}
+                  onRelaunch={() => {}}
+                  onToggleAutoCheck={() => {}}
                 />
               </div>
             </Match>

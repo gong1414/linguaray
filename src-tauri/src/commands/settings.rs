@@ -39,6 +39,9 @@ pub fn set_setting(app: tauri::AppHandle, key: String, value: String) -> Result<
                 return Err(format!("unknown fallback engine: {value}"));
             }
         }
+        "check_updates_on_startup" => {
+            s.check_updates_on_startup = crate::settings::parse_bool_setting(&value)?;
+        }
         _ => return Err(format!("unknown setting: {key}")),
     }
     crate::settings::save(&app, &s)

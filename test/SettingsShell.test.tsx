@@ -106,7 +106,8 @@ describe("SettingsShell", () => {
     installMatchMedia(false);
     const { container } = render(() => <SettingsShell>body</SettingsShell>);
     const buttons = container.querySelectorAll("nav button");
-    expect(buttons.length).toBe(7);
+    // 8 nav items after R5 added the Updater section.
+    expect(buttons.length).toBe(8);
     for (const btn of Array.from(buttons)) {
       const label = (btn.getAttribute("aria-label") ?? "").trim();
       const text = (btn.textContent ?? "").trim();

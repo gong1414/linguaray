@@ -41,6 +41,9 @@ const SETTINGS_SURFACES = [
   { nav: "shortcuts", fixture: "recording", label: "shortcuts-recording" },
   { nav: "shortcuts", fixture: "conflict", label: "shortcuts-conflict" },
   { nav: "shortcuts", fixture: "failure", label: "shortcuts-registration-failed" },
+  { nav: "updater", fixture: "available", label: "updater-available" },
+  { nav: "updater", fixture: "downloading", label: "updater-downloading" },
+  { nav: "updater", fixture: "error", label: "updater-error" },
 ] as const;
 
 const POPUP_SURFACES = [
@@ -70,7 +73,7 @@ for (const width of WIDTHS) {
           document.documentElement.setAttribute("data-theme", tt);
         }, theme);
         await page.waitForSelector(
-          "[data-testid='lab-root'], .pc__body, .keystore-recovery, .privacy-data, .shortcuts",
+          "[data-testid='lab-root'], .pc__body, .keystore-recovery, .privacy-data, .shortcuts, .updater-panel",
           { timeout: 10_000 },
         );
         await expect(page).toHaveScreenshot(`${s.label}-${width}-${theme}.png`, {

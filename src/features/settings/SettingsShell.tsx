@@ -7,7 +7,7 @@ import {
   type JSX,
 } from "solid-js";
 import { invoke } from "@tauri-apps/api/core";
-import { Server, ShieldCheck, Keyboard, ShieldAlert, History, BookOpen, BookMarked } from "lucide-solid";
+import { Server, ShieldCheck, Keyboard, ShieldAlert, History, BookOpen, BookMarked, RefreshCw } from "lucide-solid";
 import { WindowChrome, SidebarItem, Tooltip } from "@linguaray/ui";
 import { SETTINGS_COPY } from "./copy";
 import { detectLocale } from "../../i18n";
@@ -20,7 +20,8 @@ export type SettingsSection =
   | "privacy"
   | "history"
   | "vocabulary"
-  | "dictionary";
+  | "dictionary"
+  | "updater";
 
 export type SettingsShellProps = {
   /** Initial active section (default: "provider-center"). */
@@ -86,6 +87,7 @@ const SettingsShell: Component<SettingsShellProps> = (props) => {
     { id: "history", label: t.nav.history, icon: <History size={16} />, disabled: false },
     { id: "vocabulary", label: t.nav.vocabulary, icon: <BookMarked size={16} />, disabled: false },
     { id: "dictionary", label: t.nav.dictionary, icon: <BookOpen size={16} />, disabled: false },
+    { id: "updater", label: t.nav.updater, icon: <RefreshCw size={16} />, disabled: false },
   ];
 
   // macOS Accessibility permission. null = unknown (pre-first-resolve), true =

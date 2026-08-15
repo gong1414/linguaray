@@ -32,6 +32,7 @@ type NavCopy = {
   history: string;
   vocabulary: string;
   dictionary: string;
+  updater: string;
   /** Tooltip shown for the disabled R3b placeholder items. */
   placeholderHint: string;
 };
@@ -270,6 +271,7 @@ const EN: SettingsCopy = {
     history: "History",
     vocabulary: "Vocabulary",
     dictionary: "Dictionary",
+    updater: "Updater",
     placeholderHint: "Coming later",
   },
   a11y: {
@@ -414,6 +416,7 @@ const ZH: SettingsCopy = {
     history: "历史",
     vocabulary: "生词本",
     dictionary: "词典",
+    updater: "检查更新",
     placeholderHint: "即将推出",
   },
   a11y: {

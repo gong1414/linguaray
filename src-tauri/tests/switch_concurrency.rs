@@ -29,6 +29,7 @@ fn fresh_app_state(dir: &tempfile::TempDir) -> Arc<linguaray_lib::AppState> {
         tray: Arc::new(parking_lot::Mutex::new(
             TrayStateController::with_renderer(renderer, Locale::En),
         )),
+        update_install_in_flight: std::sync::atomic::AtomicBool::new(false),
     })
 }
 

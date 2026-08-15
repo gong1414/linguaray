@@ -18,6 +18,7 @@ import PrivacyData from "./features/settings/PrivacyData";
 import HistoryView from "./features/settings/HistoryView";
 import VocabularyView from "./features/settings/VocabularyView";
 import DictionaryView from "./features/settings/DictionaryView";
+import UpdaterPanel from "./features/settings/UpdaterPanel";
 import { SETTINGS_COPY } from "./features/settings/copy";
 import { translateSelection, translateClipboard } from "./features/translation/selection-ipc";
 import { detectLocale } from "./i18n";
@@ -85,6 +86,8 @@ const App: Component = () => {
         <VocabularyView />
       ) : activePage() === "dictionary" ? (
         <DictionaryView />
+      ) : activePage() === "updater" ? (
+        <UpdaterPanel />
       ) : (
         <section class="app__placeholder" aria-label={t.nav.placeholderHint}>
           <p>{t.nav.placeholderHint}</p>
