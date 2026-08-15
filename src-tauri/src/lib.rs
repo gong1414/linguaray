@@ -1376,12 +1376,27 @@ pub fn run() {
             }
 
             // Testability hook (hygiene-6): the screenshot-baseline script
-            // launches the packaged app with this env var to surface the
-            // normally tray-hidden main window without UI automation.
-            if std::env::var_os("LINGUARAY_AUTOSHOW_MAIN").is_some() {
-                if let Some(w) = app.get_webview_window("main") {
-                    let _ = w.show();
-                    let _ = w.set_focus();
+            // launches the packaged app with one of these env vars to surface
+            // a normally hidden window without UI automation (tray-hidden
+            // main, consent-gated input, event-driven popup) or to build the
+            // on-demand OCR overlay exactly like the Windows capture path.
+            for (var, label) in [
+                ("LINGUARAY_AUTOSHOW_MAIN", "main"),
+                ("LINGUARAY_AUTOSHOW_INPUT", "input"),
+                ("LINGUARAY_AUTOSHOW_POPUP", "popup"),
+            ] {
+                if std::env::var_os(var).is_some() {
+                    if let Some(w) = app.get_webview_window(label) {
+                        let _ = w.show();
+                        let _ = w.set_focus();
+                    }
+                }
+            }
+            if std::env::var_os("LINGUARAY_AUTOSHOW_OCR").is_some() {
+                if let Err(e) = tauri::async_runtime::block_on(
+                    crate::commands::ocr::ensure_overlay_window(app.handle()),
+                ) {
+                    log::error!("autoshow ocr overlay: {e}");
                 }
             }
             Ok(())

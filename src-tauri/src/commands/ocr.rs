@@ -144,12 +144,9 @@ async fn run_capture(
     Ok(())
 }
 
-#[cfg(target_os = "windows")]
-async fn run_capture(
-    app: &tauri::AppHandle,
-    _session: &Arc<Session>,
-    _app_state: &Arc<AppState>,
-) -> Result<(), String> {
+/// Build (or surface) the on-demand OCR overlay window. Shared by the Windows
+/// capture path and the LINGUARAY_AUTOSHOW_OCR testability hook.
+pub(crate) async fn ensure_overlay_window(app: &tauri::AppHandle) -> Result<(), String> {
     use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
     if let Some(w) = app.get_webview_window("ocr") {
         // Overlay from a previous trigger still open — bring it forward
@@ -173,6 +170,15 @@ async fn run_capture(
         .build()
         .map_err(|e| format!("ocr overlay build: {e}"))?;
     Ok(())
+}
+
+#[cfg(target_os = "windows")]
+async fn run_capture(
+    app: &tauri::AppHandle,
+    _session: &Arc<Session>,
+    _app_state: &Arc<AppState>,
+) -> Result<(), String> {
+    ensure_overlay_window(app).await
 }
 
 #[cfg(test)]
