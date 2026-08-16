@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-external-api-regenerate-token"
+description = "Enables the external_api_regenerate_token command without any pre-configured scope."
+commands.allow = ["external_api_regenerate_token"]
+
+[[permission]]
+identifier = "deny-external-api-regenerate-token"
+description = "Denies the external_api_regenerate_token command without any pre-configured scope."
+commands.deny = ["external_api_regenerate_token"]

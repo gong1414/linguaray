@@ -1,0 +1,67 @@
+name: Storybook Test Runner
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: storybook-test-runner-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-storybook:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.18.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Storybook
+        run: pnpm build-storybook
+
+      - name: Install Chromium
+        run: pnpm exec playwright install chromium --with-deps
+
+      - name: Run Storybook test runner
+        shell: bash
+        run: |
+          pnpm exec http-server storybook-static --port 6006 --silent &
+          storybook_pid=$!
+          trap 'kill "$storybook_pid"' EXIT
+
+          ready=false
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:6006/index.json >/dev/null; then
+              ready=true
+              break
+            fi
+            sleep 1
+          done
+
+          if [[ "$ready" != "true" ]]; then
+            echo "Storybook did not become ready"
+            exit 1
+          fi
+
+          pnpm test-storybook --url http://127.0.0.1:6006

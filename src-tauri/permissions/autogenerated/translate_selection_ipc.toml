@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-translate-selection-ipc"
+description = "Enables the translate_selection_ipc command without any pre-configured scope."
+commands.allow = ["translate_selection_ipc"]
+
+[[permission]]
+identifier = "deny-translate-selection-ipc"
+description = "Denies the translate_selection_ipc command without any pre-configured scope."
+commands.deny = ["translate_selection_ipc"]

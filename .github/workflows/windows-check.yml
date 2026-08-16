@@ -1,0 +1,122 @@
+# Windows build/lint gate — NO signing, NO release, NO secrets required.
+#
+# Purpose: give the Windows-only code (Phase 4 Tasks 1, 2, 2b) a gate it can be
+# validated against as it lands, instead of merging blind. cargo check/test/clippy
+# run the Rust that compiles on Windows (macOS-only deps are cfg-gated out);
+# pnpm build + tsc validate the frontend. This is deliberately NOT a release
+# workflow — Task 5 adds signing/notarization/artifact upload on tag.
+#
+# Runs on every push and pull_request to main. Cheap to re-run; cached.
+name: LinguaRay Windows Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Cancel superseded runs on the same ref (PRs churn fast).
+concurrency:
+  group: linguaray-windows-check-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  # Windows linking debuginfo dominates wall-clock; line tables keep
+  # useful backtraces without a full PDB for every crate.
+  RUSTFLAGS: "-C debuginfo=line-tables-only"
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 75
+
+    steps:
+      - uses: actions/checkout@v7
+
+      # Match package.json's packageManager exactly.
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 11.18.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Setup Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      # Cache the Windows cargo target dir keyed on Cargo.lock + rustc hash.
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install frontend deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Frontend build (Vite)
+        run: pnpm build
+
+      - name: Frontend type-check (tsc)
+        run: pnpm exec tsc --noEmit
+
+      - name: Generated Tauri bindings are current
+        run: pnpm bindings:check
+
+      # Clippy typechecks --all-targets; a separate cargo check on Windows
+      # roughly doubles compile time and was causing the 30-minute job
+      # timeout before tests started.
+      - name: cargo clippy --all-targets (-D warnings)
+        working-directory: src-tauri
+        # --features xproc-test-helper: build the test helper bin so CARGO_BIN_EXE resolves.
+        run: cargo clippy --all-targets --locked --features xproc-test-helper -- -D warnings
+
+      - name: cargo test (integration tests only, skip lib binary)
+        working-directory: src-tauri
+        # The lib unittest binary links WinRT DLLs (Media_Ocr,
+        # Media_SpeechSynthesis) that don't exist on Windows Server runners,
+        # causing STATUS_ENTRYPOINT_NOT_FOUND at process start. Cargo's
+        # --tests flag still includes the lib target, so we enumerate the
+        # integration test binaries explicitly instead. The lib tests are
+        # platform-agnostic (readiness, HTTP, data types) and fully covered
+        # on the macOS dev machine.
+        run: >
+          cargo test --locked --features xproc-test-helper --no-fail-fast
+          --test adapter --test backup_fault --test balance_fetch
+          --test capabilities --test catalog_smoke
+          --test connection_latency --test db_schema
+          --test delete_state_machine --test dictionary_lookup
+          --test dictionary_mdx --test dictionary_package
+          --test dictionary_stardict --test export_path
+          --test external_api --test fallback --test google
+          --test history_crypto --test history_export
+          --test history_persistence --test history_repository
+          --test history_search --test hotkey_session
+          --test keystore --test keystore_v2 --test migration
+          --test ocr_recognize --test popup_geometry
+          --test provider_crud --test provider_set_key
+          --test provider_version --test recovery
+          --test selection_engine --test shortcuts
+          --test startup_readiness --test switch_concurrency
+          --test translate_parallel --test translate_session
+          --test tray_refresh --test tray_state --test tts_voices
+          --test url --test vocabulary_anki --test wire
+
+      # The clipboard_win tests are #[ignore]'d because they touch the REAL system
+      # clipboard (round-14 P2 #3: a Windows dev running `cargo test` shouldn't clobber
+      # their clipboard). CI runs them explicitly, single-threaded (they share the
+      # clipboard + a static CLIP_GUARD mutex; --test-threads=1 avoids concurrent OpenClipboard).
+      - name: cargo test clipboard_win (real clipboard, --ignored)
+        working-directory: src-tauri
+        run: cargo test --test clipboard_win --locked --features xproc-test-helper -- --ignored --test-threads=1

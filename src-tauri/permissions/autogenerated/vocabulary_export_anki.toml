@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-vocabulary-export-anki"
+description = "Enables the vocabulary_export_anki command without any pre-configured scope."
+commands.allow = ["vocabulary_export_anki"]
+
+[[permission]]
+identifier = "deny-vocabulary-export-anki"
+description = "Denies the vocabulary_export_anki command without any pre-configured scope."
+commands.deny = ["vocabulary_export_anki"]

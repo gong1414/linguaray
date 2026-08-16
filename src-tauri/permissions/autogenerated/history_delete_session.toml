@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-history-delete-session"
+description = "Enables the history_delete_session command without any pre-configured scope."
+commands.allow = ["history_delete_session"]
+
+[[permission]]
+identifier = "deny-history-delete-session"
+description = "Denies the history_delete_session command without any pre-configured scope."
+commands.deny = ["history_delete_session"]

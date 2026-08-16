@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-provider-delete"
+description = "Enables the provider_delete command without any pre-configured scope."
+commands.allow = ["provider_delete"]
+
+[[permission]]
+identifier = "deny-provider-delete"
+description = "Denies the provider_delete command without any pre-configured scope."
+commands.deny = ["provider_delete"]
