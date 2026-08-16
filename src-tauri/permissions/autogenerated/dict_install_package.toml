@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-dict-install-package"
+description = "Enables the dict_install_package command without any pre-configured scope."
+commands.allow = ["dict_install_package"]
+
+[[permission]]
+identifier = "deny-dict-install-package"
+description = "Denies the dict_install_package command without any pre-configured scope."
+commands.deny = ["dict_install_package"]

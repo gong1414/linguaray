@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-provider-create"
+description = "Enables the provider_create command without any pre-configured scope."
+commands.allow = ["provider_create"]
+
+[[permission]]
+identifier = "deny-provider-create"
+description = "Denies the provider_create command without any pre-configured scope."
+commands.deny = ["provider_create"]

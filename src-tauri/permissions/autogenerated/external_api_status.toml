@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-external-api-status"
+description = "Enables the external_api_status command without any pre-configured scope."
+commands.allow = ["external_api_status"]
+
+[[permission]]
+identifier = "deny-external-api-status"
+description = "Denies the external_api_status command without any pre-configured scope."
+commands.deny = ["external_api_status"]

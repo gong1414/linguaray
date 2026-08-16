@@ -1,0 +1,21 @@
+[package]
+name = "linguaray-kernel"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Generic capability supervisor: Fiber, staging provide, typed leases"
+publish = false
+
+[dependencies]
+futures = "0.3"
+thiserror = "1"
+tokio = { version = "1", default-features = false, features = ["macros", "rt", "sync", "time"] }
+
+[dev-dependencies]
+tokio = { version = "1", default-features = false, features = [
+  "macros",
+  "rt-multi-thread",
+  "sync",
+  "test-util",
+  "time",
+] }

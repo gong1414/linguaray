@@ -1,0 +1,169 @@
+[workspace]
+members = [".", "crates/linguaray-kernel", "crates/linguaray-contracts", "crates/linguaray-catalog"]
+resolver = "2"
+
+[package]
+name = "linguaray"
+version = "0.1.0"
+description = "Open-source, AI-native translation desktop app for macOS and Windows"
+authors = ["gong1414"]
+edition = "2021"
+default-run = "linguaray"
+
+[features]
+default = []
+# Test-only helper binary (keystore cross-process lock test). NOT included in release
+# builds — Tauri bundles only default-feature bins. Test CI passes --features xproc-test-helper.
+xproc-test-helper = []
+
+# Explicit bin declarations so the test helper is feature-gated (auto-discovery would
+# always include it). The main app bin has no required-features.
+[[bin]]
+name = "linguaray"
+path = "src/main.rs"
+
+[[bin]]
+name = "xproc-lock-holder"
+path = "src/bin/xproc-lock-holder.rs"
+required-features = ["xproc-test-helper"]
+
+# These integration tests exercise the test-only RecordingRenderer, which is
+# intentionally absent from production builds. Cargo now skips them in a
+# default test run and includes them in the full feature-enabled CI suite.
+[[test]]
+name = "recovery"
+required-features = ["xproc-test-helper"]
+
+[[test]]
+name = "switch_concurrency"
+required-features = ["xproc-test-helper"]
+
+[[test]]
+name = "tray_state"
+required-features = ["xproc-test-helper"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "linguaray_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+cc = "1"
+# rev-11/rev-12 / Task A5: generate the tray PNGs at build time. Build-only,
+# NOT a runtime dep — the bytes are embedded via include_bytes!(env!("OUT_DIR").
+# rev-12: produces TWO icons — tray-error-32.png (red-dot overlay on the base
+# icon) + tray-active-32.png (dimmed variant for the pulse frame-swap).
+image = { version = "0.25", default-features = false, features = ["png"] }
+
+[dependencies]
+linguaray-contracts = { path = "crates/linguaray-contracts" }
+linguaray-catalog = { path = "crates/linguaray-catalog" }
+linguaray-kernel = { path = "crates/linguaray-kernel" }
+tauri = { version = "2", features = ["macos-private-api", "tray-icon", "image-png"] }
+tauri-specta = { version = "=2.0.0-rc.25", features = ["typescript"] }
+specta = { version = "=2.0.0-rc.25", features = ["derive"] }
+specta-typescript = "=0.0.12"
+tauri-plugin-opener = "2"
+tauri-plugin-store = "2"
+tauri-plugin-single-instance = "2"
+tauri-plugin-clipboard-manager = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "test-util", "time"] }
+flate2 = "1"
+tiny_http = "0.12"
+image = { version = "0.25", default-features = false, features = ["png"] }
+async-trait = "0.1"
+aes-gcm = "0.10"
+argon2 = "0.5"
+rand = "0.8"
+zeroize = { version = "1", features = ["derive"] }
+base64 = "0.22"
+parking_lot = "0.12"
+fs2 = "0.4"
+thiserror = "1"
+log = "0.4"
+url = "2"
+md-5 = "0.10"
+sha2 = "0.10"
+hmac = "0.12"
+unicode-normalization = "0.1"
+unicode-casefold = "0.2"
+rusqlite = { version = "0.40", features = ["bundled"] }
+uuid = { version = "1", features = ["v4", "v5"] }
+tauri-plugin-global-shortcut = "2"
+mouse_position = "0.1"
+arboard = "3"
+enigo = "0.2"
+futures = "0.3"
+# rev-14 / Task A5: cross-platform system locale detection (macOS CFLocale,
+# Windows GetUserDefaultLocaleName, Unix LANG/LC_*). rev-13's std::env::var("LANG")
+# was Unix-only; sys-locale works on all three platforms.
+sys-locale = "0.3"
+windows-sys = { version = "0.59", features = [
+  "Win32_Foundation",
+  "Win32_Graphics_Gdi",
+  "Win32_Security",
+  "Win32_Security_Authorization",
+  "Win32_Storage_FileSystem",
+  "Win32_System_DataExchange",
+  "Win32_System_Memory",
+  "Win32_System_Ole",
+  "Win32_System_Threading",
+  "Win32_UI_ColorSystem",
+  "Win32_UI_WindowsAndMessaging",
+] }
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.61", features = [
+  "Foundation",
+  "Globalization",
+  "Graphics_Imaging",
+  "Media_Core",
+  "Media_Ocr",
+  "Media_SpeechSynthesis",
+  "Storage_Streams",
+  "Win32_Media_Audio",
+  "Win32_System_Com",
+] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+# macOS system dictionary (DCSCopyTextDefinition) + Accessibility FFI (AX selection).
+# Pinned to 0.9 to match accessibility-ng's core-foundation (avoids two versions
+# of CFString in the graph; the vendored AX module and accessibility-ng must share).
+core-foundation = "0.9"
+core-foundation-sys = "0.8"
+# Vendored AX-only read (vendor/get-selected-text-ax/) uses accessibility-ng.
+accessibility-sys = "0.1"
+accessibility-ng = "0.1"
+accessibility-sys-ng = "0.1"
+# objc2 high-level bindings for compound NSPasteboard multi-format restore (§B).
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", features = ["NSArray", "NSData", "NSString"] }
+objc2-app-kit = { version = "0.3", features = [
+  "NSPasteboard",
+  "NSPasteboardItem",
+  "NSBitmapImageRep",
+  "NSImageRep",
+  "NSGraphics",
+] }
+
+[dev-dependencies]
+wiremock = "0.6"
+tempfile = "3"
+crossbeam-channel = "0.5"
+# rev-13/rev-14 / Task A5: the red-dot pixel-diff test (Step 2) loads the generated
+# tray-error-32.png and the base icon to assert the overlay is localized to the
+# dot circle. Build-dep `image` is NOT visible to integration tests, so this is
+# a separate dev-dep entry (same version).
+image = { version = "0.25", default-features = false, features = ["png"] }

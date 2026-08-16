@@ -1,0 +1,13 @@
+[package]
+name = "linguaray-contracts"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Shared protocol/auth/tier enums for LinguaRay catalog and wire"
+publish = false
+
+[dependencies]
+linguaray-kernel = { path = "../linguaray-kernel" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+specta = { version = "=2.0.0-rc.25", features = ["derive"] }

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-a11y-status"
+description = "Enables the a11y_status command without any pre-configured scope."
+commands.allow = ["a11y_status"]
+
+[[permission]]
+identifier = "deny-a11y-status"
+description = "Denies the a11y_status command without any pre-configured scope."
+commands.deny = ["a11y_status"]

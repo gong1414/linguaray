@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-history-toggle-favorite"
+description = "Enables the history_toggle_favorite command without any pre-configured scope."
+commands.allow = ["history_toggle_favorite"]
+
+[[permission]]
+identifier = "deny-history-toggle-favorite"
+description = "Denies the history_toggle_favorite command without any pre-configured scope."
+commands.deny = ["history_toggle_favorite"]

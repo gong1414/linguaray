@@ -1,0 +1,12 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "input",
+  "description": "Capability for the input window — the consent-aware multi-engine session path + provider list",
+  "windows": ["input"],
+  "permissions": [
+    "core:default",
+    "allow-translate-session",
+    "allow-provider-list",
+    "allow-vocabulary-add"
+  ]
+}

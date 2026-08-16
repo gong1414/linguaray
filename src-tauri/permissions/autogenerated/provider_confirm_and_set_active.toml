@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-provider-confirm-and-set-active"
+description = "Enables the provider_confirm_and_set_active command without any pre-configured scope."
+commands.allow = ["provider_confirm_and_set_active"]
+
+[[permission]]
+identifier = "deny-provider-confirm-and-set-active"
+description = "Denies the provider_confirm_and_set_active command without any pre-configured scope."
+commands.deny = ["provider_confirm_and_set_active"]

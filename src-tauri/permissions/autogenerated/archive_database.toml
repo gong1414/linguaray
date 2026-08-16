@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-archive-database"
+description = "Enables the archive_database command without any pre-configured scope."
+commands.allow = ["archive_database"]
+
+[[permission]]
+identifier = "deny-archive-database"
+description = "Denies the archive_database command without any pre-configured scope."
+commands.deny = ["archive_database"]
