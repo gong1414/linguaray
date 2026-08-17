@@ -41,7 +41,7 @@ export function HistoryView(props: HistoryViewProps) {
   return (
     <section className={styles.page} aria-label={t.title} data-testid="history-page">
       <div className={styles.rowBetween}>
-        <Text as="h2" size={500} weight="semibold" className={styles.title}>{t.title}</Text>
+        <Text as="h2" size={300} weight="semibold" className={styles.title}>{t.title}</Text>
         <div className={styles.row}>
           <Button appearance="subtle" size="small" onClick={() => props.onExport("csv")}>{t.exportCsv}</Button>
           <Button appearance="subtle" size="small" onClick={() => props.onExport("json")}>{t.exportJson}</Button>
@@ -91,7 +91,7 @@ export function HistoryView(props: HistoryViewProps) {
         <>
           <div className={styles.list} data-testid="history-list">
             {props.items.map((session) => (
-              <Card key={session.session_uuid} appearance="outline" size="small" data-corrupt={session.corrupt ? "true" : undefined}>
+              <Card key={session.session_uuid} appearance="filled-alternative" size="small" data-corrupt={session.corrupt ? "true" : undefined}>
                 <div className={styles.rowBetween}>
                   <div className={styles.stackTight}>
                     <Text className={styles.preWrap}>{session.source_text ?? ""}</Text>

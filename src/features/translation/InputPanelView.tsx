@@ -1,18 +1,16 @@
 import {
-  Badge,
   Button,
-  Card,
-  Field,
   MessageBar,
   MessageBarBody,
-  Spinner,
+  ProgressBar,
   Text,
   Textarea,
   Tooltip,
+  tokens,
 } from "@fluentui/react-components";
 import { DeleteRegular, SendRegular, StarFilled, StarRegular } from "@fluentui/react-icons";
 import { t } from "../../app/i18n";
-import { useUiStyles } from "../../ui/styles";
+import { BaseLayout, Footer, Header, SearchResultItem, SearchResultList } from "../../ui/ueli";
 import { engineLabel } from "./providerNames";
 import type { InputController } from "./inputController";
 import type { TranslationState } from "./types";
@@ -34,9 +32,12 @@ export function errorMessageFor(state: TranslationState): string | null {
   return null;
 }
 
-/** Pure presentational input window (props/callbacks only). */
+/**
+ * LinguaRay adapter for Ueli's DeeplTranslator renderer. Ueli owns the
+ * header/content/footer and two-pane translator structure; this view only
+ * maps InputController state to those slots.
+ */
 export function InputPanelView({ c }: { c: InputController }) {
-  const styles = useUiStyles();
   const single = c.state.kind === "single-success" ? c.state : null;
   const multi = c.state.kind === "multi-success" || c.state.kind === "partial" ? c.state.results : null;
   const errorMessage = errorMessageFor(c.state);
@@ -58,61 +59,128 @@ export function InputPanelView({ c }: { c: InputController }) {
     );
   };
 
-  return (
-    <main className={styles.windowPage} data-testid="input-panel">
-      <Text as="h1" size={400} weight="semibold" className={styles.title}>{t("input.title")}</Text>
-      <Field>
-        <Textarea
-          ref={c.textareaRef}
-          aria-label={t("input.title")}
-          placeholder={t("input.placeholder")}
-          rows={4}
-          value={c.text}
-          disabled={!c.idle}
-          resize="vertical"
-          onChange={(e) => c.setText(e.currentTarget.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              void c.translate();
-            }
+  const resultContent = (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10, minHeight: "100%" }}>
+      {!c.hasResult && !errorMessage ? (
+        <div
+          style={{
+            minHeight: 160,
+            height: "100%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: tokens.colorNeutralForeground3,
           }}
-        />
-      </Field>
-      <div className={styles.rowWrap}>
-        <Button appearance="secondary" icon={<DeleteRegular />} onClick={c.clear} disabled={!showClear}>{t("input.action.clear")}</Button>
-        <Button appearance="primary" icon={!c.idle ? <Spinner size="tiny" aria-label={t("selection.loading")} /> : <SendRegular />} onClick={() => void c.translate()} disabled={!c.idle || !c.text.trim()}>{t("input.action.translate")}</Button>
-      </div>
-
-      {single && (
-        <Card appearance="outline" size="small" data-testid="input-result">
-          <div className={styles.stackTight}>
-            <div className={styles.rowBetween}>
-              <Badge appearance="tint" color="brand">{engineLabel(single.engine)}</Badge>
-              {favoriteButton("__single__", single.text)}
-            </div>
-            <Text className={styles.preWrap}>{single.text}</Text>
-          </div>
-        </Card>
-      )}
-
-      {multi && (
-        <div className={styles.list} data-multi="true">
-          {multi.map((result) => (
-            <Card key={result.uuid} appearance="outline" size="small" data-testid="input-result">
-              <div className={styles.stackTight}>
-                <div className={styles.rowBetween}>
-                  <Badge appearance="tint" color={result.ok ? "brand" : "subtle"}>{engineLabel(result.engine)}</Badge>
-                  {result.ok && result.text && favoriteButton(result.uuid, result.text)}
-                </div>
-                {result.ok ? <Text className={styles.preWrap}>{result.text}</Text> : <Text className={styles.danger}>{result.errorText}</Text>}
-              </div>
-            </Card>
-          ))}
+        >
+          <Text size={300}>{t("input.result.label")}</Text>
         </div>
-      )}
+      ) : null}
 
-      {errorMessage && <MessageBar intent="error" data-testid="input-error"><MessageBarBody>{errorMessage}</MessageBarBody></MessageBar>}
+      {single ? (
+        <SearchResultList>
+          <div data-testid="input-result">
+            <SearchResultItem
+              name={engineLabel(single.engine)}
+              actions={favoriteButton("__single__", single.text)}
+            >
+              <Text style={{ whiteSpace: "pre-wrap", userSelect: "text", marginTop: 6 }}>{single.text}</Text>
+            </SearchResultItem>
+          </div>
+        </SearchResultList>
+      ) : null}
+
+      {multi ? (
+        <SearchResultList>
+          {multi.map((result) => (
+            <div key={result.uuid} data-testid="input-result">
+              <SearchResultItem
+                name={engineLabel(result.engine)}
+                actions={result.ok && result.text ? favoriteButton(result.uuid, result.text) : undefined}
+              >
+                <Text
+                  style={{
+                    whiteSpace: "pre-wrap",
+                    userSelect: "text",
+                    marginTop: 6,
+                    color: result.ok ? undefined : tokens.colorPaletteRedForeground1,
+                  }}
+                >
+                  {result.ok ? result.text : result.errorText}
+                </Text>
+              </SearchResultItem>
+            </div>
+          ))}
+        </SearchResultList>
+      ) : null}
+
+      {errorMessage ? <MessageBar intent="error" data-testid="input-error"><MessageBarBody>{errorMessage}</MessageBarBody></MessageBar> : null}
+    </div>
+  );
+
+  return (
+    <main style={{ height: "100vh" }} data-testid="input-panel">
+      <BaseLayout
+        header={<Header draggable><Text weight="semibold">{t("input.title")}</Text></Header>}
+        content={
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              padding: 10,
+              boxSizing: "border-box",
+              gap: 10,
+              minHeight: "100%",
+            }}
+          >
+            <div style={{ display: "flex", flexDirection: "row", gap: 10, flexGrow: 1, minHeight: 0 }}>
+              <div style={{ width: "50%", display: "flex", flexDirection: "column", gap: 10 }}>
+                <Textarea
+                  ref={c.textareaRef}
+                  autoFocus
+                  className="non-draggable-area"
+                  aria-label={t("input.title")}
+                  placeholder={t("input.placeholder")}
+                  value={c.text}
+                  disabled={!c.idle}
+                  resize="none"
+                  style={{ flexGrow: 1, width: "100%", height: "100%" }}
+                  onChange={(_, data) => c.setText(data.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && !event.shiftKey) {
+                      event.preventDefault();
+                      void c.translate();
+                    }
+                  }}
+                />
+              </div>
+              <div
+                style={{
+                  width: "50%",
+                  minWidth: 0,
+                  overflowY: "auto",
+                  borderRadius: tokens.borderRadiusMedium,
+                  backgroundColor: tokens.colorNeutralBackground2,
+                  padding: 5,
+                  boxSizing: "border-box",
+                }}
+              >
+                {resultContent}
+              </div>
+            </div>
+            {!c.idle ? <ProgressBar aria-label={t("selection.loading")} /> : <div style={{ minHeight: 2 }} />}
+          </div>
+        }
+        footer={
+          <Footer draggable>
+            <Button className="non-draggable-area" appearance="subtle" size="small" icon={<DeleteRegular />} onClick={c.clear} disabled={!showClear}>
+              {t("input.action.clear")}
+            </Button>
+            <Button className="non-draggable-area" appearance="primary" size="small" icon={<SendRegular />} onClick={() => void c.translate()} disabled={!c.idle || !c.text.trim()}>
+              {t("input.action.translate")}
+            </Button>
+          </Footer>
+        }
+      />
     </main>
   );
 }

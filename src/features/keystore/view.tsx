@@ -26,7 +26,7 @@ export function KeystoreRecoveryView({ c }: { c: KeystoreController }) {
 
   return (
     <section aria-label={t.pageTitle} data-testid="keystore-recovery" className={styles.page}>
-      <Text as="h2" size={500} weight="semibold" className={styles.title}>{t.pageTitle}</Text>
+      <Text as="h2" size={300} weight="semibold" className={styles.title}>{t.pageTitle}</Text>
       {c.state === "healthy" && (
         <MessageBar intent="success" data-testid="keystore-healthy">
           <MessageBarBody>{t.healthy}</MessageBarBody>

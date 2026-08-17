@@ -37,16 +37,24 @@
 10. Storybook 必须渲染真实生产 View，并覆盖 loading、empty、populated、
     error、disabled、长中文、窄窗口和 dark 等状态；不能以简化替身代替生产
     组件。
-11. 修改 UI 必须通过 typecheck、lint、unit/axe、Storybook 构建、视觉基线，
-    并用稳定签名的真实应用验证 settings、input、popup、OCR 与 onboarding。
+11. 修改 UI 必须通过 typecheck、lint、unit/axe、Storybook 构建、视觉基线。
+    日常界面开发使用 Storybook/Vite 热更新；窗口尺寸、标题栏、菜单栏、权限等
+    系统集成再用构建目录内的 `LinguaRay Dev.app` 验证，不复制到
+    `/Applications`，也不覆盖测试人员正在使用的正式版本。
 12. GPL 项目（Pot、Easydict、Vicinae）的源码、CSS、图标和资产不得进入仓库；
     它们只能用于理解交互。
 
 ## 命令速查
 
-- 开发：`pnpm dev:app`
-- 稳定签名应用：`pnpm build:local`
+- 组件与状态预览：`pnpm storybook`
+- 桌面热更新：`pnpm dev:app`
+- 系统集成：构建并直接运行 `src-tauri/target/debug/bundle/macos/LinguaRay Dev.app`
+- 发布验收：`pnpm build:local`
 - DMG：`pnpm build:dmg`
 - 单元与边界门禁：`pnpm test`
 - Storybook：`pnpm build-storybook`
 - 真实应用截图：`bash scripts/real-app-screenshots.sh [--window …]`
+
+macOS 桌面应用没有与 iOS 相同的 Xcode Simulator 工作流。这里的等价分层是：
+Storybook/Vite 负责绝大多数界面迭代，Tauri Dev/开发 `.app` 负责 WebView 与系统
+窗口集成，只有发布候选才做正式签名包和安装验证。

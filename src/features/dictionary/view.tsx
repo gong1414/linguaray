@@ -23,7 +23,7 @@ export function DictionaryView({ c }: { c: DictionaryController }) {
 
   return (
     <section className={styles.page} aria-label={t.title} data-testid="dictionary-page">
-      <Text as="h2" size={500} weight="semibold" className={styles.title}>{t.title}</Text>
+      <Text as="h2" size={300} weight="semibold" className={styles.title}>{t.title}</Text>
 
       <div className={styles.row}>
         <Field label={t.word} className={styles.grow}>
@@ -38,7 +38,7 @@ export function DictionaryView({ c }: { c: DictionaryController }) {
       </div>
 
       {c.result && (
-        <Card appearance="outline" size="small" data-testid="dictionary-result">
+        <Card appearance="filled-alternative" size="small" data-testid="dictionary-result">
           <Text>{c.result.definition}</Text>
           <Text size={200} className={styles.muted}>{t.source.replace("{source}", c.result.source)}</Text>
         </Card>

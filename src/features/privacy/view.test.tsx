@@ -102,7 +102,7 @@ describe("PrivacyView", () => {
 
   it("zh locale renders Chinese copy", () => {
     renderView({ locale: "zh" });
-    expect(screen.getByText("隐私与数据")).toBeInTheDocument();
+    expect(screen.getByText("翻译历史")).toBeInTheDocument();
     expect(screen.getByText("42 条加密记录")).toBeInTheDocument();
   });
 

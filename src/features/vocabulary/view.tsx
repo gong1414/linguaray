@@ -21,7 +21,7 @@ export function VocabularyView({ c }: { c: VocabularyController }) {
 
   return (
     <section className={styles.page} aria-label={t.title} data-testid="vocabulary-page">
-      <Text as="h2" size={500} weight="semibold" className={styles.title}>{t.title}</Text>
+      <Text as="h2" size={300} weight="semibold" className={styles.title}>{t.title}</Text>
 
       <div className={styles.rowWrap}>
         <Field label={t.word} className={styles.fieldSmall}>
@@ -56,7 +56,7 @@ export function VocabularyView({ c }: { c: VocabularyController }) {
       ) : (
         <div className={styles.list} data-testid="vocabulary-list">
           {c.items.map((item) => (
-            <Card key={item.item_uuid} appearance="outline" size="small">
+            <Card key={item.item_uuid} appearance="filled-alternative" size="small">
               <div className={styles.rowBetween}>
                 <div className={styles.row}>
                   <Text weight="semibold">{item.word}</Text>

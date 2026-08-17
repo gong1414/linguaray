@@ -29,19 +29,6 @@ const renderView = (props: Partial<typeof base> = {}) =>
     { wrapper: AppProviders },
   );
 
-function installMatchMedia(matchesWide: boolean) {
-  (window.matchMedia as unknown) = vi.fn((query: string) => ({
-    matches: query.includes("700") ? matchesWide : false,
-    media: query,
-    onchange: null,
-    addEventListener() {},
-    removeEventListener() {},
-    addListener() {},
-    removeListener() {},
-    dispatchEvent: () => false,
-  }));
-}
-
 afterEach(cleanup);
 
 describe("SettingsShellView", () => {
@@ -58,14 +45,14 @@ describe("SettingsShellView", () => {
       "Dictionary",
       "Updater",
     ]) {
-      expect(within(nav).getByRole("link", { name: label })).toBeInTheDocument();
+      expect(within(nav).getByRole("button", { name: label })).toBeInTheDocument();
     }
   });
 
   it("clicking a section calls onNavigate and marks it active", () => {
     const onNavigate = vi.fn();
     renderView({ onNavigate });
-    fireEvent.click(screen.getByRole("link", { name: "Privacy" }));
+    fireEvent.click(screen.getByRole("button", { name: "Privacy" }));
     expect(onNavigate).toHaveBeenCalledWith("privacy");
   });
 
@@ -92,8 +79,8 @@ describe("SettingsShellView", () => {
 
   it("zh locale renders Chinese nav labels", () => {
     renderView({ locale: "zh" });
-    expect(screen.getByRole("link", { name: "服务商中心" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "检查更新" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "服务商中心" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "检查更新" })).toBeInTheDocument();
   });
 
   it("has no axe violations (full nav + banner, zh)", async () => {
@@ -103,21 +90,10 @@ describe("SettingsShellView", () => {
   });
 });
 
-describe("SettingsShellView rail mode", () => {
-  it("keeps an accessible name on every nav item in the icon rail", () => {
-    installMatchMedia(false);
-    renderView();
-    const nav = screen.getByRole("navigation");
-    const links = within(nav).getAllByRole("link");
-    expect(links).toHaveLength(8);
-    for (const link of links) {
-      expect((link.getAttribute("aria-label") ?? "").length).toBeGreaterThan(0);
-    }
-  });
-
-  it("wide viewport shows visible labels (data-layout=full)", () => {
-    installMatchMedia(true);
+describe("SettingsShellView Ueli layout", () => {
+  it("uses the fixed inline Ueli navigation layout", () => {
     const { container } = renderView();
-    expect(container.querySelector("[data-layout]")!.getAttribute("data-layout")).toBe("full");
+    expect(container.querySelector("[data-layout]")!.getAttribute("data-layout")).toBe("ueli");
+    expect(within(screen.getByRole("navigation")).getAllByRole("button")).toHaveLength(8);
   });
 });
