@@ -24,7 +24,7 @@ const base: OnboardingViewProps = {
   onFinish: () => {},
 };
 
-/** Fluent controls need the shared providers tree. */
+/** Ant Design controls need the shared providers tree. */
 const renderView = (props: Partial<OnboardingViewProps> = {}) =>
   render(<OnboardingView {...base} {...props} />, { wrapper: AppProviders });
 

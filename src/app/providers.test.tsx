@@ -1,17 +1,17 @@
 import { render, screen } from "@testing-library/react";
-import { Button } from "@fluentui/react-components";
+import { Button } from "antd";
 import { describe, expect, it } from "vitest";
 import { AppProviders } from "./providers";
 
 describe("AppProviders", () => {
-  it("mounts the Fluent provider and Fluent controls", () => {
+  it("mounts the Ant Design X provider and Ant controls", () => {
     render(
       <AppProviders>
         <Button>确定</Button>
       </AppProviders>,
     );
-    expect(screen.getByRole("button", { name: "确定" }).className).toContain("fui-Button");
-    expect(document.querySelector(".fui-FluentProvider")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "确定" }).className).toContain("ant-btn");
+    expect(document.querySelector(".ant-app")).toBeInTheDocument();
   });
 
   it("uses the persisted color scheme", () => {

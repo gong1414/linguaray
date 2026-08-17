@@ -3,33 +3,49 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 /**
- * UI freeze (docs/UI-RULES.md). Fluent UI is the only production component
- * framework; Ueli supplies the MIT-licensed renderer structure. These gates
- * keep the capability/view boundary and prevent a second UI kit from returning.
+ * UI architecture gates (docs/UI-RULES.md). Ant Design X is the product UI
+ * framework and Ant Design supplies its general-purpose controls. These tests
+ * preserve the capability/view boundary and prevent another UI kit or a
+ * hand-built component library from returning.
  */
 
 const ROOT = join(__dirname, "..");
 
-describe("UI freeze (Phase 5)", () => {
-  it("the self-built @linguaray/ui kit stays deleted", () => {
+function productionSources() {
+  const files: string[] = [];
+  const walk = (dir: string) => {
+    for (const name of readdirSync(dir)) {
+      const path = join(dir, name);
+      if (statSync(path).isDirectory()) walk(path);
+      else if (/\.(tsx|ts)$/.test(name) && !/\.(test|stories)\./.test(name)) files.push(path);
+    }
+  };
+  walk(join(ROOT, "src"));
+  return files;
+}
+
+describe("Ant Design X UI architecture", () => {
+  it("keeps the deleted in-house component kit deleted", () => {
     expect(
       existsSync(join(ROOT, "packages", "ui")),
-      "packages/ui was deleted in migration Phase 5. Do not resurrect a parallel " +
-        "component kit — compose Fluent UI controls (docs/UI-RULES.md).",
+      "Compose Ant Design X / Ant Design controls; do not recreate packages/ui.",
     ).toBe(false);
   });
 
-  it("package.json uses Fluent UI and bans legacy/parallel UI kits", () => {
+  it("uses the Ant Design stack and bans parallel UI kits", () => {
     const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
     const deps = { ...pkg.dependencies, ...pkg.devDependencies };
-    expect(deps["@fluentui/react-components"]).toBeDefined();
-    expect(deps["@fluentui/react-icons"]).toBeDefined();
+    expect(deps["@ant-design/x"]).toBeDefined();
+    expect(deps.antd).toBeDefined();
+    expect(deps["@ant-design/icons"]).toBeDefined();
     for (const banned of [
-      "solid-js",
-      "lucide-solid",
-      "lucide-react",
-      "@linguaray/ui",
+      "@fluentui/react-components",
+      "@fluentui/react-icons",
       "@mantine/core",
+      "@linguaray/ui",
+      "lucide-react",
+      "lucide-solid",
+      "solid-js",
       "vite-plugin-solid",
       "postcss-preset-mantine",
     ]) {
@@ -37,87 +53,58 @@ describe("UI freeze (Phase 5)", () => {
     }
   });
 
-  it("production source has no legacy UI imports or native control substitutes", () => {
-    const offenders: string[] = [];
-    const walk = (dir: string) => {
-      for (const name of readdirSync(dir)) {
-        const p = join(dir, name);
-        if (statSync(p).isDirectory()) walk(p);
-        else if (/\.(tsx|ts)$/.test(name) && !/\.(test|stories)\./.test(name)) {
-          const source = readFileSync(p, "utf8");
-          if (/@mantine\/|lucide-react|<button\b|<select\b|<textarea\b/.test(source)) {
-            offenders.push(p.slice(ROOT.length + 1));
-          }
-        }
-      }
-    };
-    walk(join(ROOT, "src"));
-    expect(offenders, "Use Fluent UI controls; do not revive legacy or native substitutes.").toEqual([]);
+  it("production source has no legacy UI imports or visible native substitutes", () => {
+    const offenders = productionSources()
+      .filter((path) => {
+        const source = readFileSync(path, "utf8");
+        return /@fluentui\/|@mantine\/|lucide-react|ui\/ueli|<button\b|<select\b|<textarea\b/.test(source);
+      })
+      .map((path) => path.slice(ROOT.length + 1));
+    expect(offenders, "Use Ant Design X / Ant Design controls for visible UI.").toEqual([]);
   });
 
   it("view modules do not import bridge or feature IPC implementations", () => {
-    const offenders: string[] = [];
-    const walk = (dir: string) => {
-      for (const name of readdirSync(dir)) {
-        const p = join(dir, name);
-        if (statSync(p).isDirectory()) walk(p);
-        else if (/\.tsx$/.test(name) && !/\.(test|stories)\./.test(name) && /(view|View|ProviderList|ProviderDetail)\.tsx$/.test(name)) {
-          const source = readFileSync(p, "utf8");
-          if (/from\s+["'][^"']*(?:bridge\/|(?:^|\/)[^/"']*ipc)["']/.test(source)) {
-            offenders.push(p.slice(ROOT.length + 1));
-          }
-        }
-      }
-    };
-    walk(join(ROOT, "src", "features"));
-    expect(offenders, "Views receive callbacks; bridge/IPC belongs in controllers.").toEqual([]);
+    const offenders = productionSources()
+      .filter((path) => /(view|View|ProviderList|ProviderDetail)\.tsx$/.test(path))
+      .filter((path) => /from\s+["'][^"']*(?:bridge\/|(?:^|\/)[^/"']*ipc)["']/.test(readFileSync(path, "utf8")))
+      .map((path) => path.slice(ROOT.length + 1));
+    expect(offenders, "Views receive state and callbacks; bridge/IPC belongs in controllers.").toEqual([]);
   });
 
-  it("keeps the Ueli MIT source attribution", () => {
-    const notices = readFileSync(join(ROOT, "THIRD_PARTY_NOTICES.md"), "utf8");
-    expect(notices).toContain("https://github.com/oliverschwendener/ueli");
-    expect(notices).toContain("f04ebdd82df71949d6b685ca7f2e5dd7e9b1bf90");
-    expect(notices).toContain("Copyright (c) 2023 Oliver Schwendener");
+  it("uses Ant Design X conversation primitives on both translation surfaces", () => {
+    const input = readFileSync(join(ROOT, "src/features/translation/InputPanelView.tsx"), "utf8");
+    const popup = readFileSync(join(ROOT, "src/features/translation/PopupView.tsx"), "utf8");
+    expect(input).toMatch(/from "@ant-design\/x"/);
+    expect(input).toMatch(/<Sender\b/);
+    expect(input).toMatch(/<Bubble\.List\b/);
+    expect(popup).toMatch(/from "@ant-design\/x"/);
+    expect(popup).toMatch(/<Bubble\.List\b/);
   });
 
-  it("keeps the adapted Ueli renderer layer and its per-file attribution", () => {
-    const upstreamCommit = "f04ebdd82df71949d6b685ca7f2e5dd7e9b1bf90";
-    for (const name of ["BaseLayout.tsx", "Header.tsx", "Footer.tsx", "Settings.tsx", "SearchResult.tsx"]) {
-      const path = join(ROOT, "src", "ui", "ueli", name);
-      expect(existsSync(path), `${name} is part of the fixed Ueli renderer adapter`).toBe(true);
-      const source = readFileSync(path, "utf8");
-      expect(source).toContain("Ueli");
-      expect(source).toContain(upstreamCommit);
-      expect(source).toContain("MIT");
-    }
-  });
-
-  it("routes the main surfaces through the Ueli renderer adapters", () => {
+  it("routes settings through the shared Ant Design layer", () => {
+    expect(existsSync(join(ROOT, "src/ui/x/Settings.tsx"))).toBe(true);
+    expect(existsSync(join(ROOT, "src/ui/ueli"))).toBe(false);
     for (const relative of [
       "src/features/shell/view.tsx",
-      "src/features/translation/InputPanelView.tsx",
-      "src/features/translation/PopupView.tsx",
-      "src/features/provider/parts/ProviderList.tsx",
       "src/features/provider/parts/ProviderDetail.tsx",
+      "src/features/privacy/view.tsx",
+      "src/features/shortcuts/view.tsx",
     ]) {
-      const source = readFileSync(join(ROOT, relative), "utf8");
-      expect(source, `${relative} must not fall back to a separately designed shell`).toMatch(/ui\/ueli/);
+      expect(readFileSync(join(ROOT, relative), "utf8"), relative).toMatch(/ui\/x/);
     }
   });
 
-  it("production src/ has no WindowChrome / custom window chrome imports", () => {
-    const offenders: string[] = [];
-    const walk = (dir: string) => {
-      for (const name of readdirSync(dir)) {
-        const p = join(dir, name);
-        if (statSync(p).isDirectory()) walk(p);
-        else if (/\.(tsx|ts)$/.test(name)) {
-          const text = readFileSync(p, "utf8");
-          if (/WindowChrome/.test(text)) offenders.push(p.slice(ROOT.length + 1));
-        }
-      }
-    };
-    walk(join(ROOT, "src"));
-    expect(offenders, "No custom window chrome in production code.").toEqual([]);
+  it("keeps the Ant Design X MIT source attribution", () => {
+    const notices = readFileSync(join(ROOT, "THIRD_PARTY_NOTICES.md"), "utf8");
+    expect(notices).toContain("https://github.com/ant-design/x");
+    expect(notices).toContain("25aad7b9c13abeb165466d53b375d0f2ffe81fa0");
+    expect(notices).toContain("Copyright (c) 2015-present Ant UED");
+  });
+
+  it("production src/ has no custom WindowChrome", () => {
+    const offenders = productionSources()
+      .filter((path) => /WindowChrome/.test(readFileSync(path, "utf8")))
+      .map((path) => path.slice(ROOT.length + 1));
+    expect(offenders, "Use native window chrome for normal windows.").toEqual([]);
   });
 });

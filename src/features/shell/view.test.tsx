@@ -45,14 +45,14 @@ describe("SettingsShellView", () => {
       "Dictionary",
       "Updater",
     ]) {
-      expect(within(nav).getByRole("button", { name: label })).toBeInTheDocument();
+      expect(within(nav).getByRole("menuitem", { name: label })).toBeInTheDocument();
     }
   });
 
   it("clicking a section calls onNavigate and marks it active", () => {
     const onNavigate = vi.fn();
     renderView({ onNavigate });
-    fireEvent.click(screen.getByRole("button", { name: "Privacy" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Privacy" }));
     expect(onNavigate).toHaveBeenCalledWith("privacy");
   });
 
@@ -79,8 +79,8 @@ describe("SettingsShellView", () => {
 
   it("zh locale renders Chinese nav labels", () => {
     renderView({ locale: "zh" });
-    expect(screen.getByRole("button", { name: "服务商中心" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "检查更新" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "服务商中心" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "检查更新" })).toBeInTheDocument();
   });
 
   it("has no axe violations (full nav + banner, zh)", async () => {
@@ -90,10 +90,10 @@ describe("SettingsShellView", () => {
   });
 });
 
-describe("SettingsShellView Ueli layout", () => {
-  it("uses the fixed inline Ueli navigation layout", () => {
+describe("SettingsShellView Ant Design X layout", () => {
+  it("uses the Ant Design navigation layout", () => {
     const { container } = renderView();
-    expect(container.querySelector("[data-layout]")!.getAttribute("data-layout")).toBe("ueli");
-    expect(within(screen.getByRole("navigation")).getAllByRole("button")).toHaveLength(8);
+    expect(container.querySelector("[data-layout]")!.getAttribute("data-layout")).toBe("ant-design-x");
+    expect(within(screen.getByRole("navigation")).getAllByRole("menuitem")).toHaveLength(8);
   });
 });

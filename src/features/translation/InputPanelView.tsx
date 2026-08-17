@@ -1,16 +1,10 @@
-import {
-  Button,
-  MessageBar,
-  MessageBarBody,
-  ProgressBar,
-  Text,
-  Textarea,
-  Tooltip,
-  tokens,
-} from "@fluentui/react-components";
-import { DeleteRegular, SendRegular, StarFilled, StarRegular } from "@fluentui/react-icons";
+import type { GetRef } from "antd";
+import { Alert, Button, Typography } from "antd";
+import { DeleteOutlined, SendOutlined, StarFilled, StarOutlined, TranslationOutlined } from "@ant-design/icons";
+import { Bubble, Sender, Welcome } from "@ant-design/x";
+import type { BubbleItemType } from "@ant-design/x";
 import { t } from "../../app/i18n";
-import { BaseLayout, Footer, Header, SearchResultItem, SearchResultList } from "../../ui/ueli";
+import { SurfaceFooter, SurfaceHeader, SurfaceLayout, XActionBar } from "../../ui/x";
 import { engineLabel } from "./providerNames";
 import type { InputController } from "./inputController";
 import type { TranslationState } from "./types";
@@ -32,153 +26,117 @@ export function errorMessageFor(state: TranslationState): string | null {
   return null;
 }
 
-/**
- * LinguaRay adapter for Ueli's DeeplTranslator renderer. Ueli owns the
- * header/content/footer and two-pane translator structure; this view only
- * maps InputController state to those slots.
- */
+/** Ant Design X conversation surface backed by the existing InputController. */
 export function InputPanelView({ c }: { c: InputController }) {
   const single = c.state.kind === "single-success" ? c.state : null;
   const multi = c.state.kind === "multi-success" || c.state.kind === "partial" ? c.state.results : null;
   const errorMessage = errorMessageFor(c.state);
   const showClear = c.hasResult || c.text.trim().length > 0;
 
-  const favoriteButton = (key: string, translation: string) => {
+  const favoriteActions = (key: string, translation: string) => {
     const favorited = c.favoritedKey === key;
     const label = favorited ? t("selection.action.favorited") : t("selection.action.favorite");
     return (
-      <Tooltip content={label} relationship="label">
-        <Button
-          appearance={favorited ? "primary" : "subtle"}
-          size="small"
-          icon={favorited ? <StarFilled /> : <StarRegular />}
-          aria-label={label}
-          onClick={() => void c.favorite(c.text, translation, key)}
-        />
-      </Tooltip>
+      <XActionBar
+        actions={[{
+          key: "favorite",
+          label,
+          icon: favorited ? <StarFilled aria-hidden /> : <StarOutlined aria-hidden />,
+          active: favorited,
+          onClick: () => void c.favorite(c.text, translation, key),
+        }]}
+      />
     );
   };
 
-  const resultContent = (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10, minHeight: "100%" }}>
-      {!c.hasResult && !errorMessage ? (
-        <div
-          style={{
-            minHeight: 160,
-            height: "100%",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: tokens.colorNeutralForeground3,
-          }}
-        >
-          <Text size={300}>{t("input.result.label")}</Text>
-        </div>
-      ) : null}
+  const items: BubbleItemType[] = [];
+  if (c.hasResult && c.text.trim()) {
+    items.push({ key: "source", role: "user", placement: "end", content: c.text, variant: "filled" });
+  }
+  if (!c.idle) {
+    items.push({ key: "loading", role: "ai", content: t("selection.loading"), loading: true, header: t("input.result.label") });
+  }
+  if (single) {
+    items.push({
+      key: "single",
+      role: "ai",
+      content: <div data-testid="input-result">{single.text}</div>,
+      header: engineLabel(single.engine),
+      footer: () => favoriteActions("__single__", single.text),
+      variant: "outlined",
+    });
+  }
+  multi?.forEach((result) => {
+    items.push({
+      key: result.uuid,
+      role: "ai",
+      content: <div data-testid="input-result">{result.ok ? result.text : result.errorText}</div>,
+      header: engineLabel(result.engine),
+      footer: result.ok && result.text ? () => favoriteActions(result.uuid, result.text!) : undefined,
+      variant: "outlined",
+      status: result.ok ? "success" : "error",
+      className: result.ok ? undefined : "lr-x-bubble-error",
+    });
+  });
 
-      {single ? (
-        <SearchResultList>
-          <div data-testid="input-result">
-            <SearchResultItem
-              name={engineLabel(single.engine)}
-              actions={favoriteButton("__single__", single.text)}
-            >
-              <Text style={{ whiteSpace: "pre-wrap", userSelect: "text", marginTop: 6 }}>{single.text}</Text>
-            </SearchResultItem>
-          </div>
-        </SearchResultList>
-      ) : null}
-
-      {multi ? (
-        <SearchResultList>
-          {multi.map((result) => (
-            <div key={result.uuid} data-testid="input-result">
-              <SearchResultItem
-                name={engineLabel(result.engine)}
-                actions={result.ok && result.text ? favoriteButton(result.uuid, result.text) : undefined}
-              >
-                <Text
-                  style={{
-                    whiteSpace: "pre-wrap",
-                    userSelect: "text",
-                    marginTop: 6,
-                    color: result.ok ? undefined : tokens.colorPaletteRedForeground1,
-                  }}
-                >
-                  {result.ok ? result.text : result.errorText}
-                </Text>
-              </SearchResultItem>
-            </div>
-          ))}
-        </SearchResultList>
-      ) : null}
-
-      {errorMessage ? <MessageBar intent="error" data-testid="input-error"><MessageBarBody>{errorMessage}</MessageBarBody></MessageBar> : null}
-    </div>
-  );
+  const bindSenderRef = (ref: GetRef<typeof Sender> | null) => {
+    c.textareaRef.current = (ref?.inputElement as HTMLTextAreaElement | undefined) ?? null;
+    ref?.inputElement?.setAttribute("aria-label", t("input.title"));
+  };
 
   return (
-    <main style={{ height: "100vh" }} data-testid="input-panel">
-      <BaseLayout
-        header={<Header draggable><Text weight="semibold">{t("input.title")}</Text></Header>}
+    <main className="lr-x-translation-window" data-testid="input-panel">
+      <SurfaceLayout
+        header={
+          <SurfaceHeader draggable>
+            <TranslationOutlined aria-hidden />
+            <Typography.Text strong>{t("input.title")}</Typography.Text>
+          </SurfaceHeader>
+        }
         content={
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              padding: 10,
-              boxSizing: "border-box",
-              gap: 10,
-              minHeight: "100%",
-            }}
-          >
-            <div style={{ display: "flex", flexDirection: "row", gap: 10, flexGrow: 1, minHeight: 0 }}>
-              <div style={{ width: "50%", display: "flex", flexDirection: "column", gap: 10 }}>
-                <Textarea
-                  ref={c.textareaRef}
-                  autoFocus
-                  className="non-draggable-area"
-                  aria-label={t("input.title")}
-                  placeholder={t("input.placeholder")}
-                  value={c.text}
-                  disabled={!c.idle}
-                  resize="none"
-                  style={{ flexGrow: 1, width: "100%", height: "100%" }}
-                  onChange={(_, data) => c.setText(data.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" && !event.shiftKey) {
-                      event.preventDefault();
-                      void c.translate();
-                    }
-                  }}
-                />
-              </div>
-              <div
-                style={{
-                  width: "50%",
-                  minWidth: 0,
-                  overflowY: "auto",
-                  borderRadius: tokens.borderRadiusMedium,
-                  backgroundColor: tokens.colorNeutralBackground2,
-                  padding: 5,
-                  boxSizing: "border-box",
-                }}
-              >
-                {resultContent}
-              </div>
-            </div>
-            {!c.idle ? <ProgressBar aria-label={t("selection.loading")} /> : <div style={{ minHeight: 2 }} />}
+          <div className="lr-x-conversation-content">
+            {items.length > 0 ? (
+              <Bubble.List items={items} autoScroll={false} />
+            ) : (
+              <Welcome icon={<TranslationOutlined aria-hidden />} title={t("input.result.label")} description={t("input.placeholder")} variant="borderless" />
+            )}
+            {errorMessage ? <Alert type="error" showIcon title={errorMessage} data-testid="input-error" /> : null}
           </div>
         }
         footer={
-          <Footer draggable>
-            <Button className="non-draggable-area" appearance="subtle" size="small" icon={<DeleteRegular />} onClick={c.clear} disabled={!showClear}>
-              {t("input.action.clear")}
-            </Button>
-            <Button className="non-draggable-area" appearance="primary" size="small" icon={<SendRegular />} onClick={() => void c.translate()} disabled={!c.idle || !c.text.trim()}>
-              {t("input.action.translate")}
-            </Button>
-          </Footer>
+          <SurfaceFooter draggable>
+            <Sender
+              ref={bindSenderRef}
+              rootClassName="lr-x-sender non-draggable-area"
+              value={c.text}
+              placeholder={t("input.placeholder")}
+              loading={!c.idle}
+              disabled={!c.idle}
+              autoSize={{ minRows: 2, maxRows: 5 }}
+              submitType="enter"
+              onChange={c.setText}
+              onSubmit={() => void c.translate()}
+              prefix={
+                <Button type="text" size="small" icon={<DeleteOutlined aria-hidden />} onClick={c.clear} disabled={!showClear}>
+                  {t("input.action.clear")}
+                </Button>
+              }
+              suffix={(_, { components }) => {
+                const SendButton = components.SendButton;
+                return (
+                  <SendButton
+                    type="primary"
+                    shape="default"
+                    size="small"
+                    icon={<SendOutlined aria-hidden />}
+                    disabled={!c.idle || !c.text.trim()}
+                  >
+                    {t("input.action.translate")}
+                  </SendButton>
+                );
+              }}
+            />
+          </SurfaceFooter>
         }
       />
     </main>

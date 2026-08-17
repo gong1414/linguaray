@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { FluentProvider, webDarkTheme } from "@fluentui/react-components";
 import { SettingsShellView } from "./view";
 import { PrivacyView } from "../privacy/view";
 import { HistoryView } from "../history/view";
@@ -111,14 +110,7 @@ export const LongChineseNav: StoryObj<typeof SettingsShellView> = {
 };
 
 export const Dark: StoryObj<typeof SettingsShellView> = {
-  parameters: { backgrounds: { default: "dark" } },
-  decorators: [
-    (Story) => (
-      <FluentProvider theme={webDarkTheme}>
-        <Story />
-      </FluentProvider>
-    ),
-  ],
+  parameters: { colorScheme: "dark", backgrounds: { default: "dark" } },
   render: (args) => (
     <SettingsShellView {...args} locale="zh">
       <div>深色模式内容</div>

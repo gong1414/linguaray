@@ -1,44 +1,27 @@
 # Third-party notices
 
-LinguaRay includes or adapts code from the following projects. Their licenses
-apply to the corresponding portions; LinguaRay's own license remains in
-`LICENSE`.
+LinguaRay uses the following open-source UI packages. Their licenses apply to
+the corresponding packages; LinguaRay's own license remains in `LICENSE`.
 
-## Ueli
+## Ant Design X
 
-- Source: <https://github.com/oliverschwendener/ueli>
-- Reviewed/adapted commit: `f04ebdd82df71949d6b685ca7f2e5dd7e9b1bf90`
-- Adapted areas: renderer `BaseLayout`, `Header`, `Footer`, settings navigation,
-  settings layout/group/row composition, detailed search-result list and selected
-  indicator, plus the DeepL-style two-pane translator composition. LinguaRay's
-  controllers, IPC, data models, copy, provider adapters, permissions, and Tauri
-  windows remain independent project code.
-- Copyright (c) 2023 Oliver Schwendener
-- License: MIT
+- Source: <https://github.com/ant-design/x>
+- Package: `@ant-design/x` 2.9.0
+- Source-audit commit: `25aad7b9c13abeb165466d53b375d0f2ffe81fa0`
+- Used areas: `XProvider`, `Sender`, `Bubble`, `Welcome`, and `Actions`
+- Copyright (c) 2015-present Ant UED, <https://xtech.antfin.com/>
+- License: MIT (the complete text is distributed in `@ant-design/x/LICENSE`)
 
-```text
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+## Ant Design
 
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
+- Source: <https://github.com/ant-design/ant-design>
+- Package: `antd` 6.6.1
+- Copyright (c) 2015-present Ant UED, <https://xtech.antfin.com/>
+- License: MIT (the complete text is distributed in `antd/LICENSE`)
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
+## Ant Design Icons
 
-## Microsoft Fluent UI React
-
-- Source: <https://github.com/microsoft/fluentui>
-- Packages: `@fluentui/react-components`, `@fluentui/react-icons`
-- Copyright (c) Microsoft Corporation
-- License: MIT (package distributions include their complete license texts)
+- Source: <https://github.com/ant-design/ant-design-icons>
+- Package: `@ant-design/icons` 6.3.2
+- Copyright (c) 2018-present Ant UED, <https://xtech.antfin.com/>
+- License: MIT (the complete text is distributed in `@ant-design/icons/LICENSE`)

@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { FluentProvider, webDarkTheme } from "@fluentui/react-components";
 import DictionaryView from "./view";
 import type { DictionaryController } from "./controller";
 
@@ -56,14 +55,7 @@ export const LongChinese: StoryObj<typeof DictionaryView> = {
   },
 };
 export const Dark: StoryObj<typeof DictionaryView> = {
-  parameters: { backgrounds: { default: "dark" } },
-  decorators: [
-    (Story) => (
-      <FluentProvider theme={webDarkTheme}>
-        <Story />
-      </FluentProvider>
-    ),
-  ],
+  parameters: { colorScheme: "dark", backgrounds: { default: "dark" } },
   args: { c: fake({ word: "hello", result: { definition: "你好", source: "en-zh-1" } }) },
 };
 export const Narrow: StoryObj<typeof DictionaryView> = {

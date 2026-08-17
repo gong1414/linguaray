@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { FluentProvider, webDarkTheme } from "@fluentui/react-components";
 import InputPanelView from "./InputPanelView";
 import type { InputController } from "./inputController";
 import type { TranslationState } from "./types";
@@ -60,13 +59,6 @@ export const LongChinese: StoryObj<typeof InputPanelView> = {
   },
 };
 export const Dark: StoryObj<typeof InputPanelView> = {
-  parameters: { backgrounds: { default: "dark" } },
-  decorators: [
-    (Story) => (
-      <FluentProvider theme={webDarkTheme}>
-        <Story />
-      </FluentProvider>
-    ),
-  ],
+  parameters: { colorScheme: "dark", backgrounds: { default: "dark" } },
   args: { c: fake(single) },
 };

@@ -3,14 +3,16 @@ import { AppProviders } from "../src/app/providers";
 
 const preview: Preview = {
   decorators: [
-    (Story) => (
-      <AppProviders>
+    (Story, context) => (
+      <AppProviders forceColorScheme={context.parameters.colorScheme === "dark" ? "dark" : undefined}>
         <Story />
       </AppProviders>
     ),
   ],
   parameters: {
-    layout: "centered",
+    // Window stories must occupy the same canvas as their Tauri webview.
+    // Individual component-only stories may opt back into `centered`.
+    layout: "fullscreen",
     a11y: {
       test: "error",
     },

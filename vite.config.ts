@@ -4,8 +4,8 @@ import react from "@vitejs/plugin-react";
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
 
-// Migration complete (2026-08-16): single React 19 + Mantine 9 pipeline. Every
-// window entry lives under src/windows/*.
+// Single React 19 + Ant Design X pipeline. Every window entry lives under
+// src/windows/*.
 export default defineConfig(async () => ({
   plugins: [react()],
 

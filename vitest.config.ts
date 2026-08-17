@@ -6,20 +6,6 @@ export default defineConfig({
   plugins: [react()],
   test: {
     environment: "jsdom",
-    // Fluent UI's interaction layer (Tabster) publishes a mixed ESM/CJS
-    // dependency graph. Pre-bundle the browser-facing packages so Vitest's
-    // jsdom runner resolves the same graph as Vite/Tauri.
-    deps: {
-      optimizer: {
-        client: {
-          enabled: true,
-          include: [
-            "@fluentui/react-components",
-            "@fluentui/react-icons",
-          ],
-        },
-      },
-    },
     environmentOptions: {
       jsdom: {
         url: "http://localhost",

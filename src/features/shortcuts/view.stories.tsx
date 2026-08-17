@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { FluentProvider, webDarkTheme } from "@fluentui/react-components";
 import ShortcutsView from "./view";
 import type { ShortcutsController } from "./controller";
 import type { ShortcutSnapshot } from "./model";
@@ -69,13 +68,6 @@ export const SaveFailed: StoryObj<typeof ShortcutsView> = {
   args: { c: fake({ operationError: "save" }) },
 };
 export const Dark: StoryObj<typeof ShortcutsView> = {
-  parameters: { backgrounds: { default: "dark" } },
-  decorators: [
-    (Story) => (
-      <FluentProvider theme={webDarkTheme}>
-        <Story />
-      </FluentProvider>
-    ),
-  ],
+  parameters: { colorScheme: "dark", backgrounds: { default: "dark" } },
   args: { c: fake({ recordingAction: "ocr_translate", recordedCombo: "⌥⇧" }) },
 };

@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { FluentProvider, webDarkTheme } from "@fluentui/react-components";
 import ProviderCenterView from "./view";
 import type { ProviderController } from "./controller";
 import type { ProviderProfileFE, ProviderDetailState } from "./model";
@@ -166,13 +165,6 @@ export const LongChinese: StoryObj<typeof ProviderCenterView> = {
 };
 
 export const Dark: StoryObj<typeof ProviderCenterView> = {
-  parameters: { backgrounds: { default: "dark" } },
-  decorators: [
-    (Story) => (
-      <FluentProvider theme={webDarkTheme}>
-        <Story />
-      </FluentProvider>
-    ),
-  ],
+  parameters: { colorScheme: "dark", backgrounds: { default: "dark" } },
   args: { c: fake({}) },
 };

@@ -1,5 +1,12 @@
-import { FluentProvider, webDarkTheme, webLightTheme } from "@fluentui/react-components";
+import { App as AntApp, theme } from "antd";
+import { XProvider } from "@ant-design/x";
+import enUS from "antd/locale/en_US";
+import zhCN from "antd/locale/zh_CN";
+import enUSX from "@ant-design/x/locale/en_US";
+import zhCNX from "@ant-design/x/locale/zh_CN";
 import { useEffect, useState, type ReactNode } from "react";
+import "antd/dist/reset.css";
+import "../ui/styles.css";
 
 type ColorScheme = "light" | "dark";
 
@@ -9,15 +16,18 @@ function readColorScheme(): ColorScheme {
   return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
-/**
- * Root providers for every React window. Color scheme persists under the
- * SAME localStorage key the legacy Solid windows use ("linguaray.theme"), so
- * a user's theme choice survives the window-by-window migration and mixed
- * old/new windows stay consistent. "auto" follows prefers-color-scheme,
- * matching the legacy initTheme fallback.
- */
-export function AppProviders({ children, transparent = false }: { children: ReactNode; transparent?: boolean }) {
+function isChineseLocale() {
+  return (navigator.language || "en").toLowerCase().startsWith("zh");
+}
+
+/** Shared Ant Design X provider for every Tauri webview window. */
+export function AppProviders({ children, transparent = false, forceColorScheme }: {
+  children: ReactNode;
+  transparent?: boolean;
+  forceColorScheme?: ColorScheme;
+}) {
   const [colorScheme, setColorScheme] = useState<ColorScheme>(readColorScheme);
+  const activeColorScheme = forceColorScheme ?? colorScheme;
 
   useEffect(() => {
     const media = window.matchMedia?.("(prefers-color-scheme: dark)");
@@ -30,13 +40,44 @@ export function AppProviders({ children, transparent = false }: { children: Reac
     return () => media.removeEventListener("change", onChange);
   }, []);
 
+  const locale = isChineseLocale() ? { ...zhCNX, ...zhCN } : { ...enUSX, ...enUS };
+
   return (
-    <FluentProvider
-      theme={colorScheme === "dark" ? webDarkTheme : webLightTheme}
-      data-color-scheme={colorScheme}
-      style={{ minHeight: "100%", backgroundColor: transparent ? "transparent" : undefined }}
+    <XProvider
+      locale={locale}
+      button={{ autoInsertSpace: false }}
+      theme={{
+        algorithm: activeColorScheme === "dark" ? theme.darkAlgorithm : theme.defaultAlgorithm,
+        cssVar: {},
+        token: {
+          colorPrimary: "#0958d9",
+          colorError: "#a8071a",
+          colorInfo: activeColorScheme === "dark" ? "#69b1ff" : "#0958d9",
+          colorInfoBg: activeColorScheme === "dark" ? "#111a2c" : "#e6f4ff",
+          colorSuccess: activeColorScheme === "dark" ? "#73d13d" : "#237804",
+          colorSuccessBg: activeColorScheme === "dark" ? "#162312" : "#f6ffed",
+          colorWarning: activeColorScheme === "dark" ? "#ffd666" : "#874d00",
+          colorWarningBg: activeColorScheme === "dark" ? "#2b2111" : "#fffbe6",
+          colorLink: activeColorScheme === "dark" ? "#69b1ff" : "#0958d9",
+          colorTextSecondary: activeColorScheme === "dark" ? "#bfbfbf" : "#595959",
+          colorTextDescription: activeColorScheme === "dark" ? "#bfbfbf" : "#595959",
+          colorWarningText: activeColorScheme === "dark" ? "#ffd666" : "#874d00",
+          colorSuccessText: activeColorScheme === "dark" ? "#b7eb8f" : "#135200",
+          borderRadius: 10,
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        },
+        components: {
+          Menu: {
+            itemSelectedColor: activeColorScheme === "dark" ? "#69b1ff" : "#0958d9",
+          },
+        },
+      }}
     >
-      {children}
-    </FluentProvider>
+      <AntApp className="lr-ant-app">
+        <div className={transparent ? "lr-root lr-root-transparent" : "lr-root"} data-color-scheme={activeColorScheme}>
+          {children}
+        </div>
+      </AntApp>
+    </XProvider>
   );
 }

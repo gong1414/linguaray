@@ -2,9 +2,9 @@
  * Normalize a Tauri WebView document before React mounts.
  *
  * Keep this out of inline <style> tags: on WKWebView, a pre-existing document
- * style sheet can interfere with Fluent/Griffel's ordered runtime style
- * buckets. Direct element styles establish the window canvas without
- * participating in that style-sheet ordering.
+ * style sheet can interfere with component-library runtime styles. Direct
+ * element styles establish the window canvas without participating in the
+ * style-sheet cascade.
  */
 export function prepareWindowDocument(options: { transparent?: boolean } = {}) {
   const root = document.getElementById("root");
@@ -17,4 +17,3 @@ export function prepareWindowDocument(options: { transparent?: boolean } = {}) {
     if (options.transparent) element.style.backgroundColor = "transparent";
   }
 }
-
