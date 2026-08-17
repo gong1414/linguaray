@@ -125,12 +125,12 @@ describe("SettingsWindow", () => {
       </AppProviders>,
     );
     await screen.findByTestId("provider-list");
-    fireEvent.click(screen.getByRole("link", { name: "History" }));
+    fireEvent.click(screen.getByRole("button", { name: "History" }));
     await waitFor(() =>
       expect(screen.getByTestId("shell").getAttribute("data-page")).toBe("history"),
     );
     expect(screen.getByTestId("history-disabled")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("link", { name: "Privacy" }));
+    fireEvent.click(screen.getByRole("button", { name: "Privacy" }));
     await waitFor(() =>
       expect(screen.getByTestId("shell").getAttribute("data-page")).toBe("privacy"),
     );

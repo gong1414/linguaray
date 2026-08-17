@@ -8,7 +8,11 @@ apply to the corresponding portions; LinguaRay's own license remains in
 
 - Source: <https://github.com/oliverschwendener/ueli>
 - Reviewed/adapted commit: `f04ebdd82df71949d6b685ca7f2e5dd7e9b1bf90`
-- Adapted area: pure React/Fluent UI settings navigation and layout structure
+- Adapted areas: renderer `BaseLayout`, `Header`, `Footer`, settings navigation,
+  settings layout/group/row composition, detailed search-result list and selected
+  indicator, plus the DeepL-style two-pane translator composition. LinguaRay's
+  controllers, IPC, data models, copy, provider adapters, permissions, and Tauri
+  windows remain independent project code.
 - Copyright (c) 2023 Oliver Schwendener
 - License: MIT
 

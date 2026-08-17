@@ -80,6 +80,31 @@ describe("UI freeze (Phase 5)", () => {
     expect(notices).toContain("Copyright (c) 2023 Oliver Schwendener");
   });
 
+  it("keeps the adapted Ueli renderer layer and its per-file attribution", () => {
+    const upstreamCommit = "f04ebdd82df71949d6b685ca7f2e5dd7e9b1bf90";
+    for (const name of ["BaseLayout.tsx", "Header.tsx", "Footer.tsx", "Settings.tsx", "SearchResult.tsx"]) {
+      const path = join(ROOT, "src", "ui", "ueli", name);
+      expect(existsSync(path), `${name} is part of the fixed Ueli renderer adapter`).toBe(true);
+      const source = readFileSync(path, "utf8");
+      expect(source).toContain("Ueli");
+      expect(source).toContain(upstreamCommit);
+      expect(source).toContain("MIT");
+    }
+  });
+
+  it("routes the main surfaces through the Ueli renderer adapters", () => {
+    for (const relative of [
+      "src/features/shell/view.tsx",
+      "src/features/translation/InputPanelView.tsx",
+      "src/features/translation/PopupView.tsx",
+      "src/features/provider/parts/ProviderList.tsx",
+      "src/features/provider/parts/ProviderDetail.tsx",
+    ]) {
+      const source = readFileSync(join(ROOT, relative), "utf8");
+      expect(source, `${relative} must not fall back to a separately designed shell`).toMatch(/ui\/ueli/);
+    }
+  });
+
   it("production src/ has no WindowChrome / custom window chrome imports", () => {
     const offenders: string[] = [];
     const walk = (dir: string) => {

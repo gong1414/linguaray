@@ -13,6 +13,7 @@ import {
   Text,
 } from "@fluentui/react-components";
 import { ServerRegular } from "@fluentui/react-icons";
+import { Setting, SettingGroup, SettingGroupList } from "../../../ui/ueli";
 import { useUiStyles } from "../../../ui/styles";
 import type { ProviderCopy } from "../copy";
 import type { ConnectionResult, ProviderDetailState } from "../model";
@@ -37,104 +38,130 @@ export type ProviderDetailProps = {
   onResolveSaveConflict: (uuid: string) => void;
 };
 
-/** Detail panel: edit form + model selection + key + connection test + balance. */
+/** Ueli setting-group adapter for one provider profile. */
 export function ProviderDetail(props: ProviderDetailProps) {
   const styles = useUiStyles();
   const t = props.t;
-  const d = props.detail;
-  const uuid = d.provider.uuid;
+  const detail = props.detail;
+  const uuid = detail.provider.uuid;
   const locked = props.exclusiveBusy;
   const isReloading = props.reloading;
-  const fieldDisabled = d.saveState === "saving" || isReloading || locked;
-  const canListModels = d.provider.capabilities.model_list;
+  const fieldDisabled = detail.saveState === "saving" || isReloading || locked;
+  const canListModels = detail.provider.capabilities.model_list;
   const hasUnsavedDrafts =
-    d.nameDraft !== d.provider.name ||
-    d.endpointDraft !== d.provider.endpoint ||
-    d.modelDraft !== (d.provider.model ?? "") ||
-    d.keyText.length > 0;
-  const modelOptions = d.modelOptions.length > 0
-    ? d.modelOptions
-    : [{ id: d.modelDraft || "—", label: d.modelDraft || "—" }];
-  const conn = d.conn;
-  const connResult: ConnectionResult | null = conn !== "testing" && conn !== "idle" ? conn : null;
+    detail.nameDraft !== detail.provider.name ||
+    detail.endpointDraft !== detail.provider.endpoint ||
+    detail.modelDraft !== (detail.provider.model ?? "") ||
+    detail.keyText.length > 0;
+  const modelOptions = detail.modelOptions.length > 0
+    ? detail.modelOptions
+    : [{ id: detail.modelDraft || "—", label: detail.modelDraft || "—" }];
+  const connection = detail.conn;
+  const connectionResult: ConnectionResult | null = connection !== "testing" && connection !== "idle" ? connection : null;
+  const controlStyle = { width: "min(420px, 42vw)" };
 
   return (
-    <div className={styles.stack} aria-label={t.detailLabel} data-testid="provider-detail">
-      {d.saveConflict && (
-        <MessageBar intent="error" data-testid="save-conflict">
-          <MessageBarBody><MessageBarTitle>{t.saveConflict}</MessageBarTitle></MessageBarBody>
-          <MessageBarActions>
-            <Button appearance="secondary" size="small" icon={isReloading ? <Spinner size="tiny" /> : undefined} disabled={isReloading || locked} onClick={() => props.onResolveSaveConflict(uuid)}>{t.reload}</Button>
-          </MessageBarActions>
-        </MessageBar>
-      )}
+    <div aria-label={t.detailLabel} data-testid="provider-detail">
+      <SettingGroupList>
+        <SettingGroup title={detail.provider.name}>
+          {detail.saveConflict ? (
+            <MessageBar intent="error" data-testid="save-conflict">
+              <MessageBarBody><MessageBarTitle>{t.saveConflict}</MessageBarTitle></MessageBarBody>
+              <MessageBarActions>
+                <Button appearance="secondary" size="small" icon={isReloading ? <Spinner size="tiny" /> : undefined} disabled={isReloading || locked} onClick={() => props.onResolveSaveConflict(uuid)}>{t.reload}</Button>
+              </MessageBarActions>
+            </MessageBar>
+          ) : null}
 
-      <Field label={t.name} validationMessage={d.nameError || undefined} validationState={d.nameError ? "error" : "none"}>
-        <Input value={d.nameDraft} disabled={fieldDisabled} onChange={(e) => props.onNameInput(uuid, e.currentTarget.value)} />
-      </Field>
+          <Setting
+            label={t.name}
+            control={
+              <Field validationMessage={detail.nameError || undefined} validationState={detail.nameError ? "error" : "none"} style={controlStyle}>
+                <Input aria-label={t.name} value={detail.nameDraft} disabled={fieldDisabled} onChange={(_, data) => props.onNameInput(uuid, data.value)} />
+              </Field>
+            }
+          />
 
-      <Field label={t.endpoint.label} validationMessage={d.endpointError || undefined} validationState={d.endpointError ? "error" : "none"}>
-        <Input placeholder={t.endpoint.placeholder} value={d.endpointDraft} disabled={fieldDisabled} onChange={(e) => props.onEndpointInput(uuid, e.currentTarget.value)} />
-      </Field>
-      {d.provider.template_id === "azure-openai" && <Button appearance="subtle" size="small" disabled={fieldDisabled} onClick={() => props.onEndpointInput(uuid, "https://{resource}.openai.azure.com/openai/v1/chat/completions")}>{t.insertAzureTemplate}</Button>}
-      {d.provider.template_id === "kimi" && <Button appearance="subtle" size="small" disabled={fieldDisabled} onClick={() => props.onEndpointInput(uuid, "https://api.moonshot.ai/v1/chat/completions")}>{t.useKimiGlobal}</Button>}
-      {d.provider.template_id === "custom" && (
-        <Checkbox label={t.customAnthropic} checked={d.provider.protocol === "anthropic"} disabled={fieldDisabled} onChange={(_, data) => props.onToggleCustomAnthropic(uuid, Boolean(data.checked))} />
-      )}
+          <Setting
+            label={t.endpoint.label}
+            description={t.endpoint.placeholder}
+            control={
+              <div className={styles.stackTight} style={controlStyle}>
+                <Field validationMessage={detail.endpointError || undefined} validationState={detail.endpointError ? "error" : "none"}>
+                  <Input aria-label={t.endpoint.label} placeholder={t.endpoint.placeholder} value={detail.endpointDraft} disabled={fieldDisabled} onChange={(_, data) => props.onEndpointInput(uuid, data.value)} />
+                </Field>
+                {detail.provider.template_id === "azure-openai" ? <Button appearance="subtle" size="small" disabled={fieldDisabled} onClick={() => props.onEndpointInput(uuid, "https://{resource}.openai.azure.com/openai/v1/chat/completions")}>{t.insertAzureTemplate}</Button> : null}
+                {detail.provider.template_id === "kimi" ? <Button appearance="subtle" size="small" disabled={fieldDisabled} onClick={() => props.onEndpointInput(uuid, "https://api.moonshot.ai/v1/chat/completions")}>{t.useKimiGlobal}</Button> : null}
+                {detail.provider.template_id === "custom" ? <Checkbox label={t.customAnthropic} checked={detail.provider.protocol === "anthropic"} disabled={fieldDisabled} onChange={(_, data) => props.onToggleCustomAnthropic(uuid, Boolean(data.checked))} /> : null}
+              </div>
+            }
+          />
 
-      {d.modelFetch !== "error" && canListModels ? (
-        <div className={styles.row}>
-          <Field label={t.models} className={styles.grow}>
-            <Select value={d.modelDraft || ""} disabled={fieldDisabled} onChange={(e) => props.onModelChange(uuid, e.currentTarget.value)}>
-              {modelOptions.map((model) => <option key={model.id} value={model.id}>{model.label}</option>)}
-            </Select>
-          </Field>
-          <Button appearance="secondary" disabled={locked || hasUnsavedDrafts || d.modelFetch === "loading"} icon={d.modelFetch === "loading" ? <Spinner size="tiny" /> : undefined} onClick={() => props.onFetchModels(uuid)} data-testid="fetch-models">
-            {d.modelFetch === "loading" ? t.loadingModels : t.fetchModels}
-          </Button>
-        </div>
-      ) : (
-        <Field label={t.models}>
-          <Input placeholder={t.manualModelPlaceholder} value={d.modelDraft} disabled={fieldDisabled} onChange={(e) => props.onModelInput(uuid, e.currentTarget.value)} />
-        </Field>
-      )}
-      {hasUnsavedDrafts && <Text size={200} className={styles.muted} role="status">{t.saveFirstToFetch}</Text>}
+          <Setting
+            label={t.models}
+            description={hasUnsavedDrafts ? t.saveFirstToFetch : undefined}
+            control={
+              <div className={styles.row} style={controlStyle}>
+                {detail.modelFetch !== "error" && canListModels ? (
+                  <Select aria-label={t.models} value={detail.modelDraft || ""} disabled={fieldDisabled} onChange={(event) => props.onModelChange(uuid, event.currentTarget.value)} style={{ flexGrow: 1 }}>
+                    {modelOptions.map((model) => <option key={model.id} value={model.id}>{model.label}</option>)}
+                  </Select>
+                ) : (
+                  <Input aria-label={t.models} placeholder={t.manualModelPlaceholder} value={detail.modelDraft} disabled={fieldDisabled} onChange={(_, data) => props.onModelInput(uuid, data.value)} style={{ flexGrow: 1 }} />
+                )}
+                {canListModels ? <Button appearance="secondary" disabled={locked || hasUnsavedDrafts || detail.modelFetch === "loading"} icon={detail.modelFetch === "loading" ? <Spinner size="tiny" /> : undefined} onClick={() => props.onFetchModels(uuid)} data-testid="fetch-models">{detail.modelFetch === "loading" ? t.loadingModels : t.fetchModels}</Button> : null}
+              </div>
+            }
+          />
 
-      <div className={styles.rowWrap}>
-        <Button appearance="primary" icon={d.saveState === "saving" ? <Spinner size="tiny" /> : undefined} disabled={d.saveState === "saving" || isReloading || locked} onClick={() => props.onSaveProfile(uuid)}>{t.saveProfile}</Button>
-        {d.saveState === "saved" && <Text className={styles.success}>{t.profileSaved}</Text>}
-      </div>
+          <Setting
+            label={t.saveProfile}
+            control={
+              <div className={styles.rowWrap} style={controlStyle}>
+                <Button appearance="primary" icon={detail.saveState === "saving" ? <Spinner size="tiny" /> : undefined} disabled={detail.saveState === "saving" || isReloading || locked} onClick={() => props.onSaveProfile(uuid)}>{t.saveProfile}</Button>
+                {detail.saveState === "saved" ? <Text className={styles.success}>{t.profileSaved}</Text> : null}
+              </div>
+            }
+          />
+        </SettingGroup>
 
-      {!d.provider.needs_key ? (
-        <Text size={300} className={styles.muted}>{t.noKeyRequired}</Text>
-      ) : d.provider.hasKey ? (
-        <Badge appearance="tint" color="success">{t.keySaved}</Badge>
-      ) : (
-        <div className={styles.row}>
-          <Field label={t.apiKey} validationMessage={d.keyError || undefined} validationState={d.keyError ? "error" : "none"} className={styles.grow}>
-            <Input type="password" placeholder={t.apiKeyPlaceholder} value={d.keyText} disabled={d.saveState === "saving" || locked} onChange={(e) => props.onKeyInput(uuid, e.currentTarget.value)} />
-          </Field>
-          <Button appearance="primary" disabled={d.keyText.trim().length === 0 || locked || d.saveState === "saving"} icon={d.saveState === "saving" ? <Spinner size="tiny" /> : undefined} onClick={() => props.onSaveKey(uuid)}>{t.saveKey}</Button>
-        </div>
-      )}
+        <SettingGroup title={t.apiKey}>
+          <Setting
+            label={t.apiKey}
+            description={!detail.provider.needs_key ? t.noKeyRequired : detail.provider.hasKey ? t.keySaved : undefined}
+            control={
+              !detail.provider.needs_key ? <Badge appearance="tint" color="subtle">{t.noKeyRequired}</Badge>
+                : detail.provider.hasKey ? <Badge appearance="tint" color="success">{t.keySaved}</Badge>
+                  : (
+                    <div className={styles.row} style={controlStyle}>
+                      <Field validationMessage={detail.keyError || undefined} validationState={detail.keyError ? "error" : "none"} style={{ flexGrow: 1 }}>
+                        <Input type="password" aria-label={t.apiKey} placeholder={t.apiKeyPlaceholder} value={detail.keyText} disabled={detail.saveState === "saving" || locked} onChange={(_, data) => props.onKeyInput(uuid, data.value)} />
+                      </Field>
+                      <Button appearance="primary" disabled={detail.keyText.trim().length === 0 || locked || detail.saveState === "saving"} icon={detail.saveState === "saving" ? <Spinner size="tiny" /> : undefined} onClick={() => props.onSaveKey(uuid)}>{t.saveKey}</Button>
+                    </div>
+                  )
+            }
+          />
+        </SettingGroup>
 
-      <div className={styles.rowWrap}>
-        <Button appearance="secondary" icon={conn === "testing" ? <Spinner size="tiny" /> : undefined} disabled={locked || hasUnsavedDrafts || conn === "testing"} onClick={() => props.onTestConnection(uuid)} data-testid="test-connection">{t.testConnection}</Button>
-        {connResult && (
-          <>
-            <Badge appearance="tint" color={connResult.ok ? "success" : "danger"}>{connResult.ok ? t.connectionOk : t.connectionFailed}</Badge>
-            <Text size={300} className={styles.muted}>{connResult.message}{typeof connResult.latency_ms === "number" && ` · ${connResult.latency_ms}ms`}</Text>
-          </>
-        )}
-      </div>
-      {hasUnsavedDrafts && <Text size={200} className={styles.muted} role="status">{t.saveFirstToTest}</Text>}
-
-      <div className={styles.rowWrap}>
-        <Text weight="semibold">{t.balance.title}</Text>
-        {d.provider.capabilities.balance ? (
-          <><Button appearance="subtle" size="small" onClick={() => props.onFetchBalance(uuid)}>{t.balance.fetch}</Button>{props.balanceText && <Text size={300} className={styles.muted}>{props.balanceText}</Text>}</>
-        ) : <Text size={300} className={styles.muted}>{t.balance.unsupportedNote}</Text>}
-      </div>
+        <SettingGroup title={t.testConnection}>
+          <Setting
+            label={t.testConnection}
+            description={connectionResult ? `${connectionResult.message}${typeof connectionResult.latency_ms === "number" ? ` · ${connectionResult.latency_ms}ms` : ""}` : hasUnsavedDrafts ? t.saveFirstToTest : undefined}
+            control={
+              <div className={styles.rowWrap} style={controlStyle}>
+                <Button appearance="secondary" icon={connection === "testing" ? <Spinner size="tiny" /> : undefined} disabled={locked || hasUnsavedDrafts || connection === "testing"} onClick={() => props.onTestConnection(uuid)} data-testid="test-connection">{t.testConnection}</Button>
+                {connectionResult ? <Badge appearance="tint" color={connectionResult.ok ? "success" : "danger"}>{connectionResult.ok ? t.connectionOk : t.connectionFailed}</Badge> : null}
+              </div>
+            }
+          />
+          <Setting
+            label={t.balance.title}
+            description={!detail.provider.capabilities.balance ? t.balance.unsupportedNote : props.balanceText}
+            control={detail.provider.capabilities.balance ? <Button appearance="subtle" size="small" onClick={() => props.onFetchBalance(uuid)}>{t.balance.fetch}</Button> : <Text size={300}>{t.balance.unsupportedNote}</Text>}
+          />
+        </SettingGroup>
+      </SettingGroupList>
     </div>
   );
 }

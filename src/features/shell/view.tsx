@@ -1,15 +1,11 @@
-import { useEffect, useState, type ReactElement, type ReactNode } from "react";
+import type { ReactElement, ReactNode } from "react";
 import {
   Button,
   MessageBar,
   MessageBarBody,
   MessageBarTitle,
-  NavDrawer,
-  NavDrawerBody,
-  NavItem,
   Text,
   makeStyles,
-  tokens,
 } from "@fluentui/react-components";
 import {
   ArrowSyncRegular,
@@ -23,52 +19,28 @@ import {
 } from "@fluentui/react-icons";
 import { SHELL_COPY } from "./copy";
 import { SETTINGS_SECTIONS, type SettingsSection } from "./model";
+import { SettingsLayout, SettingsNavigation } from "../../ui/ueli";
 
 // Layout structure follows Ueli's MIT-licensed Fluent UI settings renderer at
-// commit f04ebdd82df7; LinguaRay state and all Tauri calls stay outside the view.
+// commit f04ebdd82df71949d6b685ca7f2e5dd7e9b1bf90; LinguaRay state and all
+// Tauri calls stay outside the view.
 const useStyles = makeStyles({
-  shell: {
-    height: "100vh",
-    display: "flex",
-    overflow: "hidden",
-    backgroundColor: tokens.colorNeutralBackground1,
-    color: tokens.colorNeutralForeground1,
-  },
-  navigation: {
-    height: "100vh",
-    flexShrink: 0,
-    overflow: "hidden",
-    borderRight: `${tokens.strokeWidthThin} solid ${tokens.colorNeutralStroke2}`,
-    transitionProperty: "width",
-    transitionDuration: tokens.durationNormal,
-  },
-  drawer: {
-    width: "100%",
-    minWidth: "unset",
-    height: "100%",
-  },
-  main: {
-    minWidth: 0,
-    flexGrow: 1,
-    overflowY: "auto",
-    padding: tokens.spacingHorizontalL,
-  },
   banner: {
-    marginBottom: tokens.spacingVerticalL,
+    marginBottom: "20px",
   },
   bannerRow: {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
     flexWrap: "wrap",
-    gap: tokens.spacingHorizontalM,
+    gap: "12px",
   },
   bannerCopy: {
     flex: "1 1 16rem",
   },
   bannerActions: {
     display: "flex",
-    gap: tokens.spacingHorizontalXS,
+    gap: "6px",
   },
 });
 
@@ -94,101 +66,60 @@ export type SettingsShellViewProps = {
   onOpenA11ySettings: () => void;
 };
 
-/** Wide breakpoint: >=700px shows full labels; 600-699px collapses to a rail. */
-const WIDE_QUERY = "(min-width: 700px)";
-
 /**
- * Pure presentational settings shell. Fluent UI owns controls, states, focus,
- * theme and accessibility; this component only chooses the desktop layout.
+ * Ueli's settings renderer with LinguaRay navigation/state injected through
+ * props. The shell contains no Tauri or controller imports.
  */
 export function SettingsShellView(props: SettingsShellViewProps) {
   const styles = useStyles();
   const t = SHELL_COPY[props.locale];
-  const [wide, setWide] = useState(
-    typeof window !== "undefined" && window.matchMedia
-      ? window.matchMedia(WIDE_QUERY).matches
-      : true,
-  );
-
-  useEffect(() => {
-    if (typeof window === "undefined" || !window.matchMedia) return;
-    const mql = window.matchMedia(WIDE_QUERY);
-    const onChange = (event: MediaQueryListEvent) => setWide(event.matches);
-    mql.addEventListener("change", onChange);
-    return () => mql.removeEventListener("change", onChange);
-  }, []);
-
-  const layout = wide ? "full" : "rail";
+  const items = SETTINGS_SECTIONS.map((section) => ({
+    value: section,
+    label: t.nav[section],
+    icon: SECTION_ICONS[section],
+  }));
 
   return (
     <div
-      className={styles.shell}
+      style={{ height: "100vh", overflow: "hidden" }}
       data-testid="shell"
       data-page={props.active}
-      data-layout={layout}
+      data-layout="ueli"
     >
-      <div className={styles.navigation} style={{ width: wide ? 220 : 64 }}>
-        <NavDrawer
-          open
-          type="inline"
-          density="small"
-          selectedValue={props.active}
-          aria-label={t.navLabel}
-          className={styles.drawer}
-        >
-          <NavDrawerBody>
-            {SETTINGS_SECTIONS.map((section) => (
-              <NavItem
-                key={section}
-                value={section}
-                href="#"
-                icon={SECTION_ICONS[section]}
-                aria-label={t.nav[section]}
-                onClick={(event) => {
-                  event.preventDefault();
-                  props.onNavigate(section);
-                }}
-              >
-                {wide ? t.nav[section] : null}
-              </NavItem>
-            ))}
-          </NavDrawerBody>
-        </NavDrawer>
-      </div>
-
-      <main className={styles.main}>
-        {props.a11yGranted === false && (
-          <MessageBar intent="warning" className={styles.banner} data-testid="a11y-banner">
-            <MessageBarBody>
-              <div className={styles.bannerRow}>
-                <div className={styles.bannerCopy}>
-                  <MessageBarTitle>{t.a11y.title}</MessageBarTitle>
-                  <Text size={300}>{t.a11y.hint}</Text>
+      <SettingsLayout
+        navigation={
+          <SettingsNavigation
+            label={t.navLabel}
+            active={props.active}
+            items={items}
+            onNavigate={props.onNavigate}
+          />
+        }
+      >
+        <main>
+          {props.a11yGranted === false && (
+            <MessageBar intent="warning" className={styles.banner} data-testid="a11y-banner">
+              <MessageBarBody>
+                <div className={styles.bannerRow}>
+                  <div className={styles.bannerCopy}>
+                    <MessageBarTitle>{t.a11y.title}</MessageBarTitle>
+                    <Text size={300}>{t.a11y.hint}</Text>
+                  </div>
+                  <div className={styles.bannerActions}>
+                    <Button appearance="subtle" size="small" onClick={props.onRecheckA11y} data-testid="a11y-recheck">
+                      {t.a11y.recheck}
+                    </Button>
+                    <Button appearance="secondary" size="small" onClick={props.onOpenA11ySettings} data-testid="a11y-open-settings">
+                      {t.a11y.openSettings}
+                    </Button>
+                  </div>
                 </div>
-                <div className={styles.bannerActions}>
-                  <Button
-                    appearance="subtle"
-                    size="small"
-                    onClick={props.onRecheckA11y}
-                    data-testid="a11y-recheck"
-                  >
-                    {t.a11y.recheck}
-                  </Button>
-                  <Button
-                    appearance="secondary"
-                    size="small"
-                    onClick={props.onOpenA11ySettings}
-                    data-testid="a11y-open-settings"
-                  >
-                    {t.a11y.openSettings}
-                  </Button>
-                </div>
-              </div>
-            </MessageBarBody>
-          </MessageBar>
-        )}
-        {props.children}
-      </main>
+              </MessageBarBody>
+            </MessageBar>
+          )}
+          {props.children}
+        </main>
+      </SettingsLayout>
     </div>
   );
 }

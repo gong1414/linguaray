@@ -9,8 +9,8 @@
 # 产出: docs/baselines/real-app/<窗口名>.png（提交入库作为对照基线）。
 # 说明: 通过 LINGUARAY_AUTOSHOW_{MAIN,INPUT,POPUP,OCR} 环境变量直启打包后的
 # 二进制（绕过托盘隐藏），再按窗口逻辑尺寸用 scripts/listwin.swift 定位
-# CGWindowID 后 screencapture 抓取（尺寸来自 tauri.conf.json：input 420×280、
-# popup 360×180；ocr 为全屏覆盖层取最大面积窗口）。修改 UI 的提交必须更新
+# CGWindowID 后 screencapture 抓取（尺寸来自 tauri.conf.json：input 720×440、
+# popup 460×300；ocr 为全屏覆盖层取最大面积窗口）。修改 UI 的提交必须更新
 # 基线并在 PR 中附新旧对照。终端需要屏幕录制权限，否则截图只有壁纸。
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -77,9 +77,9 @@ select_window_id() {
   if [[ "$WINDOW" == "ocr" ]]; then
     want_w=0; want_h=0; mode="max"
   elif [[ "$WINDOW" == "input" ]]; then
-    want_w=420; want_h=280; mode="exact"
+    want_w=720; want_h=440; mode="exact"
   else
-    want_w=360; want_h=180; mode="exact"   # popup
+    want_w=460; want_h=300; mode="exact"   # popup
   fi
   swift scripts/listwin.swift | awk -v w="$want_w" -v h="$want_h" -v mode="$mode" '
     {

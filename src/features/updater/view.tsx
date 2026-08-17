@@ -33,11 +33,11 @@ export function UpdaterPanelView({ c }: { c: UpdaterController }) {
   return (
     <section className={styles.page} data-testid="updater-panel" aria-label={t.title}>
       <div className={styles.rowBetween}>
-        <Text as="h2" size={500} weight="semibold" className={styles.title}>{t.title}</Text>
+        <Text as="h2" size={300} weight="semibold" className={styles.title}>{t.title}</Text>
         {knownVersion && <Text size={300} className={styles.muted} data-testid="updater-current-version">{t.currentVersion}: {knownVersion}</Text>}
       </div>
 
-      <Card appearance="outline" data-testid="updater-status">
+      <Card appearance="filled-alternative" data-testid="updater-status">
         <div className={styles.stack}>
           {phase.kind === "checking" && <div className={styles.row}><Spinner size="tiny" /><Text size={300}>{t.status.checking}</Text></div>}
           {phase.kind === "upToDate" && <Text>{t.status.upToDate}</Text>}
