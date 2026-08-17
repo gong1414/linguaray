@@ -1,18 +1,6 @@
 import { useEffect, useRef } from "react";
-import {
-  Badge,
-  Button,
-  Card,
-  MessageBar,
-  MessageBarBody,
-  MessageBarTitle,
-  ProgressBar,
-  Spinner,
-  Text,
-  makeStyles,
-  tokens,
-} from "@fluentui/react-components";
-import { SettingsRegular } from "@fluentui/react-icons";
+import { Alert, Button, Card, Progress, Spin, Tag, Typography } from "antd";
+import { SettingOutlined } from "@ant-design/icons";
 import { ONBOARDING_COPY, type Locale } from "./copy";
 import { STEP_ORDER, type OnboardingStepName, type PermissionState, type ShortcutCombo } from "./model";
 
@@ -36,57 +24,16 @@ export type OnboardingViewProps = {
   onFinish: (openSettings: boolean) => void;
 };
 
-const useStyles = makeStyles({
-  shell: {
-    height: "100vh",
-    display: "flex",
-    flexDirection: "column",
-    minHeight: 0,
-    color: tokens.colorNeutralForeground1,
-    backgroundColor: tokens.colorNeutralBackground1,
-  },
-  progress: {
-    padding: `${tokens.spacingVerticalS} ${tokens.spacingHorizontalM} 0`,
-    display: "flex",
-    flexDirection: "column",
-    gap: tokens.spacingVerticalXS,
-  },
-  content: {
-    flex: "1 1 auto",
-    minHeight: 0,
-    overflowY: "auto",
-    display: "flex",
-    flexDirection: "column",
-    gap: tokens.spacingVerticalS,
-    padding: tokens.spacingHorizontalM,
-  },
-  title: { margin: 0 },
-  desc: { whiteSpace: "pre-line", color: tokens.colorNeutralForeground2 },
-  card: { width: "100%" },
-  row: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: tokens.spacingHorizontalM },
-  stack: { display: "flex", flexDirection: "column", gap: tokens.spacingVerticalXS },
-  end: { display: "flex", justifyContent: "flex-end", gap: tokens.spacingHorizontalS, flexWrap: "wrap" },
-  footer: {
-    flex: "0 0 auto",
-    display: "flex",
-    justifyContent: "flex-end",
-    gap: tokens.spacingHorizontalS,
-    padding: `${tokens.spacingVerticalS} ${tokens.spacingHorizontalM}`,
-    borderTop: `${tokens.strokeWidthThin} solid ${tokens.colorNeutralStroke2}`,
-  },
-  monospace: { fontFamily: '"SF Mono", "Cascadia Code", Consolas, monospace' },
-});
-
-const BADGE_COLOR: Record<PermissionState, "subtle" | "success" | "warning" | "danger"> = {
-  checking: "subtle",
+const BADGE_COLOR: Record<PermissionState, string> = {
+  checking: "default",
   granted: "success",
   denied: "warning",
-  error: "danger",
-  unsupported: "subtle",
+  error: "error",
+  unsupported: "default",
 };
 
 function StatusBadge({ state, labels }: { state: PermissionState; labels: Record<string, string> }) {
-  return <Badge appearance="tint" color={BADGE_COLOR[state]} role="status">{labels[state] ?? state}</Badge>;
+  return <Tag color={BADGE_COLOR[state]} role="status">{labels[state] ?? state}</Tag>;
 }
 
 function stepTitle(t: (typeof ONBOARDING_COPY)[Locale], step: OnboardingStepName): string {
@@ -98,97 +45,55 @@ function stepTitle(t: (typeof ONBOARDING_COPY)[Locale], step: OnboardingStepName
   return t.shortcuts.title;
 }
 
-/** Pure presentational onboarding (props + callbacks only). */
+/** Pure presentational Ant Design onboarding (props + callbacks only). */
 export function OnboardingView(props: OnboardingViewProps) {
   const t = ONBOARDING_COPY[props.locale];
-  const styles = useStyles();
   const titleRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => titleRef.current?.focus(), [props.step]);
   const stepIndex = STEP_ORDER.indexOf(props.step);
-  const providerHint = props.providerCount === null
-    ? t.provider.checking
-    : props.providerCount === 0 ? t.provider.noneBody : t.provider.count(props.providerCount);
+  const providerHint = props.providerCount === null ? t.provider.checking : props.providerCount === 0 ? t.provider.noneBody : t.provider.count(props.providerCount);
 
   return (
-    <main className={styles.shell} data-step={props.step} data-testid="onboarding">
-      <div className={styles.progress}>
-        <div className={styles.row}>
-          <Text size={200} weight="semibold">{t.brand}</Text>
-          <Text size={200}>{t.stepLabels[props.step]} · {stepIndex + 1}/{STEP_ORDER.length}</Text>
-        </div>
-        <ProgressBar value={(stepIndex + 1) / STEP_ORDER.length} aria-label={t.brand} />
+    <main className="lr-onboarding" data-step={props.step} data-testid="onboarding">
+      <div className="lr-onboarding-progress">
+        <div className="lr-row-between"><Typography.Text strong>{t.brand}</Typography.Text><Typography.Text type="secondary">{t.stepLabels[props.step]} · {stepIndex + 1}/{STEP_ORDER.length}</Typography.Text></div>
+        <Progress percent={Math.round(((stepIndex + 1) / STEP_ORDER.length) * 100)} showInfo={false} aria-label={t.brand} />
       </div>
-
-      <div className={styles.content}>
-        <Text as="h1" size={600} weight="semibold" ref={titleRef} tabIndex={-1} className={styles.title} data-testid="onboarding-title">
-          {stepTitle(t, props.step)}
-        </Text>
-
-        {props.step === "welcome" && <Text size={300} className={styles.desc}>{t.welcome.body}</Text>}
-
-        {props.step === "accessibility" && (
+      <div className="lr-onboarding-content">
+        <Typography.Title level={1} ref={titleRef} tabIndex={-1} className="lr-title" data-testid="onboarding-title">{stepTitle(t, props.step)}</Typography.Title>
+        {props.step === "welcome" ? <Typography.Paragraph type="secondary">{t.welcome.body}</Typography.Paragraph> : null}
+        {props.step === "accessibility" ? (
           <>
-            <Text size={300} className={styles.desc}>{t.a11y.body}</Text>
-            <Card appearance="outline" size="small" className={styles.card}>
-              <div className={styles.stack}>
-                <div className={styles.row}><Text>{t.a11y.title}</Text><StatusBadge state={props.a11y} labels={t.a11y.status} /></div>
-                <div className={styles.end}><Button appearance="secondary" size="small" icon={<SettingsRegular />} onClick={props.onOpenA11ySettings} disabled={props.a11y === "unsupported"}>{t.a11y.openSettings}</Button></div>
-              </div>
-            </Card>
-            <Card appearance="outline" size="small" className={styles.card}>
-              <div className={styles.stack}>
-                <div className={styles.row}><Text>{t.a11y.screenTitle}</Text><StatusBadge state={props.screenCapture} labels={t.a11y.status} /></div>
-                <Text size={200} className={styles.desc}>{t.a11y.screenBody}</Text>
-                <div className={styles.end}><Button appearance="secondary" size="small" icon={<SettingsRegular />} onClick={props.onOpenScreenCaptureSettings} disabled={props.screenCapture === "unsupported"}>{t.a11y.openScreenSettings}</Button></div>
-              </div>
-            </Card>
-            <Button appearance="subtle" size="small" onClick={props.onRecheckPermissions} disabled={props.advancing}>{t.a11y.recheck}</Button>
+            <Typography.Paragraph type="secondary">{t.a11y.body}</Typography.Paragraph>
+            <Card size="small"><div className="lr-stack-tight"><div className="lr-row-between"><Typography.Text>{t.a11y.title}</Typography.Text><StatusBadge state={props.a11y} labels={t.a11y.status} /></div><div className="lr-end"><Button icon={<SettingOutlined aria-hidden />} onClick={props.onOpenA11ySettings} disabled={props.a11y === "unsupported"}>{t.a11y.openSettings}</Button></div></div></Card>
+            <Card size="small"><div className="lr-stack-tight"><div className="lr-row-between"><Typography.Text>{t.a11y.screenTitle}</Typography.Text><StatusBadge state={props.screenCapture} labels={t.a11y.status} /></div><Typography.Text type="secondary">{t.a11y.screenBody}</Typography.Text><div className="lr-end"><Button icon={<SettingOutlined aria-hidden />} onClick={props.onOpenScreenCaptureSettings} disabled={props.screenCapture === "unsupported"}>{t.a11y.openScreenSettings}</Button></div></div></Card>
+            <Button type="text" onClick={props.onRecheckPermissions} disabled={props.advancing}>{t.a11y.recheck}</Button>
           </>
-        )}
-
-        {props.step === "provider" && (
+        ) : null}
+        {props.step === "provider" ? (
           <>
-            <Text size={300} className={styles.desc}>{t.provider.body}</Text>
-            <Card appearance="outline" size="small" className={styles.card}>
-              <div className={styles.stack}>
-                <Text size={300}>{providerHint}</Text>
-                <div className={styles.end}><Button appearance="secondary" size="small" icon={<SettingsRegular />} onClick={props.onOpenProviderSettings}>{t.provider.openSettings}</Button></div>
-              </div>
-            </Card>
+            <Typography.Paragraph type="secondary">{t.provider.body}</Typography.Paragraph>
+            <Card size="small"><div className="lr-stack-tight"><Typography.Text>{providerHint}</Typography.Text><div className="lr-end"><Button icon={<SettingOutlined aria-hidden />} onClick={props.onOpenProviderSettings}>{t.provider.openSettings}</Button></div></div></Card>
           </>
-        )}
-
-        {props.step === "history" && <Text size={300} className={styles.desc}>{t.history.body}</Text>}
-
-        {props.step === "shortcuts" && (
+        ) : null}
+        {props.step === "history" ? <Typography.Paragraph type="secondary">{t.history.body}</Typography.Paragraph> : null}
+        {props.step === "shortcuts" ? (
           <>
-            <Text size={300} className={styles.desc}>{t.shortcuts.body}</Text>
-            <Card appearance="outline" size="small" className={styles.card} data-testid="onboarding-shortcuts">
-              <div className={styles.stack}>
-                {props.shortcuts.map((shortcut) => (
-                  <div key={shortcut.action} className={styles.row}>
-                    <Text>{t.shortcuts.combos[shortcut.action] ?? shortcut.action}</Text>
-                    <Badge appearance="tint"><kbd className={styles.monospace}>{shortcut.combo}</kbd></Badge>
-                  </div>
-                ))}
-              </div>
-            </Card>
-            <Button appearance="subtle" size="small" icon={<SettingsRegular />} onClick={props.onOpenShortcutsSettings}>{t.shortcuts.openSettings}</Button>
+            <Typography.Paragraph type="secondary">{t.shortcuts.body}</Typography.Paragraph>
+            <Card size="small" data-testid="onboarding-shortcuts"><div className="lr-stack-tight">{props.shortcuts.map((shortcut) => <div key={shortcut.action} className="lr-row-between"><Typography.Text>{t.shortcuts.combos[shortcut.action] ?? shortcut.action}</Typography.Text><Tag><kbd className="lr-monospace">{shortcut.combo}</kbd></Tag></div>)}</div></Card>
+            <Button type="text" icon={<SettingOutlined aria-hidden />} onClick={props.onOpenShortcutsSettings}>{t.shortcuts.openSettings}</Button>
           </>
-        )}
-
-        {props.step === "done" && <Text size={300} className={styles.desc}>{t.done.body}</Text>}
-
-        {props.error && <MessageBar intent="error" role="alert" data-testid="onboarding-error"><MessageBarBody><MessageBarTitle>{t.errorPrefix}</MessageBarTitle>{props.error}</MessageBarBody></MessageBar>}
+        ) : null}
+        {props.step === "done" ? <Typography.Paragraph type="secondary">{t.done.body}</Typography.Paragraph> : null}
+        {props.error ? <Alert type="error" showIcon title={t.errorPrefix} description={props.error} role="alert" data-testid="onboarding-error" /> : null}
       </div>
-
-      <div className={styles.footer}>
-        {props.step === "welcome" && <Button appearance="primary" onClick={() => props.onAdvance("start")}>{t.welcome.start}</Button>}
-        {props.step === "accessibility" && <><Button appearance="subtle" onClick={() => props.onAdvance("skip")} disabled={props.advancing}>{t.a11y.later}</Button><Button appearance="primary" onClick={() => props.onAdvance("continue")} disabled={props.advancing || props.a11y === "checking"}>{t.a11y.continue}</Button></>}
-        {props.step === "provider" && <Button appearance="primary" onClick={() => props.onAdvance("continue")} disabled={props.advancing}>{t.provider.continue}</Button>}
-        {props.step === "history" && <><Button appearance="subtle" onClick={() => props.onAdvance("skip")} disabled={props.advancing || props.historyBusy}>{t.history.skip}</Button><Button appearance="primary" icon={props.historyBusy ? <Spinner size="tiny" /> : undefined} onClick={props.onEnableHistory} disabled={props.advancing || props.historyBusy}>{props.historyBusy ? t.history.enabling : t.history.enable}</Button></>}
-        {props.step === "shortcuts" && <Button appearance="primary" onClick={() => props.onAdvance("complete")} disabled={props.advancing}>{t.shortcuts.continue}</Button>}
-        {props.step === "done" && <><Button appearance="subtle" onClick={() => props.onFinish(false)}>{t.done.tray}</Button><Button appearance="primary" onClick={() => props.onFinish(true)}>{t.done.openApp}</Button></>}
+      <div className="lr-onboarding-footer">
+        {props.step === "welcome" ? <Button type="primary" onClick={() => props.onAdvance("start")}>{t.welcome.start}</Button> : null}
+        {props.step === "accessibility" ? <><Button type="text" onClick={() => props.onAdvance("skip")} disabled={props.advancing}>{t.a11y.later}</Button><Button type="primary" onClick={() => props.onAdvance("continue")} disabled={props.advancing || props.a11y === "checking"}>{t.a11y.continue}</Button></> : null}
+        {props.step === "provider" ? <Button type="primary" onClick={() => props.onAdvance("continue")} disabled={props.advancing}>{t.provider.continue}</Button> : null}
+        {props.step === "history" ? <><Button type="text" onClick={() => props.onAdvance("skip")} disabled={props.advancing || props.historyBusy}>{t.history.skip}</Button><Button type="primary" icon={props.historyBusy ? <Spin size="small" /> : undefined} onClick={props.onEnableHistory} disabled={props.advancing || props.historyBusy}>{props.historyBusy ? t.history.enabling : t.history.enable}</Button></> : null}
+        {props.step === "shortcuts" ? <Button type="primary" onClick={() => props.onAdvance("complete")} disabled={props.advancing}>{t.shortcuts.continue}</Button> : null}
+        {props.step === "done" ? <><Button type="text" onClick={() => props.onFinish(false)}>{t.done.tray}</Button><Button type="primary" onClick={() => props.onFinish(true)}>{t.done.openApp}</Button></> : null}
       </div>
     </main>
   );

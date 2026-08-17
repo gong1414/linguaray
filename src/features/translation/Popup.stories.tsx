@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { FluentProvider, webDarkTheme } from "@fluentui/react-components";
 import PopupView from "./PopupView";
 import type { PopupController } from "./popupController";
 import type { TranslationState } from "./types";
@@ -70,13 +69,6 @@ export const LongChinese: StoryObj<typeof PopupView> = {
   },
 };
 export const Dark: StoryObj<typeof PopupView> = {
-  parameters: { backgrounds: { default: "dark" } },
-  decorators: [
-    (Story) => (
-      <FluentProvider theme={webDarkTheme}>
-        <Story />
-      </FluentProvider>
-    ),
-  ],
+  parameters: { colorScheme: "dark", backgrounds: { default: "dark" } },
   args: { c: fake(single) },
 };

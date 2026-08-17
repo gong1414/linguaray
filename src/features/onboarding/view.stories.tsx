@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { FluentProvider, webDarkTheme } from "@fluentui/react-components";
 import { OnboardingView, type OnboardingViewProps } from "./view";
 import { STEP_ORDER } from "./model";
 /**
@@ -102,14 +101,7 @@ export const LongChinese: StoryObj<typeof OnboardingView> = {
 };
 
 export const Dark: StoryObj<typeof OnboardingView> = {
-  parameters: { backgrounds: { default: "dark" } },
-  decorators: [
-    (Story) => (
-      <FluentProvider theme={webDarkTheme}>
-        <Story />
-      </FluentProvider>
-    ),
-  ],
+  parameters: { colorScheme: "dark", backgrounds: { default: "dark" } },
   args: { ...base, step: "accessibility", a11y: "denied" },
 };
 
@@ -138,7 +130,7 @@ export const EveryStep: StoryObj<typeof OnboardingView> = {
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
       {STEP_ORDER.map((step) => (
         <div key={step}>
-          <div style={{ fontSize: 12, opacity: 0.6, marginBottom: 4 }}>{step}</div>
+          <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 4 }}>{step}</div>
           <OnboardingView {...args} step={step} />
         </div>
       ))}

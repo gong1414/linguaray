@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { FluentProvider, webDarkTheme } from "@fluentui/react-components";
 import { PrivacyView, type PrivacyViewProps } from "./view";
 
 const base: PrivacyViewProps = {
@@ -68,14 +67,7 @@ export const LongChinese: StoryObj<typeof PrivacyView> = {
 };
 
 export const Dark: StoryObj<typeof PrivacyView> = {
-  parameters: { backgrounds: { default: "dark" } },
-  decorators: [
-    (Story) => (
-      <FluentProvider theme={webDarkTheme}>
-        <Story />
-      </FluentProvider>
-    ),
-  ],
+  parameters: { colorScheme: "dark", backgrounds: { default: "dark" } },
   args: { ...base, locale: "zh", external: { state: "enabled", port: 8787 }, tokenOnce: "lray_zh" },
 };
 

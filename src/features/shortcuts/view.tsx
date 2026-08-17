@@ -1,20 +1,5 @@
-import {
-  Badge,
-  Button,
-  Dialog,
-  DialogActions,
-  DialogBody,
-  DialogContent,
-  DialogSurface,
-  DialogTitle,
-  MessageBar,
-  MessageBarActions,
-  MessageBarBody,
-  MessageBarTitle,
-  Spinner,
-  Text,
-} from "@fluentui/react-components";
-import { Setting, SettingGroup, SettingGroupList } from "../../ui/ueli";
+import { Alert, Button, Modal, Spin, Tag, Typography } from "antd";
+import { Setting, SettingGroup, SettingGroupList } from "../../ui/x";
 import { detectLocale } from "../../app/i18n";
 import { useUiStyles } from "../../ui/styles";
 import { SHORTCUTS_COPY } from "./copy";
@@ -31,7 +16,7 @@ function entryFor(snapshot: ShortcutSnapshot, action: ShortcutAction) {
   };
 }
 
-/** LinguaRay shortcuts mapped onto Ueli setting rows. */
+/** LinguaRay shortcuts mapped onto Ant Design setting rows. */
 export function ShortcutsView({ c }: { c: ShortcutsController }) {
   const t = SHORTCUTS_COPY[detectLocale()];
   const styles = useUiStyles();
@@ -39,15 +24,8 @@ export function ShortcutsView({ c }: { c: ShortcutsController }) {
   return (
     <section aria-label={t.title} data-testid="shortcuts-page">
       <SettingGroupList>
-        {c.loadError ? (
-          <MessageBar intent="error" data-testid="shortcuts-load-error">
-            <MessageBarBody><MessageBarTitle>{t.loadFailed}</MessageBarTitle></MessageBarBody>
-            <MessageBarActions><Button size="small" appearance="secondary" onClick={c.retryLoad}>{t.retry}</Button></MessageBarActions>
-          </MessageBar>
-        ) : null}
-
-        {!c.loadError && !c.snapshot ? <div className={styles.row} role="status"><Spinner size="tiny" /><Text size={300}>{t.loading}</Text></div> : null}
-
+        {c.loadError ? <Alert type="error" showIcon title={t.loadFailed} action={<Button onClick={c.retryLoad}>{t.retry}</Button>} data-testid="shortcuts-load-error" /> : null}
+        {!c.loadError && !c.snapshot ? <div className={styles.row} role="status"><Spin size="small" /><Typography.Text>{t.loading}</Typography.Text></div> : null}
         {c.snapshot ? (
           <SettingGroup title={t.title}>
             {SHORTCUT_ACTIONS.map((action) => {
@@ -57,7 +35,6 @@ export function ShortcutsView({ c }: { c: ShortcutsController }) {
               const registrationFailed = c.localFailures[action] || entry.registration_state === "registration_failed";
               const changeLabel = t.changeLabel.replace("{action}", t.actions[action]);
               const description = !entry.available ? t.unavailable : registrationFailed ? t.registrationFailed : undefined;
-
               return (
                 <div key={action} data-action={action}>
                   <Setting
@@ -67,60 +44,45 @@ export function ShortcutsView({ c }: { c: ShortcutsController }) {
                       <div className={styles.rowWrap}>
                         {isRecording ? (
                           <>
-                            <Button appearance="secondary" size="small" aria-label={t.recordingPrompt} data-recorder-action={action} onKeyDown={c.onRecorderKeyDown}>
-                              {t.recordingPrompt} <span className={styles.monospace}>{c.recordedCombo || "…"}</span>
-                            </Button>
-                            <Button appearance="subtle" size="small" onClick={c.cancelRecording}>{t.cancel}</Button>
+                            <Button aria-label={t.recordingPrompt} data-recorder-action={action} onKeyDown={c.onRecorderKeyDown}>{t.recordingPrompt} <span className={styles.monospace}>{c.recordedCombo || "…"}</span></Button>
+                            <Button type="text" onClick={c.cancelRecording}>{t.cancel}</Button>
                           </>
                         ) : (
                           <>
-                            <Badge appearance="tint" size="large" data-testid={`shortcut-chip-${action}`}><span className={styles.monospace}>{entry.combo}</span></Badge>
-                            <Button appearance="subtle" size="small" aria-label={changeLabel} data-change-action={action} data-testid={`shortcuts-change-${action}`} disabled={!entry.available || c.busy !== null} onClick={() => c.change(action)}>{t.change}</Button>
+                            <Tag data-testid={`shortcut-chip-${action}`}><span className={styles.monospace}>{entry.combo}</span></Tag>
+                            <Button type="text" aria-label={changeLabel} data-change-action={action} data-testid={`shortcuts-change-${action}`} disabled={!entry.available || c.busy !== null} onClick={() => c.change(action)}>{t.change}</Button>
                           </>
                         )}
                       </div>
                     }
                   />
-                  {registrationFailed ? <Text size={200} className={styles.warning} data-testid={`shortcut-regfail-${action}`}>{t.registrationFailed}</Text> : null}
+                  {registrationFailed ? <Typography.Text type="warning" data-testid={`shortcut-regfail-${action}`}>{t.registrationFailed}</Typography.Text> : null}
                   {conflict ? (
-                    <MessageBar intent="warning" data-testid={`shortcut-conflict-${action}`}>
-                      <MessageBarBody>{t.conflictMessage.replace("{action}", t.actions[conflict.otherAction])}</MessageBarBody>
-                      <MessageBarActions>
-                        <Button appearance="primary" size="small" icon={c.busy === "save" ? <Spinner size="tiny" /> : undefined} disabled={c.busy === "save"} onClick={c.overrideConflict}>{t.override}</Button>
-                        <Button appearance="subtle" size="small" onClick={c.cancelRecording}>{t.cancel}</Button>
-                      </MessageBarActions>
-                    </MessageBar>
+                    <Alert
+                      type="warning"
+                      showIcon
+                      title={t.conflictMessage.replace("{action}", t.actions[conflict.otherAction])}
+                      data-testid={`shortcut-conflict-${action}`}
+                      action={<div className={styles.row}><Button type="primary" icon={c.busy === "save" ? <Spin size="small" /> : undefined} disabled={c.busy === "save"} onClick={c.overrideConflict}>{t.override}</Button><Button type="text" onClick={c.cancelRecording}>{t.cancel}</Button></div>}
+                    />
                   ) : null}
                 </div>
               );
             })}
           </SettingGroup>
         ) : null}
-
-        {c.operationError ? <MessageBar intent="error" data-testid="shortcuts-operation-error"><MessageBarBody>{c.operationError === "reset" ? t.resetFailed : t.saveFailed}</MessageBarBody></MessageBar> : null}
-
-        {c.snapshot ? (
-          <SettingGroup>
-            <Setting
-              label={t.resetDefaults}
-              control={<Button appearance="secondary" disabled={!c.differsFromDefaults || c.busy !== null} onClick={c.openReset} data-testid="shortcuts-reset-trigger">{t.resetDefaults}</Button>}
-            />
-          </SettingGroup>
-        ) : null}
+        {c.operationError ? <Alert type="error" showIcon title={c.operationError === "reset" ? t.resetFailed : t.saveFailed} data-testid="shortcuts-operation-error" /> : null}
+        {c.snapshot ? <SettingGroup><Setting label={t.resetDefaults} control={<Button disabled={!c.differsFromDefaults || c.busy !== null} onClick={c.openReset} data-testid="shortcuts-reset-trigger">{t.resetDefaults}</Button>} /></SettingGroup> : null}
       </SettingGroupList>
-
-      <Dialog open={c.resetOpen} onOpenChange={(_, data) => !data.open && c.closeReset()}>
-        <DialogSurface data-testid="shortcuts-reset-modal">
-          <DialogBody>
-            <DialogTitle>{t.resetConfirmTitle}</DialogTitle>
-            <DialogContent><Text>{t.resetConfirmMessage}</Text></DialogContent>
-            <DialogActions>
-              <Button appearance="secondary" onClick={c.closeReset}>{t.cancel}</Button>
-              <Button appearance="primary" onClick={c.reset} data-testid="shortcuts-reset-confirm">{t.useDefaults}</Button>
-            </DialogActions>
-          </DialogBody>
-        </DialogSurface>
-      </Dialog>
+      <Modal
+        open={c.resetOpen}
+        title={t.resetConfirmTitle}
+        onCancel={c.closeReset}
+        data-testid="shortcuts-reset-modal"
+        footer={[<Button key="cancel" onClick={c.closeReset}>{t.cancel}</Button>, <Button key="confirm" type="primary" onClick={c.reset} data-testid="shortcuts-reset-confirm">{t.useDefaults}</Button>]}
+      >
+        <Typography.Paragraph>{t.resetConfirmMessage}</Typography.Paragraph>
+      </Modal>
     </section>
   );
 }

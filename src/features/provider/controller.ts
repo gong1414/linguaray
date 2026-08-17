@@ -697,7 +697,7 @@ export function useProviderController() {
             firstEdit.focus();
             return;
           }
-          document.querySelector<HTMLButtonElement>("[data-testid='preset-button']")?.focus();
+          document.querySelector<HTMLElement>("[data-testid='preset-button']")?.focus();
         });
       } catch {
         if (disposedRef.current) return;

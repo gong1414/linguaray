@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { FluentProvider, webDarkTheme } from "@fluentui/react-components";
 import { HistoryView, type HistoryViewProps } from "./view";
 import type { HistoryItem } from "./model";
 
@@ -79,14 +78,7 @@ export const LongChinese: StoryObj<typeof HistoryView> = {
 };
 
 export const Dark: StoryObj<typeof HistoryView> = {
-  parameters: { backgrounds: { default: "dark" } },
-  decorators: [
-    (Story) => (
-      <FluentProvider theme={webDarkTheme}>
-        <Story />
-      </FluentProvider>
-    ),
-  ],
+  parameters: { colorScheme: "dark", backgrounds: { default: "dark" } },
   args: { ...base, locale: "zh" },
 };
 

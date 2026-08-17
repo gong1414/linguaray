@@ -1,19 +1,5 @@
-import {
-  Button,
-  Dialog,
-  DialogActions,
-  DialogBody,
-  DialogContent,
-  DialogSurface,
-  DialogTitle,
-  MessageBar,
-  MessageBarActions,
-  MessageBarBody,
-  MessageBarTitle,
-  Spinner,
-  Text,
-} from "@fluentui/react-components";
-import { DismissRegular } from "@fluentui/react-icons";
+import { Alert, Button, Modal, Spin, Typography } from "antd";
+import { CloseOutlined } from "@ant-design/icons";
 import { detectLocale } from "../../app/i18n";
 import { useUiStyles } from "../../ui/styles";
 import { PROVIDER_COPY } from "./copy";
@@ -32,19 +18,8 @@ export function ProviderCenterView({ c }: { c: ProviderController }) {
 
   return (
     <div className={styles.page} role="region" aria-label={t.providerListLabel}>
-      {c.loadError && (
-        <MessageBar intent="error">
-          <MessageBarBody><MessageBarTitle>{t.loadFailed}</MessageBarTitle></MessageBarBody>
-          <MessageBarActions><Button size="small" appearance="secondary" disabled={locked} onClick={c.onReloadFromError}>{t.reload}</Button></MessageBarActions>
-        </MessageBar>
-      )}
-      {c.selectionError && (
-        <MessageBar intent="error" data-testid="selection-error">
-          <MessageBarBody>{t.loadFailed}</MessageBarBody>
-          <MessageBarActions><Button size="small" appearance="secondary" disabled={locked} onClick={c.onRetrySelectionLoad}>{t.retry}</Button></MessageBarActions>
-        </MessageBar>
-      )}
-
+      {c.loadError ? <Alert type="error" showIcon title={t.loadFailed} action={<Button disabled={locked} onClick={c.onReloadFromError}>{t.reload}</Button>} /> : null}
+      {c.selectionError ? <Alert type="error" showIcon title={t.loadFailed} action={<Button disabled={locked} onClick={c.onRetrySelectionLoad}>{t.retry}</Button>} data-testid="selection-error" /> : null}
       <div className={styles.twoColumn}>
         <ProviderList
           t={t}
@@ -91,59 +66,39 @@ export function ProviderCenterView({ c }: { c: ProviderController }) {
         </section>
       </div>
 
-      <Dialog open={c.deleteConfirmUuid !== null} onOpenChange={(_, data) => !data.open && c.onCancelDelete()}>
-        <DialogSurface data-testid="delete-confirm">
-          <DialogBody>
-            <DialogTitle>{t.deleteConfirmTitle}</DialogTitle>
-            <DialogContent><Text>{t.deleteConfirmMsg}</Text></DialogContent>
-            <DialogActions>
-              <Button appearance="secondary" onClick={c.onCancelDelete}>{t.cancel}</Button>
-              <Button appearance="primary" icon={c.deletingUuid !== null ? <Spinner size="tiny" /> : undefined} disabled={c.deletingUuid !== null} onClick={c.onConfirmDelete}>{t.delete}</Button>
-            </DialogActions>
-          </DialogBody>
-        </DialogSurface>
-      </Dialog>
+      <Modal
+        open={c.deleteConfirmUuid !== null}
+        title={t.deleteConfirmTitle}
+        onCancel={c.onCancelDelete}
+        data-testid="delete-confirm"
+        footer={[
+          <Button key="cancel" onClick={c.onCancelDelete}>{t.cancel}</Button>,
+          <Button key="delete" type="primary" danger icon={c.deletingUuid !== null ? <Spin size="small" /> : undefined} disabled={c.deletingUuid !== null} onClick={c.onConfirmDelete}>{t.delete}</Button>,
+        ]}
+      >
+        <Typography.Paragraph>{t.deleteConfirmMsg}</Typography.Paragraph>
+      </Modal>
 
-      {c.deleteError && (
-        <MessageBar intent="error" data-testid="delete-error">
-          <MessageBarBody><MessageBarTitle>{t.saveFailed}</MessageBarTitle></MessageBarBody>
-          <MessageBarActions>
-            <Button size="small" appearance="secondary" disabled={locked} onClick={c.onRetryDelete}>{t.retry}</Button>
-            <Button size="small" appearance="subtle" onClick={c.onDismissDeleteError}>{t.cancel}</Button>
-          </MessageBarActions>
-        </MessageBar>
-      )}
+      {c.deleteError ? <Alert type="error" showIcon title={t.saveFailed} action={<div className={styles.row}><Button disabled={locked} onClick={c.onRetryDelete}>{t.retry}</Button><Button type="text" onClick={c.onDismissDeleteError}>{t.cancel}</Button></div>} data-testid="delete-error" /> : null}
 
-      <Dialog open={c.consentOpen} onOpenChange={(_, data) => !data.open && c.onCancelConsent()}>
-        <DialogSurface data-testid="consent-modal">
-          <DialogBody>
-            <DialogTitle>{t.consent.title}</DialogTitle>
-            <DialogContent>
-              <div className={styles.stack}>
-                <Text>{t.consent.message}</Text>
-                <ul>
-                  {recipients.map((recipient) => <li key={recipient.name}><Text weight="semibold">{recipient.name}</Text> <Text size={300} className={styles.muted}>{recipient.localLabel}</Text></li>)}
-                </ul>
-              </div>
-            </DialogContent>
-            <DialogActions>
-              <Button appearance="secondary" onClick={c.onCancelConsent}>{t.consent.cancel}</Button>
-              <Button appearance="primary" onClick={c.onConfirmConsent}>{t.consent.confirm}</Button>
-            </DialogActions>
-          </DialogBody>
-        </DialogSurface>
-      </Dialog>
-
-      {toasts.length > 0 && (
-        <div className={styles.stack} aria-live="polite" data-testid="provider-toasts">
-          {toasts.map((toast) => (
-            <MessageBar key={toast.id} intent={toast.variant === "success" ? "success" : toast.variant === "warning" ? "warning" : toast.variant === "destructive" ? "error" : "info"}>
-              <MessageBarBody>{toast.message}</MessageBarBody>
-              <MessageBarActions containerAction={<Button appearance="transparent" icon={<DismissRegular />} aria-label={t.toastDismiss} onClick={() => c.onDismissToast(toast.id)} />} />
-            </MessageBar>
-          ))}
+      <Modal
+        open={c.consentOpen}
+        title={t.consent.title}
+        onCancel={c.onCancelConsent}
+        data-testid="consent-modal"
+        footer={[<Button key="cancel" onClick={c.onCancelConsent}>{t.consent.cancel}</Button>, <Button key="confirm" type="primary" onClick={c.onConfirmConsent}>{t.consent.confirm}</Button>]}
+      >
+        <div className={styles.stack}>
+          <Typography.Text>{t.consent.message}</Typography.Text>
+          <ul>{recipients.map((recipient) => <li key={recipient.name}><Typography.Text strong>{recipient.name}</Typography.Text> <Typography.Text type="secondary">{recipient.localLabel}</Typography.Text></li>)}</ul>
         </div>
-      )}
+      </Modal>
+
+      {toasts.length > 0 ? (
+        <div className={styles.stack} aria-live="polite" data-testid="provider-toasts">
+          {toasts.map((toast) => <Alert key={toast.id} type={toast.variant === "success" ? "success" : toast.variant === "warning" ? "warning" : toast.variant === "destructive" ? "error" : "info"} showIcon title={toast.message} action={<Button type="text" size="small" icon={<CloseOutlined aria-hidden />} aria-label={t.toastDismiss} onClick={() => c.onDismissToast(toast.id)} />} />)}
+        </div>
+      ) : null}
     </div>
   );
 }

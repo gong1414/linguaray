@@ -1,27 +1,17 @@
+import { Avatar, Button, Dropdown, Empty, List, Switch, Tag, Typography } from "antd";
+import type { MenuProps } from "antd";
 import {
-  Badge,
-  Button,
-  Menu,
-  MenuItem,
-  MenuList,
-  MenuPopover,
-  MenuTrigger,
-  Switch,
-  Text,
-} from "@fluentui/react-components";
-import {
-  AddRegular,
-  ArrowDownRegular,
-  ArrowReplyRegular,
-  ArrowUpRegular,
-  CopyRegular,
-  DeleteRegular,
-  LayerRegular,
-  MoreHorizontalRegular,
-  ServerRegular,
-  StarRegular,
-} from "@fluentui/react-icons";
-import { SearchResultItem, SearchResultList } from "../../../ui/ueli";
+  ArrowDownOutlined,
+  ArrowUpOutlined,
+  CloudServerOutlined,
+  CopyOutlined,
+  DeleteOutlined,
+  EllipsisOutlined,
+  FallOutlined,
+  PlusOutlined,
+  StarOutlined,
+  SwapOutlined,
+} from "@ant-design/icons";
 import { useUiStyles } from "../../../ui/styles";
 import type { ProviderCopy } from "../copy";
 import type { Preset, ProviderProfileFE, RoleState } from "../model";
@@ -47,115 +37,79 @@ export type ProviderListProps = {
   onAddPreset: (preset: Preset) => void;
 };
 
-/** Ueli result-list adapter for configured providers and provider presets. */
+/** Ant Design provider list with menu-driven presets and row actions. */
 export function ProviderList(props: ProviderListProps) {
   const styles = useUiStyles();
   const t = props.t;
   const sorted = [...props.providers].sort((a, b) => a.sort_order - b.sort_order);
   const locked = props.exclusiveBusy;
+  const presetItems: MenuProps["items"] = props.presets.map((preset) => ({
+    key: preset.templateId,
+    label: (
+      <div className={styles.rowBetween} data-testid="preset-button" title={preset.notes ?? undefined} tabIndex={-1}>
+        <span>{preset.name ?? "Ollama"}</span>
+        {preset.supportTier !== "ready" ? <Tag color="warning">{preset.supportTier === "setup_required" ? t.tier.setupRequired : t.tier.unverified}</Tag> : null}
+      </div>
+    ),
+    onClick: () => props.onAddPreset(preset),
+  }));
 
   return (
     <div className={styles.stack} aria-label={t.providerListLabel} data-testid="provider-list">
       <div className={styles.rowBetween}>
-        <Text weight="semibold">{t.providerListLabel}</Text>
-        <Menu>
-          <MenuTrigger disableButtonEnhancement>
-            <Button appearance="primary" size="small" icon={<AddRegular />} disabled={locked}>
-              {t.addProvider}
-            </Button>
-          </MenuTrigger>
-          <MenuPopover style={{ maxHeight: 360, overflowY: "auto" }}>
-            <MenuList>
-              {props.presets.map((preset) => (
-                <MenuItem
-                  key={preset.templateId}
-                  data-testid="preset-button"
-                  title={preset.notes ?? undefined}
-                  onClick={() => props.onAddPreset(preset)}
-                >
-                  <div className={styles.rowBetween} style={{ width: "100%" }}>
-                    <span>{preset.name ?? "Ollama"}</span>
-                    {preset.supportTier !== "ready" ? (
-                      <Badge appearance="tint" color="warning">
-                        {preset.supportTier === "setup_required" ? t.tier.setupRequired : t.tier.unverified}
-                      </Badge>
-                    ) : null}
-                  </div>
-                </MenuItem>
-              ))}
-            </MenuList>
-          </MenuPopover>
-        </Menu>
+        <Typography.Title level={4} className={styles.title}>{t.providerListLabel}</Typography.Title>
+        <Dropdown menu={{ items: presetItems }} trigger={["click"]}>
+          <Button type="primary" size="small" icon={<PlusOutlined aria-hidden />} disabled={locked}>{t.addProvider}</Button>
+        </Dropdown>
       </div>
-
       {props.providers.length === 0 ? (
-        <div className={styles.empty} data-testid="provider-empty">
-          <ServerRegular fontSize={28} aria-hidden />
-          <Text weight="semibold">{t.empty.title}</Text>
-          <Text size={300}>{t.empty.description}</Text>
-        </div>
+        <Empty image={<CloudServerOutlined aria-hidden />} description={<><Typography.Text strong>{t.empty.title}</Typography.Text><br /><Typography.Text type="secondary">{t.empty.description}</Typography.Text></>} data-testid="provider-empty" />
       ) : (
-        <SearchResultList>
-          {sorted.map((provider) => {
+        <List
+          className="lr-provider-list"
+          dataSource={sorted}
+          renderItem={(provider) => {
             const role = props.roleFor(provider.uuid);
             const rowDisabled = props.deletingUuid === provider.uuid || locked;
             const selected = props.selectedUuid === provider.uuid;
-            const badges = (
+            const roleItems: MenuProps["items"] = [
+              provider.enabled && role.kind !== "primary" ? { key: "primary", icon: <StarOutlined aria-hidden />, label: t.setPrimary, onClick: () => props.onSetPrimary(provider.uuid) } : null,
+              provider.enabled && role.kind === "parallel" ? { key: "remove-parallel", icon: <SwapOutlined aria-hidden />, label: t.removeParallel, onClick: () => props.onRemoveParallel(provider.uuid) } : null,
+              provider.enabled && role.kind !== "parallel" && role.kind !== "primary" ? { key: "parallel", icon: <SwapOutlined aria-hidden />, label: t.addParallel, onClick: () => props.onAddParallel(provider.uuid) } : null,
+              provider.enabled && role.kind !== "fallback" && role.kind !== "primary" ? { key: "fallback", icon: <FallOutlined aria-hidden />, label: t.setFallback, onClick: () => props.onSetFallback(provider.uuid) } : null,
+              { type: "divider" },
+              { key: "duplicate", icon: <CopyOutlined aria-hidden />, label: t.duplicate, onClick: () => props.onDuplicate(provider.uuid) },
+              { key: "up", icon: <ArrowUpOutlined aria-hidden />, label: t.moveUp, onClick: () => props.onMoveUp(provider.uuid) },
+              { key: "down", icon: <ArrowDownOutlined aria-hidden />, label: t.moveDown, onClick: () => props.onMoveDown(provider.uuid) },
+              { key: "delete", danger: true, icon: <DeleteOutlined aria-hidden />, label: t.cardDelete.replace("{name}", provider.name), onClick: () => props.onDelete(provider.uuid) },
+            ];
+            const tags = (
               <div className={styles.rowWrap}>
-                {!provider.enabled ? <Badge appearance="tint" color="subtle">{t.disabled}</Badge> : null}
-                {provider.needs_key && !provider.hasKey ? <Badge appearance="tint" color="warning">{t.keyMissing}</Badge> : null}
-                {role.kind === "primary" ? <Badge appearance="tint" color="success">{t.role.primary}</Badge> : null}
-                {role.kind === "parallel" ? <Badge appearance="tint" color="informative">{t.role.parallel} {role.index}</Badge> : null}
-                {role.kind === "fallback" ? <Badge appearance="tint" color="subtle">{t.role.fallback}</Badge> : null}
+                {!provider.enabled ? <Tag>{t.disabled}</Tag> : null}
+                {provider.needs_key && !provider.hasKey ? <Tag color="warning">{t.keyMissing}</Tag> : null}
+                {role.kind === "primary" ? <Tag color="success">{t.role.primary}</Tag> : null}
+                {role.kind === "parallel" ? <Tag color="processing">{t.role.parallel} {role.index}</Tag> : null}
+                {role.kind === "fallback" ? <Tag>{t.role.fallback}</Tag> : null}
               </div>
             );
-
-            const actions = (
-              <div className={styles.row} onClick={(event) => event.stopPropagation()}>
-                <Switch
-                  aria-label={t.enabled}
-                  checked={provider.enabled}
-                  disabled={rowDisabled}
-                  onChange={(_, data) => props.onToggle(provider.uuid, data.checked)}
-                />
-                <Menu>
-                  <MenuTrigger disableButtonEnhancement>
-                    <Button appearance="subtle" size="small" icon={<MoreHorizontalRegular />} aria-label={t.cardEdit.replace("{name}", provider.name)} disabled={rowDisabled} />
-                  </MenuTrigger>
-                  <MenuPopover>
-                    <MenuList>
-                      {provider.enabled && role.kind !== "primary" ? <MenuItem icon={<StarRegular />} onClick={() => props.onSetPrimary(provider.uuid)}>{t.setPrimary}</MenuItem> : null}
-                      {provider.enabled && role.kind === "parallel" ? <MenuItem icon={<LayerRegular />} onClick={() => props.onRemoveParallel(provider.uuid)}>{t.removeParallel}</MenuItem> : null}
-                      {provider.enabled && role.kind !== "parallel" && role.kind !== "primary" ? <MenuItem icon={<LayerRegular />} onClick={() => props.onAddParallel(provider.uuid)}>{t.addParallel}</MenuItem> : null}
-                      {provider.enabled && role.kind !== "fallback" && role.kind !== "primary" ? <MenuItem icon={<ArrowReplyRegular />} onClick={() => props.onSetFallback(provider.uuid)}>{t.setFallback}</MenuItem> : null}
-                      <MenuItem icon={<CopyRegular />} onClick={() => props.onDuplicate(provider.uuid)}>{t.duplicate}</MenuItem>
-                      <MenuItem icon={<ArrowUpRegular />} onClick={() => props.onMoveUp(provider.uuid)}>{t.moveUp}</MenuItem>
-                      <MenuItem icon={<ArrowDownRegular />} onClick={() => props.onMoveDown(provider.uuid)}>{t.moveDown}</MenuItem>
-                      <MenuItem icon={<DeleteRegular />} onClick={() => props.onDelete(provider.uuid)}>{t.cardDelete.replace("{name}", provider.name)}</MenuItem>
-                    </MenuList>
-                  </MenuPopover>
-                </Menu>
-              </div>
-            );
-
             return (
-              <div
-                key={provider.uuid}
+              <List.Item
+                className={selected ? "lr-provider-row lr-provider-row-selected" : "lr-provider-row"}
                 data-status={props.deletingUuid === provider.uuid ? "deleting" : provider.status}
                 data-selected={selected || undefined}
+                onClick={() => props.onEdit(provider.uuid)}
+                actions={[
+                  <Switch key="enabled" aria-label={t.enabled} checked={provider.enabled} disabled={rowDisabled} onClick={(_, event) => event.stopPropagation()} onChange={(checked) => props.onToggle(provider.uuid, checked)} />,
+                  <Dropdown key="menu" menu={{ items: roleItems }} trigger={["click"]}>
+                    <Button type="text" size="small" icon={<EllipsisOutlined aria-hidden />} aria-label={t.cardEdit.replace("{name}", provider.name)} disabled={rowDisabled} onClick={(event) => event.stopPropagation()} />
+                  </Dropdown>,
+                ]}
               >
-                <SearchResultItem
-                  selected={selected}
-                  icon={<ServerRegular fontSize={24} />}
-                  name={provider.name}
-                  details={badges}
-                  actions={actions}
-                  onClick={() => props.onEdit(provider.uuid)}
-                />
-              </div>
+                <List.Item.Meta avatar={<Avatar icon={<CloudServerOutlined aria-hidden />} />} title={provider.name} description={tags} />
+              </List.Item>
             );
-          })}
-        </SearchResultList>
+          }}
+        />
       )}
     </div>
   );

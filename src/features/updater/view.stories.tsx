@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { FluentProvider, webDarkTheme } from "@fluentui/react-components";
 import UpdaterPanelView from "./view";
 import type { UpdaterController } from "./controller";
 import type { AvailableUpdate } from "./model";
@@ -47,13 +46,6 @@ export const AutoCheckError: StoryObj<typeof UpdaterPanelView> = {
   args: { c: fake({ kind: "upToDate", version: "0.1.0" }, { autoCheckError: "db locked" }) },
 };
 export const Dark: StoryObj<typeof UpdaterPanelView> = {
-  parameters: { backgrounds: { default: "dark" } },
-  decorators: [
-    (Story) => (
-      <FluentProvider theme={webDarkTheme}>
-        <Story />
-      </FluentProvider>
-    ),
-  ],
+  parameters: { colorScheme: "dark", backgrounds: { default: "dark" } },
   args: { c: fake({ kind: "available", update }) },
 };

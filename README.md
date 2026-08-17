@@ -93,7 +93,7 @@ Three legs, decided in the design grilling:
 
 ## Tech stack
 
-- **Tauri 2** + **Rust** backend, **React 19** + **Microsoft Fluent UI v9** + TypeScript frontend
+- **Tauri 2** + **Rust** backend, **React 19** + **Ant Design X / Ant Design 6** + TypeScript frontend
 - **Platforms:** Windows + macOS (Linux out of scope for v1)
 - v1 official capabilities and protocol drivers are **in-tree plugins**.
   Third-party / WASM loading remains post-v1.

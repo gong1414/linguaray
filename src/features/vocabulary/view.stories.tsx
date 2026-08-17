@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { FluentProvider, webDarkTheme } from "@fluentui/react-components";
 import VocabularyView from "./view";
 import type { VocabularyController } from "./controller";
 
@@ -46,14 +45,7 @@ export const LongChinese: StoryObj<typeof VocabularyView> = {
   },
 };
 export const Dark: StoryObj<typeof VocabularyView> = {
-  parameters: { backgrounds: { default: "dark" } },
-  decorators: [
-    (Story) => (
-      <FluentProvider theme={webDarkTheme}>
-        <Story />
-      </FluentProvider>
-    ),
-  ],
+  parameters: { colorScheme: "dark", backgrounds: { default: "dark" } },
   args: { c: fake({}) },
 };
 export const Narrow: StoryObj<typeof VocabularyView> = {

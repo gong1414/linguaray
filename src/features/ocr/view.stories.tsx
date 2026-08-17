@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { FluentProvider, webDarkTheme } from "@fluentui/react-components";
 import OcrOverlayView from "./view";
 import type { OcrController } from "./controller";
 
@@ -35,13 +34,6 @@ export const ErrorState: StoryObj<typeof OcrOverlayView> = {
   args: { c: fake({ notice: "engine unavailable" }) },
 };
 export const Dark: StoryObj<typeof OcrOverlayView> = {
-  parameters: { backgrounds: { default: "dark" } },
-  decorators: [
-    (Story) => (
-      <FluentProvider theme={webDarkTheme}>
-        <Story />
-      </FluentProvider>
-    ),
-  ],
+  parameters: { colorScheme: "dark", backgrounds: { default: "dark" } },
   args: { c: fake({ rect: { x: 60, y: 40, w: 260, h: 140 } }) },
 };

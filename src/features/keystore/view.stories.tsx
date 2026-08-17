@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { FluentProvider, webDarkTheme } from "@fluentui/react-components";
 import KeystoreRecoveryView from "./view";
 import type { KeystoreController } from "./controller";
 
@@ -48,13 +47,6 @@ export const ResetFailed: StoryObj<typeof KeystoreRecoveryView> = {
   },
 };
 export const Dark: StoryObj<typeof KeystoreRecoveryView> = {
-  parameters: { backgrounds: { default: "dark" } },
-  decorators: [
-    (Story) => (
-      <FluentProvider theme={webDarkTheme}>
-        <Story />
-      </FluentProvider>
-    ),
-  ],
+  parameters: { colorScheme: "dark", backgrounds: { default: "dark" } },
   args: { c: fake({ state: "corrupt", reason: "bad header" }) },
 };

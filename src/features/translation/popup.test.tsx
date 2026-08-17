@@ -106,7 +106,8 @@ describe("popup (controller + view integration)", () => {
     renderLive();
     emit("popup-state", state({ status: "result", text: "x", engine: "e" }));
     await screen.findAllByTestId("popup-card");
-    fireEvent.keyDown(screen.getByTestId("popup-shell"), { key: "Escape" });
+    expect(screen.getByTestId("popup-shell")).toHaveFocus();
+    fireEvent.keyDown(document.activeElement!, { key: "Escape" });
     await waitFor(() => expect(hideMock).toHaveBeenCalledTimes(1));
   });
 

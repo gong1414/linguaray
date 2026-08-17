@@ -1,27 +1,22 @@
 import { useEffect, useRef, useState } from "react";
+import { Button, Flex, Result, Spin, Typography } from "antd";
 import {
-  Button,
-  Spinner,
-  Text,
-  Tooltip,
-  makeStyles,
-  tokens,
-} from "@fluentui/react-components";
-import {
-  ArrowClockwiseRegular,
-  CheckmarkRegular,
-  CopyRegular,
-  ErrorCircleRegular,
-  PinOffRegular,
-  PinRegular,
-  SettingsRegular,
-  Speaker2Regular,
-  SpeakerOffRegular,
+  CheckOutlined,
+  CopyOutlined,
+  PushpinFilled,
+  PushpinOutlined,
+  RedoOutlined,
+  SettingOutlined,
+  SoundFilled,
+  SoundOutlined,
   StarFilled,
-  StarRegular,
-} from "@fluentui/react-icons";
+  StarOutlined,
+  TranslationOutlined,
+} from "@ant-design/icons";
+import { Bubble } from "@ant-design/x";
+import type { BubbleItemType } from "@ant-design/x";
 import { t } from "../../app/i18n";
-import { BaseLayout, Footer, Header, SearchResultItem, SearchResultList } from "../../ui/ueli";
+import { SurfaceFooter, SurfaceHeader, SurfaceLayout, XActionBar } from "../../ui/x";
 import type { PopupController } from "./popupController";
 import type { TranslationState } from "./types";
 
@@ -45,45 +40,6 @@ export function headlineFor(state: TranslationState): string {
 
 const COPIED_FEEDBACK_MS = 1200;
 
-const usePopupStyles = makeStyles({
-  surface: {
-    boxSizing: "border-box",
-    height: "calc(100vh - 12px)",
-    margin: "6px",
-    overflow: "hidden",
-    backgroundColor: tokens.colorNeutralBackground1,
-    border: `${tokens.strokeWidthThin} solid ${tokens.colorNeutralStroke2}`,
-    borderRadius: tokens.borderRadiusLarge,
-    boxShadow: tokens.shadow16,
-  },
-  loading: {
-    minHeight: "100%",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: tokens.spacingHorizontalS,
-  },
-  actions: {
-    display: "flex",
-    alignItems: "center",
-    gap: tokens.spacingHorizontalXXS,
-  },
-  resultText: {
-    whiteSpace: "pre-wrap",
-    userSelect: "text",
-    marginTop: tokens.spacingVerticalXS,
-  },
-  error: {
-    minHeight: "100%",
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: tokens.spacingVerticalS,
-    textAlign: "center",
-  },
-});
-
 function ResultActions({
   c,
   text,
@@ -103,42 +59,52 @@ function ResultActions({
   onFavorited: () => void;
   onSpeaking: (on: boolean) => void;
 }) {
-  const styles = usePopupStyles();
   const copyLabel = copied ? t("selection.action.copied") : t("selection.action.copy");
   const speakLabel = speaking ? t("selection.action.stop") : t("selection.action.speak");
   const pinLabel = c.pinned ? t("selection.action.unpin") : t("selection.action.pin");
   const favoriteLabel = favorited ? t("selection.action.favorited") : t("selection.action.favorite");
 
   return (
-    <div className={styles.actions}>
-      <Tooltip content={copyLabel} relationship="label">
-        <Button appearance={copied ? "primary" : "subtle"} size="small" icon={copied ? <CheckmarkRegular /> : <CopyRegular />} aria-label={copyLabel} onClick={() => void c.copyText(text).then(onCopied).catch(() => {})} />
-      </Tooltip>
-      <Tooltip content={speakLabel} relationship="label">
-        <Button
-          appearance={speaking ? "primary" : "subtle"}
-          size="small"
-          icon={speaking ? <SpeakerOffRegular /> : <Speaker2Regular />}
-          aria-label={speakLabel}
-          onClick={() => {
+    <XActionBar
+      actions={[
+        {
+          key: "copy",
+          label: copyLabel,
+          icon: copied ? <CheckOutlined aria-hidden /> : <CopyOutlined aria-hidden />,
+          active: copied,
+          onClick: () => void c.copyText(text).then(onCopied).catch(() => {}),
+        },
+        {
+          key: "speak",
+          label: speakLabel,
+          icon: speaking ? <SoundFilled aria-hidden /> : <SoundOutlined aria-hidden />,
+          active: speaking,
+          onClick: () => {
             if (speaking) void c.stopSpeaking().finally(() => onSpeaking(false));
             else void c.speak(text).then(() => onSpeaking(true)).catch(() => onSpeaking(false));
-          }}
-        />
-      </Tooltip>
-      <Tooltip content={pinLabel} relationship="label">
-        <Button appearance={c.pinned ? "primary" : "subtle"} size="small" icon={c.pinned ? <PinOffRegular /> : <PinRegular />} aria-label={pinLabel} onClick={() => c.pinned ? c.unpin() : c.pin()} />
-      </Tooltip>
-      <Tooltip content={favoriteLabel} relationship="label">
-        <Button appearance={favorited ? "primary" : "subtle"} size="small" icon={favorited ? <StarFilled /> : <StarRegular />} aria-label={favoriteLabel} onClick={() => void c.favoriteText(c.lastSource || text, text).then(onFavorited).catch(() => {})} />
-      </Tooltip>
-    </div>
+          },
+        },
+        {
+          key: "pin",
+          label: pinLabel,
+          icon: c.pinned ? <PushpinFilled aria-hidden /> : <PushpinOutlined aria-hidden />,
+          active: c.pinned,
+          onClick: () => c.pinned ? c.unpin() : c.pin(),
+        },
+        {
+          key: "favorite",
+          label: favoriteLabel,
+          icon: favorited ? <StarFilled aria-hidden /> : <StarOutlined aria-hidden />,
+          active: favorited,
+          onClick: () => void c.favoriteText(c.lastSource || text, text).then(onFavorited).catch(() => {}),
+        },
+      ]}
+    />
   );
 }
 
-/** LinguaRay state adapter around Ueli's search/result window renderer. */
+/** Compact Ant Design X result surface backed by PopupController. */
 export function PopupView({ c }: { c: PopupController }) {
-  const styles = usePopupStyles();
   const single = c.state.kind === "single-success" ? c.state : null;
   const multi = c.state.kind === "multi-success" || c.state.kind === "partial" ? c.state.results : null;
   const errorState = c.state.kind === "error" ? c.state : null;
@@ -147,7 +113,9 @@ export function PopupView({ c }: { c: PopupController }) {
   const [favoritedKey, setFavoritedKey] = useState<string | null>(null);
   const [speakingKey, setSpeakingKey] = useState<string | null>(null);
   const copiedTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const shellRef = useRef<HTMLElement | null>(null);
   useEffect(() => () => copiedTimer.current && clearTimeout(copiedTimer.current), []);
+  useEffect(() => shellRef.current?.focus(), []);
 
   const markCopied = (key: string) => {
     setCopiedKey(key);
@@ -168,58 +136,79 @@ export function PopupView({ c }: { c: PopupController }) {
     />
   );
 
+  const items: BubbleItemType[] = [];
+  if (single) {
+    items.push({
+      key: "single",
+      role: "ai",
+      content: <div data-testid="popup-card">{single.text}</div>,
+      header: c.engineLabel(single.engine),
+      footer: () => resultActions("__single__", single.text),
+      variant: "outlined",
+    });
+  }
+  multi?.forEach((result) => {
+    items.push({
+      key: result.uuid,
+      role: "ai",
+      content: <div data-testid="popup-card">{result.ok ? result.text : result.errorText}</div>,
+      header: c.engineLabel(result.engine),
+      footer: result.ok && result.text ? () => resultActions(result.uuid, result.text!) : undefined,
+      variant: "outlined",
+      status: result.ok ? "success" : "error",
+      className: result.ok ? undefined : "lr-x-bubble-error",
+    });
+  });
+
+  const errorActions = (
+    <Flex gap="small" wrap justify="center">
+      {errorState?.sub === "network" && c.hasSource ? <Button icon={<RedoOutlined aria-hidden />} onClick={c.retrySelection}>{t("selection.action.retry")}</Button> : null}
+      {(errorState?.sub === "config-key" || errorState?.sub === "config-401" || c.state.kind === "no-provider") ? <Button type="primary" icon={<SettingOutlined aria-hidden />} onClick={() => void c.openSettings("provider-center")}>{t("selection.action.openSettings")}</Button> : null}
+      {c.state.kind === "keystore-corrupt" ? <Button type="primary" icon={<SettingOutlined aria-hidden />} onClick={() => void c.openSettings("keystore-recovery")}>{t("selection.action.recovery")}</Button> : null}
+    </Flex>
+  );
+
   const content = c.state.kind === "loading" ? (
-    <div className={styles.loading} data-testid="popup-loading">
-      <Spinner size="tiny" />
-      <Text size={300}>{t("selection.loading")}</Text>
-      {c.hasSource ? <Button appearance="subtle" size="small" icon={<ArrowClockwiseRegular />} onClick={c.retrySelection}>{t("selection.action.retry")}</Button> : null}
+    <div className="lr-x-popup-state" data-testid="popup-loading">
+      <Spin size="small" />
+      <Typography.Text>{t("selection.loading")}</Typography.Text>
+      {c.hasSource ? <Button type="text" size="small" icon={<RedoOutlined aria-hidden />} onClick={c.retrySelection}>{t("selection.action.retry")}</Button> : null}
     </div>
   ) : isError ? (
-    <div className={styles.error} role="alert" data-testid={c.state.kind === "keystore-corrupt" ? "popup-keystore" : "popup-error"}>
-      <ErrorCircleRegular fontSize={24} aria-hidden />
-      <Text weight="semibold">{headlineFor(c.state)}</Text>
-      {errorState?.sub === "network" && c.hasSource ? <Button appearance="secondary" size="small" icon={<ArrowClockwiseRegular />} onClick={c.retrySelection}>{t("selection.action.retry")}</Button> : null}
-      {(errorState?.sub === "config-key" || errorState?.sub === "config-401" || c.state.kind === "no-provider") ? <Button appearance="subtle" size="small" icon={<SettingsRegular />} onClick={() => void c.openSettings("provider-center")}>{t("selection.action.openSettings")}</Button> : null}
-      {c.state.kind === "keystore-corrupt" ? <Button appearance="subtle" size="small" icon={<SettingsRegular />} onClick={() => void c.openSettings("keystore-recovery")}>{t("selection.action.recovery")}</Button> : null}
+    <div data-testid={c.state.kind === "keystore-corrupt" ? "popup-keystore" : "popup-error"}>
+      <Result status="error" title={headlineFor(c.state)} extra={errorActions} />
     </div>
   ) : (
-    <div style={{ padding: 5 }}>
-      <SearchResultList>
-        {single ? (
-          <div data-testid="popup-card">
-            <SearchResultItem selected name={c.engineLabel(single.engine)} actions={resultActions("__single__", single.text)}>
-              <Text className={styles.resultText}>{single.text}</Text>
-            </SearchResultItem>
-          </div>
-        ) : null}
-        {multi?.map((result, index) => (
-          <div key={result.uuid} data-testid="popup-card">
-            <SearchResultItem selected={index === 0} name={c.engineLabel(result.engine)} actions={result.ok && result.text ? resultActions(result.uuid, result.text) : undefined}>
-              <Text className={styles.resultText} style={{ color: result.ok ? undefined : tokens.colorPaletteRedForeground1 }}>
-                {result.ok ? result.text : result.errorText}
-              </Text>
-            </SearchResultItem>
-          </div>
-        ))}
-      </SearchResultList>
+    <div className="lr-x-popup-results">
+      <Bubble.List items={items} autoScroll={false} />
     </div>
   );
 
   return (
     <section
+      ref={shellRef}
       aria-label={headlineFor(c.state)}
       aria-busy={c.state.kind === "loading" || undefined}
       data-testid="popup-shell"
       tabIndex={-1}
       onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); c.dismiss(); } }}
-      className={styles.surface}
-      style={{ outline: "none" }}
+      className="lr-x-popup-shell"
     >
-      <BaseLayout
+      <SurfaceLayout
         transparent
-        header={c.state.kind === "loading" ? undefined : <Header draggable><Text weight="semibold">{headlineFor(c.state)}</Text></Header>}
+        header={c.state.kind === "loading" ? undefined : (
+          <SurfaceHeader draggable>
+            <TranslationOutlined aria-hidden />
+            <Typography.Text strong>{headlineFor(c.state)}</Typography.Text>
+          </SurfaceHeader>
+        )}
         content={content}
-        footer={(single || multi) && c.hasSource ? <Footer draggable><div /><Button className="non-draggable-area" appearance="subtle" size="small" icon={<ArrowClockwiseRegular />} onClick={c.retrySelection}>{t("selection.action.retry")}</Button></Footer> : undefined}
+        footer={(single || multi) && c.hasSource ? (
+          <SurfaceFooter draggable>
+            <span />
+            <Button className="non-draggable-area" type="text" size="small" icon={<RedoOutlined aria-hidden />} onClick={c.retrySelection}>{t("selection.action.retry")}</Button>
+          </SurfaceFooter>
+        ) : undefined}
       />
     </section>
   );
