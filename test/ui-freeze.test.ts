@@ -36,6 +36,10 @@ describe("Ant Design X UI architecture", () => {
     const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
     const deps = { ...pkg.dependencies, ...pkg.devDependencies };
     expect(deps["@ant-design/x"]).toBeDefined();
+    expect(deps["@ant-design/x-markdown"]).toBeDefined();
+    expect(deps["@ant-design/x-sdk"]).toBeDefined();
+    expect(deps["@ant-design/x-card"]).toBeDefined();
+    expect(deps["@ant-design/x-skill"]).toBeDefined();
     expect(deps.antd).toBeDefined();
     expect(deps["@ant-design/icons"]).toBeDefined();
     for (const banned of [
@@ -71,14 +75,24 @@ describe("Ant Design X UI architecture", () => {
     expect(offenders, "Views receive state and callbacks; bridge/IPC belongs in controllers.").toEqual([]);
   });
 
-  it("uses Ant Design X conversation primitives on both translation surfaces", () => {
+  it("uses the complete Ant Design X runtime on translation surfaces", () => {
     const input = readFileSync(join(ROOT, "src/features/translation/InputPanelView.tsx"), "utf8");
     const popup = readFileSync(join(ROOT, "src/features/translation/PopupView.tsx"), "utf8");
+    const result = readFileSync(join(ROOT, "src/features/translation/TranslationResultSurface.tsx"), "utf8");
+    const provider = readFileSync(join(ROOT, "src/features/translation/translationXProvider.ts"), "utf8");
     expect(input).toMatch(/from "@ant-design\/x"/);
     expect(input).toMatch(/<Sender\b/);
     expect(input).toMatch(/<Bubble\.List\b/);
-    expect(popup).toMatch(/from "@ant-design\/x"/);
-    expect(popup).toMatch(/<Bubble\.List\b/);
+    expect(input).toMatch(/<Conversations\b/);
+    expect(input).toMatch(/useXChat/);
+    expect(input).toMatch(/useXConversations/);
+    expect(popup).toMatch(/<TranslationResultSurface\b/);
+    expect(result).toMatch(/from "@ant-design\/x-card"/);
+    expect(result).toMatch(/<XCard\.Box\b/);
+    expect(result).toMatch(/<XMarkdown\b/);
+    expect(result).toMatch(/version: "v0\.9"/);
+    expect(provider).toMatch(/extends AbstractChatProvider/);
+    expect(provider).toMatch(/XRequest</);
   });
 
   it("routes settings through the shared Ant Design layer", () => {

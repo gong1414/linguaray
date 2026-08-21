@@ -1,84 +1,92 @@
-# LinguaRay 上游界面框架决定：Ant Design X
+# LinguaRay 上游界面决定：完整采用 Ant Design X
 
-> 决定日期：2026-08-17。官方文档、npm 包和 GitHub 源码均已核对；源码审计
-> 固定在 `ant-design/x` 提交 `25aad7b9c13abeb165466d53b375d0f2ffe81fa0`。
+> 决定日期：2026-08-17。源码审计固定于 `ant-design/x` 提交
+> `25aad7b9c13abeb165466d53b375d0f2ffe81fa0`（2.9.0）。
 
 ## 结论
 
-保留现有 Rust/Tauri 能力层、TypeScript controller 和 IPC 协议，只替换 React
-View。生产界面使用以下单一体系：
+LinguaRay 不再“参考 Ant Design X 的外观”，而是采用它的完整产品与研发体系。
+旧 LinguaRay、Ueli 和 Fluent 页面结构全部失去约束力；只保留 Rust/Tauri 能力、
+IPC、领域模型和 controller。
 
-1. `@ant-design/x`：翻译输入、会话结果、欢迎状态和动作区。
-2. `antd`：设置导航、表单、列表、弹窗、反馈与主题 token。
-3. `@ant-design/icons`：唯一图标来源。
+| 官方模块 | LinguaRay 的原生用途 |
+| --- | --- |
+| 设计规范 | 按 RICH 与 Hybrid UI 划分唤醒、表达、确认、反馈阶段 |
+| React 研发 | React 19、XProvider、AntD 6 token、官方组合方式 |
+| X Components | Conversations/Bubble/Sender/Welcome/Prompts/Suggestion/ThoughtChain/Actions |
+| X Markdown | 安全渲染翻译正文，跟随 light/dark 官方主题 |
+| X SDK | XRequest、自定义 Provider、useXChat、useXConversations |
+| X Card | A2UI v0.9 Catalog、命令、数据绑定和 Action 回传 |
+| X Skill | 六个 2.9.0 官方技能作为 AI 开发规范 |
+| Ultramodern | 输入窗口的信息架构、会话侧栏、内容宽度与底部 Sender |
 
-不再从 Ueli 搬壳，也不再使用 Fluent UI。这样依赖关系、交互语义、主题和版本
-由同一上游维护，LinguaRay 只保留桌面窗口布局和业务信息架构。
+## Hybrid UI 选择
 
-## 为什么选 Ant Design X
+官方规范不是“所有页面都变成聊天”。LinguaRay 使用两种模式：
 
-Ant Design X 官方将 AI 界面归纳为 RICH：Role、Intention、Conversation、
-Hybrid UI。它与 LinguaRay 的实际结构直接对应：
+- 输入翻译：Chat 为主。用户连续提交文本、查看多服务商回复、切换翻译会话。
+- 划词弹窗：Do 为主。结果出现后立即复制、朗读、固定、收藏或重试。
+- 设置/权限/OCR：传统 GUI 为主，以明确、可预测的操作完成任务。
 
-| LinguaRay 场景 | Ant Design X 组件 | 责任边界 |
-| --- | --- | --- |
-| 输入翻译 | `Sender` | View 负责输入与提交事件；controller 负责翻译 |
-| 单/多服务结果 | `Bubble.List` | View 负责结果语义；provider 并发仍在能力层 |
-| 空状态 | `Welcome` / `Prompts` | 只传文案和 callback |
-| 结果动作 | `Actions` | 复制、朗读、收藏、固定由 callback 注入 |
-| 长任务状态 | `Think` / `ThoughtChain` | 未来有真实状态时再接入，不预造组件 |
-| OCR/文件输入 | `Attachments` | 未来接真实 OCR controller；不在 View 读文件系统 |
-| 设置中心 | AntD `Layout` / `Menu` / `Form` | 配置读写仍由各 feature controller 完成 |
+这避免了旧方案把翻译当普通表单，也避免把设置页错误包装成对话。
 
-所选版本为 `@ant-design/x` 2.9.0、`antd` 6.6.1、
-`@ant-design/icons` 6.3.2；均为 MIT。X 的 React peer requirement 与项目的
-React 19 满足关系，且 X 与 AntD 属于同一组件生态，不需要维护两套主题适配。
-
-## 与旧方案的区别
-
-旧的 Fluent + Ueli 组合仍要求 LinguaRay 自己决定并维护翻译窗口的结构；Ueli
-本身又是命令启动器而不是 AI/翻译产品。Ant Design X 直接提供 Sender、Bubble、
-Actions 等交互原语，因此此次实现不是“照着截图写 CSS”，而是把真实生产 View
-替换成上游组件。
-
-开源翻译项目 Pot/Easydict 仍只用于理解产品流程：两者的 GPL 源码、样式、图标
-和资产不得复制。Handy、Maccy 等只校准窗口与权限行为，不成为 UI 依赖。
-
-## 能力与界面边界
+## 运行时数据流
 
 ```text
-Rust capabilities
-  selection / OCR / providers / history / shortcuts / updater / permissions
-                         │
-                         ▼
-src/bridge (唯一 Tauri API 边界)
-                         │
-                         ▼
-feature controllers + domain state
-                         │ props / callbacks
-                         ▼
-Ant Design X views
-  Sender / Bubble / Actions + AntD settings shell
+Sender
+  │ onRequest
+  ▼
+useXChat ── conversationKey ── useXConversations
+  │
+  ▼
+TranslationChatProvider (仅三个 transform 方法)
+  │
+  ▼
+XRequest(custom fetch contract)
+  │
+  ▼
+InputController → feature IPC → src/bridge → Rust translation capabilities
+  │
+  ▼
+TranslationState
+  │
+  ├─ XMarkdown：翻译正文
+  └─ XCard A2UI v0.9：结构化结果、状态与 Actions
 ```
 
-强制约束：
+`XRequest.fetch` 在这里是安全适配层，不是浏览器直连服务商。API key 始终留在
+Rust keystore/能力层，不进入 React 或请求头。
 
-- View 不导入 `src/bridge`、`@tauri-apps/*` 或 feature IPC。
-- `src/ui/x` 只组合上游组件，不实现平行 Button/Input/Dialog/Sender/Bubble。
-- 普通窗口使用系统标题栏；无装饰只用于 popup/OCR overlay。
-- CSS 只处理窗口结构和少量产品布局，主题由 `XProvider` token 控制。
-- 依赖、核心组件使用和边界由 `test/ui-freeze.test.ts` 自动检查。
+## A2UI 结果 Surface
 
-## 验证方式
+LinguaRay 注册本地 Catalog，只允许以下白名单组件：结果栈、翻译结果、翻译进度、
+翻译错误。每个 Surface 明确发送：
 
-日常 UI 在 Storybook/Vite 中预览，不要求测试人员反复安装。合并前依次执行
-typecheck、lint、unit/axe、Storybook build；需要验证 Tauri WebView、窗口尺寸、
-透明浮层、菜单栏和 macOS 权限时，直接运行构建目录内的 `LinguaRay Dev.app`。
-正式 `/Applications/LinguaRay.app` 只在发布候选阶段安装。
+1. `createSurface`
+2. `updateComponents`（扁平结构，根节点 id 为 `root`）
+3. `updateDataModel`（服务商、正文、状态、原文）
+4. Action 从组件回传 `XCard.Box.onAction`，再调用 controller callback
+
+因此动态内容是结构化数据，不是 AI 生成 HTML，也不会执行任意代码。
+
+## X Skill 使用记录
+
+本次重构实际安装并读取了官方 2.9.0：`x-components`、`x-markdown`、`x-card`、
+`x-request`、`x-chat-provider`、`use-x-chat`。项目同时固定
+`@ant-design/x-skill` 2.9.0，供后续 AI 开发保持相同规则。
+
+技能直接影响的实现包括：Provider 禁止自写 request、每会话独立实例、
+Bubble.List 使用稳定 role、XMarkdown 安全默认值、A2UI v0.9 命令顺序和稳定
+Catalog/component map。
 
 ## 官方来源
 
-- 文档与组件总览：<https://x.ant.design/index-cn>
-- 组件说明：<https://x.ant.design/components/overview-cn/>
-- 安装与版本关系：<https://x.ant.design/components/introduce-cn/>
+- 设计：<https://x.ant.design/docs/spec/introduce-cn>
+- React 研发：<https://x.ant.design/docs/react/introduce-cn>
+- 组件：<https://x.ant.design/components/introduce-cn/>
+- X Markdown：<https://x.ant.design/x-markdowns/introduce-cn>
+- X SDK：<https://x.ant.design/x-sdks/introduce-cn>
+- X Card：<https://x.ant.design/x-cards/introduce-cn>
+- X Skill：<https://x.ant.design/x-skills/introduce-cn>
+- Ultramodern：<https://x.ant.design/docs/playground/ultramodern-cn>
 - 源码与 MIT 许可：<https://github.com/ant-design/x>

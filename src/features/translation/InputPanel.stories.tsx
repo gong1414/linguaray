@@ -16,6 +16,7 @@ const fake = (state: TranslationState, over: Record<string, unknown> = {}): Inpu
     translate: noop,
     clear: noop,
     favorite: noop,
+    copyText: async () => {},
     ...over,
   }) as unknown as InputController;
 

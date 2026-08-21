@@ -1,57 +1,81 @@
-# LinguaRay 界面强制规则（Ant Design X）
+# LinguaRay 界面强制规则（完整 Ant Design X 体系）
 
-> 2026-08-17 起，Ant Design X 是 LinguaRay 唯一产品界面框架，Ant Design
-> 只为它补充通用桌面控件。选择依据与能力边界见
-> `docs/UI-UPSTREAM-SELECTION.md`。
+> 2026-08-17 起，旧界面截图、Ueli/Fluent 迁移稿和早期 LinguaRay 布局均不再是
+> 设计依据。产品界面以 Ant Design X 2.9.0 官方设计、研发、组件、Markdown、
+> SDK、Card、Skill 与 Ultramodern 演示为唯一上游。
 
-## 自动门禁规则
+## 唯一允许的界面栈
 
-1. **唯一 UI 栈是 Ant Design X。** AI/翻译交互优先使用 `@ant-design/x`；
-   通用控件使用 `antd`，图标使用 `@ant-design/icons`。禁止重新加入 Fluent、
-   Mantine、Lucide、shadcn、Tailwind UI primitives 或 `packages/ui` 自制组件库。
-2. **翻译不是普通表单。** 输入窗口必须以 X `Sender` 为输入核心，翻译结果
-   必须以 X `Bubble` 呈现；空状态、快捷建议、附件或思考过程分别优先采用
-   X 的 `Welcome`、`Prompts`、`Attachments`、`ThoughtChain` 等现成语义组件。
-3. **能力和界面严格分开。** `@tauri-apps/*` 只能出现在 `src/bridge/`；
-   `view.tsx` 与 `*View.tsx` 不得导入 bridge 或 feature IPC。View 只接收状态、
-   callback 和 controller type；Tauri 调用放在 controller/ipc。
-4. **共享层只组合，不造控件。** `src/ui/x/` 可以组合 Ant Design X/AntD 的
-   设置壳、Surface 与 ActionBar，但不得复制 Button、Input、Dialog、Menu、
-   Bubble 或 Sender 的实现和状态机。
-5. **禁止自绘普通窗口标题栏。** main、onboarding、input 使用系统原生标题栏；
-   只有翻译 popup 与 OCR 捕获浮层允许 `decorations: false`。
-6. **窗口权限最小化。** 每个 Tauri capability 只覆盖对应窗口实际使用的 API；
-   设置主窗口不继承无关权限。
-7. **Debug/Release 身份稳定且可区分。** 开发包使用 debug bundle id 和稳定
-   Apple Development 签名，避免 macOS TCC 因 ad-hoc `cdhash` 改变而误报权限。
+1. `@ant-design/x`：RICH/HUI 语义组件和 `XProvider`。
+2. `antd` + `@ant-design/icons`：同体系的通用 GUI 控件和图标。
+3. `@ant-design/x-markdown`：所有翻译富文本结果；禁止另造 Markdown 渲染器。
+4. `@ant-design/x-sdk`：对话消息、会话、请求和 Provider 状态。
+5. `@ant-design/x-card`：A2UI v0.9 动态结果 Surface。
+6. `@ant-design/x-skill`：AI 开发指南，版本与运行时保持一致。
 
-## 代码评审规则
+禁止重新加入 Fluent、Mantine、Lucide、shadcn、Tailwind UI primitives、Ueli
+界面代码或 `packages/ui` 自制控件库。
 
-8. 主题、颜色、排版、圆角和控件状态以 `XProvider`/Ant Design token 为准；
-   CSS 只负责桌面窗口尺寸、分栏、滚动和透明浮层等结构，不建立第二套 token。
-9. 可见交互不得用裸 `<button>`、`<select>`、`<textarea>`、文本符号、CSS 图形
-   或手写 SVG 模拟。原生文件输入可以隐藏使用，但可见触发器必须是 AntD 控件。
-10. 单个 View 超过约 600 行按区块拆分；controller 管能力和状态，View 管呈现，
-    窗口入口只做 provider、controller 与路由组合。
-11. Storybook 必须渲染真实生产 View，覆盖 loading、empty、populated、error、
-    disabled、长中文、窄窗口和 dark；不能用简化替身代替生产组件。
-12. 修改 UI 必须通过 typecheck、lint、unit/axe、Storybook 构建和真实开发包
-    验证。日常界面开发使用 Storybook/Vite 热更新；系统窗口、菜单栏、快捷键、
-    权限再运行构建目录内的 `LinguaRay Dev.app`，不得反复安装或覆盖
-    `/Applications/LinguaRay.app`。
-13. GPL 项目（Pot、Easydict、Vicinae）的源码、CSS、图标和资产不得进入仓库；
-    它们只能用于理解交互。
+## 产品模式
 
-## 开发与验证
+1. 输入翻译是官方 Ultramodern **Chat-first 独立工作区**：`Conversations`、
+   `Bubble.List`、`Welcome`、`Prompts`、`Suggestion`、`Sender`。
+2. 选词弹窗是 **Do-first Hybrid Quick Bar**：保留即时操作，不复制完整聊天页。
+3. 设置、权限、服务商配置是 **Do-first GUI**：使用 AntD Layout/Menu/Form/List；
+   不得为了“像 AI”而误用 Conversations。
+4. loading 必须表达确认阶段的真实步骤；结果必须进入反馈阶段并提供真实动作。
+5. 不实现后端不支持的语言选择、深度思考、附件或模型能力开关。
 
-- 组件和状态预览：`pnpm storybook`
-- 桌面热更新：`pnpm dev:app`
-- 单元与边界门禁：`pnpm test`
-- 静态 Storybook：`pnpm build-storybook`
-- 系统集成：直接运行 `src-tauri/target/debug/bundle/macos/LinguaRay Dev.app`
-- 发布验收：`pnpm build:local`
-- DMG：`pnpm build:dmg`
+## 数据与能力边界
 
-macOS 桌面应用没有 iOS 式 Xcode Simulator。这里的等价分层是：Storybook/Vite
-负责绝大多数 UI 迭代，Tauri Dev/开发 `.app` 负责 WebView 与系统集成，只有
-发布候选才做安装包验证。
+6. `@tauri-apps/*` 只能出现在 `src/bridge/`。View 不得导入 bridge 或 feature
+   IPC；只接收 controller callback。
+7. X SDK 的 Provider 只允许实现 `transformParams`、`transformLocalMessage`、
+   `transformMessage`。请求统一由 `XRequest` 承载。
+8. Tauri IPC 通过 `XRequest.fetch` 适配器接入；API key、认证头和服务商请求仍在
+   Rust 能力层，禁止放入 WebView。
+9. 多会话必须使用独立 Provider 实例和全局唯一 conversation key。
+
+## A2UI 与 Markdown
+
+10. X Card 新代码只使用 A2UI v0.9。每条命令含 `version: "v0.9"`；先
+    `createSurface`，组件是含 `root` 的扁平邻接表，数据由 `updateDataModel` 分离。
+11. Catalog 必须在挂载前本地注册；只渲染白名单组件。组件 map 必须稳定。
+12. 命令流只能追加。若外部不可变状态整体替换 Surface，必须用新的 React key
+    重建 Card，不能让旧消费指针误判。
+13. 翻译正文使用 `XMarkdown`，启用 `escapeRawHtml`；外链用
+    `openLinksInNewTab`。主题使用官方 light/dark CSS。
+
+## 代码与验证
+
+14. 可见交互不得使用裸 `button/select/textarea`、文本符号、CSS 图形或手写 SVG。
+15. 主题由 `XProvider`/Ant token 管理；CSS 只做窗口结构、分栏、滚动、透明层。
+16. 普通窗口使用系统标题栏；仅 popup/OCR overlay 允许无装饰窗口。
+17. Storybook 渲染生产 View，覆盖 empty/loading/success/partial/error/long/dark。
+18. UI 修改必须通过 typecheck、lint、unit、Storybook axe/build、Vite build，并在
+    签名的 `LinguaRay Dev.app` 验证真实窗口、焦点、Esc、权限和 IPC。
+
+## X Skill 工作流
+
+开发 AI 界面前必须读取同版本官方技能：
+
+- `x-components`
+- `x-markdown`
+- `x-card`
+- `x-request`
+- `x-chat-provider`
+- `use-x-chat`
+
+本机注册可运行 `pnpm dlx @ant-design/x-skill@2.9.0`。技能说明不能替代运行时
+测试，也不能越过本文件的能力边界。
+
+## 日常命令
+
+- `pnpm storybook`：组件与状态热预览
+- `pnpm dev:app`：Tauri WebView 热更新
+- `pnpm test && pnpm typecheck && pnpm lint`
+- `pnpm build-storybook && pnpm test-storybook`
+- `pnpm build:local`：签名开发包/发布前集成验证
+
+不要求测试人员反复安装。绝大多数界面迭代在 Storybook/Vite；系统集成直接运行
+构建目录中的 `LinguaRay Dev.app`，不得覆盖 `/Applications/LinguaRay.app`。
