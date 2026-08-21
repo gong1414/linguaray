@@ -4,11 +4,19 @@ import enUS from "antd/locale/en_US";
 import zhCN from "antd/locale/zh_CN";
 import enUSX from "@ant-design/x/locale/en_US";
 import zhCNX from "@ant-design/x/locale/zh_CN";
-import { useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import "antd/dist/reset.css";
+import "@ant-design/x-markdown/themes/light.css";
+import "@ant-design/x-markdown/themes/dark.css";
 import "../ui/styles.css";
 
 type ColorScheme = "light" | "dark";
+
+const AppColorSchemeContext = createContext<ColorScheme>("light");
+
+export function useAppColorScheme(): ColorScheme {
+  return useContext(AppColorSchemeContext);
+}
 
 function readColorScheme(): ColorScheme {
   const saved = localStorage.getItem("linguaray.theme");
@@ -73,11 +81,13 @@ export function AppProviders({ children, transparent = false, forceColorScheme }
         },
       }}
     >
-      <AntApp className="lr-ant-app">
-        <div className={transparent ? "lr-root lr-root-transparent" : "lr-root"} data-color-scheme={activeColorScheme}>
-          {children}
-        </div>
-      </AntApp>
+      <AppColorSchemeContext.Provider value={activeColorScheme}>
+        <AntApp className="lr-ant-app">
+          <div className={transparent ? "lr-root lr-root-transparent" : "lr-root"} data-color-scheme={activeColorScheme}>
+            {children}
+          </div>
+        </AntApp>
+      </AppColorSchemeContext.Provider>
     </XProvider>
   );
 }

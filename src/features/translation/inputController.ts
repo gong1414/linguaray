@@ -4,6 +4,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { detectLocale } from "../../app/i18n";
+import { writeText } from "../../bridge/clipboard";
 import { decodeSessionResult } from "./decode";
 import { ensureProviderNameMap } from "./providerNames";
 import { addVocabulary, translateSession } from "./input-ipc";
@@ -48,9 +49,10 @@ export function useInputController() {
     }, DEBOUNCE_MS);
   }, [text]);
 
-  const translate = useCallback(async () => {
-    const value = textRef.current.trim();
-    if (!value) return;
+  const translate = useCallback(async (valueOverride?: string): Promise<TranslationState> => {
+    const value = (valueOverride ?? textRef.current).trim();
+    if (!value) return { kind: "loading" };
+    if (valueOverride !== undefined) setText(valueOverride);
     setIdle(false);
     setState({ kind: "loading" });
     try {
@@ -58,11 +60,15 @@ export function useInputController() {
       // engine labels resolve to friendly names synchronously.
       await ensureProviderNameMap();
       const res = await translateSession(value);
-      setState(decodeSessionResult(res));
+      const nextState = decodeSessionResult(res);
+      setState(nextState);
       setHasResult(true);
+      return nextState;
     } catch (e) {
-      setState({ kind: "error", sub: "generic", message: String(e) });
+      const nextState: TranslationState = { kind: "error", sub: "generic", message: String(e) };
+      setState(nextState);
       setHasResult(true);
+      return nextState;
     } finally {
       setIdle(true);
     }
@@ -94,6 +100,7 @@ export function useInputController() {
     translate,
     clear,
     favorite,
+    copyText: writeText,
   };
 }
 

@@ -1,4 +1,4 @@
-import { Avatar, Button, Dropdown, Empty, List, Switch, Tag, Typography } from "antd";
+import { Avatar, Button, Dropdown, Empty, Switch, Tag, Typography } from "antd";
 import type { MenuProps } from "antd";
 import {
   ArrowDownOutlined,
@@ -65,10 +65,8 @@ export function ProviderList(props: ProviderListProps) {
       {props.providers.length === 0 ? (
         <Empty image={<CloudServerOutlined aria-hidden />} description={<><Typography.Text strong>{t.empty.title}</Typography.Text><br /><Typography.Text type="secondary">{t.empty.description}</Typography.Text></>} data-testid="provider-empty" />
       ) : (
-        <List
-          className="lr-provider-list"
-          dataSource={sorted}
-          renderItem={(provider) => {
+        <div className="lr-provider-list" role="list">
+          {sorted.map((provider) => {
             const role = props.roleFor(provider.uuid);
             const rowDisabled = props.deletingUuid === provider.uuid || locked;
             const selected = props.selectedUuid === provider.uuid;
@@ -93,23 +91,30 @@ export function ProviderList(props: ProviderListProps) {
               </div>
             );
             return (
-              <List.Item
+              <div
+                key={provider.uuid}
+                role="listitem"
                 className={selected ? "lr-provider-row lr-provider-row-selected" : "lr-provider-row"}
                 data-status={props.deletingUuid === provider.uuid ? "deleting" : provider.status}
                 data-selected={selected || undefined}
-                onClick={() => props.onEdit(provider.uuid)}
-                actions={[
-                  <Switch key="enabled" aria-label={t.enabled} checked={provider.enabled} disabled={rowDisabled} onClick={(_, event) => event.stopPropagation()} onChange={(checked) => props.onToggle(provider.uuid, checked)} />,
-                  <Dropdown key="menu" menu={{ items: roleItems }} trigger={["click"]}>
-                    <Button type="text" size="small" icon={<EllipsisOutlined aria-hidden />} aria-label={t.cardEdit.replace("{name}", provider.name)} disabled={rowDisabled} onClick={(event) => event.stopPropagation()} />
-                  </Dropdown>,
-                ]}
               >
-                <List.Item.Meta avatar={<Avatar icon={<CloudServerOutlined aria-hidden />} />} title={provider.name} description={tags} />
-              </List.Item>
+                <Button className="lr-provider-row-main" type="text" onClick={() => props.onEdit(provider.uuid)}>
+                  <Avatar icon={<CloudServerOutlined aria-hidden />} />
+                  <span className="lr-provider-row-copy">
+                    <Typography.Text strong>{provider.name}</Typography.Text>
+                    {tags}
+                  </span>
+                </Button>
+                <div className="lr-provider-row-actions">
+                  <Switch aria-label={t.enabled} checked={provider.enabled} disabled={rowDisabled} onChange={(checked) => props.onToggle(provider.uuid, checked)} />
+                  <Dropdown menu={{ items: roleItems }} trigger={["click"]}>
+                    <Button type="text" size="small" icon={<EllipsisOutlined aria-hidden />} aria-label={t.cardEdit.replace("{name}", provider.name)} disabled={rowDisabled} />
+                  </Dropdown>
+                </div>
+              </div>
             );
-          }}
-        />
+          })}
+        </div>
       )}
     </div>
   );

@@ -27,6 +27,9 @@
   "dependencies": {
     "@ant-design/icons": "6.3.2",
     "@ant-design/x": "2.9.0",
+    "@ant-design/x-card": "2.9.0",
+    "@ant-design/x-markdown": "2.9.0",
+    "@ant-design/x-sdk": "2.9.0",
     "@tauri-apps/api": "^2.11.1",
     "@tauri-apps/plugin-clipboard-manager": "^2.3.2",
     "@tauri-apps/plugin-dialog": "^2.7.2",
@@ -37,6 +40,7 @@
     "react-dom": "^19.2.8"
   },
   "devDependencies": {
+    "@ant-design/x-skill": "2.9.0",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.62.1",
     "@storybook/addon-a11y": "^9.1.20",
