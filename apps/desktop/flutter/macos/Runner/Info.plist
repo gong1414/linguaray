@@ -32,11 +32,6 @@
 	<string>LinguaRay</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
-	<key>NSAppTransportSecurity</key>
-	<dict>
-		<key>NSAllowsArbitraryLoads</key>
-		<true/>
-	</dict>
 	<key>CFBundleShortVersionString</key>
 	<string>$(FLUTTER_BUILD_NAME)</string>
 	<key>CFBundleVersion</key>
@@ -47,5 +42,18 @@
 	<string>$(PRODUCT_COPYRIGHT)</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>io.github.gong1414.linguaray</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>linguaray</string>
+			</array>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+		</dict>
+	</array>
 </dict>
 </plist>

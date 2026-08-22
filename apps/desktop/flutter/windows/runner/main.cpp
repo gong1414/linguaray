@@ -4,6 +4,8 @@
 #include <dwmapi.h>
 #include <windows.h>
 
+#include <string>
+
 #include "utils.h"
 #include "flutter_window.h"
 
@@ -35,7 +37,12 @@ void CALLBACK HandleWindowCreatedOrShown(HWINEVENTHOOK, DWORD, HWND window,
 
 int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
                       _In_ wchar_t *command_line, _In_ int show_command) {
-  // TODO: Re-implement protocol handler dispatch when feature is restored
+  // Single-instance: a second launch carrying a linguaray:// URL is forwarded
+  // to the running process instead of opening another engine.
+  HANDLE instance_mutex = ::CreateMutexW(nullptr, TRUE, L"Local\\LinguaRaySingleInstance");
+  const bool already_running = instance_mutex != nullptr &&
+                               ::GetLastError() == ERROR_ALREADY_EXISTS;
+
   // Attach to console when present (e.g., 'flutter run') or create a
   // new console when running with a debugger.
   if (!::AttachConsole(ATTACH_PARENT_PROCESS) && ::IsDebuggerPresent()) {
@@ -62,8 +69,34 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   project.set_impeller_switch(flutter::ImpellerSwitch::Disabled);
 
   auto command_line_arguments{GetCommandLineArguments()};
+  std::string protocol_url;
+  for (const auto& argument : command_line_arguments) {
+    if (argument.rfind("linguaray://", 0) == 0) {
+      protocol_url = argument;
+    }
+  }
+  if (already_running) {
+    if (!protocol_url.empty()) {
+      HWND existing = ::FindWindowW(L"FLUTTER_RUNNER_WIN32_WINDOW", L"LinguaRay");
+      if (existing != nullptr) {
+        COPYDATASTRUCT data{};
+        data.dwData = 0x4C5259;  // LRY
+        data.cbData = static_cast<DWORD>(protocol_url.size() + 1);
+        data.lpData = protocol_url.data();
+        ::SendMessageW(existing, WM_COPYDATA, 0, reinterpret_cast<LPARAM>(&data));
+      }
+    }
+    if (instance_mutex != nullptr) {
+      ::CloseHandle(instance_mutex);
+    }
+    ::CoUninitialize();
+    return EXIT_SUCCESS;
+  }
 
   project.set_dart_entrypoint_arguments(std::move(command_line_arguments));
+  if (!protocol_url.empty()) {
+    SetPendingProtocolUrl(protocol_url);
+  }
 
   FlutterWindow window(project);
   Win32Window::Point origin(10, 10);

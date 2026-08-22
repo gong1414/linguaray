@@ -1646,11 +1646,29 @@ impl Provider for SystemProvider {
     }
 
     fn dictionary(&self) -> Option<&dyn DictionaryService> {
-        Some(&self.dictionary_service)
+        // Windows ships system OCR only. Advertising dictionary look-up here
+        // would present a service that always returns UnsupportedMethod.
+        #[cfg(target_os = "macos")]
+        {
+            Some(&self.dictionary_service)
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            let _ = &self.dictionary_service;
+            None
+        }
     }
 
     fn translation(&self) -> Option<&dyn TranslationService> {
-        Some(&self.translation_service)
+        #[cfg(target_os = "macos")]
+        {
+            Some(&self.translation_service)
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            let _ = &self.translation_service;
+            None
+        }
     }
 
     fn ocr(&self) -> Option<&dyn OcrService> {

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:linguaray_application/linguaray_application.dart';
 
 import '../../../config/dependencies.dart';
+import '../../translation/view_models/translation_session_id.dart';
 import '../../translation/view_models/translation_view_model.dart';
 
 final quickTranslateViewModelProvider =
@@ -92,6 +93,7 @@ final class QuickTranslateViewModel extends Notifier<TranslationViewState> {
     if (catalog == null || text.isEmpty || state.loadingCatalog) return;
 
     final requestId = ++_requestId;
+    final sessionId = newTranslationSessionId();
     state = state.copyWith(
       submitting: true,
       clearRun: true,
@@ -118,6 +120,10 @@ final class QuickTranslateViewModel extends Notifier<TranslationViewState> {
       }
       if (requestId == _requestId) {
         state = state.copyWith(submitting: false);
+        final run = state.run;
+        if (run != null && run.complete) {
+          unawaited(_recordHistory(sessionId, run));
+        }
       }
     } catch (_) {
       if (requestId != _requestId) return;
@@ -125,6 +131,17 @@ final class QuickTranslateViewModel extends Notifier<TranslationViewState> {
         submitting: false,
         submissionErrorCode: 'translation_failed',
       );
+    }
+  }
+
+  Future<void> _recordHistory(String sessionId, TranslationRun run) async {
+    try {
+      await ref.read(recordCompletedTranslationProvider)(
+        sessionId: sessionId,
+        run: run,
+      );
+    } catch (_) {
+      // The translator remains usable when optional history persistence fails.
     }
   }
 

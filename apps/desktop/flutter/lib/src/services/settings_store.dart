@@ -156,6 +156,8 @@ class SettingsStore extends ChangeNotifier {
         case SettingsChange.history:
           // HistoryStore owns history reloads through its own subscription.
           break;
+        case SettingsChange.vocabulary:
+          break;
       }
     }
   }

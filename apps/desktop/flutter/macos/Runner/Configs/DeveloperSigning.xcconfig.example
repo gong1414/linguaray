@@ -1,0 +1,6 @@
+// Copy this file to DeveloperSigning.xcconfig and fill in the team identifier
+// shown by `security find-identity -v -p codesigning`.
+// The local file is ignored and must not be committed.
+LINGUARAY_CODE_SIGN_IDENTITY = Apple Development
+LINGUARAY_CODE_SIGN_STYLE = Automatic
+LINGUARAY_DEVELOPMENT_TEAM = YOUR_TEAM_ID

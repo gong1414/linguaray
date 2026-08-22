@@ -11,7 +11,7 @@ pub use api_server::{ApiServerInfo, RuntimeApiServer};
 pub use runtime::{
     Runtime, RuntimeDictionary, RuntimeError, RuntimeGlossary, RuntimeHistory, RuntimeLlm,
     RuntimeOcr, RuntimePermission, RuntimeSettings, RuntimeTextExtractor, RuntimeTranslation,
-    SettingsChange, SettingsSubscription, StreamCallback,
+    RuntimeVocabulary, SettingsChange, SettingsSubscription, StreamCallback,
 };
 
 use linguaray_core::{

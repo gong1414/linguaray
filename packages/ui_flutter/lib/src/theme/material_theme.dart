@@ -1,45 +1,62 @@
 import 'package:flutter/material.dart';
 
+/// Canonical LinguaRay brand colors. These are the only named product hues
+/// used by the production Material 3 theme.
+abstract final class LinguaRayPalette {
+  static const Color linguaBlue = Color(0xFF2859D9);
+  static const Color rayTeal = Color(0xFF18A6A6);
+  static const Color rayTealDark = Color(0xFF34C0BE);
+  static const Color navy = Color(0xFF13233F);
+  static const Color graphite = Color(0xFF172033);
+  static const Color paper = Color(0xFFF7F9FC);
+}
+
 @immutable
 final class LinguaRayBrandColors extends ThemeExtension<LinguaRayBrandColors> {
   const LinguaRayBrandColors({
     required this.navy,
     required this.ray,
-    required this.resultSurface,
-    required this.railSurface,
+    required this.canvas,
+    required this.ink,
+    required this.resultRule,
   });
 
   static const light = LinguaRayBrandColors(
-    navy: Color(0xFF1A2433),
-    ray: Color(0xFF0F766E),
-    resultSurface: Color(0xFFE7F3F1),
-    railSurface: Color(0xFFEEF2F2),
+    navy: LinguaRayPalette.navy,
+    ray: LinguaRayPalette.rayTeal,
+    canvas: LinguaRayPalette.paper,
+    ink: LinguaRayPalette.graphite,
+    resultRule: LinguaRayPalette.rayTeal,
   );
 
   static const dark = LinguaRayBrandColors(
-    navy: Color(0xFFE6EEF8),
-    ray: Color(0xFF5EEAD4),
-    resultSurface: Color(0xFF10211F),
-    railSurface: Color(0xFF111618),
+    navy: LinguaRayPalette.navy,
+    ray: LinguaRayPalette.rayTealDark,
+    canvas: LinguaRayPalette.navy,
+    ink: Color(0xFFE8EEF7),
+    resultRule: LinguaRayPalette.rayTealDark,
   );
 
   final Color navy;
   final Color ray;
-  final Color resultSurface;
-  final Color railSurface;
+  final Color canvas;
+  final Color ink;
+  final Color resultRule;
 
   @override
   LinguaRayBrandColors copyWith({
     Color? navy,
     Color? ray,
-    Color? resultSurface,
-    Color? railSurface,
+    Color? canvas,
+    Color? ink,
+    Color? resultRule,
   }) {
     return LinguaRayBrandColors(
       navy: navy ?? this.navy,
       ray: ray ?? this.ray,
-      resultSurface: resultSurface ?? this.resultSurface,
-      railSurface: railSurface ?? this.railSurface,
+      canvas: canvas ?? this.canvas,
+      ink: ink ?? this.ink,
+      resultRule: resultRule ?? this.resultRule,
     );
   }
 
@@ -49,8 +66,9 @@ final class LinguaRayBrandColors extends ThemeExtension<LinguaRayBrandColors> {
     return LinguaRayBrandColors(
       navy: Color.lerp(navy, other.navy, t)!,
       ray: Color.lerp(ray, other.ray, t)!,
-      resultSurface: Color.lerp(resultSurface, other.resultSurface, t)!,
-      railSurface: Color.lerp(railSurface, other.railSurface, t)!,
+      canvas: Color.lerp(canvas, other.canvas, t)!,
+      ink: Color.lerp(ink, other.ink, t)!,
+      resultRule: Color.lerp(resultRule, other.resultRule, t)!,
     );
   }
 }
@@ -59,10 +77,11 @@ final class LinguaRayBrandColors extends ThemeExtension<LinguaRayBrandColors> {
 final class LinguaRayMetrics extends ThemeExtension<LinguaRayMetrics> {
   const LinguaRayMetrics({
     this.space = 8,
-    this.railWidth = 80,
-    this.quickWidth = 396,
-    this.controlHeight = 44,
-    this.captionHeight = 40,
+    this.commandBarHeight = 48,
+    this.settingsNavWidth = 240,
+    this.quickWidth = 420,
+    this.controlHeight = 36,
+    this.captionHeight = 32,
     this.macTrafficInset = 78,
     this.workbenchMinSize = const Size(840, 560),
   });
@@ -70,7 +89,8 @@ final class LinguaRayMetrics extends ThemeExtension<LinguaRayMetrics> {
   static const standard = LinguaRayMetrics();
 
   final double space;
-  final double railWidth;
+  final double commandBarHeight;
+  final double settingsNavWidth;
   final double quickWidth;
   final double controlHeight;
   final double captionHeight;
@@ -80,7 +100,8 @@ final class LinguaRayMetrics extends ThemeExtension<LinguaRayMetrics> {
   @override
   LinguaRayMetrics copyWith({
     double? space,
-    double? railWidth,
+    double? commandBarHeight,
+    double? settingsNavWidth,
     double? quickWidth,
     double? controlHeight,
     double? captionHeight,
@@ -89,7 +110,8 @@ final class LinguaRayMetrics extends ThemeExtension<LinguaRayMetrics> {
   }) {
     return LinguaRayMetrics(
       space: space ?? this.space,
-      railWidth: railWidth ?? this.railWidth,
+      commandBarHeight: commandBarHeight ?? this.commandBarHeight,
+      settingsNavWidth: settingsNavWidth ?? this.settingsNavWidth,
       quickWidth: quickWidth ?? this.quickWidth,
       controlHeight: controlHeight ?? this.controlHeight,
       captionHeight: captionHeight ?? this.captionHeight,
@@ -103,7 +125,16 @@ final class LinguaRayMetrics extends ThemeExtension<LinguaRayMetrics> {
     if (other == null) return this;
     return LinguaRayMetrics(
       space: lerpDouble(space, other.space, t)!,
-      railWidth: lerpDouble(railWidth, other.railWidth, t)!,
+      commandBarHeight: lerpDouble(
+        commandBarHeight,
+        other.commandBarHeight,
+        t,
+      )!,
+      settingsNavWidth: lerpDouble(
+        settingsNavWidth,
+        other.settingsNavWidth,
+        t,
+      )!,
       quickWidth: lerpDouble(quickWidth, other.quickWidth, t)!,
       controlHeight: lerpDouble(controlHeight, other.controlHeight, t)!,
       captionHeight: lerpDouble(captionHeight, other.captionHeight, t)!,
@@ -125,8 +156,6 @@ extension LinguaRayThemeContext on BuildContext {
 }
 
 abstract final class LinguaRayMaterialTheme {
-  static const Color _seed = Color(0xFF0F766E);
-
   static ThemeData light({TargetPlatform? platform}) =>
       _build(Brightness.light, platform);
 
@@ -140,40 +169,85 @@ abstract final class LinguaRayMaterialTheme {
       ? dark(platform: platform)
       : light(platform: platform);
 
+  static ColorScheme _lightScheme() {
+    return const ColorScheme(
+      brightness: Brightness.light,
+      primary: LinguaRayPalette.linguaBlue,
+      onPrimary: Color(0xFFFFFFFF),
+      primaryContainer: Color(0xFFD9E4FF),
+      onPrimaryContainer: Color(0xFF0B1F66),
+      secondary: LinguaRayPalette.rayTeal,
+      onSecondary: Color(0xFFFFFFFF),
+      secondaryContainer: Color(0xFFD3F1F1),
+      onSecondaryContainer: Color(0xFF043838),
+      tertiary: LinguaRayPalette.navy,
+      onTertiary: Color(0xFFFFFFFF),
+      tertiaryContainer: Color(0xFFD5DCEA),
+      onTertiaryContainer: LinguaRayPalette.navy,
+      error: Color(0xFFB3261E),
+      onError: Color(0xFFFFFFFF),
+      errorContainer: Color(0xFFF9DEDC),
+      onErrorContainer: Color(0xFF410E0B),
+      surface: LinguaRayPalette.paper,
+      onSurface: LinguaRayPalette.graphite,
+      surfaceContainerLowest: Color(0xFFFFFFFF),
+      surfaceContainerLow: Color(0xFFEFF3F8),
+      surfaceContainer: Color(0xFFE7EDF5),
+      surfaceContainerHigh: Color(0xFFDFE6F0),
+      surfaceContainerHighest: Color(0xFFD6DEEA),
+      onSurfaceVariant: Color(0xFF445060),
+      outline: Color(0xFF6B7686),
+      outlineVariant: Color(0xFFC5CDD8),
+      inverseSurface: LinguaRayPalette.navy,
+      onInverseSurface: Color(0xFFE8EEF7),
+      inversePrimary: Color(0xFFADC2FF),
+      scrim: Color(0xFF000000),
+      shadow: Color(0xFF000000),
+      surfaceTint: Colors.transparent,
+    );
+  }
+
+  static ColorScheme _darkScheme() {
+    return const ColorScheme(
+      brightness: Brightness.dark,
+      primary: Color(0xFF9BB3FF),
+      onPrimary: Color(0xFF0A1A4A),
+      primaryContainer: LinguaRayPalette.linguaBlue,
+      onPrimaryContainer: Color(0xFFFFFFFF),
+      secondary: LinguaRayPalette.rayTealDark,
+      onSecondary: Color(0xFF042424),
+      secondaryContainer: Color(0xFF0E5C5C),
+      onSecondaryContainer: Color(0xFFC8F4F3),
+      tertiary: Color(0xFFC5D0E3),
+      onTertiary: LinguaRayPalette.navy,
+      tertiaryContainer: Color(0xFF243552),
+      onTertiaryContainer: Color(0xFFD7E0EE),
+      error: Color(0xFFFFB4AB),
+      onError: Color(0xFF690005),
+      errorContainer: Color(0xFF93000A),
+      onErrorContainer: Color(0xFFFFDAD6),
+      surface: LinguaRayPalette.navy,
+      onSurface: Color(0xFFE8EEF7),
+      surfaceContainerLowest: Color(0xFF0D182C),
+      surfaceContainerLow: Color(0xFF18253C),
+      surfaceContainer: Color(0xFF1C2A44),
+      surfaceContainerHigh: Color(0xFF23324E),
+      surfaceContainerHighest: Color(0xFF2B3B59),
+      onSurfaceVariant: Color(0xFFB7C2D4),
+      outline: Color(0xFF8A96A8),
+      outlineVariant: Color(0xFF3A4860),
+      inverseSurface: Color(0xFFE8EEF7),
+      onInverseSurface: LinguaRayPalette.navy,
+      inversePrimary: LinguaRayPalette.linguaBlue,
+      scrim: Color(0xFF000000),
+      shadow: Color(0xFF000000),
+      surfaceTint: Colors.transparent,
+    );
+  }
+
   static ThemeData _build(Brightness brightness, TargetPlatform? platform) {
     final isDark = brightness == Brightness.dark;
-    final scheme =
-        ColorScheme.fromSeed(
-          seedColor: _seed,
-          brightness: brightness,
-          contrastLevel: 0.18,
-        ).copyWith(
-          primary: isDark ? const Color(0xFF5EEAD4) : const Color(0xFF0F766E),
-          onPrimary: isDark ? const Color(0xFF042F2E) : Colors.white,
-          primaryContainer: isDark
-              ? const Color(0xFF134E4A)
-              : const Color(0xFFCCFBF1),
-          onPrimaryContainer: isDark
-              ? const Color(0xFFCCFBF1)
-              : const Color(0xFF134E4A),
-          secondary: isDark ? const Color(0xFFB7C5D6) : const Color(0xFF3F4F63),
-          onSecondary: isDark ? const Color(0xFF1C2836) : Colors.white,
-          surface: isDark ? const Color(0xFF121618) : const Color(0xFFFBFCFC),
-          onSurface: isDark ? const Color(0xFFE6EBEB) : const Color(0xFF1A2124),
-          surfaceContainerLowest: isDark
-              ? const Color(0xFF0C1012)
-              : const Color(0xFFFFFFFF),
-          surfaceContainerLow: isDark
-              ? const Color(0xFF161B1D)
-              : const Color(0xFFF3F6F6),
-          surfaceContainer: isDark
-              ? const Color(0xFF1B2123)
-              : const Color(0xFFEEF2F2),
-          outlineVariant: isDark
-              ? const Color(0xFF2A3336)
-              : const Color(0xFFD5DEDE),
-        );
-
+    final scheme = isDark ? _darkScheme() : _lightScheme();
     final brand = isDark
         ? LinguaRayBrandColors.dark
         : LinguaRayBrandColors.light;
@@ -182,11 +256,9 @@ abstract final class LinguaRayMaterialTheme {
       useMaterial3: true,
       brightness: brightness,
       colorScheme: scheme,
-      scaffoldBackgroundColor: isDark
-          ? const Color(0xFF0C1012)
-          : const Color(0xFFF4F6F6),
-      visualDensity: VisualDensity.standard,
-      splashFactory: InkSparkle.splashFactory,
+      scaffoldBackgroundColor: scheme.surface,
+      visualDensity: VisualDensity.compact,
+      splashFactory: InkRipple.splashFactory,
       platform: resolvedPlatform,
       fontFamilyFallback: const [
         'MiSans',
@@ -199,32 +271,41 @@ abstract final class LinguaRayMaterialTheme {
 
     final textTheme = base.textTheme.copyWith(
       headlineMedium: base.textTheme.headlineMedium?.copyWith(
-        fontSize: 26,
-        height: 1.2,
+        fontSize: 22,
+        height: 1.25,
         fontWeight: FontWeight.w600,
-        letterSpacing: -0.4,
+        letterSpacing: -0.3,
+        color: scheme.onSurface,
       ),
       titleLarge: base.textTheme.titleLarge?.copyWith(
-        fontSize: 17,
+        fontSize: 16,
         height: 1.3,
         fontWeight: FontWeight.w600,
+        color: scheme.onSurface,
       ),
       titleMedium: base.textTheme.titleMedium?.copyWith(
-        fontSize: 14,
+        fontSize: 13,
         height: 1.3,
         fontWeight: FontWeight.w600,
+        color: scheme.onSurface,
       ),
-      bodyLarge: base.textTheme.bodyLarge?.copyWith(fontSize: 15, height: 1.5),
+      bodyLarge: base.textTheme.bodyLarge?.copyWith(
+        fontSize: 14,
+        height: 1.5,
+        color: scheme.onSurface,
+      ),
       bodyMedium: base.textTheme.bodyMedium?.copyWith(
         fontSize: 13,
         height: 1.45,
+        color: scheme.onSurface,
       ),
       labelLarge: base.textTheme.labelLarge?.copyWith(
         fontWeight: FontWeight.w600,
+        fontSize: 13,
       ),
     );
 
-    const radius = 10.0;
+    const radius = 8.0;
     final outline = OutlineInputBorder(
       borderRadius: BorderRadius.circular(radius),
       borderSide: BorderSide(color: scheme.outlineVariant),
@@ -253,24 +334,33 @@ abstract final class LinguaRayMaterialTheme {
         backgroundColor: scheme.surface,
         foregroundColor: scheme.onSurface,
         surfaceTintColor: Colors.transparent,
-        toolbarHeight: 40,
+        toolbarHeight: 48,
         titleTextStyle: textTheme.titleMedium,
       ),
-      navigationRailTheme: NavigationRailThemeData(
-        backgroundColor: brand.railSurface,
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: scheme.surface,
         elevation: 0,
-        minWidth: 80,
+        height: 48,
+        indicatorColor: scheme.primaryContainer,
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          final selected = states.contains(WidgetState.selected);
+          return textTheme.labelLarge?.copyWith(
+            color: selected ? scheme.primary : scheme.onSurfaceVariant,
+          );
+        }),
+      ),
+      navigationRailTheme: NavigationRailThemeData(
+        backgroundColor: scheme.surface,
+        elevation: 0,
+        minWidth: 72,
         groupAlignment: -1,
         labelType: NavigationRailLabelType.all,
         useIndicator: true,
         indicatorColor: scheme.primaryContainer,
-        selectedIconTheme: IconThemeData(
-          color: scheme.onPrimaryContainer,
-          size: 22,
-        ),
+        selectedIconTheme: IconThemeData(color: scheme.primary, size: 20),
         unselectedIconTheme: IconThemeData(
           color: scheme.onSurfaceVariant,
-          size: 22,
+          size: 20,
         ),
         selectedLabelTextStyle: textTheme.labelMedium?.copyWith(
           color: scheme.primary,
@@ -292,8 +382,8 @@ abstract final class LinguaRayMaterialTheme {
           borderSide: BorderSide(color: scheme.error),
         ),
         contentPadding: const EdgeInsets.symmetric(
-          horizontal: 14,
-          vertical: 12,
+          horizontal: 12,
+          vertical: 10,
         ),
         hintStyle: textTheme.bodyMedium?.copyWith(
           color: scheme.onSurfaceVariant,
@@ -301,8 +391,8 @@ abstract final class LinguaRayMaterialTheme {
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          minimumSize: const Size(0, 44),
-          padding: const EdgeInsets.symmetric(horizontal: 18),
+          minimumSize: const Size(0, 36),
+          padding: const EdgeInsets.symmetric(horizontal: 14),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(radius),
           ),
@@ -311,8 +401,8 @@ abstract final class LinguaRayMaterialTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          minimumSize: const Size(0, 44),
-          padding: const EdgeInsets.symmetric(horizontal: 14),
+          minimumSize: const Size(0, 36),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(radius),
           ),
@@ -320,54 +410,62 @@ abstract final class LinguaRayMaterialTheme {
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          minimumSize: const Size(0, 40),
-          padding: const EdgeInsets.symmetric(horizontal: 12),
+          minimumSize: const Size(0, 32),
+          padding: const EdgeInsets.symmetric(horizontal: 10),
         ),
       ),
       iconButtonTheme: IconButtonThemeData(
         style: IconButton.styleFrom(
-          minimumSize: const Size.square(40),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          minimumSize: const Size.square(32),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
         ),
       ),
       chipTheme: base.chipTheme.copyWith(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
         side: BorderSide(color: scheme.outlineVariant),
         labelStyle: textTheme.labelMedium,
         selectedColor: scheme.primaryContainer,
+        showCheckmark: false,
       ),
       segmentedButtonTheme: SegmentedButtonThemeData(
         style: ButtonStyle(
           visualDensity: VisualDensity.compact,
-          tapTargetSize: MaterialTapTargetSize.padded,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           shape: WidgetStatePropertyAll(
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
           ),
         ),
       ),
       listTileTheme: ListTileThemeData(
-        minVerticalPadding: 10,
+        minVerticalPadding: 8,
         iconColor: scheme.onSurfaceVariant,
+        selectedTileColor: scheme.primaryContainer.withValues(alpha: 0.55),
+        selectedColor: scheme.primary,
         titleTextStyle: textTheme.titleMedium,
         subtitleTextStyle: textTheme.bodyMedium?.copyWith(
           color: scheme.onSurfaceVariant,
         ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: scheme.surfaceContainerLowest,
         surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: scheme.outlineVariant),
+        ),
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: isDark
-            ? const Color(0xFF1F2A2C)
-            : const Color(0xFF1A2433),
+            ? const Color(0xFF243552)
+            : LinguaRayPalette.navy,
         contentTextStyle: textTheme.bodyMedium?.copyWith(color: Colors.white),
       ),
       tooltipTheme: const TooltipThemeData(
         waitDuration: Duration(milliseconds: 400),
-        padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       ),
       progressIndicatorTheme: ProgressIndicatorThemeData(
         color: scheme.primary,
@@ -378,11 +476,22 @@ abstract final class LinguaRayMaterialTheme {
         selectionColor: scheme.primary.withValues(alpha: 0.22),
         selectionHandleColor: scheme.primary,
       ),
+      tabBarTheme: TabBarThemeData(
+        dividerColor: scheme.outlineVariant,
+        indicatorColor: scheme.primary,
+        labelColor: scheme.primary,
+        unselectedLabelColor: scheme.onSurfaceVariant,
+        overlayColor: WidgetStatePropertyAll(
+          scheme.primary.withValues(alpha: 0.08),
+        ),
+      ),
       scrollbarTheme: const ScrollbarThemeData(
         thickness: WidgetStatePropertyAll(8),
         radius: Radius.circular(8),
         thumbVisibility: WidgetStatePropertyAll(true),
       ),
+      focusColor: scheme.primary.withValues(alpha: 0.16),
+      hoverColor: scheme.primary.withValues(alpha: 0.06),
       extensions: <ThemeExtension<dynamic>>[brand, LinguaRayMetrics.standard],
     );
   }

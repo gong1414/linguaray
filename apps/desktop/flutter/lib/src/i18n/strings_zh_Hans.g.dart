@@ -260,6 +260,26 @@ class _TranslationsUiZhHans extends TranslationsUiEn {
     _root,
   );
   @override
+  late final _TranslationsUiErrorsZhHans errors = _TranslationsUiErrorsZhHans._(
+    _root,
+  );
+  @override
+  late final _TranslationsUiRecoveryZhHans recovery =
+      _TranslationsUiRecoveryZhHans._(_root);
+  @override
+  late final _TranslationsUiVocabularyZhHans vocabulary =
+      _TranslationsUiVocabularyZhHans._(_root);
+  @override
+  late final _TranslationsUiDictionaryZhHans dictionary =
+      _TranslationsUiDictionaryZhHans._(_root);
+  @override
+  late final _TranslationsUiUpdatesZhHans updates =
+      _TranslationsUiUpdatesZhHans._(_root);
+  @override
+  late final _TranslationsUiSpeechZhHans speech = _TranslationsUiSpeechZhHans._(
+    _root,
+  );
+  @override
   late final _TranslationsUiProvidersZhHans providers =
       _TranslationsUiProvidersZhHans._(_root);
 }
@@ -1247,6 +1267,12 @@ class _TranslationsUiShellZhHans extends TranslationsUiShellEn {
   @override
   String get translate => '翻译';
   @override
+  String get history => '历史';
+  @override
+  String get glossary => '术语库';
+  @override
+  String get vocabulary => '生词本';
+  @override
   String get settings => '设置';
   @override
   String get minimize => '最小化';
@@ -1336,6 +1362,240 @@ class _TranslationsUiQuickZhHans extends TranslationsUiQuickEn {
   String get permission_next => '打开系统设置授予辅助功能或屏幕录制权限，然后返回重新检查。';
   @override
   String get capture_cancelled => '已取消截图。原文未改动。';
+  @override
+  String get capture_failed => '截图失败，请重试。';
+  @override
+  String get ocr_not_configured => '尚未配置文字识别服务。';
+  @override
+  String get ocr_empty => '所选区域没有识别到文字。';
+  @override
+  String get empty_selection => '没有选中文本。';
+  @override
+  String get clipboard_unavailable => '无法读取剪贴板。';
+  @override
+  String get clipboard_restore_failed => '无法恢复之前的剪贴板内容。';
+  @override
+  String get recheck => '重新检查';
+}
+
+// Path: ui.errors
+class _TranslationsUiErrorsZhHans extends TranslationsUiErrorsEn {
+  _TranslationsUiErrorsZhHans._(TranslationsZhHans root)
+    : this._root = root,
+      super.internal(root);
+
+  final TranslationsZhHans _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get accessibility_denied => '读取选中文本需要辅助功能权限。';
+  @override
+  String get screen_recording_denied => '截图需要屏幕录制权限。';
+  @override
+  String get capture_failed => '截图失败。';
+  @override
+  String get capture_cancelled => '已取消截图。';
+  @override
+  String get ocr_not_configured => '请先配置文字识别服务。';
+  @override
+  String get ocr_empty => '所选区域没有识别到文字。';
+  @override
+  String get empty_selection => '没有选中文本。';
+  @override
+  String get clipboard_unavailable => '剪贴板不可用。';
+  @override
+  String get clipboard_restore_failed => '剪贴板恢复失败，之前的内容可能仍在剪贴板中。';
+  @override
+  String get source_language_detection_failed => '无法检测源语言，请手动选择。';
+  @override
+  String get unsupported_language_pair => '当前服务不支持这对语言。';
+  @override
+  String get language_pack_missing => '请在 macOS 语言与地区中安装该语言包后再试。';
+  @override
+  String get network_failure => '无法连接服务，请检查网络。';
+  @override
+  String get provider_auth_failed => '认证失败，请在设置中检查服务密钥。';
+  @override
+  String get translation_failed => '翻译失败，请检查服务后重试。';
+  @override
+  String get empty_result => '服务没有返回译文。';
+  @override
+  String get catalog_unavailable => '无法读取翻译服务。';
+  @override
+  String get no_translation_service => '请先启用一个可用的翻译服务。';
+  @override
+  String get glossary_corrupt => '有一本术语库文件无法读取，其他术语库仍可使用。';
+  @override
+  String get history_unavailable => '无法读取历史记录。';
+  @override
+  String get dictionary_unavailable => '当前系统没有可用的词典服务。';
+  @override
+  String get vocabulary_unavailable => '无法读取生词本。';
+  @override
+  String get speech_unavailable => '当前系统不支持朗读。';
+  @override
+  String get speech_interrupted => '朗读被中断。';
+  @override
+  String get speech_failed => '朗读失败。';
+  @override
+  String get update_check_failed => '检查更新失败。';
+  @override
+  String get update_checksum_missing => '该更新没有校验和，不会安装。';
+  @override
+  String get update_checksum_mismatch => '下载的文件与校验和不匹配。';
+  @override
+  String get protocol_invalid => '这个 LinguaRay 链接无效。';
+  @override
+  String get protocol_too_large => '链接中的文本过大，无法打开。';
+  @override
+  String get api_server_bind_failed => '本地 API 服务无法绑定该端口。';
+  @override
+  String get invalid_port => '请输入 0（自动分配）或 1 到 65535 之间的端口。';
+  @override
+  String get unknown => '出现了问题，请重试。';
+}
+
+// Path: ui.recovery
+class _TranslationsUiRecoveryZhHans extends TranslationsUiRecoveryEn {
+  _TranslationsUiRecoveryZhHans._(TranslationsZhHans root)
+    : this._root = root,
+      super.internal(root);
+
+  final TranslationsZhHans _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get retry => '重试';
+  @override
+  String get recheck_permission => '重新检查权限';
+  @override
+  String get open_permission_settings => '打开权限设置';
+  @override
+  String get configure_ocr => '配置文字识别';
+  @override
+  String get configure_translation_provider => '配置翻译服务';
+  @override
+  String get edit_input => '编辑原文';
+  @override
+  String get choose_language => '选择语言';
+}
+
+// Path: ui.vocabulary
+class _TranslationsUiVocabularyZhHans extends TranslationsUiVocabularyEn {
+  _TranslationsUiVocabularyZhHans._(TranslationsZhHans root)
+    : this._root = root,
+      super.internal(root);
+
+  final TranslationsZhHans _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get title => '生词本';
+  @override
+  String get empty_title => '还没有生词';
+  @override
+  String get empty_description => '可以从词典查询或翻译结果中加入。';
+  @override
+  String get search => '搜索生词';
+  @override
+  String get all => '全部';
+  @override
+  String get favorites => '收藏';
+  @override
+  String get note => '笔记';
+  @override
+  String get add => '加入生词本';
+  @override
+  String get saved => '已加入生词本';
+  @override
+  String get delete => '删除';
+  @override
+  String get favorite => '收藏';
+  @override
+  String get unfavorite => '取消收藏';
+  @override
+  String get source_dictionary => '词典';
+  @override
+  String get source_translation => '翻译';
+  @override
+  String get no_results => '没有匹配的生词。';
+}
+
+// Path: ui.dictionary
+class _TranslationsUiDictionaryZhHans extends TranslationsUiDictionaryEn {
+  _TranslationsUiDictionaryZhHans._(TranslationsZhHans root)
+    : this._root = root,
+      super.internal(root);
+
+  final TranslationsZhHans _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get title => '词典';
+  @override
+  String get empty => '从译文中选词查询。';
+  @override
+  String get unavailable => '没有可用的词典服务。';
+  @override
+  String get lookup => '查询';
+  @override
+  String get pronunciation => '发音';
+  @override
+  String get definitions => '释义';
+  @override
+  String get save => '加入生词本';
+}
+
+// Path: ui.updates
+class _TranslationsUiUpdatesZhHans extends TranslationsUiUpdatesEn {
+  _TranslationsUiUpdatesZhHans._(TranslationsZhHans root)
+    : this._root = root,
+      super.internal(root);
+
+  final TranslationsZhHans _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get title => '更新';
+  @override
+  String get current => '当前版本';
+  @override
+  String get check => '检查更新';
+  @override
+  String get checking => '正在检查…';
+  @override
+  String get up_to_date => '已是最新版本。';
+  @override
+  String available({required Object version}) => '发现新版本 ${version}。';
+  @override
+  String get download => '下载';
+  @override
+  String get downloading => '正在下载…';
+  @override
+  String get ready => '已校验，可以安装。';
+  @override
+  String get install => '安装';
+  @override
+  String get unsigned => '该更新没有校验和，不会安装。';
+  @override
+  String get notes => '发行说明';
+}
+
+// Path: ui.speech
+class _TranslationsUiSpeechZhHans extends TranslationsUiSpeechEn {
+  _TranslationsUiSpeechZhHans._(TranslationsZhHans root)
+    : this._root = root,
+      super.internal(root);
+
+  final TranslationsZhHans _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get speak_source => '朗读原文';
+  @override
+  String get speak_result => '朗读译文';
+  @override
+  String get stop => '停止朗读';
 }
 
 // Path: ui.providers
@@ -2443,575 +2703,672 @@ class _TranslationsSettingsProvidersDetailModelsZhHans
 extension on TranslationsZhHans {
   dynamic _flatMapFunction(String path) {
     return switch (path) {
-      'common.ui.button.ok' => '确定',
-      'common.ui.button.cancel' => '取消',
-      'common.ui.button.add' => '添加',
-      'common.ui.button.delete' => '删除',
-      'common.ui.button.edit' => '编辑',
-      'common.ui.button.save' => '保存',
-      'common.ui.button.manage' => '管理',
-      'common.ui.button.kContinue' => '继续',
-      'common.ui.feedback.copied' => '已复制',
-      'common.language.ar' => '阿拉伯语',
-      'common.language.bn' => '孟加拉语',
-      'common.language.de' => '德语',
-      'common.language.en' => '英语',
-      'common.language.es' => '西班牙语',
-      'common.language.fa' => '波斯语',
-      'common.language.fr' => '法语',
-      'common.language.gu' => '古吉拉特语',
-      'common.language.ha' => '豪萨语',
-      'common.language.hi' => '印地语',
-      'common.language.id' => '印尼语',
-      'common.language.it' => '意大利语',
-      'common.language.ja' => '日语',
-      'common.language.jv' => '印尼爪哇语',
-      'common.language.ko' => '韩语',
-      'common.language.ml' => '马拉雅拉姆语',
-      'common.language.mr' => '马拉地语',
-      'common.language.ms' => '马来语',
-      'common.language.nl' => '荷兰语',
-      'common.language.pa' => '旁遮普语',
-      'common.language.pl' => '波兰语',
-      'common.language.pt' => '葡萄牙语',
-      'common.language.ro' => '罗马尼亚语',
-      'common.language.ru' => '俄语',
-      'common.language.sw' => '斯瓦希里语',
-      'common.language.ta' => '泰米尔语',
-      'common.language.te' => '泰卢固语',
-      'common.language.th' => '泰语',
-      'common.language.tr' => '土耳其语',
-      'common.language.uk' => '乌克兰语',
-      'common.language.ur' => '乌尔都语',
-      'common.language.vi' => '越南语',
-      'common.language.yo' => '约鲁巴语',
-      'common.language.zh_hans' => '中文（简体）',
-      'common.language.zh_hant' => '中文（繁体）',
-      'common.theme_mode.light' => '浅色',
-      'common.theme_mode.dark' => '深色',
-      'common.theme_mode.system' => '跟随系统',
-      'common.theme_style.studio' => 'Studio',
-      'common.theme_style.bright' => 'Bright',
-      'common.provider.anthropic' => 'Anthropic',
-      'common.provider.baidu' => '百度',
-      'common.provider.caiyun' => '彩云小译',
-      'common.provider.deepl' => 'DeepL',
-      'common.provider.google' => '谷歌',
-      'common.provider.ollama' => 'Ollama',
-      'common.provider.openai' => 'OpenAI',
-      'common.provider.sogou' => '搜狗',
-      'common.provider.xai' => 'xAI',
-      'common.provider.system' => '系统',
-      'common.provider.tencent' => '腾讯',
-      'common.provider.youdao' => '有道',
-      'app.tray.context_menu.show_window' => '显示窗口',
-      'app.tray.context_menu.dev_tools.title' => '开发工具',
-      'app.tray.context_menu.dev_tools.open_data_directory' => '打开数据目录',
-      'app.tray.context_menu.check_for_updates' => '检查更新',
-      'app.tray.context_menu.settings' => '设置',
-      'app.tray.context_menu.quit' => '退出',
-      'mini_translator.limited_banner.permission.missing_both' =>
-        '请授予屏幕录制和辅助功能权限以启用完整功能。',
-      'mini_translator.limited_banner.permission.missing_screen_capture' =>
-        '请授予屏幕录制权限以启用完整功能。',
-      'mini_translator.limited_banner.permission.missing_accessibility' =>
-        '请授予辅助功能权限以启用完整功能。',
-      'mini_translator.limited_banner.instruction.app_settings_prefix' => '请前往',
-      'mini_translator.limited_banner.instruction.follow_guide_prefix' =>
-        '，按指引授权后点击',
-      'mini_translator.limited_banner.instruction.suffix' => '。',
-      'mini_translator.limited_banner.action.app_settings' => '应用设置',
-      'mini_translator.limited_banner.action.recheck' => '重新检查',
-      'mini_translator.limited_banner.feedback.enabled' => '屏幕取词功能已启用',
-      'mini_translator.limited_banner.feedback.still_missing' =>
-        '仍缺少所需权限，\n请检查设置后重试。',
-      'mini_translator.limited_banner.tooltip.help' => '查看帮助文档',
-      'mini_translator.input.hint' => '在此处输入单词或文本',
-      'mini_translator.input.extracting_text' => '正在提取文字...',
-      'mini_translator.input.hint_translate_to' => ({
-        required Object language,
-      }) => '输入单词或文本，翻译为${language}',
-      'mini_translator.toolbar.tooltip.extract_text_from_screen_capture' =>
-        '截取屏幕区域并识别文字',
-      'mini_translator.toolbar.tooltip.extract_text_from_clipboard' =>
-        '读取剪切板内容',
-      'mini_translator.toolbar.tooltip.pin' => '固定窗口',
-      'mini_translator.toolbar.tooltip.more_actions' => '更多操作',
-      'mini_translator.toolbar.menu.extract_from_screen_capture' => '屏幕取词',
-      'mini_translator.toolbar.menu.extract_from_clipboard' => '剪贴板取词',
-      'mini_translator.toolbar.menu.open_main_window' => '打开主窗口',
-      'mini_translator.toolbar.menu.open_settings' => '设置…',
-      'mini_translator.button.clear' => '清空',
-      'mini_translator.button.translate' => '翻译',
-      'mini_translator.button.copy' => '复制',
-      'mini_translator.button.copied' => '已复制',
-      'mini_translator.button.bookmark' => '收藏',
-      'mini_translator.button.bookmarked' => '已收藏',
-      'mini_translator.language.auto_detect' => '自动检测',
-      'mini_translator.language.auto_match' => '自动匹配',
-      'mini_translator.language.switch_config' => '切换目标',
-      'mini_translator.language.more_languages' => '更多语言...',
-      'mini_translator.language.manage_common_languages' => '管理常用语言...',
-      'mini_translator.language.manage_targets' => '管理翻译目标...',
-      'mini_translator.language.add_target' => '添加翻译目标...',
-      'mini_translator.message.please_enter_word_or_text' => '未输入或未提取到文本',
-      'mini_translator.message.capture_screen_area_canceled' => '截取屏幕区域已取消',
-      'mini_translator.message.ocr_service_not_configured' =>
-        '未配置默认文字识别服务，请在设置中配置。',
-      'mini_translator.message.ocr_recognition_failed' => '文字识别失败',
-      'mini_translator.result.translating' => '正在翻译…',
-      'mini_translator.result.stale_requery' => ({
-        required Object key,
-      }) => '原文已修改 · ${key} 重新翻译',
-      'mini_translator.result.compare_services' => ({
-        required Object count,
-      }) => '对比 ${count} 个服务',
-      'mini_translator.result.collapse_compare' => '收起对比',
-      'mini_translator.result.set_preferred' => '设为首选',
-      'mini_translator.result.retry' => '重试',
-      'mini_translator.result.no_result' => '所有服务都没有返回结果 —— 检查网络，或换一个服务再试。',
-      'mini_translator.result.no_result_note' => '原文已保留，重试不会重复计入历史。',
-      'mini_translator.result.no_result_meta' => ({
-        required Object count,
-      }) => '${count} 个服务都没有返回结果',
-      'mini_translator.result.no_result_body' =>
-        '没有拿到译文。检查网络后按 ⏎ 重试，或展开看每个服务的原因。',
-      'mini_translator.result.check_services' => '检查服务',
-      'mini_translator.result.show_reasons' => ({
-        required Object count,
-      }) => '查看 ${count} 个服务的原因',
-      'mini_translator.result.collapse_reasons' => '收起原因',
-      'mini_translator.result.unknown_error' => '服务没有说明原因。',
-      'mini_translator.result.no_result_tag' => '未返回结果',
-      'workbench.workspace' => '工作区',
-      'workbench.translate' => '翻译',
-      'workbench.history' => '历史',
-      'workbench.history_page.all' => '全部',
-      'workbench.history_page.favorites' => '收藏',
-      'workbench.history_page.edited' => '我改过的',
-      'workbench.history_page.search' => '搜索',
-      'workbench.history_page.search_placeholder' => '搜索原文、译文或服务',
-      'workbench.history_page.search_label' => '搜索历史',
-      'workbench.history_page.entry_count' => ({
-        required Object label,
-        required Object count,
-      }) => '${label} · ${count} 条',
-      'workbench.history_page.by_time' => '按时间',
-      'workbench.history_page.loading' => '正在载入历史…',
-      'workbench.history_page.load_failed' => '历史载入失败',
-      'workbench.history_page.retry' => '重试',
-      'workbench.history_page.empty_title' => '还没有翻译历史',
-      'workbench.history_page.empty_description' => '完成一次翻译后，首选译文会自动保存在这里。',
-      'workbench.history_page.no_results' => ({
-        required Object query,
-      }) => '没有匹配「${query}」的记录',
-      'workbench.history_page.clear_search' => '清除搜索',
-      'workbench.history_page.select' => '多选',
-      'workbench.history_page.selected_count' => ({
-        required Object count,
-      }) => '已选 ${count} 条',
-      'workbench.history_page.exit_select' => '退出多选',
-      'workbench.history_page.add_to_glossary' => '加入术语库',
-      'workbench.history_page.favorite' => '收藏',
-      'workbench.history_page.unfavorite' => '取消收藏',
-      'workbench.history_page.delete_confirm' => ({
-        required Object count,
-      }) => '确定删除选中的 ${count} 条历史？此操作无法撤销。',
-      'workbench.history_page.no_glossary' => '请先创建一个术语库',
-      'workbench.history_page.added_to_glossary' => ({
-        required Object count,
-      }) => '已将 ${count} 条记录加入术语库',
-      'workbench.history_page.favorite_flag' => '已收藏',
-      'workbench.history_page.edited_flag' => '我改过',
-      'workbench.history_page.edit_history_hint' => '修改后的译文会保存到历史',
-      'workbench.history_page.copy_translation' => '复制译文',
-      'workbench.history_page.more_actions' => '更多',
-      'workbench.history_page.delete_title_one' => '删除这条记录',
-      'workbench.history_page.delete_title_many' => ({
-        required Object count,
-      }) => '删除 ${count} 条记录',
-      'workbench.history_page.delete_message' =>
-        '删除后无法恢复。收藏和你改过的译文也会一起删除，术语库不受影响。',
-      'workbench.glossary' => '术语库',
-      'workbench.recent_languages' => '最近语言',
-      'workbench.not_configured' => '尚未配置',
-      'workbench.subtitle.translate' => '工作台 · 多服务对照',
-      'workbench.subtitle.settings' => '设置',
-      'workbench.placeholder.history' => '收藏与历史将在后续版本中提供',
-      'workbench.placeholder.glossary' => '术语库管理正在建设中',
-      'workbench.glossary_page.add_entry' => '新增条目',
-      'workbench.glossary_page.term' => '原文',
-      'workbench.glossary_page.translation' => '指定译法',
-      'workbench.glossary_page.forbidden' => '禁用',
-      'workbench.glossary_page.hits' => '命中',
-      'workbench.glossary_page.term_placeholder' => 'teacher forcing',
-      'workbench.glossary_page.translation_placeholder' => '教师强制',
-      'workbench.glossary_page.forbidden_placeholder' => '强制教学',
-      'workbench.glossary_page.search' => '搜索',
-      'workbench.glossary_page.search_placeholder' => '搜索术语或指定译法',
-      'workbench.glossary_page.search_label' => '搜索术语库',
-      'workbench.glossary_page.entry_count' => ({
-        required Object name,
-        required Object count,
-      }) => '${name} · ${count} 条',
-      'workbench.glossary_page.priority_note' => '术语优先级高于任何服务输出',
-      'workbench.glossary_page.new_book' => '新建术语库',
-      'workbench.glossary_page.new_book_placeholder' => '术语库名称',
-      'workbench.glossary_page.rename_book' => '重命名',
-      'workbench.glossary_page.delete_book_confirm' => ({
-        required Object name,
-        required Object count,
-      }) => '删除「${name}」及其中的 ${count} 条术语？',
-      'workbench.glossary_page.disabled' => '已停用',
-      'workbench.glossary_page.enable' => '启用',
-      'workbench.glossary_page.disable' => '停用',
-      'workbench.glossary_page.empty_title' => '这个术语库还是空的',
-      'workbench.glossary_page.empty_description' =>
-        '术语优先级高于任何服务输出。可以逐条新增，也可以把 CSV 拖进来合并。',
-      'workbench.glossary_page.no_results_title' => ({
-        required Object query,
-      }) => '没有匹配「${query}」的术语',
-      'workbench.glossary_page.no_results_description' => '换个关键词，或直接新增一条。',
-      'workbench.glossary_page.no_books_title' => '还没有术语库',
-      'workbench.glossary_page.no_books_description' =>
-        '术语库让指定译法在所有服务里保持一致。先建一个，再往里加词。',
-      'workbench.glossary_page.loading' => '正在载入…',
-      'workbench.glossary_page.new_book_subtitle' => '按领域分库，翻译时全部生效',
-      'workbench.glossary_page.name' => '名称',
-      'workbench.glossary_page.name_taken' => '名称 · 已存在',
-      'workbench.glossary_page.name_taken_hint' => ({
-        required Object name,
-      }) => '已经有一个叫「${name}」的术语库了。',
-      'workbench.glossary_page.name_placeholder' => '机器学习',
-      'workbench.glossary_page.source_language' => '源语言',
-      'workbench.glossary_page.target_language' => '目标语言',
-      'workbench.glossary_page.same_language' => '源语言和目标语言得是两种语言。',
-      'workbench.glossary_page.seed' => '初始内容',
-      'workbench.glossary_page.seed_blank' => '空白',
-      'workbench.glossary_page.seed_blank_hint' => '之后逐条新增',
-      'workbench.glossary_page.seed_csv_hint' => '两列：原文 / 译法',
-      'workbench.glossary_page.seed_tbx_hint' => '行业术语交换格式',
-      'workbench.glossary_page.seed_blank_note' =>
-        '建好后可以逐条新增，也可以把 CSV / TBX 拖进列表里合并。',
-      'workbench.glossary_page.seed_file_note' => ({
-        required Object format,
-      }) => '创建后立即导入 ${format} 文件 · 重复的原文按文件里的译法为准',
-      'workbench.glossary_page.choose_file' => '选择文件…',
-      'workbench.glossary_page.create' => '创建',
-      'workbench.glossary_page.add_entry_subtitle' => '术语优先级高于任何服务输出',
-      'workbench.glossary_page.book' => '术语库',
-      'workbench.glossary_page.forbidden_label' => '禁用译法',
-      'workbench.glossary_page.forbidden_hint' =>
-        '服务给出这些说法时会被标为冲突；多个用 / 分隔，留空表示不禁用。',
-      'workbench.glossary_page.forbidden_placeholder_full' => '强制教学 / 强制教师',
-      'workbench.glossary_page.duplicate' => ({
-        required Object term,
-        required Object book,
-      }) => '「${term}」已在${book}中，保存会覆盖原有译法。',
-      'workbench.glossary_page.duplicate_book_fallback' => '该术语库',
-      'workbench.glossary_page.keep_adding' => '保存后继续添加下一条',
-      'workbench.glossary_page.added_count' => ({
-        required Object count,
-      }) => '本次已添加 ${count} 条',
-      'workbench.glossary_page.overwrite' => '覆盖',
-      'workbench.glossary_page.done' => '完成',
-      'workbench.translation.source' => '原文',
-      'workbench.translation.target' => '译文',
-      'workbench.translation.input_hint' => '输入或粘贴需要翻译的文本',
-      'workbench.translation.button' => '翻译',
-      'workbench.translation.auto_detected' => '已自动检测',
-      'workbench.translation.loading_services' => '正在读取翻译服务…',
-      'workbench.translation.no_services' => '请先在设置中配置翻译服务',
-      'workbench.translation.translating' => '正在翻译…',
-      'workbench.translation.failed' => '翻译失败，请检查服务配置后重试',
-      'workbench.translation.empty' => '译文将在这里显示',
-      'workbench.translation.service_compare' => '服务对比',
-      'workbench.translation.main_translation' => '主译文',
-      'workbench.translation.service_unavailable' => '服务暂不可用',
-      'workbench.translation.waiting' => '等待翻译',
-      'workbench.translation.copy' => '复制',
-      'workbench.translation.favorite_unavailable' => '收藏功能将在后续版本中提供',
-      'workbench.translation.preferred' => '首选译文',
-      'workbench.translation.other_services' => '其他服务',
-      'workbench.translation.copy_result' => '复制译文',
-      'workbench.translation.copied' => '已复制',
-      'workbench.translation.favorite' => '收藏',
-      'workbench.translation.terms' => '命中术语',
-      'workbench.translation.terms_hint' => '输入后自动比对术语库。',
-      'workbench.translation.quality' => '质量信号',
-      'workbench.translation.quality_hint' => '译文生成后计算。',
-      'workbench.translation.shortcuts' => '快捷键',
-      'workbench.translation.other_services_disabled' => '其他服务已停用',
-      'workbench.translation.input_hint_translate_to' => ({
-        required Object language,
-      }) => '输入或粘贴要翻译的文本，翻译为${language}',
-      'workbench.translation.newline_hint' => ({
-        required Object key,
-      }) => '${key} 换行',
-      'workbench.translation.failed_body' =>
-        '这一段没有拿到译文。检查网络连接后重试，或展开看每个服务的原因逐个处理。',
-      'workbench.translation.clear' => '清空',
-      'workbench.translation.swap_languages' => '交换语言',
-      'workbench.translation.services' => '翻译服务',
-      'workbench.translation.configure_services' => '配置服务',
-      'workbench.translation.retry' => '重试',
-      'workbench.translation.character_count' => ({
-        required Object count,
-      }) => '${count} 个字符',
-      'workbench.translation.language_pair_not_installed' =>
-        '请先在 macOS“语言与地区”中安装这个语言组合，然后重试。',
-      'workbench.translation.unsupported_language_pair' => '当前翻译服务不支持这个语言组合。',
-      'workbench.translation.source_language_detection_failed' =>
-        '无法识别原文语言，请手动选择源语言后重试。',
-      'workbench.translation.network_error' => '无法连接翻译服务，请检查网络后重试。',
-      'workbench.translation.partial_failure' => ({
-        required Object count,
-      }) => '${count} 个服务失败，可切换查看原因',
-      'workbench.translation.streaming' => '正在生成译文…',
-      'workbench.status.runtime_ready' => '翻译运行时已就绪',
-      'workbench.status.settings_synced' => '设置已同步',
-      'workbench.status.shortcuts' => '⌥Space 小窗 · ⌥⇧2 截图',
-      'workbench.version_latest' => '已是最新',
-      'workbench.version_checking' => '正在检查…',
-      'workbench.check_updates' => '检查更新',
-      'settings.version' => 'v{} (Build {})',
-      'settings.general.title' => '常规',
-      'settings.general.section.permissions' => '系统权限',
-      'settings.general.section.ocr' => '文字识别',
-      'settings.general.section.directory' => '词典',
-      'settings.general.section.translation' => '翻译',
-      'settings.general.section.translation_target' => '翻译目标',
-      'settings.general.section.languages' => '语言',
-      'settings.general.section.input' => '输入设置',
-      'settings.general.section.startup' => '启动与集成',
-      'settings.general.section.ocr_behaviour' => '取词行为',
-      'settings.general.section.translation_behaviour' => '翻译行为',
-      'settings.general.row.launch_at_login' => '登录时启动',
-      'settings.general.row.show_in_menu_bar' => '在菜单栏中显示',
-      'settings.general.row.screen_capture_access' => '授予屏幕录制权限',
-      'settings.general.row.screen_selection_access' => '授予辅助功能权限',
-      'settings.general.row.default_ocr_service' => '默认文字识别服务',
-      'settings.general.row.auto_copy_detected_text' => '自动复制检测到的文本',
-      'settings.general.row.default_directory_service' => '默认词典服务',
-      'settings.general.row.default_translation_service' => '默认翻译服务',
-      'settings.general.row.translation_target_hint' => '配置翻译器使用的语言目标。',
-      'settings.general.row.common_languages' => '常用语言',
-      'settings.general.row.common_languages_description' => '显示在语言选择列表顶部。',
-      'settings.general.row.common_languages_hint' => '选择你常用的语言：',
-      'settings.general.row.common_languages_sort' => '按代码排序',
-      'settings.general.row.common_languages_reset' => '恢复默认',
-      'settings.general.row.common_languages_reset_help' => '恢复为默认的常用语言集合',
-      'settings.general.row.common_languages_search' => '搜索语言...',
-      'settings.general.row.common_languages_all' => '所有语言',
-      'settings.general.row.double_click_copy_result' => '双击复制翻译结果',
-      'settings.general.row.submit_with_enter' => '按 Enter 提交',
-      'settings.general.row.submit_with_meta_enter_mac' => '按 ⌘ + Enter 提交',
-      'settings.general.row.screen_capture_access_hint' => '截图取词需要读取屏幕内容。',
-      'settings.general.row.screen_selection_access_hint' =>
-        '划词取词需要读取其他应用中选中的文本。',
-      'settings.general.row.no_translation_targets' =>
-        '还没有翻译目标，添加一条来决定默认译入哪种语言。',
-      'settings.general.button.add_provider' => '添加...',
-      'settings.general.button.add_target' => '添加目标...',
-      'settings.general.button.manage_targets' => '管理翻译目标...',
-      'settings.general.button.manage_languages' => '管理常用语言...',
-      'settings.general.button.grant' => '授权',
-      'settings.general.option.none' => '无',
-      'settings.general.option.no_services_available' => '暂无可用服务',
-      'settings.general.option.granted' => '已授权',
-      'settings.general.option.built_in_ocr' => '内置 OCR',
-      'settings.general.option.tesseract' => 'Tesseract',
-      'settings.general.option.youdao_ocr' => '有道 OCR',
-      'settings.general.editor.add_target_title' => '添加翻译目标：',
-      'settings.general.editor.edit_target_title' => '修改翻译目标：',
-      'settings.general.editor.row.source_language' => '源语言',
-      'settings.general.editor.row.target_language' => '目标语言',
-      'settings.general.editor.title_edit' => '编辑翻译目标',
-      'settings.general.editor.subtitle' => '决定某种源语言默认翻译成哪种语言',
-      'settings.general.editor.same_language' => '源语言与目标语言相同，换一个目标语言。',
-      'settings.general.editor.duplicate' => '已经有一条同样的翻译目标了。',
-      'settings.general.editor.hint_auto' => '未匹配到其他规则时，一律译成{}。',
-      'settings.general.editor.hint_source' => '检测到{}时，译成{}。',
-      'settings.appearance.title' => '外观',
-      'settings.appearance.section.app_language' => '显示语言',
-      'settings.appearance.section.theme_mode' => '主题模式',
-      'settings.appearance.section.theme_style' => '主题风格',
-      'settings.appearance.footer' => '更改立即应用到整个窗口。',
-      'settings.shortcuts.title' => '快捷键',
-      'settings.shortcuts.section.text_extraction' => '文字提取',
-      'settings.shortcuts.section.input_assist' => '输入辅助功能',
-      'settings.shortcuts.section.submit_mode' => '提交方式',
-      'settings.shortcuts.row.toggle_mini_translator' => '显示/隐藏窗口',
-      'settings.shortcuts.row.extract_text_from_screen_selection' =>
-        '从屏幕选区提取文字',
-      'settings.shortcuts.row.extract_text_from_screen_capture' => '从屏幕截图提取文字',
-      'settings.shortcuts.row.extract_text_from_clipboard' => '从剪贴板提取文字',
-      'settings.shortcuts.row.translate_input' => '翻译输入内容',
-      'settings.shortcuts.reset_dialog.title' => '重置快捷键',
-      'settings.shortcuts.reset_dialog.message' => '确定要重置所有快捷键为默认值吗？',
-      'settings.shortcuts.reset_dialog.confirm' => '重置',
-      'settings.shortcuts.reset_dialog.cancel' => '取消',
-      'settings.shortcuts.group.global.title' => '全局快捷键',
-      'settings.shortcuts.group.global.description' => '在任何应用里都能触发。',
-      'settings.shortcuts.group.in_app.title' => '应用内按键',
-      'settings.shortcuts.group.in_app.description' => '仅在应用自己的输入框内生效。',
-      'settings.shortcuts.reset' => '恢复默认...',
-      'settings.shortcuts.record_placeholder' => '录制快捷键',
-      'settings.shortcuts.recording' => '按下快捷键…',
-      'settings.shortcuts.clear' => '清除',
-      'settings.shortcuts.conflict' => ({
-        required Object label,
-      }) => '与「${label}」冲突',
-      'settings.advanced.title' => '高级',
-      'settings.advanced.api_server' => '本地 API 服务',
-      'settings.advanced.api_server_description' =>
-        '在 127.0.0.1 上开放翻译 API，供本机集成使用。',
-      'settings.advanced.enable' => '启用',
-      'settings.advanced.port' => '端口',
-      'settings.advanced.running_at' => '运行于 {url}',
-      'settings.advanced.disabled' => '已关闭',
-      'settings.services.title' => '服务',
-      'settings.services.button.add_service' => '添加服务...',
-      'settings.services.section.available_services' => '可用服务',
-      'settings.services.editor.title' => '添加服务',
-      'settings.services.editor.subtitle' => '为已配置的提供商新增一项服务',
-      'settings.services.editor.row.model' => '模型',
-      'settings.services.editor.row.system_prompt' => '系统提示词',
-      'settings.services.editor.prompt_placeholder' => '留空则使用该类型的默认提示词',
-      'settings.services.editor.variant_hint' => '{} 已有一项{}服务，这条会作为并列的另一份配置。',
-      'settings.services.editor.traditional_note' =>
-        '{} 是传统接口，没有模型与提示词可调；服务参数在提供商详情里配置。',
-      'settings.services.detail.row.id' => '服务 ID',
-      'settings.services.detail.row.name' => '名称',
-      'settings.services.detail.row.provider' => '提供商',
-      'settings.services.detail.row.type' => '类型',
-      'settings.services.detail.delete_dialog.title' => '删除「{}」？',
-      'settings.services.detail.delete_dialog.message' => '此服务将从提供商中移除。',
-      'settings.services.detail.prompt_variables' =>
-        '可用变量：{{sourceLanguage}}、{{targetLanguage}}、{{text}}',
-      'settings.services.make_default' => '设为默认',
-      'settings.services.item.none_of_kind' => '还没有可用的{}服务。',
-      'settings.providers.title' => '提供商',
-      'settings.providers.section.services' => '可用服务',
-      'settings.providers.section.services_description' =>
-        '查看已配置提供商的可用服务，并按服务类型切换。',
-      'settings.providers.item.empty' => '暂无已配置的提供商。添加一个提供商以启用翻译服务。',
-      'settings.providers.item.loading' => '正在加载提供商...',
-      'settings.providers.item.no_services' => '暂无可用服务。',
-      'settings.providers.button.add' => '添加提供商...',
-      'settings.providers.alert.error' => '错误',
-      'settings.providers.intro.body' => '管理应用使用的服务提供商。',
-      'settings.providers.intro.warning' => '已连接的提供商可能会处理你发送的文本或图片，请只启用你信任的服务。',
-      'settings.providers.editor.row.id' => '提供商 ID',
-      'settings.providers.editor.row.type' => '提供商类型',
-      'settings.providers.editor.row.default_model' => '默认模型',
-      'settings.providers.editor.placeholder.id' => '例如 deepl-main',
-      'settings.providers.editor.type_picker.prompt' => '请选择要添加的提供商类型：',
-      'settings.providers.editor.type_picker.section_llm' => 'LLM',
-      'settings.providers.editor.type_picker.section_traditional' => '传统',
-      'settings.providers.editor.tooltip.help' => '帮助',
-      'settings.providers.editor.step.next' => '继续',
-      'settings.providers.editor.step.back' => '上一步',
-      'settings.providers.editor.add_title' => '添加 {}',
-      'settings.providers.editor.capability_note.translation' => '加入翻译候选',
-      'settings.providers.editor.capability_note.dictionary' => '提供词典释义',
-      'settings.providers.editor.capability_note.ocr' => '识别图片中的文字',
-      'settings.providers.editor.test.run' => '测试连接',
-      'settings.providers.editor.test.running' => '正在测试连接 · 已用 {}s',
-      'settings.providers.editor.test.passed_models' => '连接正常 · {} 个模型可用',
-      'settings.providers.editor.test.passed_service' => '连接正常 · 服务可用',
-      'settings.providers.editor.test.passed_footer' => '已通过连接测试',
-      'settings.providers.editor.test.retest' => '重新测试',
-      'settings.providers.editor.test.tips_title' => '可以试试',
-      'settings.providers.editor.test.tips_llm' =>
-        '· 确认密钥与所选提供商类型一致\n· 检查 Base URL 是否需要包含 /v1\n· 在提供商控制台确认该模型已开通',
-      'settings.providers.editor.test.tips_traditional' =>
-        '· 确认密钥与所选提供商类型一致\n· 在提供商控制台确认服务已开通',
-      'settings.providers.editor.test.failed_suffix' => '验证失败',
-      'settings.providers.editor.test.passed_suffix' => '已验证',
-      'settings.providers.detail.tooltip.edit' => '编辑提供商',
-      'settings.providers.detail.row.id_hint' => '创建后不可更改',
-      'settings.providers.detail.section.configuration' => '配置',
-      'settings.providers.detail.section.models' => '模型',
-      'settings.providers.detail.models.loading' => '正在加载模型...',
-      'settings.providers.detail.models.empty' => '未找到模型。',
-      'settings.providers.detail.models.retry' => '重试',
-      'settings.providers.detail.models.refresh' => '刷新列表',
-      'settings.providers.detail.models.default_badge' => '默认',
-      'settings.providers.detail.models.set_default' => '设为默认',
-      'settings.providers.detail.models.fetch_error' => '无法从提供商 API 获取模型。',
-      'settings.providers.capability.translation' => '翻译',
-      'settings.providers.capability.dictionary' => '词典',
-      'settings.providers.capability.ocr' => 'OCR',
-      'settings.providers.capability.llm' => 'AI',
-      'settings.providers.description.all' => '提供词典查询和文本翻译',
-      'settings.providers.description.translation' => '提供语言间文本翻译',
-      'settings.providers.description.dictionary' => '提供词典查询和单词释义',
-      'settings.providers.description.fallback' => '提供翻译服务',
-      'settings.providers.delete_dialog.title' => '删除「{}」？',
-      'settings.providers.delete_dialog.message' => '此操作无法撤销。',
-      'settings.layout.title' => '设置',
-      'settings.layout.empty.title' => '选择一个分类',
-      'settings.layout.empty.message' => '从侧边栏选择一个设置分类。',
-      'settings.layout.groups' => '设置分组',
-      'settings.layout.effect_hint' => '更改即时生效',
-      'settings.layout.footer_note' => '译文与密钥仅保存在本机',
-      'settings.layout.support' => '支持',
-      'settings.about.title' => '关于',
-      'settings.about.copy_version_info' => '复制版本信息',
-      'settings.about.up_to_date' => '已是最新版本。',
-      'settings.about.check_again' => '重新检查',
-      'settings.about.links' => '链接',
-      'settings.about.website' => '网站',
-      'settings.about.github' => 'GitHub',
-      'settings.about.report_issue' => '提交问题',
-      'settings.about.license' => '许可证',
-      'settings.about.open_changelog' => '查看更新日志',
-      'settings.about.update' => '更新',
-      'settings.permissions.title' => '权限',
-      'settings.permissions.windows_note' => 'Windows 上无需额外授权即可使用划词和截图。',
-      'settings.permissions.recheck' => '重新检查',
-      'ui.shell.app_name' => 'LinguaRay',
-      'ui.shell.translate' => '翻译',
-      'ui.shell.settings' => '设置',
-      'ui.shell.minimize' => '最小化',
-      'ui.shell.maximize' => '最大化',
-      'ui.shell.close' => '关闭',
-      'ui.first_run.title' => '开始使用 LinguaRay',
-      'ui.first_run.subtitle' => '完成这几步后，就可以从任何应用唤起翻译。',
-      'ui.first_run.permissions_title' => '系统权限',
-      'ui.first_run.permissions_body' => '划词和截图 OCR 需要辅助功能与屏幕录制权限。',
-      'ui.first_run.accessibility' => '辅助功能',
-      'ui.first_run.screen_recording' => '屏幕录制',
-      'ui.first_run.shortcuts_title' => '全局快捷键',
-      'ui.first_run.shortcuts_body' => '四个首版动作已准备好。若有冲突，可稍后在设置中修改。',
-      'ui.first_run.services_title' => '翻译服务',
-      'ui.first_run.services_body' => '至少启用一个翻译服务。',
-      'ui.first_run.granted' => '已授权',
-      'ui.first_run.denied' => '未授权',
-      'ui.first_run.not_required' => '当前系统无需授权',
-      'ui.first_run.unknown' => '状态未知',
-      'ui.first_run.checking' => '正在检查…',
-      'ui.first_run.conflict' => '有快捷键冲突。可先跳过，之后在设置中修复。',
-      'ui.first_run.no_provider' => '还没有可用的翻译服务。',
-      'ui.first_run.ready' => '已有可用服务。',
-      'ui.first_run.grant' => '授权',
-      'ui.first_run.recheck' => '重新检查',
-      'ui.first_run.configure_services' => '配置服务',
-      'ui.first_run.start' => '开始使用',
-      'ui.first_run.skip' => '稍后再说',
-      'ui.quick.title' => '快捷翻译',
-      'ui.quick.input_hint' => '输入、粘贴，或由划词和截图填入',
-      'ui.quick.pin' => '置顶',
-      'ui.quick.unpin' => '取消置顶',
-      'ui.quick.permission_denied' => '没有所需的系统权限',
-      'ui.quick.permission_next' => '打开系统设置授予辅助功能或屏幕录制权限，然后返回重新检查。',
-      'ui.quick.capture_cancelled' => '已取消截图。原文未改动。',
-      'ui.providers.secret_stored' => '密钥已保存在系统钥匙串',
-      'ui.providers.secret_placeholder' => '留空则保留已保存的密钥',
-      'ui.providers.validation_missing' => '请填写必填项。',
-      'ui.providers.save_failed' => '无法保存服务商，请检查配置后重试。',
-      _ => null,
-    };
+          'common.ui.button.ok' => '确定',
+          'common.ui.button.cancel' => '取消',
+          'common.ui.button.add' => '添加',
+          'common.ui.button.delete' => '删除',
+          'common.ui.button.edit' => '编辑',
+          'common.ui.button.save' => '保存',
+          'common.ui.button.manage' => '管理',
+          'common.ui.button.kContinue' => '继续',
+          'common.ui.feedback.copied' => '已复制',
+          'common.language.ar' => '阿拉伯语',
+          'common.language.bn' => '孟加拉语',
+          'common.language.de' => '德语',
+          'common.language.en' => '英语',
+          'common.language.es' => '西班牙语',
+          'common.language.fa' => '波斯语',
+          'common.language.fr' => '法语',
+          'common.language.gu' => '古吉拉特语',
+          'common.language.ha' => '豪萨语',
+          'common.language.hi' => '印地语',
+          'common.language.id' => '印尼语',
+          'common.language.it' => '意大利语',
+          'common.language.ja' => '日语',
+          'common.language.jv' => '印尼爪哇语',
+          'common.language.ko' => '韩语',
+          'common.language.ml' => '马拉雅拉姆语',
+          'common.language.mr' => '马拉地语',
+          'common.language.ms' => '马来语',
+          'common.language.nl' => '荷兰语',
+          'common.language.pa' => '旁遮普语',
+          'common.language.pl' => '波兰语',
+          'common.language.pt' => '葡萄牙语',
+          'common.language.ro' => '罗马尼亚语',
+          'common.language.ru' => '俄语',
+          'common.language.sw' => '斯瓦希里语',
+          'common.language.ta' => '泰米尔语',
+          'common.language.te' => '泰卢固语',
+          'common.language.th' => '泰语',
+          'common.language.tr' => '土耳其语',
+          'common.language.uk' => '乌克兰语',
+          'common.language.ur' => '乌尔都语',
+          'common.language.vi' => '越南语',
+          'common.language.yo' => '约鲁巴语',
+          'common.language.zh_hans' => '中文（简体）',
+          'common.language.zh_hant' => '中文（繁体）',
+          'common.theme_mode.light' => '浅色',
+          'common.theme_mode.dark' => '深色',
+          'common.theme_mode.system' => '跟随系统',
+          'common.theme_style.studio' => 'Studio',
+          'common.theme_style.bright' => 'Bright',
+          'common.provider.anthropic' => 'Anthropic',
+          'common.provider.baidu' => '百度',
+          'common.provider.caiyun' => '彩云小译',
+          'common.provider.deepl' => 'DeepL',
+          'common.provider.google' => '谷歌',
+          'common.provider.ollama' => 'Ollama',
+          'common.provider.openai' => 'OpenAI',
+          'common.provider.sogou' => '搜狗',
+          'common.provider.xai' => 'xAI',
+          'common.provider.system' => '系统',
+          'common.provider.tencent' => '腾讯',
+          'common.provider.youdao' => '有道',
+          'app.tray.context_menu.show_window' => '显示窗口',
+          'app.tray.context_menu.dev_tools.title' => '开发工具',
+          'app.tray.context_menu.dev_tools.open_data_directory' => '打开数据目录',
+          'app.tray.context_menu.check_for_updates' => '检查更新',
+          'app.tray.context_menu.settings' => '设置',
+          'app.tray.context_menu.quit' => '退出',
+          'mini_translator.limited_banner.permission.missing_both' =>
+            '请授予屏幕录制和辅助功能权限以启用完整功能。',
+          'mini_translator.limited_banner.permission.missing_screen_capture' =>
+            '请授予屏幕录制权限以启用完整功能。',
+          'mini_translator.limited_banner.permission.missing_accessibility' =>
+            '请授予辅助功能权限以启用完整功能。',
+          'mini_translator.limited_banner.instruction.app_settings_prefix' =>
+            '请前往',
+          'mini_translator.limited_banner.instruction.follow_guide_prefix' =>
+            '，按指引授权后点击',
+          'mini_translator.limited_banner.instruction.suffix' => '。',
+          'mini_translator.limited_banner.action.app_settings' => '应用设置',
+          'mini_translator.limited_banner.action.recheck' => '重新检查',
+          'mini_translator.limited_banner.feedback.enabled' => '屏幕取词功能已启用',
+          'mini_translator.limited_banner.feedback.still_missing' =>
+            '仍缺少所需权限，\n请检查设置后重试。',
+          'mini_translator.limited_banner.tooltip.help' => '查看帮助文档',
+          'mini_translator.input.hint' => '在此处输入单词或文本',
+          'mini_translator.input.extracting_text' => '正在提取文字...',
+          'mini_translator.input.hint_translate_to' => ({
+            required Object language,
+          }) => '输入单词或文本，翻译为${language}',
+          'mini_translator.toolbar.tooltip.extract_text_from_screen_capture' =>
+            '截取屏幕区域并识别文字',
+          'mini_translator.toolbar.tooltip.extract_text_from_clipboard' =>
+            '读取剪切板内容',
+          'mini_translator.toolbar.tooltip.pin' => '固定窗口',
+          'mini_translator.toolbar.tooltip.more_actions' => '更多操作',
+          'mini_translator.toolbar.menu.extract_from_screen_capture' => '屏幕取词',
+          'mini_translator.toolbar.menu.extract_from_clipboard' => '剪贴板取词',
+          'mini_translator.toolbar.menu.open_main_window' => '打开主窗口',
+          'mini_translator.toolbar.menu.open_settings' => '设置…',
+          'mini_translator.button.clear' => '清空',
+          'mini_translator.button.translate' => '翻译',
+          'mini_translator.button.copy' => '复制',
+          'mini_translator.button.copied' => '已复制',
+          'mini_translator.button.bookmark' => '收藏',
+          'mini_translator.button.bookmarked' => '已收藏',
+          'mini_translator.language.auto_detect' => '自动检测',
+          'mini_translator.language.auto_match' => '自动匹配',
+          'mini_translator.language.switch_config' => '切换目标',
+          'mini_translator.language.more_languages' => '更多语言...',
+          'mini_translator.language.manage_common_languages' => '管理常用语言...',
+          'mini_translator.language.manage_targets' => '管理翻译目标...',
+          'mini_translator.language.add_target' => '添加翻译目标...',
+          'mini_translator.message.please_enter_word_or_text' => '未输入或未提取到文本',
+          'mini_translator.message.capture_screen_area_canceled' => '截取屏幕区域已取消',
+          'mini_translator.message.ocr_service_not_configured' =>
+            '未配置默认文字识别服务，请在设置中配置。',
+          'mini_translator.message.ocr_recognition_failed' => '文字识别失败',
+          'mini_translator.result.translating' => '正在翻译…',
+          'mini_translator.result.stale_requery' => ({
+            required Object key,
+          }) => '原文已修改 · ${key} 重新翻译',
+          'mini_translator.result.compare_services' => ({
+            required Object count,
+          }) => '对比 ${count} 个服务',
+          'mini_translator.result.collapse_compare' => '收起对比',
+          'mini_translator.result.set_preferred' => '设为首选',
+          'mini_translator.result.retry' => '重试',
+          'mini_translator.result.no_result' => '所有服务都没有返回结果 —— 检查网络，或换一个服务再试。',
+          'mini_translator.result.no_result_note' => '原文已保留，重试不会重复计入历史。',
+          'mini_translator.result.no_result_meta' => ({
+            required Object count,
+          }) => '${count} 个服务都没有返回结果',
+          'mini_translator.result.no_result_body' =>
+            '没有拿到译文。检查网络后按 ⏎ 重试，或展开看每个服务的原因。',
+          'mini_translator.result.check_services' => '检查服务',
+          'mini_translator.result.show_reasons' => ({
+            required Object count,
+          }) => '查看 ${count} 个服务的原因',
+          'mini_translator.result.collapse_reasons' => '收起原因',
+          'mini_translator.result.unknown_error' => '服务没有说明原因。',
+          'mini_translator.result.no_result_tag' => '未返回结果',
+          'workbench.workspace' => '工作区',
+          'workbench.translate' => '翻译',
+          'workbench.history' => '历史',
+          'workbench.history_page.all' => '全部',
+          'workbench.history_page.favorites' => '收藏',
+          'workbench.history_page.edited' => '我改过的',
+          'workbench.history_page.search' => '搜索',
+          'workbench.history_page.search_placeholder' => '搜索原文、译文或服务',
+          'workbench.history_page.search_label' => '搜索历史',
+          'workbench.history_page.entry_count' => ({
+            required Object label,
+            required Object count,
+          }) => '${label} · ${count} 条',
+          'workbench.history_page.by_time' => '按时间',
+          'workbench.history_page.loading' => '正在载入历史…',
+          'workbench.history_page.load_failed' => '历史载入失败',
+          'workbench.history_page.retry' => '重试',
+          'workbench.history_page.empty_title' => '还没有翻译历史',
+          'workbench.history_page.empty_description' => '完成一次翻译后，首选译文会自动保存在这里。',
+          'workbench.history_page.no_results' => ({
+            required Object query,
+          }) => '没有匹配「${query}」的记录',
+          'workbench.history_page.clear_search' => '清除搜索',
+          'workbench.history_page.select' => '多选',
+          'workbench.history_page.selected_count' => ({
+            required Object count,
+          }) => '已选 ${count} 条',
+          'workbench.history_page.exit_select' => '退出多选',
+          'workbench.history_page.add_to_glossary' => '加入术语库',
+          'workbench.history_page.favorite' => '收藏',
+          'workbench.history_page.unfavorite' => '取消收藏',
+          'workbench.history_page.delete_confirm' => ({
+            required Object count,
+          }) => '确定删除选中的 ${count} 条历史？此操作无法撤销。',
+          'workbench.history_page.no_glossary' => '请先创建一个术语库',
+          'workbench.history_page.added_to_glossary' => ({
+            required Object count,
+          }) => '已将 ${count} 条记录加入术语库',
+          'workbench.history_page.favorite_flag' => '已收藏',
+          'workbench.history_page.edited_flag' => '我改过',
+          'workbench.history_page.edit_history_hint' => '修改后的译文会保存到历史',
+          'workbench.history_page.copy_translation' => '复制译文',
+          'workbench.history_page.more_actions' => '更多',
+          'workbench.history_page.delete_title_one' => '删除这条记录',
+          'workbench.history_page.delete_title_many' => ({
+            required Object count,
+          }) => '删除 ${count} 条记录',
+          'workbench.history_page.delete_message' =>
+            '删除后无法恢复。收藏和你改过的译文也会一起删除，术语库不受影响。',
+          'workbench.glossary' => '术语库',
+          'workbench.recent_languages' => '最近语言',
+          'workbench.not_configured' => '尚未配置',
+          'workbench.subtitle.translate' => '工作台 · 多服务对照',
+          'workbench.subtitle.settings' => '设置',
+          'workbench.placeholder.history' => '收藏与历史将在后续版本中提供',
+          'workbench.placeholder.glossary' => '术语库管理正在建设中',
+          'workbench.glossary_page.add_entry' => '新增条目',
+          'workbench.glossary_page.term' => '原文',
+          'workbench.glossary_page.translation' => '指定译法',
+          'workbench.glossary_page.forbidden' => '禁用',
+          'workbench.glossary_page.hits' => '命中',
+          'workbench.glossary_page.term_placeholder' => 'teacher forcing',
+          'workbench.glossary_page.translation_placeholder' => '教师强制',
+          'workbench.glossary_page.forbidden_placeholder' => '强制教学',
+          'workbench.glossary_page.search' => '搜索',
+          'workbench.glossary_page.search_placeholder' => '搜索术语或指定译法',
+          'workbench.glossary_page.search_label' => '搜索术语库',
+          'workbench.glossary_page.entry_count' => ({
+            required Object name,
+            required Object count,
+          }) => '${name} · ${count} 条',
+          'workbench.glossary_page.priority_note' => '术语优先级高于任何服务输出',
+          'workbench.glossary_page.new_book' => '新建术语库',
+          'workbench.glossary_page.new_book_placeholder' => '术语库名称',
+          'workbench.glossary_page.rename_book' => '重命名',
+          'workbench.glossary_page.delete_book_confirm' => ({
+            required Object name,
+            required Object count,
+          }) => '删除「${name}」及其中的 ${count} 条术语？',
+          'workbench.glossary_page.disabled' => '已停用',
+          'workbench.glossary_page.enable' => '启用',
+          'workbench.glossary_page.disable' => '停用',
+          'workbench.glossary_page.empty_title' => '这个术语库还是空的',
+          'workbench.glossary_page.empty_description' =>
+            '术语优先级高于任何服务输出。可以逐条新增，也可以把 CSV 拖进来合并。',
+          'workbench.glossary_page.no_results_title' => ({
+            required Object query,
+          }) => '没有匹配「${query}」的术语',
+          'workbench.glossary_page.no_results_description' => '换个关键词，或直接新增一条。',
+          'workbench.glossary_page.no_books_title' => '还没有术语库',
+          'workbench.glossary_page.no_books_description' =>
+            '术语库让指定译法在所有服务里保持一致。先建一个，再往里加词。',
+          'workbench.glossary_page.loading' => '正在载入…',
+          'workbench.glossary_page.new_book_subtitle' => '按领域分库，翻译时全部生效',
+          'workbench.glossary_page.name' => '名称',
+          'workbench.glossary_page.name_taken' => '名称 · 已存在',
+          'workbench.glossary_page.name_taken_hint' => ({
+            required Object name,
+          }) => '已经有一个叫「${name}」的术语库了。',
+          'workbench.glossary_page.name_placeholder' => '机器学习',
+          'workbench.glossary_page.source_language' => '源语言',
+          'workbench.glossary_page.target_language' => '目标语言',
+          'workbench.glossary_page.same_language' => '源语言和目标语言得是两种语言。',
+          'workbench.glossary_page.seed' => '初始内容',
+          'workbench.glossary_page.seed_blank' => '空白',
+          'workbench.glossary_page.seed_blank_hint' => '之后逐条新增',
+          'workbench.glossary_page.seed_csv_hint' => '两列：原文 / 译法',
+          'workbench.glossary_page.seed_tbx_hint' => '行业术语交换格式',
+          'workbench.glossary_page.seed_blank_note' =>
+            '建好后可以逐条新增，也可以把 CSV / TBX 拖进列表里合并。',
+          'workbench.glossary_page.seed_file_note' => ({
+            required Object format,
+          }) => '创建后立即导入 ${format} 文件 · 重复的原文按文件里的译法为准',
+          'workbench.glossary_page.choose_file' => '选择文件…',
+          'workbench.glossary_page.create' => '创建',
+          'workbench.glossary_page.add_entry_subtitle' => '术语优先级高于任何服务输出',
+          'workbench.glossary_page.book' => '术语库',
+          'workbench.glossary_page.forbidden_label' => '禁用译法',
+          'workbench.glossary_page.forbidden_hint' =>
+            '服务给出这些说法时会被标为冲突；多个用 / 分隔，留空表示不禁用。',
+          'workbench.glossary_page.forbidden_placeholder_full' => '强制教学 / 强制教师',
+          'workbench.glossary_page.duplicate' => ({
+            required Object term,
+            required Object book,
+          }) => '「${term}」已在${book}中，保存会覆盖原有译法。',
+          'workbench.glossary_page.duplicate_book_fallback' => '该术语库',
+          'workbench.glossary_page.keep_adding' => '保存后继续添加下一条',
+          'workbench.glossary_page.added_count' => ({
+            required Object count,
+          }) => '本次已添加 ${count} 条',
+          'workbench.glossary_page.overwrite' => '覆盖',
+          'workbench.glossary_page.done' => '完成',
+          'workbench.translation.source' => '原文',
+          'workbench.translation.target' => '译文',
+          'workbench.translation.input_hint' => '输入或粘贴需要翻译的文本',
+          'workbench.translation.button' => '翻译',
+          'workbench.translation.auto_detected' => '已自动检测',
+          'workbench.translation.loading_services' => '正在读取翻译服务…',
+          'workbench.translation.no_services' => '请先在设置中配置翻译服务',
+          'workbench.translation.translating' => '正在翻译…',
+          'workbench.translation.failed' => '翻译失败，请检查服务配置后重试',
+          'workbench.translation.empty' => '译文将在这里显示',
+          'workbench.translation.service_compare' => '服务对比',
+          'workbench.translation.main_translation' => '主译文',
+          'workbench.translation.service_unavailable' => '服务暂不可用',
+          'workbench.translation.waiting' => '等待翻译',
+          'workbench.translation.copy' => '复制',
+          'workbench.translation.favorite_unavailable' => '收藏功能将在后续版本中提供',
+          'workbench.translation.preferred' => '首选译文',
+          'workbench.translation.other_services' => '其他服务',
+          'workbench.translation.copy_result' => '复制译文',
+          'workbench.translation.copied' => '已复制',
+          'workbench.translation.favorite' => '收藏',
+          'workbench.translation.terms' => '命中术语',
+          'workbench.translation.terms_hint' => '输入后自动比对术语库。',
+          'workbench.translation.quality' => '质量信号',
+          'workbench.translation.quality_hint' => '译文生成后计算。',
+          'workbench.translation.shortcuts' => '快捷键',
+          'workbench.translation.other_services_disabled' => '其他服务已停用',
+          'workbench.translation.input_hint_translate_to' => ({
+            required Object language,
+          }) => '输入或粘贴要翻译的文本，翻译为${language}',
+          'workbench.translation.newline_hint' => ({
+            required Object key,
+          }) => '${key} 换行',
+          'workbench.translation.failed_body' =>
+            '这一段没有拿到译文。检查网络连接后重试，或展开看每个服务的原因逐个处理。',
+          'workbench.translation.clear' => '清空',
+          'workbench.translation.swap_languages' => '交换语言',
+          'workbench.translation.services' => '翻译服务',
+          'workbench.translation.configure_services' => '配置服务',
+          'workbench.translation.retry' => '重试',
+          'workbench.translation.character_count' => ({
+            required Object count,
+          }) => '${count} 个字符',
+          'workbench.translation.language_pair_not_installed' =>
+            '请先在 macOS“语言与地区”中安装这个语言组合，然后重试。',
+          'workbench.translation.unsupported_language_pair' =>
+            '当前翻译服务不支持这个语言组合。',
+          'workbench.translation.source_language_detection_failed' =>
+            '无法识别原文语言，请手动选择源语言后重试。',
+          'workbench.translation.network_error' => '无法连接翻译服务，请检查网络后重试。',
+          'workbench.translation.partial_failure' => ({
+            required Object count,
+          }) => '${count} 个服务失败，可切换查看原因',
+          'workbench.translation.streaming' => '正在生成译文…',
+          'workbench.status.runtime_ready' => '翻译运行时已就绪',
+          'workbench.status.settings_synced' => '设置已同步',
+          'workbench.status.shortcuts' => '⌥Space 小窗 · ⌥⇧2 截图',
+          'workbench.version_latest' => '已是最新',
+          'workbench.version_checking' => '正在检查…',
+          'workbench.check_updates' => '检查更新',
+          'settings.version' => 'v{} (Build {})',
+          'settings.general.title' => '常规',
+          'settings.general.section.permissions' => '系统权限',
+          'settings.general.section.ocr' => '文字识别',
+          'settings.general.section.directory' => '词典',
+          'settings.general.section.translation' => '翻译',
+          'settings.general.section.translation_target' => '翻译目标',
+          'settings.general.section.languages' => '语言',
+          'settings.general.section.input' => '输入设置',
+          'settings.general.section.startup' => '启动与集成',
+          'settings.general.section.ocr_behaviour' => '取词行为',
+          'settings.general.section.translation_behaviour' => '翻译行为',
+          'settings.general.row.launch_at_login' => '登录时启动',
+          'settings.general.row.show_in_menu_bar' => '在菜单栏中显示',
+          'settings.general.row.screen_capture_access' => '授予屏幕录制权限',
+          'settings.general.row.screen_selection_access' => '授予辅助功能权限',
+          'settings.general.row.default_ocr_service' => '默认文字识别服务',
+          'settings.general.row.auto_copy_detected_text' => '自动复制检测到的文本',
+          'settings.general.row.default_directory_service' => '默认词典服务',
+          'settings.general.row.default_translation_service' => '默认翻译服务',
+          'settings.general.row.translation_target_hint' => '配置翻译器使用的语言目标。',
+          'settings.general.row.common_languages' => '常用语言',
+          'settings.general.row.common_languages_description' => '显示在语言选择列表顶部。',
+          'settings.general.row.common_languages_hint' => '选择你常用的语言：',
+          'settings.general.row.common_languages_sort' => '按代码排序',
+          'settings.general.row.common_languages_reset' => '恢复默认',
+          'settings.general.row.common_languages_reset_help' => '恢复为默认的常用语言集合',
+          'settings.general.row.common_languages_search' => '搜索语言...',
+          'settings.general.row.common_languages_all' => '所有语言',
+          'settings.general.row.double_click_copy_result' => '双击复制翻译结果',
+          'settings.general.row.submit_with_enter' => '按 Enter 提交',
+          'settings.general.row.submit_with_meta_enter_mac' => '按 ⌘ + Enter 提交',
+          'settings.general.row.screen_capture_access_hint' => '截图取词需要读取屏幕内容。',
+          'settings.general.row.screen_selection_access_hint' =>
+            '划词取词需要读取其他应用中选中的文本。',
+          'settings.general.row.no_translation_targets' =>
+            '还没有翻译目标，添加一条来决定默认译入哪种语言。',
+          'settings.general.button.add_provider' => '添加...',
+          'settings.general.button.add_target' => '添加目标...',
+          'settings.general.button.manage_targets' => '管理翻译目标...',
+          'settings.general.button.manage_languages' => '管理常用语言...',
+          'settings.general.button.grant' => '授权',
+          'settings.general.option.none' => '无',
+          'settings.general.option.no_services_available' => '暂无可用服务',
+          'settings.general.option.granted' => '已授权',
+          'settings.general.option.built_in_ocr' => '内置 OCR',
+          'settings.general.option.tesseract' => 'Tesseract',
+          'settings.general.option.youdao_ocr' => '有道 OCR',
+          'settings.general.editor.add_target_title' => '添加翻译目标：',
+          'settings.general.editor.edit_target_title' => '修改翻译目标：',
+          'settings.general.editor.row.source_language' => '源语言',
+          'settings.general.editor.row.target_language' => '目标语言',
+          'settings.general.editor.title_edit' => '编辑翻译目标',
+          'settings.general.editor.subtitle' => '决定某种源语言默认翻译成哪种语言',
+          'settings.general.editor.same_language' => '源语言与目标语言相同，换一个目标语言。',
+          'settings.general.editor.duplicate' => '已经有一条同样的翻译目标了。',
+          'settings.general.editor.hint_auto' => '未匹配到其他规则时，一律译成{}。',
+          'settings.general.editor.hint_source' => '检测到{}时，译成{}。',
+          'settings.appearance.title' => '外观',
+          'settings.appearance.section.app_language' => '显示语言',
+          'settings.appearance.section.theme_mode' => '主题模式',
+          'settings.appearance.section.theme_style' => '主题风格',
+          'settings.appearance.footer' => '更改立即应用到整个窗口。',
+          'settings.shortcuts.title' => '快捷键',
+          'settings.shortcuts.section.text_extraction' => '文字提取',
+          'settings.shortcuts.section.input_assist' => '输入辅助功能',
+          'settings.shortcuts.section.submit_mode' => '提交方式',
+          'settings.shortcuts.row.toggle_mini_translator' => '显示/隐藏窗口',
+          'settings.shortcuts.row.extract_text_from_screen_selection' =>
+            '从屏幕选区提取文字',
+          'settings.shortcuts.row.extract_text_from_screen_capture' =>
+            '从屏幕截图提取文字',
+          'settings.shortcuts.row.extract_text_from_clipboard' => '从剪贴板提取文字',
+          'settings.shortcuts.row.translate_input' => '翻译输入内容',
+          'settings.shortcuts.reset_dialog.title' => '重置快捷键',
+          'settings.shortcuts.reset_dialog.message' => '确定要重置所有快捷键为默认值吗？',
+          'settings.shortcuts.reset_dialog.confirm' => '重置',
+          'settings.shortcuts.reset_dialog.cancel' => '取消',
+          'settings.shortcuts.group.global.title' => '全局快捷键',
+          'settings.shortcuts.group.global.description' => '在任何应用里都能触发。',
+          'settings.shortcuts.group.in_app.title' => '应用内按键',
+          'settings.shortcuts.group.in_app.description' => '仅在应用自己的输入框内生效。',
+          'settings.shortcuts.reset' => '恢复默认...',
+          'settings.shortcuts.record_placeholder' => '录制快捷键',
+          'settings.shortcuts.recording' => '按下快捷键…',
+          'settings.shortcuts.clear' => '清除',
+          'settings.shortcuts.conflict' => ({
+            required Object label,
+          }) => '与「${label}」冲突',
+          'settings.advanced.title' => '高级',
+          'settings.advanced.api_server' => '本地 API 服务',
+          'settings.advanced.api_server_description' =>
+            '在 127.0.0.1 上开放翻译 API，供本机集成使用。',
+          'settings.advanced.enable' => '启用',
+          'settings.advanced.port' => '端口',
+          'settings.advanced.running_at' => '运行于 {url}',
+          'settings.advanced.disabled' => '已关闭',
+          'settings.services.title' => '服务',
+          'settings.services.button.add_service' => '添加服务...',
+          'settings.services.section.available_services' => '可用服务',
+          'settings.services.editor.title' => '添加服务',
+          'settings.services.editor.subtitle' => '为已配置的提供商新增一项服务',
+          'settings.services.editor.row.model' => '模型',
+          'settings.services.editor.row.system_prompt' => '系统提示词',
+          'settings.services.editor.prompt_placeholder' => '留空则使用该类型的默认提示词',
+          'settings.services.editor.variant_hint' =>
+            '{} 已有一项{}服务，这条会作为并列的另一份配置。',
+          'settings.services.editor.traditional_note' =>
+            '{} 是传统接口，没有模型与提示词可调；服务参数在提供商详情里配置。',
+          'settings.services.detail.row.id' => '服务 ID',
+          'settings.services.detail.row.name' => '名称',
+          'settings.services.detail.row.provider' => '提供商',
+          'settings.services.detail.row.type' => '类型',
+          'settings.services.detail.delete_dialog.title' => '删除「{}」？',
+          'settings.services.detail.delete_dialog.message' => '此服务将从提供商中移除。',
+          'settings.services.detail.prompt_variables' =>
+            '可用变量：{{sourceLanguage}}、{{targetLanguage}}、{{text}}',
+          'settings.services.make_default' => '设为默认',
+          'settings.services.item.none_of_kind' => '还没有可用的{}服务。',
+          'settings.providers.title' => '提供商',
+          'settings.providers.section.services' => '可用服务',
+          'settings.providers.section.services_description' =>
+            '查看已配置提供商的可用服务，并按服务类型切换。',
+          'settings.providers.item.empty' => '暂无已配置的提供商。添加一个提供商以启用翻译服务。',
+          'settings.providers.item.loading' => '正在加载提供商...',
+          'settings.providers.item.no_services' => '暂无可用服务。',
+          'settings.providers.button.add' => '添加提供商...',
+          'settings.providers.alert.error' => '错误',
+          'settings.providers.intro.body' => '管理应用使用的服务提供商。',
+          'settings.providers.intro.warning' =>
+            '已连接的提供商可能会处理你发送的文本或图片，请只启用你信任的服务。',
+          'settings.providers.editor.row.id' => '提供商 ID',
+          'settings.providers.editor.row.type' => '提供商类型',
+          'settings.providers.editor.row.default_model' => '默认模型',
+          'settings.providers.editor.placeholder.id' => '例如 deepl-main',
+          'settings.providers.editor.type_picker.prompt' => '请选择要添加的提供商类型：',
+          'settings.providers.editor.type_picker.section_llm' => 'LLM',
+          'settings.providers.editor.type_picker.section_traditional' => '传统',
+          'settings.providers.editor.tooltip.help' => '帮助',
+          'settings.providers.editor.step.next' => '继续',
+          'settings.providers.editor.step.back' => '上一步',
+          'settings.providers.editor.add_title' => '添加 {}',
+          'settings.providers.editor.capability_note.translation' => '加入翻译候选',
+          'settings.providers.editor.capability_note.dictionary' => '提供词典释义',
+          'settings.providers.editor.capability_note.ocr' => '识别图片中的文字',
+          'settings.providers.editor.test.run' => '测试连接',
+          'settings.providers.editor.test.running' => '正在测试连接 · 已用 {}s',
+          'settings.providers.editor.test.passed_models' => '连接正常 · {} 个模型可用',
+          'settings.providers.editor.test.passed_service' => '连接正常 · 服务可用',
+          'settings.providers.editor.test.passed_footer' => '已通过连接测试',
+          'settings.providers.editor.test.retest' => '重新测试',
+          'settings.providers.editor.test.tips_title' => '可以试试',
+          'settings.providers.editor.test.tips_llm' =>
+            '· 确认密钥与所选提供商类型一致\n· 检查 Base URL 是否需要包含 /v1\n· 在提供商控制台确认该模型已开通',
+          'settings.providers.editor.test.tips_traditional' =>
+            '· 确认密钥与所选提供商类型一致\n· 在提供商控制台确认服务已开通',
+          'settings.providers.editor.test.failed_suffix' => '验证失败',
+          'settings.providers.editor.test.passed_suffix' => '已验证',
+          'settings.providers.detail.tooltip.edit' => '编辑提供商',
+          'settings.providers.detail.row.id_hint' => '创建后不可更改',
+          'settings.providers.detail.section.configuration' => '配置',
+          'settings.providers.detail.section.models' => '模型',
+          'settings.providers.detail.models.loading' => '正在加载模型...',
+          'settings.providers.detail.models.empty' => '未找到模型。',
+          'settings.providers.detail.models.retry' => '重试',
+          'settings.providers.detail.models.refresh' => '刷新列表',
+          'settings.providers.detail.models.default_badge' => '默认',
+          'settings.providers.detail.models.set_default' => '设为默认',
+          'settings.providers.detail.models.fetch_error' => '无法从提供商 API 获取模型。',
+          'settings.providers.capability.translation' => '翻译',
+          'settings.providers.capability.dictionary' => '词典',
+          'settings.providers.capability.ocr' => 'OCR',
+          'settings.providers.capability.llm' => 'AI',
+          'settings.providers.description.all' => '提供词典查询和文本翻译',
+          'settings.providers.description.translation' => '提供语言间文本翻译',
+          'settings.providers.description.dictionary' => '提供词典查询和单词释义',
+          'settings.providers.description.fallback' => '提供翻译服务',
+          'settings.providers.delete_dialog.title' => '删除「{}」？',
+          'settings.providers.delete_dialog.message' => '此操作无法撤销。',
+          'settings.layout.title' => '设置',
+          'settings.layout.empty.title' => '选择一个分类',
+          'settings.layout.empty.message' => '从侧边栏选择一个设置分类。',
+          'settings.layout.groups' => '设置分组',
+          'settings.layout.effect_hint' => '更改即时生效',
+          'settings.layout.footer_note' => '译文与密钥仅保存在本机',
+          'settings.layout.support' => '支持',
+          'settings.about.title' => '关于',
+          'settings.about.copy_version_info' => '复制版本信息',
+          'settings.about.up_to_date' => '已是最新版本。',
+          'settings.about.check_again' => '重新检查',
+          'settings.about.links' => '链接',
+          'settings.about.website' => '网站',
+          'settings.about.github' => 'GitHub',
+          'settings.about.report_issue' => '提交问题',
+          'settings.about.license' => '许可证',
+          'settings.about.open_changelog' => '查看更新日志',
+          'settings.about.update' => '更新',
+          'settings.permissions.title' => '权限',
+          'settings.permissions.windows_note' => 'Windows 上无需额外授权即可使用划词和截图。',
+          'settings.permissions.recheck' => '重新检查',
+          'ui.shell.app_name' => 'LinguaRay',
+          'ui.shell.translate' => '翻译',
+          'ui.shell.history' => '历史',
+          'ui.shell.glossary' => '术语库',
+          'ui.shell.vocabulary' => '生词本',
+          'ui.shell.settings' => '设置',
+          'ui.shell.minimize' => '最小化',
+          'ui.shell.maximize' => '最大化',
+          'ui.shell.close' => '关闭',
+          'ui.first_run.title' => '开始使用 LinguaRay',
+          'ui.first_run.subtitle' => '完成这几步后，就可以从任何应用唤起翻译。',
+          'ui.first_run.permissions_title' => '系统权限',
+          'ui.first_run.permissions_body' => '划词和截图 OCR 需要辅助功能与屏幕录制权限。',
+          'ui.first_run.accessibility' => '辅助功能',
+          'ui.first_run.screen_recording' => '屏幕录制',
+          'ui.first_run.shortcuts_title' => '全局快捷键',
+          'ui.first_run.shortcuts_body' => '四个首版动作已准备好。若有冲突，可稍后在设置中修改。',
+          'ui.first_run.services_title' => '翻译服务',
+          'ui.first_run.services_body' => '至少启用一个翻译服务。',
+          'ui.first_run.granted' => '已授权',
+          'ui.first_run.denied' => '未授权',
+          'ui.first_run.not_required' => '当前系统无需授权',
+          'ui.first_run.unknown' => '状态未知',
+          'ui.first_run.checking' => '正在检查…',
+          'ui.first_run.conflict' => '有快捷键冲突。可先跳过，之后在设置中修复。',
+          'ui.first_run.no_provider' => '还没有可用的翻译服务。',
+          'ui.first_run.ready' => '已有可用服务。',
+          'ui.first_run.grant' => '授权',
+          'ui.first_run.recheck' => '重新检查',
+          'ui.first_run.configure_services' => '配置服务',
+          'ui.first_run.start' => '开始使用',
+          'ui.first_run.skip' => '稍后再说',
+          'ui.quick.title' => '快捷翻译',
+          'ui.quick.input_hint' => '输入、粘贴，或由划词和截图填入',
+          'ui.quick.pin' => '置顶',
+          'ui.quick.unpin' => '取消置顶',
+          'ui.quick.permission_denied' => '没有所需的系统权限',
+          'ui.quick.permission_next' => '打开系统设置授予辅助功能或屏幕录制权限，然后返回重新检查。',
+          'ui.quick.capture_cancelled' => '已取消截图。原文未改动。',
+          'ui.quick.capture_failed' => '截图失败，请重试。',
+          'ui.quick.ocr_not_configured' => '尚未配置文字识别服务。',
+          'ui.quick.ocr_empty' => '所选区域没有识别到文字。',
+          'ui.quick.empty_selection' => '没有选中文本。',
+          'ui.quick.clipboard_unavailable' => '无法读取剪贴板。',
+          'ui.quick.clipboard_restore_failed' => '无法恢复之前的剪贴板内容。',
+          'ui.quick.recheck' => '重新检查',
+          'ui.errors.accessibility_denied' => '读取选中文本需要辅助功能权限。',
+          'ui.errors.screen_recording_denied' => '截图需要屏幕录制权限。',
+          'ui.errors.capture_failed' => '截图失败。',
+          'ui.errors.capture_cancelled' => '已取消截图。',
+          'ui.errors.ocr_not_configured' => '请先配置文字识别服务。',
+          'ui.errors.ocr_empty' => '所选区域没有识别到文字。',
+          'ui.errors.empty_selection' => '没有选中文本。',
+          'ui.errors.clipboard_unavailable' => '剪贴板不可用。',
+          'ui.errors.clipboard_restore_failed' => '剪贴板恢复失败，之前的内容可能仍在剪贴板中。',
+          'ui.errors.source_language_detection_failed' => '无法检测源语言，请手动选择。',
+          'ui.errors.unsupported_language_pair' => '当前服务不支持这对语言。',
+          'ui.errors.language_pack_missing' => '请在 macOS 语言与地区中安装该语言包后再试。',
+          'ui.errors.network_failure' => '无法连接服务，请检查网络。',
+          'ui.errors.provider_auth_failed' => '认证失败，请在设置中检查服务密钥。',
+          _ => null,
+        } ??
+        switch (path) {
+          'ui.errors.translation_failed' => '翻译失败，请检查服务后重试。',
+          'ui.errors.empty_result' => '服务没有返回译文。',
+          'ui.errors.catalog_unavailable' => '无法读取翻译服务。',
+          'ui.errors.no_translation_service' => '请先启用一个可用的翻译服务。',
+          'ui.errors.glossary_corrupt' => '有一本术语库文件无法读取，其他术语库仍可使用。',
+          'ui.errors.history_unavailable' => '无法读取历史记录。',
+          'ui.errors.dictionary_unavailable' => '当前系统没有可用的词典服务。',
+          'ui.errors.vocabulary_unavailable' => '无法读取生词本。',
+          'ui.errors.speech_unavailable' => '当前系统不支持朗读。',
+          'ui.errors.speech_interrupted' => '朗读被中断。',
+          'ui.errors.speech_failed' => '朗读失败。',
+          'ui.errors.update_check_failed' => '检查更新失败。',
+          'ui.errors.update_checksum_missing' => '该更新没有校验和，不会安装。',
+          'ui.errors.update_checksum_mismatch' => '下载的文件与校验和不匹配。',
+          'ui.errors.protocol_invalid' => '这个 LinguaRay 链接无效。',
+          'ui.errors.protocol_too_large' => '链接中的文本过大，无法打开。',
+          'ui.errors.api_server_bind_failed' => '本地 API 服务无法绑定该端口。',
+          'ui.errors.invalid_port' => '请输入 0（自动分配）或 1 到 65535 之间的端口。',
+          'ui.errors.unknown' => '出现了问题，请重试。',
+          'ui.recovery.retry' => '重试',
+          'ui.recovery.recheck_permission' => '重新检查权限',
+          'ui.recovery.open_permission_settings' => '打开权限设置',
+          'ui.recovery.configure_ocr' => '配置文字识别',
+          'ui.recovery.configure_translation_provider' => '配置翻译服务',
+          'ui.recovery.edit_input' => '编辑原文',
+          'ui.recovery.choose_language' => '选择语言',
+          'ui.vocabulary.title' => '生词本',
+          'ui.vocabulary.empty_title' => '还没有生词',
+          'ui.vocabulary.empty_description' => '可以从词典查询或翻译结果中加入。',
+          'ui.vocabulary.search' => '搜索生词',
+          'ui.vocabulary.all' => '全部',
+          'ui.vocabulary.favorites' => '收藏',
+          'ui.vocabulary.note' => '笔记',
+          'ui.vocabulary.add' => '加入生词本',
+          'ui.vocabulary.saved' => '已加入生词本',
+          'ui.vocabulary.delete' => '删除',
+          'ui.vocabulary.favorite' => '收藏',
+          'ui.vocabulary.unfavorite' => '取消收藏',
+          'ui.vocabulary.source_dictionary' => '词典',
+          'ui.vocabulary.source_translation' => '翻译',
+          'ui.vocabulary.no_results' => '没有匹配的生词。',
+          'ui.dictionary.title' => '词典',
+          'ui.dictionary.empty' => '从译文中选词查询。',
+          'ui.dictionary.unavailable' => '没有可用的词典服务。',
+          'ui.dictionary.lookup' => '查询',
+          'ui.dictionary.pronunciation' => '发音',
+          'ui.dictionary.definitions' => '释义',
+          'ui.dictionary.save' => '加入生词本',
+          'ui.updates.title' => '更新',
+          'ui.updates.current' => '当前版本',
+          'ui.updates.check' => '检查更新',
+          'ui.updates.checking' => '正在检查…',
+          'ui.updates.up_to_date' => '已是最新版本。',
+          'ui.updates.available' => ({
+            required Object version,
+          }) => '发现新版本 ${version}。',
+          'ui.updates.download' => '下载',
+          'ui.updates.downloading' => '正在下载…',
+          'ui.updates.ready' => '已校验，可以安装。',
+          'ui.updates.install' => '安装',
+          'ui.updates.unsigned' => '该更新没有校验和，不会安装。',
+          'ui.updates.notes' => '发行说明',
+          'ui.speech.speak_source' => '朗读原文',
+          'ui.speech.speak_result' => '朗读译文',
+          'ui.speech.stop' => '停止朗读',
+          'ui.providers.secret_stored' => '密钥已保存在系统钥匙串',
+          'ui.providers.secret_placeholder' => '留空则保留已保存的密钥',
+          'ui.providers.validation_missing' => '请填写必填项。',
+          'ui.providers.save_failed' => '无法保存服务商，请检查配置后重试。',
+          _ => null,
+        };
   }
 }

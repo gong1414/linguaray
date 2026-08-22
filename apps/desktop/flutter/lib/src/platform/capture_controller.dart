@@ -58,7 +58,7 @@ class CaptureController {
     if (!capture.succeeded) {
       throw PlatformOperationException(
         action: TriggerAction.captureAndTranslate,
-        code: capture.cancelled ? 'cancelled' : 'captureFailed',
+        code: capture.cancelled ? 'capture_cancelled' : 'capture_failed',
         message: capture.failureReason ?? 'Screen capture was cancelled.',
       );
     }
@@ -76,7 +76,7 @@ class CaptureController {
       if (serviceId == null || serviceId.isEmpty) {
         throw const PlatformOperationException(
           action: TriggerAction.captureAndTranslate,
-          code: 'ocrNotConfigured',
+          code: 'ocr_not_configured',
           message: 'No OCR service is configured.',
         );
       }
@@ -89,7 +89,7 @@ class CaptureController {
       if (response.text.trim().isEmpty) {
         throw const PlatformOperationException(
           action: TriggerAction.captureAndTranslate,
-          code: 'ocrEmpty',
+          code: 'ocr_empty',
           message: 'No text was found in the selected region.',
         );
       }

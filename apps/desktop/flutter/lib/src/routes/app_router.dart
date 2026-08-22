@@ -10,6 +10,7 @@ import 'package:nativeapi/nativeapi.dart';
 import '../i18n/i18n.dart';
 import '../platform/onboarding_controller.dart';
 import '../platform/permission_controller.dart';
+import '../platform/protocol_controller.dart';
 import '../platform/trigger_controller.dart';
 import '../services/app_windows.dart';
 import '../services/dock_icon_controller.dart';
@@ -199,6 +200,11 @@ class _RootBodyViewState extends State<_RootBodyView>
     unawaited(
       ShortcutService.instance.start(onAction: triggerController.trigger),
     );
+    protocolController.onTranslate = (text) {
+      triggerController.quickWindowText.value = text;
+    };
+    protocolController.onOpenSettings = showSettingsWindow;
+    protocolController.start();
     unawaited(permissionController.refresh());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       showWorkbenchWindow();
@@ -291,6 +297,14 @@ class _RootBodyViewState extends State<_RootBodyView>
       devToolsItem.submenu = devToolsSubmenu;
       menu.addItem(devToolsItem);
     }
+
+    menu.addItem(
+      MenuItem(
+        t.app.tray.context_menu.check_for_updates,
+      )..on<MenuItemClickedEvent>((_) {
+        showWorkbenchWindow(destination: WorkbenchDestination.settingsUpdates);
+      }),
+    );
 
     // ── 设置 ──
     menu.addItem(

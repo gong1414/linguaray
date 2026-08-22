@@ -1,3 +1,5 @@
+import 'package:linguaray_application/linguaray_application.dart';
+
 import '../i18n/i18n.dart';
 import 'chrome/workbench_shell_view.dart';
 import 'first_run/first_run_view.dart';
@@ -8,6 +10,9 @@ import 'translation/widgets/translation_workspace_view.dart';
 WorkbenchShellLabels workbenchShellLabels() => WorkbenchShellLabels(
   appName: t.ui.shell.app_name,
   translate: t.ui.shell.translate,
+  history: t.workbench.history,
+  glossary: t.workbench.glossary,
+  vocabulary: t.ui.shell.vocabulary,
   settings: t.ui.shell.settings,
   minimize: t.ui.shell.minimize,
   maximize: t.ui.shell.maximize,
@@ -70,18 +75,79 @@ TranslationWorkspaceLabels translationWorkspaceLabels() {
     failureMessage: translationFailureMessage,
     partialFailure: (count) => translation.partial_failure(count: count),
     streaming: translation.streaming,
+    speakSource: t.ui.speech.speak_source,
+    speakResult: t.ui.speech.speak_result,
+    stopSpeech: t.ui.speech.stop,
+    lookup: t.ui.dictionary.lookup,
+    saveWord: t.ui.vocabulary.add,
+    savedWord: t.ui.vocabulary.saved,
+    glossaryHits: translation.terms,
+    glossaryEmpty: translation.terms_hint,
+    glossaryWarning: translation.quality,
+    recoveryRecheck: t.ui.recovery.recheck_permission,
+    recoveryPermissions: t.ui.recovery.open_permission_settings,
+    recoveryConfigureOcr: t.ui.recovery.configure_ocr,
+    recoveryConfigureProvider: t.ui.recovery.configure_translation_provider,
+    recoveryEditInput: t.ui.recovery.edit_input,
+    recoveryChooseLanguage: t.ui.recovery.choose_language,
   );
 }
 
 String translationFailureMessage(String? code) {
   final translation = t.workbench.translation;
-  return switch (code) {
-    'language_pair_not_installed' => translation.language_pair_not_installed,
-    'unsupported_language_pair' => translation.unsupported_language_pair,
-    'source_language_detection_failed' =>
+  final errors = t.ui.errors;
+  return switch (mapErrorCode(code)) {
+    AppErrorCode.languagePackMissing => translation.language_pair_not_installed,
+    AppErrorCode.unsupportedPair => translation.unsupported_language_pair,
+    AppErrorCode.sourceLanguageDetectionFailed =>
       translation.source_language_detection_failed,
-    'network_error' => translation.network_error,
+    AppErrorCode.networkFailure => translation.network_error,
+    AppErrorCode.providerAuthFailed => errors.provider_auth_failed,
+    AppErrorCode.noTranslationService => errors.no_translation_service,
+    AppErrorCode.emptyResult => errors.empty_result,
     _ => translation.failed,
+  };
+}
+
+/// Converts every stable operation error code into user-facing localized copy.
+/// Raw wire identifiers must never escape into a screen or dialog.
+String appErrorMessage(String? code) {
+  final errors = t.ui.errors;
+  return switch (mapErrorCode(code)) {
+    AppErrorCode.accessibilityDenied => errors.accessibility_denied,
+    AppErrorCode.screenRecordingDenied => errors.screen_recording_denied,
+    AppErrorCode.captureFailed => errors.capture_failed,
+    AppErrorCode.captureCancelled => errors.capture_cancelled,
+    AppErrorCode.ocrNotConfigured => errors.ocr_not_configured,
+    AppErrorCode.ocrEmpty => errors.ocr_empty,
+    AppErrorCode.emptySelection => errors.empty_selection,
+    AppErrorCode.clipboardUnavailable => errors.clipboard_unavailable,
+    AppErrorCode.clipboardRestoreFailed => errors.clipboard_restore_failed,
+    AppErrorCode.sourceLanguageDetectionFailed =>
+      errors.source_language_detection_failed,
+    AppErrorCode.unsupportedPair => errors.unsupported_language_pair,
+    AppErrorCode.languagePackMissing => errors.language_pack_missing,
+    AppErrorCode.networkFailure => errors.network_failure,
+    AppErrorCode.providerAuthFailed => errors.provider_auth_failed,
+    AppErrorCode.translationFailed => errors.translation_failed,
+    AppErrorCode.emptyResult => errors.empty_result,
+    AppErrorCode.catalogUnavailable => errors.catalog_unavailable,
+    AppErrorCode.noTranslationService => errors.no_translation_service,
+    AppErrorCode.glossaryCorrupt => errors.glossary_corrupt,
+    AppErrorCode.historyUnavailable => errors.history_unavailable,
+    AppErrorCode.dictionaryUnavailable => errors.dictionary_unavailable,
+    AppErrorCode.vocabularyUnavailable => errors.vocabulary_unavailable,
+    AppErrorCode.speechUnavailable => errors.speech_unavailable,
+    AppErrorCode.speechInterrupted => errors.speech_interrupted,
+    AppErrorCode.speechFailed => errors.speech_failed,
+    AppErrorCode.updateCheckFailed => errors.update_check_failed,
+    AppErrorCode.updateChecksumMissing => errors.update_checksum_missing,
+    AppErrorCode.updateChecksumMismatch => errors.update_checksum_mismatch,
+    AppErrorCode.protocolInvalid => errors.protocol_invalid,
+    AppErrorCode.protocolTooLarge => errors.protocol_too_large,
+    AppErrorCode.apiServerBindFailed => errors.api_server_bind_failed,
+    AppErrorCode.invalidPort => errors.invalid_port,
+    AppErrorCode.unknown => errors.unknown,
   };
 }
 
@@ -123,6 +189,8 @@ SettingsShellLabels settingsShellLabels() => SettingsShellLabels(
   shortcuts: t.settings.shortcuts.title,
   permissions: t.settings.permissions.title,
   about: t.settings.about.title,
+  advanced: t.settings.advanced.title,
+  updates: t.ui.updates.title,
 );
 
 GeneralSettingsLabels generalSettingsLabels() => GeneralSettingsLabels(
@@ -135,6 +203,16 @@ GeneralSettingsLabels generalSettingsLabels() => GeneralSettingsLabels(
   light: t.common.theme_mode.light,
   dark: t.common.theme_mode.dark,
   system: t.common.theme_mode.system,
+  commonLanguages: t.settings.general.row.common_languages,
+  autoCopyOcr: t.settings.general.row.auto_copy_detected_text,
+  doubleClickCopy: t.settings.general.row.double_click_copy_result,
+  submitEnter: t.settings.general.row.submit_with_enter,
+  submitModifierEnter: t.settings.general.row.submit_with_meta_enter_mac,
+  input: t.settings.general.section.input,
+  translationBehaviour: t.settings.general.section.translation_behaviour,
+  error: t.ui.providers.save_failed,
+  errorMessage: appErrorMessage,
+  retry: t.workbench.translation.retry,
 );
 
 ServicesSettingsLabels servicesSettingsLabels() => ServicesSettingsLabels(
@@ -149,6 +227,7 @@ ServicesSettingsLabels servicesSettingsLabels() => ServicesSettingsLabels(
   configureProviders: t.settings.providers.button.add,
   commonLanguages: t.settings.general.row.common_languages,
   defaultService: t.settings.general.row.default_translation_service,
+  errorMessage: appErrorMessage,
 );
 
 ProvidersSettingsLabels providersSettingsLabels() => ProvidersSettingsLabels(

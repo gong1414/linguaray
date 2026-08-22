@@ -3,6 +3,8 @@ import 'package:linguaray_application/linguaray_application.dart';
 
 import '../chrome/workbench_shell_view.dart';
 import '../first_run/first_run_view.dart';
+import '../glossary/glossary_view.dart';
+import '../history/history_view.dart';
 import '../quick_translate/widgets/quick_translate_view.dart';
 import '../settings/settings_labels.dart';
 import '../settings/settings_shell_view.dart';
@@ -13,6 +15,8 @@ import '../settings/views/providers_settings_view.dart';
 import '../settings/views/services_settings_view.dart';
 import '../settings/views/shortcuts_settings_view.dart';
 import '../translation/widgets/translation_workspace_view.dart';
+import '../updates/updates_view.dart';
+import '../vocabulary/vocabulary_view.dart';
 
 enum CatalogTranslationScenario {
   empty('Empty · 中文'),
@@ -616,6 +620,10 @@ class SettingsCatalogPreview extends StatelessWidget {
           onGrantScreenRecording: () {},
           onRecheck: () {},
         ),
+        SettingsSection.advanced || SettingsSection.updates => Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(section.name),
+        ),
         SettingsSection.about => AboutSettingsView(
           labels: _aboutZh,
           info: const AboutInfo(
@@ -699,6 +707,9 @@ class ProviderEditorCatalogPreview extends StatelessWidget {
 const _shellZh = WorkbenchShellLabels(
   appName: 'LinguaRay',
   translate: '翻译',
+  history: '历史',
+  glossary: '术语库',
+  vocabulary: '生词本',
   settings: '设置',
   minimize: '最小化',
   maximize: '最大化',
@@ -708,6 +719,9 @@ const _shellZh = WorkbenchShellLabels(
 const _shellEn = WorkbenchShellLabels(
   appName: 'LinguaRay',
   translate: 'Translate',
+  history: 'History',
+  glossary: 'Glossary',
+  vocabulary: 'Vocabulary',
   settings: 'Settings',
   minimize: 'Minimize',
   maximize: 'Maximize',
@@ -1003,3 +1017,229 @@ const _longSource =
 const _longResult =
     'LinguaRay 是一款隐私优先的桌面翻译工具。它不打扰当前工作，把提供商密钥留在系统钥匙串中，'
     '并让空白、加载、流式输出和失败都成为可以检查的状态。';
+
+class HistoryCatalogPreview extends StatelessWidget {
+  const HistoryCatalogPreview({required this.empty, super.key});
+
+  final bool empty;
+
+  @override
+  Widget build(BuildContext context) {
+    return HistoryView(
+      labels: const HistoryViewLabels(
+        title: '历史',
+        all: '全部',
+        favorites: '收藏',
+        search: '搜索',
+        emptyTitle: '还没有翻译历史',
+        emptyDescription: '成功的翻译会保存在这里。',
+        noResults: '没有匹配的历史',
+        loading: '正在读取…',
+        retry: '重试',
+        delete: '删除',
+        clear: '清空',
+        clearConfirm: '确定清空？',
+        select: '选择',
+        open: '打开',
+        favorite: '收藏',
+        unfavorite: '取消收藏',
+      ),
+      snapshot: HistorySnapshot(
+        entries: empty
+            ? const []
+            : const [
+                HistoryRecord(
+                  id: '1',
+                  source: 'hello',
+                  translation: '你好',
+                  sourceLanguage: 'en',
+                  targetLanguage: 'zh-Hans',
+                  serviceId: 'deepl',
+                  serviceName: 'DeepL',
+                  favorite: true,
+                  edited: false,
+                  createdAt: 0,
+                  updatedAt: 0,
+                ),
+              ],
+        counts: HistoryCounts(
+          all: empty ? 0 : 1,
+          favorites: empty ? 0 : 1,
+          edited: 0,
+        ),
+        filter: HistoryFilter.all,
+        query: '',
+      ),
+      selectedIds: const {},
+      onQueryChanged: (_) {},
+      onFilterChanged: (_) {},
+      onOpen: (_) {},
+      onFavorite: (_, _) {},
+      onDelete: (_) {},
+      onClear: () {},
+      onRetry: () {},
+      onToggleSelected: (_) {},
+    );
+  }
+}
+
+class GlossaryCatalogPreview extends StatelessWidget {
+  const GlossaryCatalogPreview({required this.empty, super.key});
+
+  final bool empty;
+
+  @override
+  Widget build(BuildContext context) {
+    return GlossaryView(
+      labels: const GlossaryViewLabels(
+        title: '术语库',
+        newBook: '新建',
+        rename: '重命名',
+        enable: '启用',
+        disable: '停用',
+        delete: '删除',
+        addEntry: '新术语',
+        term: '原文',
+        translation: '译文',
+        forbidden: '禁用译法',
+        search: '搜索',
+        emptyTitle: '这本术语库是空的',
+        emptyDescription: '添加术语后，翻译会优先使用它们。',
+        noBooksTitle: '还没有术语库',
+        noBooksDescription: '先创建一本，再添加术语。',
+        loading: '正在读取…',
+        retry: '重试',
+        save: '保存',
+        cancel: '取消',
+        caseSensitive: 'Aa',
+        wholeWord: '[]',
+        corrupt: '有一本术语库无法读取。',
+      ),
+      books: empty
+          ? const []
+          : const [
+              GlossaryBookRecord(
+                id: 'ml',
+                name: '机器学习',
+                enabled: true,
+                entryCount: 1,
+              ),
+            ],
+      entries: empty
+          ? const []
+          : const [
+              GlossaryEntryRecord(
+                id: '1',
+                term: 'teacher forcing',
+                translation: '强制教学',
+                forbidden: ['强迫教学'],
+                caseSensitive: false,
+                wholeWord: true,
+              ),
+            ],
+      selectedBookId: empty ? null : 'ml',
+      loading: false,
+      query: '',
+      onSelectBook: (_) {},
+      onQueryChanged: (_) {},
+      onCreateBook: () {},
+      onRenameBook: () {},
+      onToggleBook: () {},
+      onDeleteBook: () {},
+      onAddEntry: () {},
+      onEditEntry: (_) {},
+      onDeleteEntry: (_) {},
+      onRetry: () {},
+    );
+  }
+}
+
+class VocabularyCatalogPreview extends StatelessWidget {
+  const VocabularyCatalogPreview({required this.empty, super.key});
+
+  final bool empty;
+
+  @override
+  Widget build(BuildContext context) {
+    return VocabularyView(
+      labels: const VocabularyViewLabels(
+        title: '生词本',
+        search: '搜索生词',
+        all: '全部',
+        favorites: '收藏',
+        emptyTitle: '还没有生词',
+        emptyDescription: '可以从词典或译文加入。',
+        noResults: '没有匹配的生词',
+        note: '笔记',
+        delete: '删除',
+        favorite: '收藏',
+        unfavorite: '取消收藏',
+        retry: '重试',
+      ),
+      snapshot: VocabularySnapshot(
+        entries: empty
+            ? const []
+            : const [
+                VocabularyRecord(
+                  id: '1',
+                  word: 'ray',
+                  translation: '光线',
+                  sourceLanguage: 'en',
+                  targetLanguage: 'zh-Hans',
+                  source: 'dictionary',
+                  favorite: false,
+                  createdAt: 0,
+                  updatedAt: 0,
+                ),
+              ],
+        filter: VocabularyFilter.all,
+        query: '',
+      ),
+      onQueryChanged: (_) {},
+      onFilterChanged: (_) {},
+      onFavorite: (_, _) {},
+      onDelete: (_) {},
+      onEditNote: (_) {},
+      onRetry: () {},
+    );
+  }
+}
+
+class UpdatesCatalogPreview extends StatelessWidget {
+  const UpdatesCatalogPreview({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return UpdatesView(
+      labels: UpdatesViewLabels(
+        title: '更新',
+        current: '当前版本',
+        check: '检查更新',
+        checking: '正在检查…',
+        upToDate: '已是最新版本',
+        available: (version) => '发现新版本 $version',
+        download: '下载',
+        downloading: '正在下载…',
+        ready: '已校验，可以安装',
+        install: '安装',
+        unsigned: '没有校验和，不会安装',
+        notes: '发行说明',
+        retry: '重试',
+      ),
+      state: const UpdateState(
+        status: UpdateStatus.available,
+        currentVersion: '0.5.0',
+        manifest: UpdateManifest(
+          version: '0.6.0',
+          notes: 'New interface.',
+          assetName: 'LinguaRay-macos.zip',
+          assetUrl: 'https://example.invalid/app.zip',
+          checksumSha256: 'abc',
+        ),
+      ),
+      onCheck: () {},
+      onDownload: () {},
+      onInstall: () {},
+    );
+  }
+}

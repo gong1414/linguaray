@@ -14,22 +14,32 @@ final class GeneralSettingsViewState {
   const GeneralSettingsViewState({
     this.preferences,
     this.languages = const [],
+    this.translationLanguages = const [],
     this.loading = true,
+    this.errorCode,
   });
 
   final GeneralPreferences? preferences;
   final List<LanguageChoice> languages;
+  final List<LanguageChoice> translationLanguages;
   final bool loading;
+  final String? errorCode;
 
   GeneralSettingsViewState copyWith({
     GeneralPreferences? preferences,
     List<LanguageChoice>? languages,
+    List<LanguageChoice>? translationLanguages,
     bool? loading,
+    Object? errorCode = _unset,
   }) {
     return GeneralSettingsViewState(
       preferences: preferences ?? this.preferences,
       languages: languages ?? this.languages,
+      translationLanguages: translationLanguages ?? this.translationLanguages,
       loading: loading ?? this.loading,
+      errorCode: identical(errorCode, _unset)
+          ? this.errorCode
+          : errorCode as String?,
     );
   }
 }
@@ -43,35 +53,71 @@ final class GeneralSettingsViewModel
   }
 
   Future<void> reload() async {
-    final repository = ref.read(workspaceSettingsRepositoryProvider);
-    final preferences = await repository.loadGeneral();
-    final languages = await repository.listAppLanguages();
-    state = GeneralSettingsViewState(
-      preferences: preferences,
-      languages: languages,
-      loading: false,
-    );
+    try {
+      final repository = ref.read(workspaceSettingsRepositoryProvider);
+      final preferences = await repository.loadGeneral();
+      final languages = await repository.listAppLanguages();
+      final translationLanguages = await repository.listTranslationLanguages();
+      state = GeneralSettingsViewState(
+        preferences: preferences,
+        languages: languages,
+        translationLanguages: translationLanguages,
+        loading: false,
+      );
+    } catch (_) {
+      state = state.copyWith(
+        loading: false,
+        errorCode: AppErrorCode.unknown.wireName,
+      );
+    }
   }
 
-  Future<void> setLaunchAtLogin(bool value) async {
-    await ref.read(workspaceSettingsRepositoryProvider).setLaunchAtLogin(value);
-    await reload();
+  Future<void> _run(Future<void> Function() action) async {
+    try {
+      await action();
+      await reload();
+    } catch (_) {
+      state = state.copyWith(errorCode: AppErrorCode.unknown.wireName);
+    }
   }
 
-  Future<void> setShowInMenuBar(bool value) async {
-    await ref.read(workspaceSettingsRepositoryProvider).setShowInMenuBar(value);
-    await reload();
-  }
+  Future<void> setLaunchAtLogin(bool value) => _run(
+    () => ref.read(workspaceSettingsRepositoryProvider).setLaunchAtLogin(value),
+  );
 
-  Future<void> setLanguage(String language) async {
-    await ref.read(workspaceSettingsRepositoryProvider).setLanguage(language);
-    await reload();
-  }
+  Future<void> setShowInMenuBar(bool value) => _run(
+    () => ref.read(workspaceSettingsRepositoryProvider).setShowInMenuBar(value),
+  );
 
-  Future<void> setThemeMode(ThemePreference mode) async {
-    await ref.read(workspaceSettingsRepositoryProvider).setThemeMode(mode);
-    await reload();
-  }
+  Future<void> setLanguage(String language) => _run(
+    () => ref.read(workspaceSettingsRepositoryProvider).setLanguage(language),
+  );
+
+  Future<void> setThemeMode(ThemePreference mode) => _run(
+    () => ref.read(workspaceSettingsRepositoryProvider).setThemeMode(mode),
+  );
+
+  Future<void> setCommonLanguages(List<String> codes) => _run(
+    () =>
+        ref.read(workspaceSettingsRepositoryProvider).setCommonLanguages(codes),
+  );
+
+  Future<void> setInputSubmitMode(InputSubmitMode mode) => _run(
+    () =>
+        ref.read(workspaceSettingsRepositoryProvider).setInputSubmitMode(mode),
+  );
+
+  Future<void> setAutoCopyDetectedText(bool value) => _run(
+    () => ref
+        .read(workspaceSettingsRepositoryProvider)
+        .setAutoCopyDetectedText(value),
+  );
+
+  Future<void> setDoubleClickCopyResult(bool value) => _run(
+    () => ref
+        .read(workspaceSettingsRepositoryProvider)
+        .setDoubleClickCopyResult(value),
+  );
 }
 
 final servicesSettingsViewModelProvider =
@@ -83,10 +129,12 @@ final class ServicesSettingsViewState {
   const ServicesSettingsViewState({
     this.services = const [],
     this.loading = true,
+    this.operationErrorCode,
   });
 
   final List<ServiceRecord> services;
   final bool loading;
+  final String? operationErrorCode;
 }
 
 final class ServicesSettingsViewModel
@@ -98,29 +146,68 @@ final class ServicesSettingsViewModel
   }
 
   Future<void> reload() async {
-    final services = await ref
-        .read(workspaceSettingsRepositoryProvider)
-        .listServices();
-    state = ServicesSettingsViewState(services: services, loading: false);
+    try {
+      final services = await ref
+          .read(workspaceSettingsRepositoryProvider)
+          .listServices();
+      state = ServicesSettingsViewState(services: services, loading: false);
+    } catch (_) {
+      state = ServicesSettingsViewState(
+        services: state.services,
+        loading: false,
+        operationErrorCode: AppErrorCode.unknown.wireName,
+      );
+    }
   }
 
   Future<void> setEnabled(String id, bool enabled) async {
-    await ref
-        .read(workspaceSettingsRepositoryProvider)
-        .setServiceEnabled(serviceId: id, enabled: enabled);
-    await reload();
+    try {
+      await ref
+          .read(workspaceSettingsRepositoryProvider)
+          .setServiceEnabled(serviceId: id, enabled: enabled);
+      await reload();
+    } catch (_) {
+      state = ServicesSettingsViewState(
+        services: state.services,
+        loading: false,
+        operationErrorCode: AppErrorCode.unknown.wireName,
+      );
+    }
   }
 
   Future<void> makeDefault(String id) async {
     final service = state.services.where((item) => item.id == id).firstOrNull;
     if (service == null) return;
     final repository = ref.read(workspaceSettingsRepositoryProvider);
-    if (service.kind == 'ocr') {
-      await repository.setDefaultOcrService(id);
-    } else {
-      await repository.setDefaultTranslationService(id);
+    try {
+      if (service.kind == 'ocr') {
+        await repository.setDefaultOcrService(id);
+      } else if (service.kind == 'dictionary') {
+        await repository.setDefaultDictionaryService(id);
+      } else {
+        await repository.setDefaultTranslationService(id);
+      }
+      await reload();
+    } catch (_) {
+      state = ServicesSettingsViewState(
+        services: state.services,
+        loading: false,
+        operationErrorCode: AppErrorCode.unknown.wireName,
+      );
     }
-    await reload();
+  }
+
+  Future<void> addService(ServiceDraft draft) async {
+    try {
+      await ref.read(workspaceSettingsRepositoryProvider).saveService(draft);
+      await reload();
+    } catch (_) {
+      state = ServicesSettingsViewState(
+        services: state.services,
+        loading: false,
+        operationErrorCode: AppErrorCode.unknown.wireName,
+      );
+    }
   }
 }
 

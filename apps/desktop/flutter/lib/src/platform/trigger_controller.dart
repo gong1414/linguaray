@@ -40,6 +40,21 @@ class TriggerController {
           break;
         case TriggerAction.translateSelection:
           final result = await _selection.readSelection();
+          if (result.text.trim().isEmpty) {
+            throw const PlatformOperationException(
+              action: TriggerAction.translateSelection,
+              code: 'empty_selection',
+              message: 'No text is selected.',
+            );
+          }
+          if (result.recoverableError != null &&
+              result.recoverableError!.isNotEmpty) {
+            lastError.value = const PlatformOperationException(
+              action: TriggerAction.translateSelection,
+              code: 'clipboard_restore_failed',
+              message: 'Clipboard restoration failed.',
+            );
+          }
           quickWindowText.value = result.text;
           await showMiniTranslatorWindow(
             position: miniTranslatorPositionNearPoint(result.triggerPosition),
@@ -48,7 +63,14 @@ class TriggerController {
         case TriggerAction.translateInput:
           final position = DisplayManager.instance.getCursorPosition();
           final text = await _selection.readClipboard();
-          if (text?.trim().isNotEmpty == true) quickWindowText.value = text;
+          if (text == null) {
+            throw const PlatformOperationException(
+              action: TriggerAction.translateInput,
+              code: 'clipboard_unavailable',
+              message: 'The clipboard could not be read.',
+            );
+          }
+          if (text.trim().isNotEmpty) quickWindowText.value = text;
           await showMiniTranslatorWindow(
             position: miniTranslatorPositionNearPoint(position),
           );
@@ -78,7 +100,7 @@ class TriggerController {
     } on PlatformOperationException catch (error) {
       lastError.value = error;
       if (action != TriggerAction.captureAndTranslate ||
-          error.code != 'cancelled') {
+          error.code != 'capture_cancelled' && error.code != 'cancelled') {
         await showMiniTranslatorWindow(
           position: miniTranslatorPositionNearCursor(),
         );

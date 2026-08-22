@@ -110,10 +110,21 @@ class _QuickTranslateScreenState extends ConsumerState<QuickTranslateScreen>
     if (error == null) return;
     setState(() {
       _notice = switch (error.code) {
-        'cancelled' => QuickTranslateNotice.captureCancelled,
+        'cancelled' ||
+        'capture_cancelled' => QuickTranslateNotice.captureCancelled,
         'permission_denied' ||
         'accessibility_denied' ||
+        'accessibilityDenied' ||
         'screen_recording_denied' => QuickTranslateNotice.permissionDenied,
+        'capture_failed' ||
+        'captureFailed' => QuickTranslateNotice.captureFailed,
+        'ocr_not_configured' ||
+        'ocrNotConfigured' => QuickTranslateNotice.ocrNotConfigured,
+        'ocr_empty' || 'ocrEmpty' => QuickTranslateNotice.ocrEmpty,
+        'empty_selection' => QuickTranslateNotice.emptySelection,
+        'clipboard_unavailable' => QuickTranslateNotice.clipboardUnavailable,
+        'clipboard_restore_failed' =>
+          QuickTranslateNotice.clipboardRestoreFailed,
         _ => QuickTranslateNotice.none,
       };
     });
@@ -146,6 +157,7 @@ class _QuickTranslateScreenState extends ConsumerState<QuickTranslateScreen>
   }
 
   void _resizeWindow() {
+    if (!canResizeMiniTranslatorWindow) return;
     try {
       final toolbar = _renderHeight(_toolbarKey);
       final content = _renderHeight(_contentKey);

@@ -592,6 +592,8 @@ public protocol RuntimeProtocol: AnyObject, Sendable {
 
   func translation(providerId: String) throws -> RuntimeTranslation
 
+  func vocabulary() -> RuntimeVocabulary
+
 }
 open class Runtime: RuntimeProtocol, @unchecked Sendable {
   fileprivate let handle: UInt64
@@ -767,6 +769,15 @@ open class Runtime: RuntimeProtocol, @unchecked Sendable {
         uniffi_linguaray_runtime_fn_method_runtime_translation(
           self.uniffiCloneHandle(),
           FfiConverterString.lower(providerId), $0
+        )
+      })
+  }
+
+  open func vocabulary() -> RuntimeVocabulary {
+    return try! FfiConverterTypeRuntimeVocabulary_lift(
+      try! rustCall {
+        uniffi_linguaray_runtime_fn_method_runtime_vocabulary(
+          self.uniffiCloneHandle(), $0
         )
       })
   }
@@ -1432,6 +1443,8 @@ public func FfiConverterTypeRuntimeGlossary_lower(_ value: RuntimeGlossary) -> U
 
 public protocol RuntimeHistoryProtocol: AnyObject, Sendable {
 
+  func clear() async throws -> UInt32
+
   func counts() async throws -> HistoryCounts
 
   func deleteEntries(entryIds: [String]) async throws -> UInt32
@@ -1491,6 +1504,23 @@ open class RuntimeHistory: RuntimeHistoryProtocol, @unchecked Sendable {
     }
 
     try! rustCall { uniffi_linguaray_runtime_fn_free_runtimehistory(handle, $0) }
+  }
+
+  open func clear() async throws -> UInt32 {
+    return
+      try await uniffiRustCallAsync(
+        rustFutureFunc: {
+          uniffi_linguaray_runtime_fn_method_runtimehistory_clear(
+            self.uniffiCloneHandle()
+
+          )
+        },
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_u32,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_u32,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_u32,
+        liftFunc: FfiConverterUInt32.lift,
+        errorHandler: FfiConverterTypeRuntimeError_lift
+      )
   }
 
   open func counts() async throws -> HistoryCounts {
@@ -3123,6 +3153,198 @@ public func FfiConverterTypeRuntimeTranslation_lift(_ handle: UInt64) throws -> 
 #endif
 public func FfiConverterTypeRuntimeTranslation_lower(_ value: RuntimeTranslation) -> UInt64 {
   return FfiConverterTypeRuntimeTranslation.lower(value)
+}
+
+public protocol RuntimeVocabularyProtocol: AnyObject, Sendable {
+
+  func deleteEntries(entryIds: [String]) async throws -> UInt32
+
+  func listEntries(filter: VocabularyFilter, query: String?) async throws -> [VocabularyEntry]
+
+  func setFavorite(entryId: String, favorite: Bool) async throws -> VocabularyEntry?
+
+  func setNote(entryId: String, note: String?) async throws -> VocabularyEntry?
+
+  func upsertEntry(input: VocabularyEntryInput) async throws -> VocabularyEntry
+
+}
+open class RuntimeVocabulary: RuntimeVocabularyProtocol, @unchecked Sendable {
+  fileprivate let handle: UInt64
+
+  /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
+  #if swift(>=5.8)
+    @_documentation(visibility: private)
+  #endif
+  public struct NoHandle {
+    public init() {}
+  }
+
+  // TODO: We'd like this to be `private` but for Swifty reasons,
+  // we can't implement `FfiConverter` without making this `required` and we can't
+  // make it `required` without making it `public`.
+  #if swift(>=5.8)
+    @_documentation(visibility: private)
+  #endif
+  required public init(unsafeFromHandle handle: UInt64) {
+    self.handle = handle
+  }
+
+  // This constructor can be used to instantiate a fake object.
+  // - Parameter noHandle: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+  //
+  // - Warning:
+  //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing handle the FFI lower functions will crash.
+  #if swift(>=5.8)
+    @_documentation(visibility: private)
+  #endif
+  public init(noHandle: NoHandle) {
+    self.handle = 0
+  }
+
+  #if swift(>=5.8)
+    @_documentation(visibility: private)
+  #endif
+  public func uniffiCloneHandle() -> UInt64 {
+    return try! rustCall { uniffi_linguaray_runtime_fn_clone_runtimevocabulary(self.handle, $0) }
+  }
+  // No primary constructor declared for this class.
+
+  deinit {
+    if handle == 0 {
+      // Mock objects have handle=0 don't try to free them
+      return
+    }
+
+    try! rustCall { uniffi_linguaray_runtime_fn_free_runtimevocabulary(handle, $0) }
+  }
+
+  open func deleteEntries(entryIds: [String]) async throws -> UInt32 {
+    return
+      try await uniffiRustCallAsync(
+        rustFutureFunc: {
+          uniffi_linguaray_runtime_fn_method_runtimevocabulary_delete_entries(
+            self.uniffiCloneHandle(),
+            FfiConverterSequenceString.lower(entryIds)
+          )
+        },
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_u32,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_u32,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_u32,
+        liftFunc: FfiConverterUInt32.lift,
+        errorHandler: FfiConverterTypeRuntimeError_lift
+      )
+  }
+
+  open func listEntries(filter: VocabularyFilter, query: String?) async throws -> [VocabularyEntry]
+  {
+    return
+      try await uniffiRustCallAsync(
+        rustFutureFunc: {
+          uniffi_linguaray_runtime_fn_method_runtimevocabulary_list_entries(
+            self.uniffiCloneHandle(),
+            FfiConverterTypeVocabularyFilter_lower(filter), FfiConverterOptionString.lower(query)
+          )
+        },
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
+        liftFunc: FfiConverterSequenceTypeVocabularyEntry.lift,
+        errorHandler: FfiConverterTypeRuntimeError_lift
+      )
+  }
+
+  open func setFavorite(entryId: String, favorite: Bool) async throws -> VocabularyEntry? {
+    return
+      try await uniffiRustCallAsync(
+        rustFutureFunc: {
+          uniffi_linguaray_runtime_fn_method_runtimevocabulary_set_favorite(
+            self.uniffiCloneHandle(),
+            FfiConverterString.lower(entryId), FfiConverterBool.lower(favorite)
+          )
+        },
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
+        liftFunc: FfiConverterOptionTypeVocabularyEntry.lift,
+        errorHandler: FfiConverterTypeRuntimeError_lift
+      )
+  }
+
+  open func setNote(entryId: String, note: String?) async throws -> VocabularyEntry? {
+    return
+      try await uniffiRustCallAsync(
+        rustFutureFunc: {
+          uniffi_linguaray_runtime_fn_method_runtimevocabulary_set_note(
+            self.uniffiCloneHandle(),
+            FfiConverterString.lower(entryId), FfiConverterOptionString.lower(note)
+          )
+        },
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
+        liftFunc: FfiConverterOptionTypeVocabularyEntry.lift,
+        errorHandler: FfiConverterTypeRuntimeError_lift
+      )
+  }
+
+  open func upsertEntry(input: VocabularyEntryInput) async throws -> VocabularyEntry {
+    return
+      try await uniffiRustCallAsync(
+        rustFutureFunc: {
+          uniffi_linguaray_runtime_fn_method_runtimevocabulary_upsert_entry(
+            self.uniffiCloneHandle(),
+            FfiConverterTypeVocabularyEntryInput_lower(input)
+          )
+        },
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
+        liftFunc: FfiConverterTypeVocabularyEntry_lift,
+        errorHandler: FfiConverterTypeRuntimeError_lift
+      )
+  }
+
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeRuntimeVocabulary: FfiConverter {
+  typealias FfiType = UInt64
+  typealias SwiftType = RuntimeVocabulary
+
+  public static func lift(_ handle: UInt64) throws -> RuntimeVocabulary {
+    return RuntimeVocabulary(unsafeFromHandle: handle)
+  }
+
+  public static func lower(_ value: RuntimeVocabulary) -> UInt64 {
+    return value.uniffiCloneHandle()
+  }
+
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws
+    -> RuntimeVocabulary
+  {
+    let handle: UInt64 = try readInt(&buf)
+    return try lift(handle)
+  }
+
+  public static func write(_ value: RuntimeVocabulary, into buf: inout [UInt8]) {
+    writeInt(&buf, lower(value))
+  }
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRuntimeVocabulary_lift(_ handle: UInt64) throws -> RuntimeVocabulary {
+  return try FfiConverterTypeRuntimeVocabulary.lift(handle)
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRuntimeVocabulary_lower(_ value: RuntimeVocabulary) -> UInt64 {
+  return FfiConverterTypeRuntimeVocabulary.lower(value)
 }
 
 /// Foreign-language handle for observing [`SettingsChange`] events.
@@ -5940,6 +6162,169 @@ public func FfiConverterTypeTranslationTarget_lower(_ value: TranslationTarget) 
   return FfiConverterTypeTranslationTarget.lower(value)
 }
 
+public struct VocabularyEntry: Equatable, Hashable {
+  public var id: String
+  public var word: String
+  public var translation: String
+  public var sourceLanguage: String
+  public var targetLanguage: String
+  public var source: String
+  public var note: String?
+  public var favorite: Bool
+  public var createdAt: UInt64
+  public var updatedAt: UInt64
+
+  // Default memberwise initializers are never public by default, so we
+  // declare one manually.
+  public init(
+    id: String, word: String, translation: String, sourceLanguage: String, targetLanguage: String,
+    source: String, note: String?, favorite: Bool, createdAt: UInt64, updatedAt: UInt64
+  ) {
+    self.id = id
+    self.word = word
+    self.translation = translation
+    self.sourceLanguage = sourceLanguage
+    self.targetLanguage = targetLanguage
+    self.source = source
+    self.note = note
+    self.favorite = favorite
+    self.createdAt = createdAt
+    self.updatedAt = updatedAt
+  }
+
+}
+
+#if compiler(>=6)
+  extension VocabularyEntry: Sendable {}
+#endif
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeVocabularyEntry: FfiConverterRustBuffer {
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws
+    -> VocabularyEntry
+  {
+    return
+      try VocabularyEntry(
+        id: FfiConverterString.read(from: &buf),
+        word: FfiConverterString.read(from: &buf),
+        translation: FfiConverterString.read(from: &buf),
+        sourceLanguage: FfiConverterString.read(from: &buf),
+        targetLanguage: FfiConverterString.read(from: &buf),
+        source: FfiConverterString.read(from: &buf),
+        note: FfiConverterOptionString.read(from: &buf),
+        favorite: FfiConverterBool.read(from: &buf),
+        createdAt: FfiConverterUInt64.read(from: &buf),
+        updatedAt: FfiConverterUInt64.read(from: &buf)
+      )
+  }
+
+  public static func write(_ value: VocabularyEntry, into buf: inout [UInt8]) {
+    FfiConverterString.write(value.id, into: &buf)
+    FfiConverterString.write(value.word, into: &buf)
+    FfiConverterString.write(value.translation, into: &buf)
+    FfiConverterString.write(value.sourceLanguage, into: &buf)
+    FfiConverterString.write(value.targetLanguage, into: &buf)
+    FfiConverterString.write(value.source, into: &buf)
+    FfiConverterOptionString.write(value.note, into: &buf)
+    FfiConverterBool.write(value.favorite, into: &buf)
+    FfiConverterUInt64.write(value.createdAt, into: &buf)
+    FfiConverterUInt64.write(value.updatedAt, into: &buf)
+  }
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeVocabularyEntry_lift(_ buf: RustBuffer) throws -> VocabularyEntry {
+  return try FfiConverterTypeVocabularyEntry.lift(buf)
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeVocabularyEntry_lower(_ value: VocabularyEntry) -> RustBuffer {
+  return FfiConverterTypeVocabularyEntry.lower(value)
+}
+
+public struct VocabularyEntryInput: Equatable, Hashable {
+  public var id: String?
+  public var word: String
+  public var translation: String
+  public var sourceLanguage: String
+  public var targetLanguage: String
+  public var source: String
+  public var note: String?
+
+  // Default memberwise initializers are never public by default, so we
+  // declare one manually.
+  public init(
+    id: String?, word: String, translation: String, sourceLanguage: String, targetLanguage: String,
+    source: String, note: String?
+  ) {
+    self.id = id
+    self.word = word
+    self.translation = translation
+    self.sourceLanguage = sourceLanguage
+    self.targetLanguage = targetLanguage
+    self.source = source
+    self.note = note
+  }
+
+}
+
+#if compiler(>=6)
+  extension VocabularyEntryInput: Sendable {}
+#endif
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeVocabularyEntryInput: FfiConverterRustBuffer {
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws
+    -> VocabularyEntryInput
+  {
+    return
+      try VocabularyEntryInput(
+        id: FfiConverterOptionString.read(from: &buf),
+        word: FfiConverterString.read(from: &buf),
+        translation: FfiConverterString.read(from: &buf),
+        sourceLanguage: FfiConverterString.read(from: &buf),
+        targetLanguage: FfiConverterString.read(from: &buf),
+        source: FfiConverterString.read(from: &buf),
+        note: FfiConverterOptionString.read(from: &buf)
+      )
+  }
+
+  public static func write(_ value: VocabularyEntryInput, into buf: inout [UInt8]) {
+    FfiConverterOptionString.write(value.id, into: &buf)
+    FfiConverterString.write(value.word, into: &buf)
+    FfiConverterString.write(value.translation, into: &buf)
+    FfiConverterString.write(value.sourceLanguage, into: &buf)
+    FfiConverterString.write(value.targetLanguage, into: &buf)
+    FfiConverterString.write(value.source, into: &buf)
+    FfiConverterOptionString.write(value.note, into: &buf)
+  }
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeVocabularyEntryInput_lift(_ buf: RustBuffer) throws
+  -> VocabularyEntryInput
+{
+  return try FfiConverterTypeVocabularyEntryInput.lift(buf)
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeVocabularyEntryInput_lower(_ value: VocabularyEntryInput) -> RustBuffer
+{
+  return FfiConverterTypeVocabularyEntryInput.lower(value)
+}
+
 public struct WordDefinition: Equatable, Hashable {
   public var type: String?
   public var name: String?
@@ -6978,6 +7363,10 @@ public enum SettingsChange: Equatable, Hashable {
    * Translation history was created, edited, favorited or deleted.
    */
   case history
+  /**
+   * A vocabulary book entry was created, edited, favorited or deleted.
+   */
+  case vocabulary
 
 }
 
@@ -7010,6 +7399,8 @@ public struct FfiConverterTypeSettingsChange: FfiConverterRustBuffer {
 
     case 7: return .history
 
+    case 8: return .vocabulary
+
     default: throw UniffiInternalError.unexpectedEnumCase
     }
   }
@@ -7038,6 +7429,9 @@ public struct FfiConverterTypeSettingsChange: FfiConverterRustBuffer {
     case .history:
       writeInt(&buf, Int32(7))
 
+    case .vocabulary:
+      writeInt(&buf, Int32(8))
+
     }
   }
 }
@@ -7054,6 +7448,67 @@ public func FfiConverterTypeSettingsChange_lift(_ buf: RustBuffer) throws -> Set
 #endif
 public func FfiConverterTypeSettingsChange_lower(_ value: SettingsChange) -> RustBuffer {
   return FfiConverterTypeSettingsChange.lower(value)
+}
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
+public enum VocabularyFilter: Equatable, Hashable {
+
+  case all
+  case favorites
+
+}
+
+#if compiler(>=6)
+  extension VocabularyFilter: Sendable {}
+#endif
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeVocabularyFilter: FfiConverterRustBuffer {
+  typealias SwiftType = VocabularyFilter
+
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws
+    -> VocabularyFilter
+  {
+    let variant: Int32 = try readInt(&buf)
+    switch variant {
+
+    case 1: return .all
+
+    case 2: return .favorites
+
+    default: throw UniffiInternalError.unexpectedEnumCase
+    }
+  }
+
+  public static func write(_ value: VocabularyFilter, into buf: inout [UInt8]) {
+    switch value {
+
+    case .all:
+      writeInt(&buf, Int32(1))
+
+    case .favorites:
+      writeInt(&buf, Int32(2))
+
+    }
+  }
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeVocabularyFilter_lift(_ buf: RustBuffer) throws -> VocabularyFilter {
+  return try FfiConverterTypeVocabularyFilter.lift(buf)
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeVocabularyFilter_lower(_ value: VocabularyFilter) -> RustBuffer {
+  return FfiConverterTypeVocabularyFilter.lower(value)
 }
 
 /// Callback invoked by the Rust runtime as LLM streaming chunks arrive.
@@ -7521,6 +7976,30 @@ private struct FfiConverterOptionTypeServiceConfigEntry: FfiConverterRustBuffer 
     switch try readInt(&buf) as Int8 {
     case 0: return nil
     case 1: return try FfiConverterTypeServiceConfigEntry.read(from: &buf)
+    default: throw UniffiInternalError.unexpectedOptionalTag
+    }
+  }
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+private struct FfiConverterOptionTypeVocabularyEntry: FfiConverterRustBuffer {
+  typealias SwiftType = VocabularyEntry?
+
+  public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+    guard let value = value else {
+      writeInt(&buf, Int8(0))
+      return
+    }
+    writeInt(&buf, Int8(1))
+    FfiConverterTypeVocabularyEntry.write(value, into: &buf)
+  }
+
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+    switch try readInt(&buf) as Int8 {
+    case 0: return nil
+    case 1: return try FfiConverterTypeVocabularyEntry.read(from: &buf)
     default: throw UniffiInternalError.unexpectedOptionalTag
     }
   }
@@ -8286,6 +8765,33 @@ private struct FfiConverterSequenceTypeTranslationTarget: FfiConverterRustBuffer
 #if swift(>=5.8)
   @_documentation(visibility: private)
 #endif
+private struct FfiConverterSequenceTypeVocabularyEntry: FfiConverterRustBuffer {
+  typealias SwiftType = [VocabularyEntry]
+
+  public static func write(_ value: [VocabularyEntry], into buf: inout [UInt8]) {
+    let len = Int32(value.count)
+    writeInt(&buf, len)
+    for item in value {
+      FfiConverterTypeVocabularyEntry.write(item, into: &buf)
+    }
+  }
+
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws
+    -> [VocabularyEntry]
+  {
+    let len: Int32 = try readInt(&buf)
+    var seq = [VocabularyEntry]()
+    seq.reserveCapacity(Int(len))
+    for _ in 0..<len {
+      seq.append(try FfiConverterTypeVocabularyEntry.read(from: &buf))
+    }
+    return seq
+  }
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
 private struct FfiConverterSequenceTypeWordDefinition: FfiConverterRustBuffer {
   typealias SwiftType = [WordDefinition]
 
@@ -8892,6 +9398,9 @@ private let initializationResult: InitializationResult = {
   if uniffi_linguaray_runtime_checksum_method_runtime_translation() != 58975 {
     return InitializationResult.apiChecksumMismatch
   }
+  if uniffi_linguaray_runtime_checksum_method_runtime_vocabulary() != 24687 {
+    return InitializationResult.apiChecksumMismatch
+  }
   if uniffi_linguaray_runtime_checksum_method_runtimedictionary_lookup() != 41773 {
     return InitializationResult.apiChecksumMismatch
   }
@@ -8926,6 +9435,9 @@ private let initializationResult: InitializationResult = {
     return InitializationResult.apiChecksumMismatch
   }
   if uniffi_linguaray_runtime_checksum_method_runtimeglossary_upsert_entry() != 33639 {
+    return InitializationResult.apiChecksumMismatch
+  }
+  if uniffi_linguaray_runtime_checksum_method_runtimehistory_clear() != 16113 {
     return InitializationResult.apiChecksumMismatch
   }
   if uniffi_linguaray_runtime_checksum_method_runtimehistory_counts() != 18206 {
@@ -9078,6 +9590,21 @@ private let initializationResult: InitializationResult = {
     return InitializationResult.apiChecksumMismatch
   }
   if uniffi_linguaray_runtime_checksum_method_runtimetranslation_translate() != 55464 {
+    return InitializationResult.apiChecksumMismatch
+  }
+  if uniffi_linguaray_runtime_checksum_method_runtimevocabulary_delete_entries() != 17142 {
+    return InitializationResult.apiChecksumMismatch
+  }
+  if uniffi_linguaray_runtime_checksum_method_runtimevocabulary_list_entries() != 19511 {
+    return InitializationResult.apiChecksumMismatch
+  }
+  if uniffi_linguaray_runtime_checksum_method_runtimevocabulary_set_favorite() != 53086 {
+    return InitializationResult.apiChecksumMismatch
+  }
+  if uniffi_linguaray_runtime_checksum_method_runtimevocabulary_set_note() != 33632 {
+    return InitializationResult.apiChecksumMismatch
+  }
+  if uniffi_linguaray_runtime_checksum_method_runtimevocabulary_upsert_entry() != 58741 {
     return InitializationResult.apiChecksumMismatch
   }
   if uniffi_linguaray_runtime_checksum_method_settingssubscription_next() != 52040 {

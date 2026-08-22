@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:linguaray_application/linguaray_application.dart';
 
 import '../../../config/dependencies.dart';
+import 'translation_session_id.dart';
 
 final translationViewModelProvider =
     NotifierProvider<TranslationViewModel, TranslationViewState>(
@@ -93,6 +94,7 @@ final class TranslationViewModel extends Notifier<TranslationViewState> {
     if (catalog == null || text.isEmpty || state.loadingCatalog) return;
 
     final requestId = ++_requestId;
+    final sessionId = newTranslationSessionId();
     state = state.copyWith(
       submitting: true,
       clearRun: true,
@@ -119,7 +121,12 @@ final class TranslationViewModel extends Notifier<TranslationViewState> {
         );
       }
       if (requestId == _requestId) {
+        final run = state.run;
         state = state.copyWith(submitting: false);
+        if (run != null && run.complete) {
+          unawaited(_recordHistory(sessionId, run));
+          unawaited(_refreshGlossary(run));
+        }
       }
     } catch (_) {
       if (requestId != _requestId) return;
@@ -127,6 +134,18 @@ final class TranslationViewModel extends Notifier<TranslationViewState> {
         submitting: false,
         submissionErrorCode: 'translation_failed',
       );
+    }
+  }
+
+  Future<void> _recordHistory(String sessionId, TranslationRun run) async {
+    try {
+      await ref.read(recordCompletedTranslationProvider)(
+        sessionId: sessionId,
+        run: run,
+      );
+    } catch (_) {
+      // History persistence must never turn a successful translation into an
+      // unhandled asynchronous error.
     }
   }
 
@@ -140,6 +159,38 @@ final class TranslationViewModel extends Notifier<TranslationViewState> {
       if (result.hasText) return result.service.id;
     }
     return run.results.isEmpty ? null : run.results.first.service.id;
+  }
+
+  Future<void> _refreshGlossary(TranslationRun run) async {
+    try {
+      final matches = await ref
+          .read(glossaryRepositoryProvider)
+          .matchText(
+            text: run.sourceText,
+            sourceLanguage: run.detectedLanguage ?? run.sourceLanguage,
+            targetLanguage: run.targetLanguage,
+          );
+      final selected = state.selectedResult?.text ?? '';
+      final warnings = selected.trim().isEmpty
+          ? const <GlossaryComplianceWarning>[]
+          : await ref
+                .read(glossaryRepositoryProvider)
+                .checkCompliance(
+                  source: run.sourceText,
+                  translated: selected,
+                  sourceLanguage: run.detectedLanguage ?? run.sourceLanguage,
+                  targetLanguage: run.targetLanguage,
+                );
+      state = state.copyWith(
+        glossaryMatches: matches,
+        glossaryWarnings: warnings,
+      );
+    } catch (_) {
+      state = state.copyWith(
+        glossaryMatches: const [],
+        glossaryWarnings: const [],
+      );
+    }
   }
 }
 
@@ -157,6 +208,8 @@ final class TranslationViewState {
     this.submitting = false,
     this.catalogErrorCode,
     this.submissionErrorCode,
+    this.glossaryMatches = const [],
+    this.glossaryWarnings = const [],
   });
 
   final TranslationCatalog? catalog;
@@ -169,6 +222,8 @@ final class TranslationViewState {
   final bool submitting;
   final String? catalogErrorCode;
   final String? submissionErrorCode;
+  final List<GlossaryMatchHit> glossaryMatches;
+  final List<GlossaryComplianceWarning> glossaryWarnings;
 
   List<LanguageOption> get languages => catalog?.languages ?? const [];
   List<TranslationServiceOption> get services => catalog?.services ?? const [];
@@ -193,6 +248,8 @@ final class TranslationViewState {
     bool? submitting,
     Object? catalogErrorCode = _unset,
     Object? submissionErrorCode = _unset,
+    List<GlossaryMatchHit>? glossaryMatches,
+    List<GlossaryComplianceWarning>? glossaryWarnings,
     bool clearRun = false,
     bool clearCatalogError = false,
     bool clearSubmissionError = false,
@@ -224,6 +281,8 @@ final class TranslationViewState {
           : identical(submissionErrorCode, _unset)
           ? this.submissionErrorCode
           : submissionErrorCode as String?,
+      glossaryMatches: glossaryMatches ?? this.glossaryMatches,
+      glossaryWarnings: glossaryWarnings ?? this.glossaryWarnings,
     );
   }
 }

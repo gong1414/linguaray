@@ -13,6 +13,9 @@ class ServicesSettingsView extends StatelessWidget {
     required this.onMakeDefault,
     required this.onConfigureProviders,
     super.key,
+    this.onAdd,
+    this.errorCode,
+    this.onRetry,
   });
 
   final ServicesSettingsLabels labels;
@@ -21,6 +24,9 @@ class ServicesSettingsView extends StatelessWidget {
   final void Function(String id, bool enabled) onEnabledChanged;
   final ValueChanged<String> onMakeDefault;
   final VoidCallback onConfigureProviders;
+  final VoidCallback? onAdd;
+  final String? errorCode;
+  final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -50,9 +56,32 @@ class ServicesSettingsView extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 16, 24, 24),
       children: [
-        Text(
-          labels.translation,
-          style: Theme.of(context).textTheme.titleMedium,
+        if (errorCode != null)
+          StatusMessage(
+            kind: StatusKind.error,
+            title: labels.errorMessage?.call(errorCode) ?? labels.loading,
+            action: onRetry == null
+                ? null
+                : OutlinedButton(
+                    onPressed: onRetry,
+                    child: Text(labels.loading),
+                  ),
+          ),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                labels.translation,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            if (onAdd != null)
+              IconButton(
+                tooltip: labels.title,
+                onPressed: onAdd,
+                icon: const Icon(Icons.add_rounded),
+              ),
+          ],
         ),
         const SizedBox(height: 8),
         for (final service in translation)

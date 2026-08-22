@@ -19,6 +19,22 @@ abstract interface class WorkspaceSettingsRepository {
 
   Future<void> setCommonLanguages(List<String> codes);
 
+  Future<List<TranslationTargetRule>> loadTranslationTargets();
+
+  Future<void> setTranslationTargets(List<TranslationTargetRule> targets);
+
+  Future<InputSubmitMode> loadInputSubmitMode();
+
+  Future<void> setInputSubmitMode(InputSubmitMode mode);
+
+  Future<bool> loadAutoCopyDetectedText();
+
+  Future<void> setAutoCopyDetectedText(bool value);
+
+  Future<bool> loadDoubleClickCopyResult();
+
+  Future<void> setDoubleClickCopyResult(bool value);
+
   Future<String?> loadDefaultTranslationService();
 
   Future<void> setDefaultTranslationService(String? serviceId);
@@ -27,12 +43,20 @@ abstract interface class WorkspaceSettingsRepository {
 
   Future<void> setDefaultOcrService(String? serviceId);
 
+  Future<String?> loadDefaultDictionaryService();
+
+  Future<void> setDefaultDictionaryService(String? serviceId);
+
   Future<List<ServiceRecord>> listServices();
 
   Future<void> setServiceEnabled({
     required String serviceId,
     required bool enabled,
   });
+
+  Future<void> saveService(ServiceDraft draft);
+
+  Future<void> deleteService(String serviceId);
 
   Future<List<ProviderTypeOption>> listProviderTypes();
 
@@ -44,7 +68,15 @@ abstract interface class WorkspaceSettingsRepository {
 
   Future<ProviderTestResult> testProvider(ProviderDraft draft);
 
+  Future<ApiServerStatus> loadApiServer();
+
+  Future<ApiServerStatus> setApiServerEnabled(bool enabled);
+
+  Future<ApiServerStatus> setApiServerPort(int port);
+
   Future<AboutInfo> loadAbout();
+
+  Future<PlatformCapabilities> loadCapabilities();
 }
 
 abstract interface class PermissionRepository {

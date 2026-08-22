@@ -285,6 +285,60 @@ final class _FakeWorkspaceSettingsRepository
   Future<void> setShowInMenuBar(bool value) async {}
   @override
   Future<void> setThemeMode(ThemePreference mode) async {}
+
+  @override
+  Future<List<TranslationTargetRule>> loadTranslationTargets() async =>
+      const [];
+
+  @override
+  Future<void> setTranslationTargets(
+    List<TranslationTargetRule> targets,
+  ) async {}
+
+  @override
+  Future<InputSubmitMode> loadInputSubmitMode() async => InputSubmitMode.enter;
+
+  @override
+  Future<void> setInputSubmitMode(InputSubmitMode mode) async {}
+
+  @override
+  Future<bool> loadAutoCopyDetectedText() async => true;
+
+  @override
+  Future<void> setAutoCopyDetectedText(bool value) async {}
+
+  @override
+  Future<bool> loadDoubleClickCopyResult() async => true;
+
+  @override
+  Future<void> setDoubleClickCopyResult(bool value) async {}
+
+  @override
+  Future<String?> loadDefaultDictionaryService() async => null;
+
+  @override
+  Future<void> setDefaultDictionaryService(String? serviceId) async {}
+
+  @override
+  Future<void> saveService(ServiceDraft draft) async {}
+
+  @override
+  Future<void> deleteService(String serviceId) async {}
+
+  @override
+  Future<ApiServerStatus> loadApiServer() async =>
+      const ApiServerStatus(enabled: false, host: '127.0.0.1', port: 0);
+
+  @override
+  Future<ApiServerStatus> setApiServerEnabled(bool enabled) async =>
+      loadApiServer();
+
+  @override
+  Future<ApiServerStatus> setApiServerPort(int port) async => loadApiServer();
+
+  @override
+  Future<PlatformCapabilities> loadCapabilities() async =>
+      const PlatformCapabilities.macos();
 }
 
 final class _FakeShortcutRepository implements ShortcutRepository {

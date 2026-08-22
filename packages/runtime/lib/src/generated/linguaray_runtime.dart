@@ -2557,6 +2557,318 @@ class FfiConverterSelectionExtraction {
   }
 }
 
+class VocabularyEntry {
+  final String id;
+  final String word;
+  final String translation;
+  final String sourceLanguage;
+  final String targetLanguage;
+  final String source;
+  final String? note;
+  final bool favorite;
+  final int createdAt;
+  final int updatedAt;
+  VocabularyEntry({
+    required this.id,
+    required this.word,
+    required this.translation,
+    required this.sourceLanguage,
+    required this.targetLanguage,
+    required this.source,
+    this.note,
+    required this.favorite,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+}
+
+class FfiConverterVocabularyEntry {
+  static VocabularyEntry lift(RustBuffer buf) {
+    return FfiConverterVocabularyEntry.read(buf.asUint8List()).value;
+  }
+
+  static LiftRetVal<VocabularyEntry> read(Uint8List buf) {
+    int new_offset = buf.offsetInBytes;
+    final id_lifted = FfiConverterString.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final id = id_lifted.value;
+    new_offset += id_lifted.bytesRead;
+    final word_lifted = FfiConverterString.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final word = word_lifted.value;
+    new_offset += word_lifted.bytesRead;
+    final translation_lifted = FfiConverterString.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final translation = translation_lifted.value;
+    new_offset += translation_lifted.bytesRead;
+    final sourceLanguage_lifted = FfiConverterString.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final sourceLanguage = sourceLanguage_lifted.value;
+    new_offset += sourceLanguage_lifted.bytesRead;
+    final targetLanguage_lifted = FfiConverterString.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final targetLanguage = targetLanguage_lifted.value;
+    new_offset += targetLanguage_lifted.bytesRead;
+    final source_lifted = FfiConverterString.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final source = source_lifted.value;
+    new_offset += source_lifted.bytesRead;
+    final note_lifted = FfiConverterOptionalString.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final note = note_lifted.value;
+    new_offset += note_lifted.bytesRead;
+    final favorite_lifted = FfiConverterBool.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final favorite = favorite_lifted.value;
+    new_offset += favorite_lifted.bytesRead;
+    final createdAt_lifted = FfiConverterUInt64.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final createdAt = createdAt_lifted.value;
+    new_offset += createdAt_lifted.bytesRead;
+    final updatedAt_lifted = FfiConverterUInt64.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final updatedAt = updatedAt_lifted.value;
+    new_offset += updatedAt_lifted.bytesRead;
+    return LiftRetVal(
+      VocabularyEntry(
+        id: id,
+        word: word,
+        translation: translation,
+        sourceLanguage: sourceLanguage,
+        targetLanguage: targetLanguage,
+        source: source,
+        note: note,
+        favorite: favorite,
+        createdAt: createdAt,
+        updatedAt: updatedAt,
+      ),
+      new_offset - buf.offsetInBytes,
+    );
+  }
+
+  static RustBuffer lower(VocabularyEntry value) {
+    final total_length =
+        FfiConverterString.allocationSize(value.id) +
+        FfiConverterString.allocationSize(value.word) +
+        FfiConverterString.allocationSize(value.translation) +
+        FfiConverterString.allocationSize(value.sourceLanguage) +
+        FfiConverterString.allocationSize(value.targetLanguage) +
+        FfiConverterString.allocationSize(value.source) +
+        FfiConverterOptionalString.allocationSize(value.note) +
+        FfiConverterBool.allocationSize(value.favorite) +
+        FfiConverterUInt64.allocationSize(value.createdAt) +
+        FfiConverterUInt64.allocationSize(value.updatedAt) +
+        0;
+    final buf = Uint8List(total_length);
+    write(value, buf);
+    return toRustBuffer(buf);
+  }
+
+  static int write(VocabularyEntry value, Uint8List buf) {
+    int new_offset = buf.offsetInBytes;
+    new_offset += FfiConverterString.write(
+      value.id,
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    new_offset += FfiConverterString.write(
+      value.word,
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    new_offset += FfiConverterString.write(
+      value.translation,
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    new_offset += FfiConverterString.write(
+      value.sourceLanguage,
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    new_offset += FfiConverterString.write(
+      value.targetLanguage,
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    new_offset += FfiConverterString.write(
+      value.source,
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    new_offset += FfiConverterOptionalString.write(
+      value.note,
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    new_offset += FfiConverterBool.write(
+      value.favorite,
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    new_offset += FfiConverterUInt64.write(
+      value.createdAt,
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    new_offset += FfiConverterUInt64.write(
+      value.updatedAt,
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    return new_offset - buf.offsetInBytes;
+  }
+
+  static int allocationSize(VocabularyEntry value) {
+    return FfiConverterString.allocationSize(value.id) +
+        FfiConverterString.allocationSize(value.word) +
+        FfiConverterString.allocationSize(value.translation) +
+        FfiConverterString.allocationSize(value.sourceLanguage) +
+        FfiConverterString.allocationSize(value.targetLanguage) +
+        FfiConverterString.allocationSize(value.source) +
+        FfiConverterOptionalString.allocationSize(value.note) +
+        FfiConverterBool.allocationSize(value.favorite) +
+        FfiConverterUInt64.allocationSize(value.createdAt) +
+        FfiConverterUInt64.allocationSize(value.updatedAt) +
+        0;
+  }
+}
+
+class VocabularyEntryInput {
+  final String? id;
+  final String word;
+  final String translation;
+  final String sourceLanguage;
+  final String targetLanguage;
+  final String source;
+  final String? note;
+  VocabularyEntryInput({
+    this.id,
+    required this.word,
+    required this.translation,
+    required this.sourceLanguage,
+    required this.targetLanguage,
+    required this.source,
+    this.note,
+  });
+}
+
+class FfiConverterVocabularyEntryInput {
+  static VocabularyEntryInput lift(RustBuffer buf) {
+    return FfiConverterVocabularyEntryInput.read(buf.asUint8List()).value;
+  }
+
+  static LiftRetVal<VocabularyEntryInput> read(Uint8List buf) {
+    int new_offset = buf.offsetInBytes;
+    final id_lifted = FfiConverterOptionalString.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final id = id_lifted.value;
+    new_offset += id_lifted.bytesRead;
+    final word_lifted = FfiConverterString.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final word = word_lifted.value;
+    new_offset += word_lifted.bytesRead;
+    final translation_lifted = FfiConverterString.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final translation = translation_lifted.value;
+    new_offset += translation_lifted.bytesRead;
+    final sourceLanguage_lifted = FfiConverterString.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final sourceLanguage = sourceLanguage_lifted.value;
+    new_offset += sourceLanguage_lifted.bytesRead;
+    final targetLanguage_lifted = FfiConverterString.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final targetLanguage = targetLanguage_lifted.value;
+    new_offset += targetLanguage_lifted.bytesRead;
+    final source_lifted = FfiConverterString.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final source = source_lifted.value;
+    new_offset += source_lifted.bytesRead;
+    final note_lifted = FfiConverterOptionalString.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final note = note_lifted.value;
+    new_offset += note_lifted.bytesRead;
+    return LiftRetVal(
+      VocabularyEntryInput(
+        id: id,
+        word: word,
+        translation: translation,
+        sourceLanguage: sourceLanguage,
+        targetLanguage: targetLanguage,
+        source: source,
+        note: note,
+      ),
+      new_offset - buf.offsetInBytes,
+    );
+  }
+
+  static RustBuffer lower(VocabularyEntryInput value) {
+    final total_length =
+        FfiConverterOptionalString.allocationSize(value.id) +
+        FfiConverterString.allocationSize(value.word) +
+        FfiConverterString.allocationSize(value.translation) +
+        FfiConverterString.allocationSize(value.sourceLanguage) +
+        FfiConverterString.allocationSize(value.targetLanguage) +
+        FfiConverterString.allocationSize(value.source) +
+        FfiConverterOptionalString.allocationSize(value.note) +
+        0;
+    final buf = Uint8List(total_length);
+    write(value, buf);
+    return toRustBuffer(buf);
+  }
+
+  static int write(VocabularyEntryInput value, Uint8List buf) {
+    int new_offset = buf.offsetInBytes;
+    new_offset += FfiConverterOptionalString.write(
+      value.id,
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    new_offset += FfiConverterString.write(
+      value.word,
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    new_offset += FfiConverterString.write(
+      value.translation,
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    new_offset += FfiConverterString.write(
+      value.sourceLanguage,
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    new_offset += FfiConverterString.write(
+      value.targetLanguage,
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    new_offset += FfiConverterString.write(
+      value.source,
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    new_offset += FfiConverterOptionalString.write(
+      value.note,
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    return new_offset - buf.offsetInBytes;
+  }
+
+  static int allocationSize(VocabularyEntryInput value) {
+    return FfiConverterOptionalString.allocationSize(value.id) +
+        FfiConverterString.allocationSize(value.word) +
+        FfiConverterString.allocationSize(value.translation) +
+        FfiConverterString.allocationSize(value.sourceLanguage) +
+        FfiConverterString.allocationSize(value.targetLanguage) +
+        FfiConverterString.allocationSize(value.source) +
+        FfiConverterOptionalString.allocationSize(value.note) +
+        0;
+  }
+}
+
 class ChatChoice {
   final int index;
   final ChatMessage message;
@@ -4782,6 +5094,42 @@ class FfiConverterServiceType {
   }
 }
 
+enum VocabularyFilter { all, favorites }
+
+class FfiConverterVocabularyFilter {
+  static LiftRetVal<VocabularyFilter> read(Uint8List buf) {
+    final index = buf.buffer.asByteData(buf.offsetInBytes).getInt32(0);
+    switch (index) {
+      case 1:
+        return LiftRetVal(VocabularyFilter.all, 4);
+      case 2:
+        return LiftRetVal(VocabularyFilter.favorites, 4);
+      default:
+        throw UniffiInternalError(
+          UniffiInternalError.unexpectedEnumCase,
+          "Unable to determine enum variant",
+        );
+    }
+  }
+
+  static VocabularyFilter lift(RustBuffer buffer) {
+    return FfiConverterVocabularyFilter.read(buffer.asUint8List()).value;
+  }
+
+  static RustBuffer lower(VocabularyFilter input) {
+    return toRustBuffer(createUint8ListFromInt(input.index + 1));
+  }
+
+  static int allocationSize(VocabularyFilter _value) {
+    return 4;
+  }
+
+  static int write(VocabularyFilter value, Uint8List buf) {
+    buf.buffer.asByteData(buf.offsetInBytes).setInt32(0, value.index + 1);
+    return 4;
+  }
+}
+
 enum ChatRole { system, user, assistant }
 
 class FfiConverterChatRole {
@@ -5013,6 +5361,7 @@ enum SettingsChange {
   providers,
   glossary,
   history,
+  vocabulary,
 }
 
 class FfiConverterSettingsChange {
@@ -5033,6 +5382,8 @@ class FfiConverterSettingsChange {
         return LiftRetVal(SettingsChange.glossary, 4);
       case 7:
         return LiftRetVal(SettingsChange.history, 4);
+      case 8:
+        return LiftRetVal(SettingsChange.vocabulary, 4);
       default:
         throw UniffiInternalError(
           UniffiInternalError.unexpectedEnumCase,
@@ -5147,6 +5498,7 @@ abstract class RuntimeInterface {
   RuntimeApiServer startApiServer({required String host, required int port});
   RuntimeTextExtractor textExtractor();
   RuntimeTranslation translation({required String providerId});
+  RuntimeVocabulary vocabulary();
 }
 
 final _RuntimeFinalizer = Finalizer<Pointer<Void>>((ptr) {
@@ -5339,6 +5691,17 @@ class Runtime implements RuntimeInterface {
       ),
       RuntimeTranslation.lift,
       runtimeExceptionErrorHandler,
+    );
+  }
+
+  RuntimeVocabulary vocabulary() {
+    return rustCallWithLifter(
+      (status) => uniffi_linguaray_runtime_fn_method_runtime_vocabulary(
+        uniffiClonePointer(),
+        status,
+      ),
+      RuntimeVocabulary.lift,
+      null,
     );
   }
 }
@@ -5673,6 +6036,7 @@ class RuntimeGlossary implements RuntimeGlossaryInterface {
 }
 
 abstract class RuntimeHistoryInterface {
+  Future<int> clear();
   Future<HistoryCounts> counts();
   Future<int> deleteEntries({required List<String> entryIds});
   Future<List<HistoryEntry>> listEntries({
@@ -5731,6 +6095,19 @@ class RuntimeHistory implements RuntimeHistoryInterface {
     _RuntimeHistoryFinalizer.detach(this);
     rustCall(
       (status) => uniffi_linguaray_runtime_fn_free_runtimehistory(_ptr, status),
+    );
+  }
+
+  Future<int> clear() {
+    return uniffiRustCallAsync(
+      () => uniffi_linguaray_runtime_fn_method_runtimehistory_clear(
+        uniffiClonePointer(),
+      ),
+      ffi_linguaray_runtime_rust_future_poll_u32,
+      ffi_linguaray_runtime_rust_future_complete_u32,
+      ffi_linguaray_runtime_rust_future_free_u32,
+      FfiConverterUInt32.lift,
+      runtimeExceptionErrorHandler,
     );
   }
 
@@ -6834,6 +7211,155 @@ class RuntimeTranslation implements RuntimeTranslationInterface {
       ffi_linguaray_runtime_rust_future_complete_rust_buffer,
       ffi_linguaray_runtime_rust_future_free_rust_buffer,
       FfiConverterTranslateResponse.lift,
+      runtimeExceptionErrorHandler,
+    );
+  }
+}
+
+abstract class RuntimeVocabularyInterface {
+  Future<int> deleteEntries({required List<String> entryIds});
+  Future<List<VocabularyEntry>> listEntries({
+    required VocabularyFilter filter,
+    required String? query,
+  });
+  Future<VocabularyEntry?> setFavorite({
+    required String entryId,
+    required bool favorite,
+  });
+  Future<VocabularyEntry?> setNote({
+    required String entryId,
+    required String? note,
+  });
+  Future<VocabularyEntry> upsertEntry({required VocabularyEntryInput input});
+}
+
+final _RuntimeVocabularyFinalizer = Finalizer<Pointer<Void>>((ptr) {
+  rustCall(
+    (status) => uniffi_linguaray_runtime_fn_free_runtimevocabulary(ptr, status),
+  );
+});
+
+class RuntimeVocabulary implements RuntimeVocabularyInterface {
+  late final Pointer<Void> _ptr;
+  RuntimeVocabulary._(this._ptr) {
+    _RuntimeVocabularyFinalizer.attach(this, _ptr, detach: this);
+  }
+  factory RuntimeVocabulary.lift(Pointer<Void> ptr) {
+    return RuntimeVocabulary._(ptr);
+  }
+  static Pointer<Void> lower(RuntimeVocabulary value) {
+    return value.uniffiClonePointer();
+  }
+
+  Pointer<Void> uniffiClonePointer() {
+    return rustCall(
+      (status) =>
+          uniffi_linguaray_runtime_fn_clone_runtimevocabulary(_ptr, status),
+    );
+  }
+
+  static int allocationSize(RuntimeVocabulary value) {
+    return 8;
+  }
+
+  static LiftRetVal<RuntimeVocabulary> read(Uint8List buf) {
+    final handle = buf.buffer.asByteData(buf.offsetInBytes).getInt64(0);
+    final pointer = Pointer<Void>.fromAddress(handle);
+    return LiftRetVal(RuntimeVocabulary.lift(pointer), 8);
+  }
+
+  static int write(RuntimeVocabulary value, Uint8List buf) {
+    final handle = lower(value);
+    buf.buffer.asByteData(buf.offsetInBytes).setInt64(0, handle.address);
+    return 8;
+  }
+
+  void dispose() {
+    _RuntimeVocabularyFinalizer.detach(this);
+    rustCall(
+      (status) =>
+          uniffi_linguaray_runtime_fn_free_runtimevocabulary(_ptr, status),
+    );
+  }
+
+  Future<int> deleteEntries({required List<String> entryIds}) {
+    return uniffiRustCallAsync(
+      () => uniffi_linguaray_runtime_fn_method_runtimevocabulary_delete_entries(
+        uniffiClonePointer(),
+        FfiConverterSequenceString.lower(entryIds),
+      ),
+      ffi_linguaray_runtime_rust_future_poll_u32,
+      ffi_linguaray_runtime_rust_future_complete_u32,
+      ffi_linguaray_runtime_rust_future_free_u32,
+      FfiConverterUInt32.lift,
+      runtimeExceptionErrorHandler,
+    );
+  }
+
+  Future<List<VocabularyEntry>> listEntries({
+    required VocabularyFilter filter,
+    required String? query,
+  }) {
+    return uniffiRustCallAsync(
+      () => uniffi_linguaray_runtime_fn_method_runtimevocabulary_list_entries(
+        uniffiClonePointer(),
+        FfiConverterVocabularyFilter.lower(filter),
+        FfiConverterOptionalString.lower(query),
+      ),
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
+      FfiConverterSequenceVocabularyEntry.lift,
+      runtimeExceptionErrorHandler,
+    );
+  }
+
+  Future<VocabularyEntry?> setFavorite({
+    required String entryId,
+    required bool favorite,
+  }) {
+    return uniffiRustCallAsync(
+      () => uniffi_linguaray_runtime_fn_method_runtimevocabulary_set_favorite(
+        uniffiClonePointer(),
+        FfiConverterString.lower(entryId),
+        FfiConverterBool.lower(favorite),
+      ),
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
+      FfiConverterOptionalVocabularyEntry.lift,
+      runtimeExceptionErrorHandler,
+    );
+  }
+
+  Future<VocabularyEntry?> setNote({
+    required String entryId,
+    required String? note,
+  }) {
+    return uniffiRustCallAsync(
+      () => uniffi_linguaray_runtime_fn_method_runtimevocabulary_set_note(
+        uniffiClonePointer(),
+        FfiConverterString.lower(entryId),
+        FfiConverterOptionalString.lower(note),
+      ),
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
+      FfiConverterOptionalVocabularyEntry.lift,
+      runtimeExceptionErrorHandler,
+    );
+  }
+
+  Future<VocabularyEntry> upsertEntry({required VocabularyEntryInput input}) {
+    return uniffiRustCallAsync(
+      () => uniffi_linguaray_runtime_fn_method_runtimevocabulary_upsert_entry(
+        uniffiClonePointer(),
+        FfiConverterVocabularyEntryInput.lower(input),
+      ),
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
+      FfiConverterVocabularyEntry.lift,
       runtimeExceptionErrorHandler,
     );
   }
@@ -8795,6 +9321,56 @@ class FfiConverterOptionalUInt64 {
   }
 }
 
+class FfiConverterOptionalVocabularyEntry {
+  static VocabularyEntry? lift(RustBuffer buf) {
+    return FfiConverterOptionalVocabularyEntry.read(buf.asUint8List()).value;
+  }
+
+  static LiftRetVal<VocabularyEntry?> read(Uint8List buf) {
+    if (ByteData.view(buf.buffer, buf.offsetInBytes).getInt8(0) == 0) {
+      return LiftRetVal(null, 1);
+    }
+    final result = FfiConverterVocabularyEntry.read(
+      Uint8List.view(buf.buffer, buf.offsetInBytes + 1),
+    );
+    return LiftRetVal<VocabularyEntry?>(result.value, result.bytesRead + 1);
+  }
+
+  static int allocationSize([VocabularyEntry? value]) {
+    if (value == null) {
+      return 1;
+    }
+    return FfiConverterVocabularyEntry.allocationSize(value) + 1;
+  }
+
+  static RustBuffer lower(VocabularyEntry? value) {
+    if (value == null) {
+      return toRustBuffer(Uint8List.fromList([0]));
+    }
+    final length = FfiConverterOptionalVocabularyEntry.allocationSize(value);
+    final Pointer<Uint8> frameData = calloc<Uint8>(length);
+    final buf = frameData.asTypedList(length);
+    FfiConverterOptionalVocabularyEntry.write(value, buf);
+    final bytes = calloc<ForeignBytes>();
+    bytes.ref.len = length;
+    bytes.ref.data = frameData;
+    return RustBuffer.fromBytes(bytes.ref);
+  }
+
+  static int write(VocabularyEntry? value, Uint8List buf) {
+    if (value == null) {
+      buf[0] = 0;
+      return 1;
+    }
+    buf[0] = 1;
+    return FfiConverterVocabularyEntry.write(
+          value,
+          Uint8List.view(buf.buffer, buf.offsetInBytes + 1),
+        ) +
+        1;
+  }
+}
+
 class FfiConverterSequenceChatChoice {
   static List<ChatChoice> lift(RustBuffer buf) {
     return FfiConverterSequenceChatChoice.read(buf.asUint8List()).value;
@@ -9464,6 +10040,51 @@ class FfiConverterSequenceTranslationTarget {
   }
 
   static RustBuffer lower(List<TranslationTarget> value) {
+    final buf = Uint8List(allocationSize(value));
+    write(value, buf);
+    return toRustBuffer(buf);
+  }
+}
+
+class FfiConverterSequenceVocabularyEntry {
+  static List<VocabularyEntry> lift(RustBuffer buf) {
+    return FfiConverterSequenceVocabularyEntry.read(buf.asUint8List()).value;
+  }
+
+  static LiftRetVal<List<VocabularyEntry>> read(Uint8List buf) {
+    List<VocabularyEntry> res = [];
+    final length = buf.buffer.asByteData(buf.offsetInBytes).getInt32(0);
+    int offset = buf.offsetInBytes + 4;
+    for (var i = 0; i < length; i++) {
+      final ret = FfiConverterVocabularyEntry.read(
+        Uint8List.view(buf.buffer, offset),
+      );
+      offset += ret.bytesRead;
+      res.add(ret.value);
+    }
+    return LiftRetVal(res, offset - buf.offsetInBytes);
+  }
+
+  static int write(List<VocabularyEntry> value, Uint8List buf) {
+    buf.buffer.asByteData(buf.offsetInBytes).setInt32(0, value.length);
+    int offset = buf.offsetInBytes + 4;
+    for (var i = 0; i < value.length; i++) {
+      offset += FfiConverterVocabularyEntry.write(
+        value[i],
+        Uint8List.view(buf.buffer, offset),
+      );
+    }
+    return offset - buf.offsetInBytes;
+  }
+
+  static int allocationSize(List<VocabularyEntry> value) {
+    return value
+            .map((l) => FfiConverterVocabularyEntry.allocationSize(l))
+            .fold(0, (a, b) => a + b) +
+        4;
+  }
+
+  static RustBuffer lower(List<VocabularyEntry> value) {
     final buf = Uint8List(allocationSize(value));
     write(value, buf);
     return toRustBuffer(buf);
@@ -10527,6 +11148,14 @@ external Pointer<Void> uniffi_linguaray_runtime_fn_method_runtime_translation(
 @Native<Pointer<Void> Function(Pointer<Void>, Pointer<RustCallStatus>)>(
   assetId: _uniffiAssetId,
 )
+external Pointer<Void> uniffi_linguaray_runtime_fn_method_runtime_vocabulary(
+  Pointer<Void> ptr,
+  Pointer<RustCallStatus> uniffiStatus,
+);
+
+@Native<Pointer<Void> Function(Pointer<Void>, Pointer<RustCallStatus>)>(
+  assetId: _uniffiAssetId,
+)
 external Pointer<Void> uniffi_linguaray_runtime_fn_clone_runtimedictionary(
   Pointer<Void> handle,
   Pointer<RustCallStatus> uniffiStatus,
@@ -10688,6 +11317,11 @@ external Pointer<Void> uniffi_linguaray_runtime_fn_clone_runtimehistory(
 external void uniffi_linguaray_runtime_fn_free_runtimehistory(
   Pointer<Void> handle,
   Pointer<RustCallStatus> uniffiStatus,
+);
+
+@Native<Pointer<Void> Function(Pointer<Void>)>(assetId: _uniffiAssetId)
+external Pointer<Void> uniffi_linguaray_runtime_fn_method_runtimehistory_clear(
+  Pointer<Void> ptr,
 );
 
 @Native<Pointer<Void> Function(Pointer<Void>)>(assetId: _uniffiAssetId)
@@ -11177,6 +11811,70 @@ external Pointer<Void>
 uniffi_linguaray_runtime_fn_method_runtimetranslation_translate(
   Pointer<Void> ptr,
   RustBuffer request,
+);
+
+@Native<Pointer<Void> Function(Pointer<Void>, Pointer<RustCallStatus>)>(
+  assetId: _uniffiAssetId,
+)
+external Pointer<Void> uniffi_linguaray_runtime_fn_clone_runtimevocabulary(
+  Pointer<Void> handle,
+  Pointer<RustCallStatus> uniffiStatus,
+);
+
+@Native<Void Function(Pointer<Void>, Pointer<RustCallStatus>)>(
+  assetId: _uniffiAssetId,
+)
+external void uniffi_linguaray_runtime_fn_free_runtimevocabulary(
+  Pointer<Void> handle,
+  Pointer<RustCallStatus> uniffiStatus,
+);
+
+@Native<Pointer<Void> Function(Pointer<Void>, RustBuffer)>(
+  assetId: _uniffiAssetId,
+)
+external Pointer<Void>
+uniffi_linguaray_runtime_fn_method_runtimevocabulary_delete_entries(
+  Pointer<Void> ptr,
+  RustBuffer entry_ids,
+);
+
+@Native<Pointer<Void> Function(Pointer<Void>, RustBuffer, RustBuffer)>(
+  assetId: _uniffiAssetId,
+)
+external Pointer<Void>
+uniffi_linguaray_runtime_fn_method_runtimevocabulary_list_entries(
+  Pointer<Void> ptr,
+  RustBuffer filter,
+  RustBuffer query,
+);
+
+@Native<Pointer<Void> Function(Pointer<Void>, RustBuffer, Int8)>(
+  assetId: _uniffiAssetId,
+)
+external Pointer<Void>
+uniffi_linguaray_runtime_fn_method_runtimevocabulary_set_favorite(
+  Pointer<Void> ptr,
+  RustBuffer entry_id,
+  int favorite,
+);
+
+@Native<Pointer<Void> Function(Pointer<Void>, RustBuffer, RustBuffer)>(
+  assetId: _uniffiAssetId,
+)
+external Pointer<Void>
+uniffi_linguaray_runtime_fn_method_runtimevocabulary_set_note(
+  Pointer<Void> ptr,
+  RustBuffer entry_id,
+  RustBuffer note,
+);
+
+@Native<Pointer<Void> Function(Pointer<Void>, RustBuffer)>(
+  assetId: _uniffiAssetId,
+)
+external Pointer<Void>
+uniffi_linguaray_runtime_fn_method_runtimevocabulary_upsert_entry(
+  Pointer<Void> ptr,
+  RustBuffer input,
 );
 
 @Native<Pointer<Void> Function(Pointer<Void>, Pointer<RustCallStatus>)>(
@@ -11880,6 +12578,9 @@ external int uniffi_linguaray_runtime_checksum_method_runtime_text_extractor();
 external int uniffi_linguaray_runtime_checksum_method_runtime_translation();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
+external int uniffi_linguaray_runtime_checksum_method_runtime_vocabulary();
+
+@Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
 uniffi_linguaray_runtime_checksum_method_runtimedictionary_lookup();
 
@@ -11925,6 +12626,9 @@ uniffi_linguaray_runtime_checksum_method_runtimeglossary_upsert_book();
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
 uniffi_linguaray_runtime_checksum_method_runtimeglossary_upsert_entry();
+
+@Native<Uint16 Function()>(assetId: _uniffiAssetId)
+external int uniffi_linguaray_runtime_checksum_method_runtimehistory_clear();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int uniffi_linguaray_runtime_checksum_method_runtimehistory_counts();
@@ -12103,6 +12807,26 @@ uniffi_linguaray_runtime_checksum_method_runtimetranslation_translate();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
+uniffi_linguaray_runtime_checksum_method_runtimevocabulary_delete_entries();
+
+@Native<Uint16 Function()>(assetId: _uniffiAssetId)
+external int
+uniffi_linguaray_runtime_checksum_method_runtimevocabulary_list_entries();
+
+@Native<Uint16 Function()>(assetId: _uniffiAssetId)
+external int
+uniffi_linguaray_runtime_checksum_method_runtimevocabulary_set_favorite();
+
+@Native<Uint16 Function()>(assetId: _uniffiAssetId)
+external int
+uniffi_linguaray_runtime_checksum_method_runtimevocabulary_set_note();
+
+@Native<Uint16 Function()>(assetId: _uniffiAssetId)
+external int
+uniffi_linguaray_runtime_checksum_method_runtimevocabulary_upsert_entry();
+
+@Native<Uint16 Function()>(assetId: _uniffiAssetId)
+external int
 uniffi_linguaray_runtime_checksum_method_settingssubscription_next();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
@@ -12253,6 +12977,9 @@ void _checkApiChecksums() {
   if (uniffi_linguaray_runtime_checksum_method_runtime_translation() != 58975) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
+  if (uniffi_linguaray_runtime_checksum_method_runtime_vocabulary() != 24687) {
+    throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
+  }
   if (uniffi_linguaray_runtime_checksum_method_runtimedictionary_lookup() !=
       41773) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
@@ -12299,6 +13026,10 @@ void _checkApiChecksums() {
   }
   if (uniffi_linguaray_runtime_checksum_method_runtimeglossary_upsert_entry() !=
       33639) {
+    throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
+  }
+  if (uniffi_linguaray_runtime_checksum_method_runtimehistory_clear() !=
+      16113) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
   if (uniffi_linguaray_runtime_checksum_method_runtimehistory_counts() !=
@@ -12476,6 +13207,26 @@ void _checkApiChecksums() {
   }
   if (uniffi_linguaray_runtime_checksum_method_runtimetranslation_translate() !=
       55464) {
+    throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
+  }
+  if (uniffi_linguaray_runtime_checksum_method_runtimevocabulary_delete_entries() !=
+      17142) {
+    throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
+  }
+  if (uniffi_linguaray_runtime_checksum_method_runtimevocabulary_list_entries() !=
+      19511) {
+    throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
+  }
+  if (uniffi_linguaray_runtime_checksum_method_runtimevocabulary_set_favorite() !=
+      53086) {
+    throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
+  }
+  if (uniffi_linguaray_runtime_checksum_method_runtimevocabulary_set_note() !=
+      33632) {
+    throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
+  }
+  if (uniffi_linguaray_runtime_checksum_method_runtimevocabulary_upsert_entry() !=
+      58741) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
   if (uniffi_linguaray_runtime_checksum_method_settingssubscription_next() !=

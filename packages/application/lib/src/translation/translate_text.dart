@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:linguaray_application/src/errors/mapping.dart';
 import 'package:linguaray_application/src/translation/models.dart';
 import 'package:linguaray_application/src/translation/ports.dart';
 
@@ -53,9 +54,6 @@ final class TranslateText {
     }
 
     final orderedIds = [for (final service in catalog.services) service.id];
-    final resolvedSourceLanguage = query.sourceLanguage == autoLanguageCode
-        ? detectedLanguage ?? autoLanguageCode
-        : query.sourceLanguage;
     final results = <String, ServiceTranslationResult>{
       for (final service in catalog.services)
         service.id: ServiceTranslationResult(
@@ -86,7 +84,8 @@ final class TranslateText {
         _translateService(
           service: service,
           sourceText: sourceText,
-          sourceLanguage: resolvedSourceLanguage,
+          requestedSourceLanguage: query.sourceLanguage,
+          detectedLanguage: detectedLanguage,
           targetLanguage: targetLanguage,
           results: results,
           emit: () => controller.add(snapshot(complete: false)),
@@ -100,11 +99,17 @@ final class TranslateText {
   Future<void> _translateService({
     required TranslationServiceOption service,
     required String sourceText,
-    required String sourceLanguage,
+    required String requestedSourceLanguage,
+    required String? detectedLanguage,
     required String targetLanguage,
     required Map<String, ServiceTranslationResult> results,
     required void Function() emit,
   }) async {
+    final sourceLanguage = _sourceForService(
+      service: service,
+      requested: requestedSourceLanguage,
+      detected: detectedLanguage,
+    );
     final buffer = StringBuffer();
     try {
       await for (final chunk in _repository.translate(
@@ -134,7 +139,7 @@ final class TranslateText {
     } on TranslationFailure catch (error) {
       results[service.id] = results[service.id]!.copyWith(
         status: TranslationResultStatus.failed,
-        errorCode: error.code,
+        errorCode: mapErrorCode(error.code).wireName,
       );
     } catch (_) {
       results[service.id] = results[service.id]!.copyWith(
@@ -143,5 +148,16 @@ final class TranslateText {
       );
     }
     emit();
+  }
+
+  String _sourceForService({
+    required TranslationServiceOption service,
+    required String requested,
+    required String? detected,
+  }) {
+    if (requested != autoLanguageCode) return requested;
+    if (detected != null && detected.isNotEmpty) return detected;
+    if (service.omitsSourceLanguage) return autoLanguageCode;
+    return autoLanguageCode;
   }
 }
