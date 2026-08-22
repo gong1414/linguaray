@@ -38,6 +38,11 @@ use crate::provider::traditional::TencentProviderConfig;
 #[cfg(feature = "youdao")]
 use crate::provider::traditional::YoudaoProvider;
 use crate::provider::traditional::YoudaoProviderConfig;
+use crate::provider::traditional::{
+    BingWebProvider, BingWebProviderConfig, GoogleWebProvider, GoogleWebProviderConfig,
+    LibreTranslateProvider, LibreTranslateProviderConfig, MTranServerProvider,
+    MTranServerProviderConfig, TransmartProvider, TransmartProviderConfig,
+};
 
 // ── Error ─────────────────────────────────────────────────────────────────────
 
@@ -187,6 +192,16 @@ pub enum ProviderType {
     OpenAiCompatible,
     #[serde(rename = "system")]
     System,
+    #[serde(rename = "google_web")]
+    GoogleWeb,
+    #[serde(rename = "bing_web")]
+    BingWeb,
+    #[serde(rename = "tencent_transmart_web")]
+    TencentTransmartWeb,
+    #[serde(rename = "libretranslate")]
+    LibreTranslate,
+    #[serde(rename = "mtranserver")]
+    MTranServer,
 }
 
 impl ProviderType {
@@ -212,6 +227,11 @@ impl ProviderType {
             Self::Gemini => "gemini",
             Self::OpenAiCompatible => "openai_compatible",
             Self::System => "system",
+            Self::GoogleWeb => "google_web",
+            Self::BingWeb => "bing_web",
+            Self::TencentTransmartWeb => "tencent_transmart_web",
+            Self::LibreTranslate => "libretranslate",
+            Self::MTranServer => "mtranserver",
         }
     }
 }
@@ -294,6 +314,19 @@ fn build_provider(
             build_openai_compatible_provider(provider_id, config.decode(provider_id)?)
         }
         ProviderType::System => build_system_provider(provider_id),
+        ProviderType::GoogleWeb => {
+            build_google_web_provider(provider_id, config.decode(provider_id)?)
+        }
+        ProviderType::BingWeb => build_bing_web_provider(provider_id, config.decode(provider_id)?),
+        ProviderType::TencentTransmartWeb => {
+            build_transmart_provider(provider_id, config.decode(provider_id)?)
+        }
+        ProviderType::LibreTranslate => {
+            build_libretranslate_provider(provider_id, config.decode(provider_id)?)
+        }
+        ProviderType::MTranServer => {
+            build_mtranserver_provider(provider_id, config.decode(provider_id)?)
+        }
     }
 }
 
@@ -380,6 +413,67 @@ fn build_system_provider(provider_id: &str) -> Result<Arc<dyn Provider>, EngineE
         provider: provider_id.to_owned(),
         reason,
     })?;
+    Ok(Arc::new(provider))
+}
+
+fn build_google_web_provider(
+    provider_id: &str,
+    config: GoogleWebProviderConfig,
+) -> Result<Arc<dyn Provider>, EngineError> {
+    let provider =
+        GoogleWebProvider::new(config).map_err(|reason| EngineError::ConfigValidationFailed {
+            provider: provider_id.to_owned(),
+            reason,
+        })?;
+    Ok(Arc::new(provider))
+}
+
+fn build_bing_web_provider(
+    provider_id: &str,
+    config: BingWebProviderConfig,
+) -> Result<Arc<dyn Provider>, EngineError> {
+    let provider =
+        BingWebProvider::new(config).map_err(|reason| EngineError::ConfigValidationFailed {
+            provider: provider_id.to_owned(),
+            reason,
+        })?;
+    Ok(Arc::new(provider))
+}
+
+fn build_transmart_provider(
+    provider_id: &str,
+    config: TransmartProviderConfig,
+) -> Result<Arc<dyn Provider>, EngineError> {
+    let provider =
+        TransmartProvider::new(config).map_err(|reason| EngineError::ConfigValidationFailed {
+            provider: provider_id.to_owned(),
+            reason,
+        })?;
+    Ok(Arc::new(provider))
+}
+
+fn build_libretranslate_provider(
+    provider_id: &str,
+    config: LibreTranslateProviderConfig,
+) -> Result<Arc<dyn Provider>, EngineError> {
+    let provider = LibreTranslateProvider::new(config).map_err(|reason| {
+        EngineError::ConfigValidationFailed {
+            provider: provider_id.to_owned(),
+            reason,
+        }
+    })?;
+    Ok(Arc::new(provider))
+}
+
+fn build_mtranserver_provider(
+    provider_id: &str,
+    config: MTranServerProviderConfig,
+) -> Result<Arc<dyn Provider>, EngineError> {
+    let provider =
+        MTranServerProvider::new(config).map_err(|reason| EngineError::ConfigValidationFailed {
+            provider: provider_id.to_owned(),
+            reason,
+        })?;
     Ok(Arc::new(provider))
 }
 

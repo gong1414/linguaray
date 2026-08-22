@@ -20,6 +20,7 @@ class GeneralSettingsView extends StatelessWidget {
     this.onInputSubmitModeChanged,
     this.onAutoCopyChanged,
     this.onDoubleClickCopyChanged,
+    this.onManageTranslationTargets,
   });
 
   final GeneralSettingsLabels labels;
@@ -36,6 +37,7 @@ class GeneralSettingsView extends StatelessWidget {
   final ValueChanged<InputSubmitMode>? onInputSubmitModeChanged;
   final ValueChanged<bool>? onAutoCopyChanged;
   final ValueChanged<bool>? onDoubleClickCopyChanged;
+  final VoidCallback? onManageTranslationTargets;
 
   @override
   Widget build(BuildContext context) {
@@ -150,6 +152,49 @@ class GeneralSettingsView extends StatelessWidget {
             onChanged: onDoubleClickCopyChanged,
           ),
         ],
+        if (labels.translationTargets.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  labels.translationTargets,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+              TextButton.icon(
+                onPressed: onManageTranslationTargets,
+                icon: const Icon(Icons.tune_rounded, size: 18),
+                label: Text(labels.manageTranslationTargets),
+              ),
+            ],
+          ),
+          Text(
+            labels.translationTargetsHint,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 6),
+          if (preferences.translationTargets.isEmpty)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(labels.noTranslationTargets),
+            )
+          else
+            for (final target in preferences.translationTargets)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(
+                  target.enabled
+                      ? Icons.arrow_forward_rounded
+                      : Icons.pause_rounded,
+                  size: 18,
+                ),
+                title: Text(
+                  '${_languageName(target.source, source: true)} → '
+                  '${_languageName(target.target)}',
+                ),
+              ),
+        ],
         if (labels.commonLanguages.isNotEmpty &&
             translationLanguages.isNotEmpty) ...[
           const SizedBox(height: 16),
@@ -183,5 +228,13 @@ class GeneralSettingsView extends StatelessWidget {
         ],
       ],
     );
+  }
+
+  String _languageName(String code, {bool source = false}) {
+    if (source && code == 'auto') return labels.autoDetect;
+    for (final language in translationLanguages) {
+      if (language.code == code) return language.name;
+    }
+    return code;
   }
 }

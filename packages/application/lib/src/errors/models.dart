@@ -62,6 +62,7 @@ enum RecoveryAction {
   configureTranslationProvider,
   editInput,
   chooseLanguage,
+  switchToGoogleWeb,
 }
 
 /// One recoverable failure. Secret values must never appear in [details].
@@ -96,7 +97,7 @@ RecoveryAction recoveryFor(AppErrorCode code) {
     AppErrorCode.clipboardRestoreFailed => RecoveryAction.none,
     AppErrorCode.sourceLanguageDetectionFailed => RecoveryAction.chooseLanguage,
     AppErrorCode.unsupportedPair => RecoveryAction.chooseLanguage,
-    AppErrorCode.languagePackMissing => RecoveryAction.none,
+    AppErrorCode.languagePackMissing => RecoveryAction.switchToGoogleWeb,
     AppErrorCode.networkFailure => RecoveryAction.retry,
     AppErrorCode.providerAuthFailed =>
       RecoveryAction.configureTranslationProvider,

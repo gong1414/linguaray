@@ -1,3 +1,4 @@
+pub mod catalog;
 mod common;
 mod engine;
 mod languages;
@@ -34,8 +35,10 @@ pub use provider::traditional::TencentProvider;
 #[cfg(feature = "youdao")]
 pub use provider::traditional::YoudaoProvider;
 pub use provider::traditional::{
-    BaiduProviderConfig, CaiyunProviderConfig, DeepLProviderConfig, GoogleProviderConfig,
-    TencentProviderConfig, YoudaoProviderConfig,
+    BaiduProviderConfig, BingWebProviderConfig, CaiyunProviderConfig, DeepLProviderConfig,
+    GoogleProviderConfig, GoogleWebProviderConfig, LibreTranslateProviderConfig,
+    MTranServerProviderConfig, TencentProviderConfig, TransmartProviderConfig,
+    YoudaoProviderConfig,
 };
 
 #[cfg(test)]

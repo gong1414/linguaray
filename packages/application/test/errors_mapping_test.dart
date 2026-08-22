@@ -43,6 +43,10 @@ void main() {
       RecoveryAction.chooseLanguage,
     );
     expect(recoveryFor(AppErrorCode.captureCancelled), RecoveryAction.none);
+    expect(
+      recoveryFor(AppErrorCode.languagePackMissing),
+      RecoveryAction.switchToGoogleWeb,
+    );
   });
 
   test('infers network and auth failures from messages', () {

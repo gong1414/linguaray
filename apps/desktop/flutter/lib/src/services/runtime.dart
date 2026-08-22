@@ -81,6 +81,10 @@ late final Directory runtimeDataDirectory;
 RuntimeApiServer? _apiServer;
 ApiServerInfo? _apiServerInfo;
 
+const _runtimeDataDirectoryOverride = String.fromEnvironment(
+  'LINGUARAY_RUNTIME_DATA_DIR',
+);
+
 ApiServerInfo? get apiServerInfo => _apiServerInfo;
 
 /// Initialises the Rust runtime with the platform's application-support
@@ -88,8 +92,12 @@ ApiServerInfo? get apiServerInfo => _apiServerInfo;
 ///
 /// Must be called before any code that accesses [runtime].
 Future<void> initRuntime() async {
-  final supportDirectory = await getApplicationSupportDirectory();
-  runtimeDataDirectory = Directory(path.join(supportDirectory.path, 'v2'));
+  if (_runtimeDataDirectoryOverride.trim().isNotEmpty) {
+    runtimeDataDirectory = Directory(_runtimeDataDirectoryOverride.trim());
+  } else {
+    final supportDirectory = await getApplicationSupportDirectory();
+    runtimeDataDirectory = Directory(path.join(supportDirectory.path, 'v2'));
+  }
   await runtimeDataDirectory.create(recursive: true);
   runtime = Runtime(dataDir: runtimeDataDirectory.path);
 }

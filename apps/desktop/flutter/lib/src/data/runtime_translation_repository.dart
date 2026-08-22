@@ -183,7 +183,19 @@ final class RuntimeTranslationRepository implements TranslationRepository {
       ProviderType.qwen ||
       ProviderType.xAi ||
       ProviderType.zhipu => true,
-      _ => false,
+      ProviderType.baidu ||
+      ProviderType.caiyun ||
+      ProviderType.deepL ||
+      ProviderType.google ||
+      ProviderType.system ||
+      ProviderType.tencent ||
+      ProviderType.youdao ||
+      ProviderType.googleWeb ||
+      ProviderType.bingWeb ||
+      ProviderType.tencentTransmartWeb ||
+      ProviderType.libreTranslate ||
+      ProviderType.mTranServer => false,
+      null => false,
     };
   }
 

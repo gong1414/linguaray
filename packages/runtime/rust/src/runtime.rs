@@ -23,7 +23,9 @@ use crate::domain::history::{
 };
 use crate::domain::permission;
 use crate::domain::settings::{
-    provider_entry_from_config, AdvancedSettings, AdvancedSettingsPatch, AppearanceSettings,
+    append_translation_service_order, apply_catalog_seed, effective_translation_service_order,
+    provider_entry_from_config, remove_provider_from_translation_order,
+    remove_translation_service_order, AdvancedSettings, AdvancedSettingsPatch, AppearanceSettings,
     AppearanceSettingsPatch, GeneralSettings, GeneralSettingsPatch, ProviderConfigEntry,
     ServiceConfigEntry, ServiceType, Settings, ShortcutSettings, ShortcutSettingsPatch,
 };
@@ -102,28 +104,18 @@ struct RuntimeState {
 }
 
 impl RuntimeState {
-    fn new(mut settings: Settings) -> Result<Self, String> {
-        // Auto-create the system provider on first launch so it appears in
-        // the provider list like any other provider. Users can modify or
-        // delete it freely; it will persist to settings.json.
-        if !settings.providers.contains_key("system") {
-            settings.providers.insert(
-                "system".to_owned(),
-                ProviderConfigEntry {
-                    id: "system".to_owned(),
-                    r#type: linguaray_engine::ProviderType::System,
-                    fields: HashMap::new(),
-                    created_at: None,
-                },
-            );
-        }
+    fn new(mut settings: Settings) -> Result<(Self, bool), String> {
+        let seeded = apply_catalog_seed(&mut settings);
         let provider_secrets = HashMap::new();
         let engine = engine::build_from_settings_with_secrets(&settings, &provider_secrets)?;
-        Ok(Self {
-            settings,
-            engine,
-            provider_secrets,
-        })
+        Ok((
+            Self {
+                settings,
+                engine,
+                provider_secrets,
+            },
+            seeded,
+        ))
     }
 }
 
@@ -266,7 +258,10 @@ impl Runtime {
 
         let settings_file_path = key.join("settings.json");
         let settings = Settings::load(&settings_file_path)?;
-        let state = RuntimeState::new(settings)?;
+        let (state, seeded) = RuntimeState::new(settings)?;
+        if seeded {
+            state.settings.save(&settings_file_path)?;
+        }
         let glossary = GlossaryStore::load(&key)?;
         let history = HistoryStore::load(&key);
         let vocabulary = VocabularyStore::load(&key);
@@ -869,7 +864,7 @@ impl RuntimeSettings {
 
     pub async fn list_services(&self) -> Result<Vec<ServiceConfigEntry>, RuntimeError> {
         let state = self.runtime.inner.state.read().await;
-        let mut services = Vec::new();
+        let mut by_id: HashMap<String, ServiceConfigEntry> = HashMap::new();
 
         for (provider_id, provider) in &state.settings.providers {
             let entry = normalized_provider_entry(provider_id, provider);
@@ -877,29 +872,32 @@ impl RuntimeSettings {
                 if engine_provider.dictionary().is_some()
                     && advertises_system_capability(provider_id, ServiceType::Dictionary)
                 {
-                    services.push(service_entry_for_provider_type(
+                    let service = service_entry_for_provider_type(
                         &format!("{provider_id}+dictionary"),
                         &entry,
                         ServiceType::Dictionary,
-                    ));
+                    );
+                    by_id.insert(service.id.clone(), service);
                 }
                 if (engine_provider.translation().is_some() || engine_provider.llm().is_some())
                     && advertises_system_capability(provider_id, ServiceType::Translation)
                 {
-                    services.push(service_entry_for_provider_type(
+                    let service = service_entry_for_provider_type(
                         &format!("{provider_id}+translation"),
                         &entry,
                         ServiceType::Translation,
-                    ));
+                    );
+                    by_id.insert(service.id.clone(), service);
                 }
                 if engine_provider.ocr().is_some()
                     && advertises_system_capability(provider_id, ServiceType::Ocr)
                 {
-                    services.push(service_entry_for_provider_type(
+                    let service = service_entry_for_provider_type(
                         &format!("{provider_id}+ocr"),
                         &entry,
                         ServiceType::Ocr,
-                    ));
+                    );
+                    by_id.insert(service.id.clone(), service);
                 }
             }
         }
@@ -913,10 +911,41 @@ impl RuntimeSettings {
             }
             let mut entry = service.clone();
             entry.id = service_id.clone();
-            services.push(entry);
+            by_id.insert(service_id.clone(), entry);
         }
 
-        services.sort_by(|a, b| a.id.cmp(&b.id));
+        let mut services: Vec<ServiceConfigEntry> = by_id.into_values().collect();
+        let translation_ids: Vec<String> = services
+            .iter()
+            .filter(|service| service.r#type == ServiceType::Translation)
+            .map(|service| service.id.clone())
+            .collect();
+        let created_at = services
+            .iter()
+            .map(|service| (service.id.clone(), service.created_at))
+            .collect::<HashMap<_, _>>();
+        let order = effective_translation_service_order(
+            &state.settings.general.translation_service_order,
+            &translation_ids,
+            &created_at,
+        );
+        services.sort_by(|a, b| {
+            let translation_rank = |service: &ServiceConfigEntry| {
+                if service.r#type == ServiceType::Translation {
+                    order
+                        .iter()
+                        .position(|id| id == &service.id)
+                        .unwrap_or(usize::MAX)
+                } else {
+                    usize::MAX
+                }
+            };
+            translation_rank(a)
+                .cmp(&translation_rank(b))
+                .then_with(|| service_type_rank(a.r#type).cmp(&service_type_rank(b.r#type)))
+                .then_with(|| a.created_at.cmp(&b.created_at))
+                .then_with(|| a.id.cmp(&b.id))
+        });
         Ok(services)
     }
 
@@ -961,6 +990,7 @@ impl RuntimeSettings {
             r#type: provider_type,
             fields,
             created_at: None,
+            preset_id: None,
         };
         let config = crate::domain::settings::provider_config_from_settings(&entry)
             .map_err(RuntimeError::from)?;
@@ -983,6 +1013,14 @@ impl RuntimeSettings {
                     .map_err(|_| "provider returned too many models".to_owned());
             }
 
+            if matches!(provider.name(), "libretranslate" | "mtranserver") {
+                provider
+                    .list_models()
+                    .await
+                    .map_err(|error| error.to_string())?;
+                return Ok(0);
+            }
+
             let translation = provider
                 .translation()
                 .ok_or_else(|| "provider does not support translation".to_owned())?;
@@ -995,6 +1033,48 @@ impl RuntimeSettings {
                 .await
                 .map_err(|error| error.to_string())?;
             Ok(0)
+        })
+        .await
+        .map_err(RuntimeError::from)
+    }
+
+    /// Discovers models using an in-memory provider draft. Unlike
+    /// `list_models`, this does not require the provider to be saved first and
+    /// never writes credentials or provisional settings to disk.
+    pub async fn discover_provider_models(
+        &self,
+        provider_id: String,
+        provider_type: String,
+        fields: HashMap<String, String>,
+    ) -> Result<Vec<String>, RuntimeError> {
+        let provider_id = validate_provider_id(provider_id).map_err(RuntimeError::from)?;
+        let provider_type =
+            validate_required("provider_type", provider_type).map_err(RuntimeError::from)?;
+        let provider_type = crate::domain::settings::parse_provider_type(&provider_type)
+            .map_err(RuntimeError::from)?;
+        let entry = ProviderConfigEntry {
+            id: provider_id.clone(),
+            r#type: provider_type,
+            fields,
+            created_at: None,
+            preset_id: None,
+        };
+        let config = crate::domain::settings::provider_config_from_settings(&entry)
+            .map_err(RuntimeError::from)?;
+        let mut providers = std::collections::BTreeMap::new();
+        providers.insert(provider_id.clone(), config);
+        let engine = engine::build_from_engine_config(linguaray_engine::EngineConfig { providers })
+            .map_err(RuntimeError::from)?;
+        let provider = engine
+            .require(&provider_id)
+            .map_err(|error| RuntimeError::from(error.to_string()))?
+            .clone();
+
+        run_on_worker_thread(move || async move {
+            provider
+                .list_models()
+                .await
+                .map_err(|error| error.to_string())
         })
         .await
         .map_err(RuntimeError::from)
@@ -1050,6 +1130,7 @@ impl RuntimeSettings {
         provider_id: String,
         provider_type: String,
         fields: HashMap<String, String>,
+        preset_id: Option<String>,
     ) -> Result<ProviderConfigEntry, RuntimeError> {
         let provider_id = validate_provider_id(provider_id).map_err(RuntimeError::from)?;
         let provider_type =
@@ -1061,6 +1142,7 @@ impl RuntimeSettings {
             r#type: provider_type,
             fields,
             created_at: None,
+            preset_id: preset_id.clone(),
         };
         let config = crate::domain::settings::provider_config_from_settings(&entry)
             .map_err(RuntimeError::from)?;
@@ -1071,15 +1153,24 @@ impl RuntimeSettings {
             .ok();
 
         self.commit_settings(SettingsChange::Providers, move |settings| {
-            let entry = provider_entry_from_config(&provider_id, &config)?;
+            let mut entry = provider_entry_from_config(&provider_id, &config)?;
+            entry.preset_id = preset_id.clone().or_else(|| {
+                settings
+                    .providers
+                    .get(&provider_id)
+                    .and_then(|existing| existing.preset_id.clone())
+            });
+            let implicit_translation = format!("{provider_id}+translation");
             if let Some(existing) = settings.providers.get_mut(&provider_id) {
-                existing.id = provider_id;
+                existing.id = provider_id.clone();
                 existing.r#type = entry.r#type;
                 existing.fields = entry.fields.clone();
+                existing.preset_id = entry.preset_id.clone();
             } else {
                 let mut new_entry = entry.clone();
                 new_entry.created_at = now;
-                settings.providers.insert(provider_id, new_entry);
+                settings.providers.insert(provider_id.clone(), new_entry);
+                append_translation_service_order(settings, &implicit_translation);
             }
             Ok(entry)
         })
@@ -1124,7 +1215,11 @@ impl RuntimeSettings {
             } else {
                 entry.created_at = now;
             }
-            settings.services.insert(service_id, entry.clone());
+            let is_new = !settings.services.contains_key(&service_id);
+            settings.services.insert(service_id.clone(), entry.clone());
+            if is_new && service_type == ServiceType::Translation {
+                append_translation_service_order(settings, &service_id);
+            }
             Ok(entry)
         })
         .await
@@ -1141,9 +1236,25 @@ impl RuntimeSettings {
                 .providers
                 .remove(&provider_id)
                 .map(|provider| normalized_provider_entry(&provider_id, &provider));
+            let removed_service_ids = settings
+                .services
+                .values()
+                .filter(|service| service.provider_id == provider_id)
+                .map(|service| service.id.clone())
+                .collect::<std::collections::HashSet<_>>();
             settings
                 .services
                 .retain(|_, service| service.provider_id != provider_id);
+            remove_provider_from_translation_order(settings, &provider_id);
+            if removed_service_ids.contains(&settings.general.default_translation_service) {
+                settings.general.default_translation_service.clear();
+            }
+            if removed_service_ids.contains(&settings.general.default_ocr_service) {
+                settings.general.default_ocr_service.clear();
+            }
+            if removed_service_ids.contains(&settings.general.default_directory_service) {
+                settings.general.default_directory_service.clear();
+            }
             Ok(removed)
         })
         .await
@@ -1156,10 +1267,33 @@ impl RuntimeSettings {
     ) -> Result<Option<ServiceConfigEntry>, RuntimeError> {
         let service_id = validate_provider_id(service_id).map_err(RuntimeError::from)?;
         self.commit_settings(SettingsChange::Providers, move |settings| {
-            Ok(settings.services.remove(&service_id).map(|mut service| {
-                service.id = service_id;
+            let removed = settings.services.remove(&service_id).map(|mut service| {
+                service.id = service_id.clone();
                 service
-            }))
+            });
+            remove_translation_service_order(settings, &service_id);
+            if settings.general.default_translation_service == service_id {
+                settings.general.default_translation_service.clear();
+            }
+            if settings.general.default_ocr_service == service_id {
+                settings.general.default_ocr_service.clear();
+            }
+            if settings.general.default_directory_service == service_id {
+                settings.general.default_directory_service.clear();
+            }
+            Ok(removed)
+        })
+        .await
+        .map_err(Into::into)
+    }
+
+    pub async fn set_translation_service_order(
+        &self,
+        order: Vec<String>,
+    ) -> Result<Vec<String>, RuntimeError> {
+        self.commit_settings(SettingsChange::General, move |settings| {
+            settings.general.translation_service_order = order.clone();
+            Ok(settings.general.translation_service_order.clone())
         })
         .await
         .map_err(Into::into)
@@ -2381,6 +2515,15 @@ fn normalized_provider_entry(
         provider.id = provider_id.to_owned();
     }
     provider
+}
+
+fn service_type_rank(service_type: ServiceType) -> u8 {
+    match service_type {
+        ServiceType::Translation => 0,
+        ServiceType::Dictionary => 1,
+        ServiceType::Ocr => 2,
+        ServiceType::Llm => 3,
+    }
 }
 
 fn advertises_system_capability(provider_id: &str, service_type: ServiceType) -> bool {

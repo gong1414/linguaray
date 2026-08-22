@@ -39,7 +39,7 @@ impl OllamaProvider {
         let base_url = config
             .base_url
             .clone()
-            .unwrap_or_else(|| "http://localhost:11434".to_string());
+            .unwrap_or_else(|| "http://127.0.0.1:11434".to_string());
 
         let http = HttpClient::new(&base_url);
         let default_model = configured_default_model(&config.default_model)?;

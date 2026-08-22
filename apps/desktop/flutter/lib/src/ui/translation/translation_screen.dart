@@ -326,11 +326,39 @@ class _TranslationScreenState extends ConsumerState<TranslationScreen> {
           case RecoveryAction.openPermissionSettings:
           case RecoveryAction.recheckPermission:
             context.go('/settings/permissions');
+          case RecoveryAction.switchToGoogleWeb:
+            unawaited(_enableGoogleWeb());
           default:
             break;
         }
       },
     );
+  }
+
+  Future<void> _enableGoogleWeb() async {
+    final repository = ref.read(workspaceSettingsRepositoryProvider);
+    final providers = await repository.listProviders();
+    final hasGoogleWeb = providers.any(
+      (provider) =>
+          provider.id == 'google-web' || provider.typeId == 'google_web',
+    );
+    if (!hasGoogleWeb) {
+      await repository.saveProvider(
+        const ProviderDraft(
+          id: 'google-web',
+          typeId: 'google_web',
+          presetId: 'google-web',
+          fields: {'baseUrl': 'https://translate.google.com'},
+        ),
+      );
+    }
+    await repository.setServiceEnabled(
+      serviceId: 'google-web+translation',
+      enabled: true,
+    );
+    final viewModel = ref.read(translationViewModelProvider.notifier);
+    await viewModel.initialize();
+    viewModel.selectService('google-web+translation');
   }
 }
 

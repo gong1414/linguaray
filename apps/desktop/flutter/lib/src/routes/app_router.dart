@@ -26,6 +26,17 @@ import 'debug/runtime.dart' as debug_runtime_route;
 import 'debug/widget_showcase.dart' as widget_showcase_route;
 import 'workbench/index.dart' as workbench_route;
 
+const _debugInitialRoute = String.fromEnvironment('LINGUARAY_INITIAL_ROUTE');
+
+WorkbenchDestination? get _debugInitialDestination {
+  if (!kDebugMode || _debugInitialRoute.trim().isEmpty) return null;
+  final route = _debugInitialRoute.trim();
+  for (final destination in WorkbenchDestination.values) {
+    if (destination.location == route) return destination;
+  }
+  return null;
+}
+
 // ──────────────────────────────────────────────────────────────────────────────
 // Routers
 // ──────────────────────────────────────────────────────────────────────────────
@@ -77,7 +88,11 @@ class WorkbenchApp extends StatefulWidget {
 }
 
 class _WorkbenchAppState extends State<WorkbenchApp> {
-  late final GoRouter _router = createWorkbenchAppRouter();
+  late final GoRouter _router = createWorkbenchAppRouter(
+    initialLocation: kDebugMode && _debugInitialRoute.trim().isNotEmpty
+        ? _debugInitialRoute.trim()
+        : null,
+  );
 
   @override
   void initState() {
@@ -207,7 +222,7 @@ class _RootBodyViewState extends State<_RootBodyView>
     protocolController.start();
     unawaited(permissionController.refresh());
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      showWorkbenchWindow();
+      showWorkbenchWindow(destination: _debugInitialDestination);
     });
   }
 

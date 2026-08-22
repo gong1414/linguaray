@@ -1279,6 +1279,55 @@ class TranslationsSettingsProvidersEn {
 
   late final TranslationsSettingsProvidersSectionEn section =
       TranslationsSettingsProvidersSectionEn.internal(_root);
+
+  /// en: 'Search providers'
+  String get search => 'Search providers';
+
+  late final TranslationsSettingsProvidersNetworkEn network =
+      TranslationsSettingsProvidersNetworkEn.internal(_root);
+  late final TranslationsSettingsProvidersStabilityEn stability =
+      TranslationsSettingsProvidersStabilityEn.internal(_root);
+
+  /// en: 'This uses an unofficial web interface. Text is sent over the network when you translate. It is not an official free API.'
+  String get unofficial_notice =>
+      'This uses an unofficial web interface. Text is sent over the network when you translate. It is not an official free API.';
+
+  /// en: 'Get API key'
+  String get get_api_key => 'Get API key';
+
+  /// en: 'Fetch models'
+  String get fetch_models => 'Fetch models';
+
+  /// en: 'Advanced settings'
+  String get advanced => 'Advanced settings';
+
+  /// en: 'Verify connection'
+  String get verify => 'Verify connection';
+
+  /// en: 'Save'
+  String get save_without_verify => 'Save';
+
+  /// en: 'Enter a model id'
+  String get model_manual => 'Enter a model id';
+
+  /// en: 'No models yet. Fetch from the provider or enter one manually.'
+  String get model_empty =>
+      'No models yet. Fetch from the provider or enter one manually.';
+
+  /// en: 'Could not fetch models. You can still enter a model id and save.'
+  String get model_failed =>
+      'Could not fetch models. You can still enter a model id and save.';
+
+  /// en: 'Add'
+  String get add_directly => 'Add';
+
+  /// en: 'Switch to Google Web'
+  String get switch_to_google_web => 'Switch to Google Web';
+
+  late final TranslationsSettingsProvidersFieldsEn fields =
+      TranslationsSettingsProvidersFieldsEn.internal(_root);
+  late final TranslationsSettingsProvidersCatalogEn catalog =
+      TranslationsSettingsProvidersCatalogEn.internal(_root);
   late final TranslationsSettingsProvidersItemEn item =
       TranslationsSettingsProvidersItemEn.internal(_root);
   late final TranslationsSettingsProvidersButtonEn button =
@@ -1713,6 +1762,9 @@ class TranslationsUiRecoveryEn {
 
   /// en: 'Choose language'
   String get choose_language => 'Choose language';
+
+  /// en: 'Switch to Google Web'
+  String get switch_to_google_web => 'Switch to Google Web';
 }
 
 // Path: ui.vocabulary
@@ -2488,6 +2540,219 @@ class TranslationsSettingsProvidersSectionEn {
   /// en: 'View available services from configured providers and switch between service types.'
   String get services_description =>
       'View available services from configured providers and switch between service types.';
+
+  /// en: 'Built-in services'
+  String get built_in => 'Built-in services';
+
+  /// en: 'Traditional translation APIs'
+  String get traditional_api => 'Traditional translation APIs';
+
+  /// en: 'Official large language models'
+  String get llm_official => 'Official large language models';
+
+  /// en: 'Aggregators'
+  String get aggregator => 'Aggregators';
+
+  /// en: 'Local and self-hosted'
+  String get local_or_self_hosted => 'Local and self-hosted';
+}
+
+// Path: settings.providers.network
+class TranslationsSettingsProvidersNetworkEn {
+  TranslationsSettingsProvidersNetworkEn.internal(this._root);
+
+  final Translations _root; // ignore: unused_field
+
+  // Translations
+
+  /// en: 'On this device'
+  String get local_only => 'On this device';
+
+  /// en: 'Official API'
+  String get official_api => 'Official API';
+
+  /// en: 'Unofficial web interface'
+  String get unofficial_web => 'Unofficial web interface';
+
+  /// en: 'Self-hosted'
+  String get self_hosted => 'Self-hosted';
+}
+
+// Path: settings.providers.stability
+class TranslationsSettingsProvidersStabilityEn {
+  TranslationsSettingsProvidersStabilityEn.internal(this._root);
+
+  final Translations _root; // ignore: unused_field
+
+  // Translations
+
+  /// en: 'Stable'
+  String get stable => 'Stable';
+
+  /// en: 'Experimental'
+  String get experimental => 'Experimental';
+}
+
+// Path: settings.providers.fields
+class TranslationsSettingsProvidersFieldsEn {
+  TranslationsSettingsProvidersFieldsEn.internal(this._root);
+
+  final Translations _root; // ignore: unused_field
+
+  // Translations
+
+  /// en: 'API key'
+  String get api_key => 'API key';
+
+  /// en: 'Auth key'
+  String get auth_key => 'Auth key';
+
+  /// en: 'App ID'
+  String get app_id => 'App ID';
+
+  /// en: 'App key'
+  String get app_key => 'App key';
+
+  /// en: 'App secret'
+  String get app_secret => 'App secret';
+
+  /// en: 'Secret ID'
+  String get secret_id => 'Secret ID';
+
+  /// en: 'Secret key'
+  String get secret_key => 'Secret key';
+
+  /// en: 'Token'
+  String get token => 'Token';
+
+  /// en: 'Request ID'
+  String get request_id => 'Request ID';
+
+  /// en: 'Username'
+  String get username => 'Username';
+
+  /// en: 'Model'
+  String get default_model => 'Model';
+
+  /// en: 'Base URL'
+  String get base_url => 'Base URL';
+
+  /// en: 'Models URL'
+  String get models_url => 'Models URL';
+}
+
+// Path: settings.providers.catalog
+class TranslationsSettingsProvidersCatalogEn {
+  TranslationsSettingsProvidersCatalogEn.internal(this._root);
+
+  final Translations _root; // ignore: unused_field
+
+  // Translations
+
+  /// en: 'Uses the operating system translation, dictionary, and OCR on this Mac.'
+  String get system =>
+      'Uses the operating system translation, dictionary, and OCR on this Mac.';
+
+  /// en: 'Translates through Google Translate’s unofficial web interface. No API key. Experimental.'
+  String get google_web =>
+      'Translates through Google Translate’s unofficial web interface. No API key. Experimental.';
+
+  /// en: 'Translates through Microsoft’s unofficial Edge translator interface. No API key. Experimental.'
+  String get bing_web =>
+      'Translates through Microsoft’s unofficial Edge translator interface. No API key. Experimental.';
+
+  /// en: 'Translates through Tencent Transmart’s unofficial web interface. Optional login. Experimental.'
+  String get tencent_transmart_web =>
+      'Translates through Tencent Transmart’s unofficial web interface. Optional login. Experimental.';
+
+  /// en: 'DeepL API Free.'
+  String get deepl_free => 'DeepL API Free.';
+
+  /// en: 'DeepL API Pro.'
+  String get deepl_pro => 'DeepL API Pro.';
+
+  /// en: 'Google Cloud Translation API.'
+  String get google_cloud => 'Google Cloud Translation API.';
+
+  /// en: 'Baidu Translate API.'
+  String get baidu => 'Baidu Translate API.';
+
+  /// en: 'Tencent Cloud Machine Translation.'
+  String get tencent_cloud => 'Tencent Cloud Machine Translation.';
+
+  /// en: 'Youdao Zhiyun translation, dictionary, and OCR.'
+  String get youdao => 'Youdao Zhiyun translation, dictionary, and OCR.';
+
+  /// en: 'Caiyun Xiaoyi translation API.'
+  String get caiyun => 'Caiyun Xiaoyi translation API.';
+
+  /// en: 'OpenAI official API.'
+  String get openai => 'OpenAI official API.';
+
+  /// en: 'Anthropic official API.'
+  String get anthropic => 'Anthropic official API.';
+
+  /// en: 'Google Gemini via the OpenAI-compatible endpoint.'
+  String get gemini => 'Google Gemini via the OpenAI-compatible endpoint.';
+
+  /// en: 'DeepSeek official API.'
+  String get deepseek => 'DeepSeek official API.';
+
+  /// en: 'Alibaba Bailian Qwen official API.'
+  String get qwen => 'Alibaba Bailian Qwen official API.';
+
+  /// en: 'Zhipu BigModel official API.'
+  String get zhipu => 'Zhipu BigModel official API.';
+
+  /// en: 'Moonshot Kimi official API.'
+  String get moonshot => 'Moonshot Kimi official API.';
+
+  /// en: 'Volcano Engine Doubao Ark official API.'
+  String get doubao => 'Volcano Engine Doubao Ark official API.';
+
+  /// en: 'xAI official API.'
+  String get xai => 'xAI official API.';
+
+  /// en: 'Groq official API.'
+  String get groq => 'Groq official API.';
+
+  /// en: 'OpenRouter aggregator.'
+  String get openrouter => 'OpenRouter aggregator.';
+
+  /// en: 'SiliconFlow China endpoint.'
+  String get siliconflow_cn => 'SiliconFlow China endpoint.';
+
+  /// en: 'SiliconFlow global endpoint.'
+  String get siliconflow_global => 'SiliconFlow global endpoint.';
+
+  /// en: 'ModelScope inference API.'
+  String get modelscope => 'ModelScope inference API.';
+
+  /// en: 'Local Ollama server.'
+  String get ollama => 'Local Ollama server.';
+
+  /// en: 'Local LM Studio server.'
+  String get lm_studio => 'Local LM Studio server.';
+
+  /// en: 'LocalAI server.'
+  String get localai => 'LocalAI server.';
+
+  /// en: 'Local vLLM server.'
+  String get vllm => 'Local vLLM server.';
+
+  /// en: 'Local llama.cpp server.'
+  String get llama_cpp => 'Local llama.cpp server.';
+
+  /// en: 'Local LiteLLM proxy.'
+  String get litellm => 'Local LiteLLM proxy.';
+
+  /// en: 'Self-hosted LibreTranslate. Default http://127.0.0.1:5000. Not a public instance.'
+  String get libretranslate =>
+      'Self-hosted LibreTranslate. Default http://127.0.0.1:5000. Not a public instance.';
+
+  /// en: 'Self-hosted MTranServer. Default http://127.0.0.1:8989.'
+  String get mtranserver =>
+      'Self-hosted MTranServer. Default http://127.0.0.1:8989.';
 }
 
 // Path: settings.providers.item
@@ -3496,6 +3761,93 @@ extension on Translations {
           'settings.providers.title' => 'Providers',
           'settings.providers.section.services' => 'Available Services',
           'settings.providers.section.services_description' => 'View available services from configured providers and switch between service types.',
+          'settings.providers.section.built_in' => 'Built-in services',
+          'settings.providers.section.traditional_api' =>
+            'Traditional translation APIs',
+          'settings.providers.section.llm_official' =>
+            'Official large language models',
+          'settings.providers.section.aggregator' => 'Aggregators',
+          'settings.providers.section.local_or_self_hosted' =>
+            'Local and self-hosted',
+          'settings.providers.search' => 'Search providers',
+          'settings.providers.network.local_only' => 'On this device',
+          'settings.providers.network.official_api' => 'Official API',
+          'settings.providers.network.unofficial_web' =>
+            'Unofficial web interface',
+          'settings.providers.network.self_hosted' => 'Self-hosted',
+          'settings.providers.stability.stable' => 'Stable',
+          'settings.providers.stability.experimental' => 'Experimental',
+          'settings.providers.unofficial_notice' => 'This uses an unofficial web interface. Text is sent over the network when you translate. It is not an official free API.',
+          'settings.providers.get_api_key' => 'Get API key',
+          'settings.providers.fetch_models' => 'Fetch models',
+          'settings.providers.advanced' => 'Advanced settings',
+          'settings.providers.verify' => 'Verify connection',
+          'settings.providers.save_without_verify' => 'Save',
+          'settings.providers.model_manual' => 'Enter a model id',
+          'settings.providers.model_empty' =>
+            'No models yet. Fetch from the provider or enter one manually.',
+          'settings.providers.model_failed' =>
+            'Could not fetch models. You can still enter a model id and save.',
+          'settings.providers.add_directly' => 'Add',
+          'settings.providers.switch_to_google_web' => 'Switch to Google Web',
+          'settings.providers.fields.api_key' => 'API key',
+          'settings.providers.fields.auth_key' => 'Auth key',
+          'settings.providers.fields.app_id' => 'App ID',
+          'settings.providers.fields.app_key' => 'App key',
+          'settings.providers.fields.app_secret' => 'App secret',
+          'settings.providers.fields.secret_id' => 'Secret ID',
+          'settings.providers.fields.secret_key' => 'Secret key',
+          'settings.providers.fields.token' => 'Token',
+          'settings.providers.fields.request_id' => 'Request ID',
+          'settings.providers.fields.username' => 'Username',
+          'settings.providers.fields.default_model' => 'Model',
+          'settings.providers.fields.base_url' => 'Base URL',
+          'settings.providers.fields.models_url' => 'Models URL',
+          'settings.providers.catalog.system' => 'Uses the operating system translation, dictionary, and OCR on this Mac.',
+          'settings.providers.catalog.google_web' => 'Translates through Google Translate’s unofficial web interface. No API key. Experimental.',
+          'settings.providers.catalog.bing_web' => 'Translates through Microsoft’s unofficial Edge translator interface. No API key. Experimental.',
+          'settings.providers.catalog.tencent_transmart_web' => 'Translates through Tencent Transmart’s unofficial web interface. Optional login. Experimental.',
+          'settings.providers.catalog.deepl_free' => 'DeepL API Free.',
+          'settings.providers.catalog.deepl_pro' => 'DeepL API Pro.',
+          'settings.providers.catalog.google_cloud' =>
+            'Google Cloud Translation API.',
+          'settings.providers.catalog.baidu' => 'Baidu Translate API.',
+          'settings.providers.catalog.tencent_cloud' =>
+            'Tencent Cloud Machine Translation.',
+          'settings.providers.catalog.youdao' =>
+            'Youdao Zhiyun translation, dictionary, and OCR.',
+          'settings.providers.catalog.caiyun' =>
+            'Caiyun Xiaoyi translation API.',
+          'settings.providers.catalog.openai' => 'OpenAI official API.',
+          'settings.providers.catalog.anthropic' => 'Anthropic official API.',
+          'settings.providers.catalog.gemini' =>
+            'Google Gemini via the OpenAI-compatible endpoint.',
+          'settings.providers.catalog.deepseek' => 'DeepSeek official API.',
+          'settings.providers.catalog.qwen' =>
+            'Alibaba Bailian Qwen official API.',
+          'settings.providers.catalog.zhipu' => 'Zhipu BigModel official API.',
+          'settings.providers.catalog.moonshot' =>
+            'Moonshot Kimi official API.',
+          'settings.providers.catalog.doubao' =>
+            'Volcano Engine Doubao Ark official API.',
+          'settings.providers.catalog.xai' => 'xAI official API.',
+          'settings.providers.catalog.groq' => 'Groq official API.',
+          'settings.providers.catalog.openrouter' => 'OpenRouter aggregator.',
+          'settings.providers.catalog.siliconflow_cn' =>
+            'SiliconFlow China endpoint.',
+          'settings.providers.catalog.siliconflow_global' =>
+            'SiliconFlow global endpoint.',
+          'settings.providers.catalog.modelscope' =>
+            'ModelScope inference API.',
+          'settings.providers.catalog.ollama' => 'Local Ollama server.',
+          'settings.providers.catalog.lm_studio' => 'Local LM Studio server.',
+          'settings.providers.catalog.localai' => 'LocalAI server.',
+          'settings.providers.catalog.vllm' => 'Local vLLM server.',
+          'settings.providers.catalog.llama_cpp' => 'Local llama.cpp server.',
+          'settings.providers.catalog.litellm' => 'Local LiteLLM proxy.',
+          'settings.providers.catalog.libretranslate' => 'Self-hosted LibreTranslate. Default http://127.0.0.1:5000. Not a public instance.',
+          'settings.providers.catalog.mtranserver' =>
+            'Self-hosted MTranServer. Default http://127.0.0.1:8989.',
           'settings.providers.item.empty' =>
             'No providers configured. Add one to enable translation services.',
           'settings.providers.item.loading' => 'Loading providers...',
@@ -3582,6 +3934,9 @@ extension on Translations {
           'settings.about.up_to_date' => 'You\'re up to date.',
           'settings.about.check_again' => 'Check Again',
           'settings.about.links' => 'Links',
+          _ => null,
+        } ??
+        switch (path) {
           'settings.about.website' => 'Website',
           'settings.about.github' => 'GitHub',
           'settings.about.report_issue' => 'Report an Issue',
@@ -3666,9 +4021,6 @@ extension on Translations {
             'The service could not be reached. Check your connection.',
           'ui.errors.provider_auth_failed' =>
             'Authentication failed. Check the provider key in Settings.',
-          _ => null,
-        } ??
-        switch (path) {
           'ui.errors.translation_failed' =>
             'Translation failed. Check the service and try again.',
           'ui.errors.empty_result' => 'The service returned no translation.',
@@ -3708,6 +4060,7 @@ extension on Translations {
             'Configure a translation provider',
           'ui.recovery.edit_input' => 'Edit input',
           'ui.recovery.choose_language' => 'Choose language',
+          'ui.recovery.switch_to_google_web' => 'Switch to Google Web',
           'ui.vocabulary.title' => 'Vocabulary',
           'ui.vocabulary.empty_title' => 'No saved words yet',
           'ui.vocabulary.empty_description' =>

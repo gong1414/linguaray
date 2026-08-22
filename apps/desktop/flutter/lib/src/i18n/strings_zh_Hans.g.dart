@@ -1150,6 +1150,42 @@ class _TranslationsSettingsProvidersZhHans
   late final _TranslationsSettingsProvidersSectionZhHans section =
       _TranslationsSettingsProvidersSectionZhHans._(_root);
   @override
+  String get search => '搜索供应商';
+  @override
+  late final _TranslationsSettingsProvidersNetworkZhHans network =
+      _TranslationsSettingsProvidersNetworkZhHans._(_root);
+  @override
+  late final _TranslationsSettingsProvidersStabilityZhHans stability =
+      _TranslationsSettingsProvidersStabilityZhHans._(_root);
+  @override
+  String get unofficial_notice => '这是非官方网页接口。翻译时会把文本发到网络。它不是官方免费 API。';
+  @override
+  String get get_api_key => '获取 API Key';
+  @override
+  String get fetch_models => '获取模型';
+  @override
+  String get advanced => '高级设置';
+  @override
+  String get verify => '验证连接';
+  @override
+  String get save_without_verify => '保存';
+  @override
+  String get model_manual => '手动输入模型 ID';
+  @override
+  String get model_empty => '还没有模型。可以从供应商获取，或手动输入。';
+  @override
+  String get model_failed => '无法获取模型。你仍可手动输入模型 ID 并保存。';
+  @override
+  String get add_directly => '添加';
+  @override
+  String get switch_to_google_web => '切换到 Google Web';
+  @override
+  late final _TranslationsSettingsProvidersFieldsZhHans fields =
+      _TranslationsSettingsProvidersFieldsZhHans._(_root);
+  @override
+  late final _TranslationsSettingsProvidersCatalogZhHans catalog =
+      _TranslationsSettingsProvidersCatalogZhHans._(_root);
+  @override
   late final _TranslationsSettingsProvidersItemZhHans item =
       _TranslationsSettingsProvidersItemZhHans._(_root);
   @override
@@ -1478,6 +1514,8 @@ class _TranslationsUiRecoveryZhHans extends TranslationsUiRecoveryEn {
   String get edit_input => '编辑原文';
   @override
   String get choose_language => '选择语言';
+  @override
+  String get switch_to_google_web => '切换到 Google Web';
 }
 
 // Path: ui.vocabulary
@@ -2175,6 +2213,169 @@ class _TranslationsSettingsProvidersSectionZhHans
   String get services => '可用服务';
   @override
   String get services_description => '查看已配置提供商的可用服务，并按服务类型切换。';
+  @override
+  String get built_in => '内置服务';
+  @override
+  String get traditional_api => '传统翻译 API';
+  @override
+  String get llm_official => '官方大模型';
+  @override
+  String get aggregator => '聚合平台';
+  @override
+  String get local_or_self_hosted => '本地与自托管';
+}
+
+// Path: settings.providers.network
+class _TranslationsSettingsProvidersNetworkZhHans
+    extends TranslationsSettingsProvidersNetworkEn {
+  _TranslationsSettingsProvidersNetworkZhHans._(TranslationsZhHans root)
+    : this._root = root,
+      super.internal(root);
+
+  final TranslationsZhHans _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get local_only => '仅本机';
+  @override
+  String get official_api => '官方 API';
+  @override
+  String get unofficial_web => '非官方网页接口';
+  @override
+  String get self_hosted => '自托管';
+}
+
+// Path: settings.providers.stability
+class _TranslationsSettingsProvidersStabilityZhHans
+    extends TranslationsSettingsProvidersStabilityEn {
+  _TranslationsSettingsProvidersStabilityZhHans._(TranslationsZhHans root)
+    : this._root = root,
+      super.internal(root);
+
+  final TranslationsZhHans _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get stable => '稳定';
+  @override
+  String get experimental => '实验性';
+}
+
+// Path: settings.providers.fields
+class _TranslationsSettingsProvidersFieldsZhHans
+    extends TranslationsSettingsProvidersFieldsEn {
+  _TranslationsSettingsProvidersFieldsZhHans._(TranslationsZhHans root)
+    : this._root = root,
+      super.internal(root);
+
+  final TranslationsZhHans _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get api_key => 'API Key';
+  @override
+  String get auth_key => 'Auth Key';
+  @override
+  String get app_id => 'App ID';
+  @override
+  String get app_key => 'App Key';
+  @override
+  String get app_secret => 'App Secret';
+  @override
+  String get secret_id => 'SecretId';
+  @override
+  String get secret_key => 'SecretKey';
+  @override
+  String get token => 'Token';
+  @override
+  String get request_id => 'Request ID';
+  @override
+  String get username => '用户名';
+  @override
+  String get default_model => '模型';
+  @override
+  String get base_url => 'Base URL';
+  @override
+  String get models_url => 'Models URL';
+}
+
+// Path: settings.providers.catalog
+class _TranslationsSettingsProvidersCatalogZhHans
+    extends TranslationsSettingsProvidersCatalogEn {
+  _TranslationsSettingsProvidersCatalogZhHans._(TranslationsZhHans root)
+    : this._root = root,
+      super.internal(root);
+
+  final TranslationsZhHans _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get system => '使用这台 Mac 的系统翻译、词典和 OCR。';
+  @override
+  String get google_web => '通过 Google 翻译的非官方网页接口翻译。无需密钥。实验性。';
+  @override
+  String get bing_web => '通过微软 Edge 翻译的非官方网页接口翻译。无需密钥。实验性。';
+  @override
+  String get tencent_transmart_web => '通过腾讯交互翻译的非官方网页接口翻译。登录信息可选。实验性。';
+  @override
+  String get deepl_free => 'DeepL API Free。';
+  @override
+  String get deepl_pro => 'DeepL API Pro。';
+  @override
+  String get google_cloud => 'Google Cloud Translation API。';
+  @override
+  String get baidu => '百度翻译 API。';
+  @override
+  String get tencent_cloud => '腾讯云机器翻译。';
+  @override
+  String get youdao => '有道智云翻译、词典和 OCR。';
+  @override
+  String get caiyun => '彩云小译翻译 API。';
+  @override
+  String get openai => 'OpenAI 官方 API。';
+  @override
+  String get anthropic => 'Anthropic 官方 API。';
+  @override
+  String get gemini => 'Google Gemini 的 OpenAI 兼容接口。';
+  @override
+  String get deepseek => 'DeepSeek 官方 API。';
+  @override
+  String get qwen => '阿里云百炼通义千问官方 API。';
+  @override
+  String get zhipu => '智谱 BigModel 官方 API。';
+  @override
+  String get moonshot => '月之暗面 Kimi 官方 API。';
+  @override
+  String get doubao => '火山引擎豆包方舟官方 API。';
+  @override
+  String get xai => 'xAI 官方 API。';
+  @override
+  String get groq => 'Groq 官方 API。';
+  @override
+  String get openrouter => 'OpenRouter 聚合平台。';
+  @override
+  String get siliconflow_cn => '硅基流动国内节点。';
+  @override
+  String get siliconflow_global => '硅基流动国际节点。';
+  @override
+  String get modelscope => 'ModelScope 推理 API。';
+  @override
+  String get ollama => '本地 Ollama 服务。';
+  @override
+  String get lm_studio => '本地 LM Studio 服务。';
+  @override
+  String get localai => 'LocalAI 服务。';
+  @override
+  String get vllm => '本地 vLLM 服务。';
+  @override
+  String get llama_cpp => '本地 llama.cpp 服务。';
+  @override
+  String get litellm => '本地 LiteLLM 代理。';
+  @override
+  String get libretranslate =>
+      '自托管 LibreTranslate。默认 http://127.0.0.1:5000。不会调用公共实例。';
+  @override
+  String get mtranserver => '自托管 MTranServer。默认 http://127.0.0.1:8989。';
 }
 
 // Path: settings.providers.item
@@ -3159,6 +3360,82 @@ extension on TranslationsZhHans {
           'settings.providers.section.services' => '可用服务',
           'settings.providers.section.services_description' =>
             '查看已配置提供商的可用服务，并按服务类型切换。',
+          'settings.providers.section.built_in' => '内置服务',
+          'settings.providers.section.traditional_api' => '传统翻译 API',
+          'settings.providers.section.llm_official' => '官方大模型',
+          'settings.providers.section.aggregator' => '聚合平台',
+          'settings.providers.section.local_or_self_hosted' => '本地与自托管',
+          'settings.providers.search' => '搜索供应商',
+          'settings.providers.network.local_only' => '仅本机',
+          'settings.providers.network.official_api' => '官方 API',
+          'settings.providers.network.unofficial_web' => '非官方网页接口',
+          'settings.providers.network.self_hosted' => '自托管',
+          'settings.providers.stability.stable' => '稳定',
+          'settings.providers.stability.experimental' => '实验性',
+          'settings.providers.unofficial_notice' =>
+            '这是非官方网页接口。翻译时会把文本发到网络。它不是官方免费 API。',
+          'settings.providers.get_api_key' => '获取 API Key',
+          'settings.providers.fetch_models' => '获取模型',
+          'settings.providers.advanced' => '高级设置',
+          'settings.providers.verify' => '验证连接',
+          'settings.providers.save_without_verify' => '保存',
+          'settings.providers.model_manual' => '手动输入模型 ID',
+          'settings.providers.model_empty' => '还没有模型。可以从供应商获取，或手动输入。',
+          'settings.providers.model_failed' => '无法获取模型。你仍可手动输入模型 ID 并保存。',
+          'settings.providers.add_directly' => '添加',
+          'settings.providers.switch_to_google_web' => '切换到 Google Web',
+          'settings.providers.fields.api_key' => 'API Key',
+          'settings.providers.fields.auth_key' => 'Auth Key',
+          'settings.providers.fields.app_id' => 'App ID',
+          'settings.providers.fields.app_key' => 'App Key',
+          'settings.providers.fields.app_secret' => 'App Secret',
+          'settings.providers.fields.secret_id' => 'SecretId',
+          'settings.providers.fields.secret_key' => 'SecretKey',
+          'settings.providers.fields.token' => 'Token',
+          'settings.providers.fields.request_id' => 'Request ID',
+          'settings.providers.fields.username' => '用户名',
+          'settings.providers.fields.default_model' => '模型',
+          'settings.providers.fields.base_url' => 'Base URL',
+          'settings.providers.fields.models_url' => 'Models URL',
+          'settings.providers.catalog.system' => '使用这台 Mac 的系统翻译、词典和 OCR。',
+          'settings.providers.catalog.google_web' =>
+            '通过 Google 翻译的非官方网页接口翻译。无需密钥。实验性。',
+          'settings.providers.catalog.bing_web' =>
+            '通过微软 Edge 翻译的非官方网页接口翻译。无需密钥。实验性。',
+          'settings.providers.catalog.tencent_transmart_web' =>
+            '通过腾讯交互翻译的非官方网页接口翻译。登录信息可选。实验性。',
+          'settings.providers.catalog.deepl_free' => 'DeepL API Free。',
+          'settings.providers.catalog.deepl_pro' => 'DeepL API Pro。',
+          'settings.providers.catalog.google_cloud' =>
+            'Google Cloud Translation API。',
+          'settings.providers.catalog.baidu' => '百度翻译 API。',
+          'settings.providers.catalog.tencent_cloud' => '腾讯云机器翻译。',
+          'settings.providers.catalog.youdao' => '有道智云翻译、词典和 OCR。',
+          'settings.providers.catalog.caiyun' => '彩云小译翻译 API。',
+          'settings.providers.catalog.openai' => 'OpenAI 官方 API。',
+          'settings.providers.catalog.anthropic' => 'Anthropic 官方 API。',
+          'settings.providers.catalog.gemini' => 'Google Gemini 的 OpenAI 兼容接口。',
+          'settings.providers.catalog.deepseek' => 'DeepSeek 官方 API。',
+          'settings.providers.catalog.qwen' => '阿里云百炼通义千问官方 API。',
+          'settings.providers.catalog.zhipu' => '智谱 BigModel 官方 API。',
+          'settings.providers.catalog.moonshot' => '月之暗面 Kimi 官方 API。',
+          'settings.providers.catalog.doubao' => '火山引擎豆包方舟官方 API。',
+          'settings.providers.catalog.xai' => 'xAI 官方 API。',
+          'settings.providers.catalog.groq' => 'Groq 官方 API。',
+          'settings.providers.catalog.openrouter' => 'OpenRouter 聚合平台。',
+          'settings.providers.catalog.siliconflow_cn' => '硅基流动国内节点。',
+          'settings.providers.catalog.siliconflow_global' => '硅基流动国际节点。',
+          'settings.providers.catalog.modelscope' => 'ModelScope 推理 API。',
+          'settings.providers.catalog.ollama' => '本地 Ollama 服务。',
+          'settings.providers.catalog.lm_studio' => '本地 LM Studio 服务。',
+          'settings.providers.catalog.localai' => 'LocalAI 服务。',
+          'settings.providers.catalog.vllm' => '本地 vLLM 服务。',
+          'settings.providers.catalog.llama_cpp' => '本地 llama.cpp 服务。',
+          'settings.providers.catalog.litellm' => '本地 LiteLLM 代理。',
+          'settings.providers.catalog.libretranslate' =>
+            '自托管 LibreTranslate。默认 http://127.0.0.1:5000。不会调用公共实例。',
+          'settings.providers.catalog.mtranserver' =>
+            '自托管 MTranServer。默认 http://127.0.0.1:8989。',
           'settings.providers.item.empty' => '暂无已配置的提供商。添加一个提供商以启用翻译服务。',
           'settings.providers.item.loading' => '正在加载提供商...',
           'settings.providers.item.no_services' => '暂无可用服务。',
@@ -3227,6 +3504,9 @@ extension on TranslationsZhHans {
           'settings.about.up_to_date' => '已是最新版本。',
           'settings.about.check_again' => '重新检查',
           'settings.about.links' => '链接',
+          _ => null,
+        } ??
+        switch (path) {
           'settings.about.website' => '网站',
           'settings.about.github' => 'GitHub',
           'settings.about.report_issue' => '提交问题',
@@ -3296,9 +3576,6 @@ extension on TranslationsZhHans {
           'ui.errors.language_pack_missing' => '请在 macOS 语言与地区中安装该语言包后再试。',
           'ui.errors.network_failure' => '无法连接服务，请检查网络。',
           'ui.errors.provider_auth_failed' => '认证失败，请在设置中检查服务密钥。',
-          _ => null,
-        } ??
-        switch (path) {
           'ui.errors.translation_failed' => '翻译失败，请检查服务后重试。',
           'ui.errors.empty_result' => '服务没有返回译文。',
           'ui.errors.catalog_unavailable' => '无法读取翻译服务。',
@@ -3325,6 +3602,7 @@ extension on TranslationsZhHans {
           'ui.recovery.configure_translation_provider' => '配置翻译服务',
           'ui.recovery.edit_input' => '编辑原文',
           'ui.recovery.choose_language' => '选择语言',
+          'ui.recovery.switch_to_google_web' => '切换到 Google Web',
           'ui.vocabulary.title' => '生词本',
           'ui.vocabulary.empty_title' => '还没有生词',
           'ui.vocabulary.empty_description' => '可以从词典查询或翻译结果中加入。',

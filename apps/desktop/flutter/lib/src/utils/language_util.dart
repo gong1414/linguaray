@@ -28,13 +28,19 @@ List<String> get supportedLanguages {
 String get defaultSourceLanguage => _preferredLanguage('en');
 
 String get defaultTargetLanguage {
-  final appLang = LocaleSettings.currentLocale;
-  final code = switch (appLang) {
-    AppLocale.en => 'en',
-    AppLocale.ja => 'ja',
-    AppLocale.ko => 'ko',
-    AppLocale.zhHans => 'zh-Hans',
-    AppLocale.zhHant => 'zh-Hant',
+  return defaultTargetLanguageForAppLanguage(
+    LocaleSettings.currentLocale.languageTag,
+  );
+}
+
+String defaultTargetLanguageForAppLanguage(String languageTag) {
+  final normalized = languageTag.trim().toLowerCase().replaceAll('_', '-');
+  final code = switch (normalized) {
+    'en' || 'en-us' || 'en-gb' => 'en',
+    'ja' || 'ja-jp' => 'ja',
+    'ko' || 'ko-kr' => 'ko',
+    'zh-hant' || 'zh-tw' || 'zh-hk' => 'zh-Hant',
+    'zh' || 'zh-hans' || 'zh-cn' || 'zh-sg' => 'zh-Hans',
     _ => 'zh-Hans',
   };
   return _preferredLanguage(code);

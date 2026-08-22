@@ -7,6 +7,14 @@ use crate::{
     TranslateResponse,
 };
 
+fn sanitize_response_body(body: &str, secrets: &[&str]) -> String {
+    let mut sanitized = body.to_owned();
+    for secret in secrets.iter().filter(|secret| !secret.is_empty()) {
+        sanitized = sanitized.replace(secret, "[redacted]");
+    }
+    sanitized.chars().take(512).collect()
+}
+
 #[derive(Debug, Error, Clone)]
 pub enum TranslationError {
     #[error("unsupported method: {0}")]
@@ -34,12 +42,22 @@ impl TranslationError {
         provider: &'static str,
         response: Response,
     ) -> Result<Response, TranslationError> {
+        Self::from_response_redacting(provider, response, &[]).await
+    }
+
+    /// Converts an unsuccessful HTTP response into a user-facing error while
+    /// removing provider credentials that an endpoint may have echoed back.
+    pub async fn from_response_redacting(
+        provider: &'static str,
+        response: Response,
+        secrets: &[&str],
+    ) -> Result<Response, TranslationError> {
         let status = response.status();
         if status.is_success() {
             return Ok(response);
         }
 
-        let body = response.text().await.unwrap_or_default();
+        let body = sanitize_response_body(&response.text().await.unwrap_or_default(), secrets);
         let message = if body.is_empty() {
             status.to_string()
         } else {
@@ -78,4 +96,24 @@ pub trait TranslationService: Send + Sync {
         &self,
         request: TranslateRequest,
     ) -> Result<TranslateResponse, TranslationError>;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::sanitize_response_body;
+
+    #[test]
+    fn response_errors_redact_secrets_and_limit_length() {
+        let body = format!("Bearer sk-private {}", "x".repeat(600));
+        let sanitized = sanitize_response_body(&body, &["sk-private"]);
+
+        assert!(!sanitized.contains("sk-private"));
+        assert!(sanitized.contains("[redacted]"));
+        assert_eq!(sanitized.chars().count(), 512);
+    }
+
+    #[test]
+    fn empty_secrets_are_ignored() {
+        assert_eq!(sanitize_response_body("safe", &[""]), "safe");
+    }
 }

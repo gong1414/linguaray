@@ -136,6 +136,8 @@ pub struct GeneralSettings {
     /// remaining languages collapsed into a secondary "More languages..." menu.
     #[serde(rename = "commonLanguages")]
     pub common_languages: Vec<String>,
+    #[serde(default, rename = "translationServiceOrder")]
+    pub translation_service_order: Vec<String>,
 }
 
 impl Default for GeneralSettings {
@@ -151,6 +153,7 @@ impl Default for GeneralSettings {
             input_submit_mode: InputSubmitMode::default(),
             double_click_copy_result: true,
             common_languages: Vec::new(),
+            translation_service_order: Vec::new(),
         }
     }
 }
@@ -195,6 +198,8 @@ pub struct ProviderConfigEntry {
     /// older version of the settings file.
     #[serde(default, rename = "createdAt", skip_serializing_if = "Option::is_none")]
     pub created_at: Option<u64>,
+    #[serde(default, rename = "presetId", skip_serializing_if = "Option::is_none")]
+    pub preset_id: Option<String>,
 }
 
 impl Default for ProviderConfigEntry {
@@ -204,6 +209,7 @@ impl Default for ProviderConfigEntry {
             r#type: ProviderType::System,
             fields: HashMap::default(),
             created_at: None,
+            preset_id: None,
         }
     }
 }
@@ -273,6 +279,8 @@ pub struct Settings {
     pub appearance: AppearanceSettings,
     #[serde(default)]
     pub advanced: AdvancedSettings,
+    #[serde(default, rename = "catalogSeedRevision")]
+    pub catalog_seed_revision: u32,
 }
 
 impl Settings {
@@ -351,12 +359,137 @@ fn current_timestamp_millis() -> Result<u64, String> {
         .map_err(|_| "current timestamp does not fit in u64".to_owned())
 }
 
+pub fn apply_catalog_seed(settings: &mut Settings) -> bool {
+    apply_catalog_seed_for(settings, cfg!(target_os = "macos"))
+}
+
+pub fn apply_catalog_seed_for(settings: &mut Settings, macos: bool) -> bool {
+    if settings.catalog_seed_revision >= linguaray_engine::catalog::CATALOG_SEED_REVISION {
+        return false;
+    }
+
+    // Builds before the provider catalog created `system` eagerly on macOS.
+    // Treat that untouched system-only shape as first-run data so existing
+    // Flutter testers receive the new working Google Web default as well.
+    let legacy_system_only = !settings.providers.is_empty()
+        && settings.providers.keys().all(|id| id == "system")
+        && settings
+            .services
+            .values()
+            .all(|service| service.provider_id == "system");
+    if legacy_system_only && !macos {
+        settings.providers.remove("system");
+        settings
+            .services
+            .retain(|_, service| service.provider_id != "system");
+    }
+    if (settings.providers.is_empty() && settings.services.is_empty()) || legacy_system_only {
+        let seed = linguaray_engine::catalog::default_seed(macos);
+        for provider in seed.providers {
+            settings
+                .providers
+                .entry(provider.id.clone())
+                .or_insert_with(|| ProviderConfigEntry {
+                    id: provider.id,
+                    r#type: provider.provider_type,
+                    fields: HashMap::new(),
+                    created_at: None,
+                    preset_id: Some(provider.preset_id),
+                });
+        }
+        for service in seed.services {
+            let enabled = if service.enabled { "true" } else { "false" };
+            settings
+                .services
+                .entry(service.id.clone())
+                .and_modify(|entry| {
+                    entry
+                        .fields
+                        .insert("enabled".to_owned(), enabled.to_owned());
+                })
+                .or_insert_with(|| ServiceConfigEntry {
+                    id: service.id.clone(),
+                    provider_id: service.provider_id,
+                    r#type: ServiceType::Translation,
+                    name: service.id.clone(),
+                    fields: HashMap::from([("enabled".to_owned(), enabled.to_owned())]),
+                    created_at: None,
+                });
+        }
+        settings.general.default_translation_service = seed.default_translation_service;
+        settings.general.translation_service_order = seed.translation_service_order;
+    }
+
+    settings.catalog_seed_revision = linguaray_engine::catalog::CATALOG_SEED_REVISION;
+    true
+}
+
+pub fn append_translation_service_order(settings: &mut Settings, service_id: &str) {
+    if !settings
+        .general
+        .translation_service_order
+        .iter()
+        .any(|id| id == service_id)
+    {
+        settings
+            .general
+            .translation_service_order
+            .push(service_id.to_owned());
+    }
+}
+
+pub fn remove_translation_service_order(settings: &mut Settings, service_id: &str) {
+    settings
+        .general
+        .translation_service_order
+        .retain(|id| id != service_id);
+}
+
+pub fn remove_provider_from_translation_order(settings: &mut Settings, provider_id: &str) {
+    let prefix = format!("{provider_id}+");
+    settings
+        .general
+        .translation_service_order
+        .retain(|id| id != provider_id && !id.starts_with(&prefix));
+}
+
+pub fn effective_translation_service_order(
+    stored: &[String],
+    translation_ids: &[String],
+    created_at: &HashMap<String, Option<u64>>,
+) -> Vec<String> {
+    let known: std::collections::HashSet<&String> = translation_ids.iter().collect();
+    let mut order: Vec<String> = stored
+        .iter()
+        .filter(|id| known.contains(id))
+        .cloned()
+        .collect();
+    let mut missing: Vec<String> = translation_ids
+        .iter()
+        .filter(|id| !order.iter().any(|existing| existing == *id))
+        .cloned()
+        .collect();
+    missing.sort_by(|a, b| {
+        created_at
+            .get(a)
+            .copied()
+            .flatten()
+            .cmp(&created_at.get(b).copied().flatten())
+            .then(a.cmp(b))
+    });
+    order.extend(missing);
+    order
+}
+
 pub fn provider_config_from_settings(
     provider: &ProviderConfigEntry,
 ) -> Result<ProviderConfig, String> {
     let provider_type = provider.r#type;
     let mut options = BTreeMap::new();
     for (key, value) in &provider.fields {
+        if key == "presetId" {
+            continue;
+        }
         options.insert(key.clone(), serde_yaml::Value::String(value.clone()));
     }
     Ok(ProviderConfig {
@@ -375,7 +508,12 @@ where
     let mut map = serializer.serialize_map(Some(providers.len()))?;
     for (provider_id, provider) in providers {
         let config = provider_config_from_settings(provider).map_err(serde::ser::Error::custom)?;
-        let value = provider_config_json_value(&config).map_err(serde::ser::Error::custom)?;
+        let mut value = provider_config_json_value(&config).map_err(serde::ser::Error::custom)?;
+        if let Some(preset_id) = &provider.preset_id {
+            if let Value::Object(object) = &mut value {
+                object.insert("presetId".to_owned(), Value::String(preset_id.clone()));
+            }
+        }
         map.serialize_entry(provider_id, &value)?;
     }
     map.end()
@@ -400,11 +538,18 @@ where
 
 fn provider_entry_from_value(
     provider_id: &str,
-    value: Value,
+    mut value: Value,
 ) -> Result<ProviderConfigEntry, String> {
+    let preset_id = value.as_object_mut().and_then(|object| {
+        object
+            .remove("presetId")
+            .and_then(|value| value.as_str().map(str::to_owned))
+    });
     let config = serde_json::from_value::<ProviderConfig>(value)
         .map_err(|error| format!("invalid provider config `{provider_id}`: {error}"))?;
-    provider_entry_from_config(provider_id, &config)
+    let mut entry = provider_entry_from_config(provider_id, &config)?;
+    entry.preset_id = preset_id;
+    Ok(entry)
 }
 
 /// Deserializes the `Settings::services` map leniently: service entries whose
@@ -449,6 +594,7 @@ pub fn provider_entry_from_config(
         r#type: config.provider_type,
         fields,
         created_at: None,
+        preset_id: None,
     })
 }
 
@@ -512,6 +658,7 @@ mod tests {
                 ("defaultModel".to_owned(), "gpt-4o-mini".to_owned()),
             ]),
             created_at: Some(1_700_000_000),
+            preset_id: Some("deepl-pro".to_owned()),
         };
         let config = provider_config_from_settings(&entry).unwrap();
         let back = provider_entry_from_config("deepl-main", &config).unwrap();
@@ -747,6 +894,7 @@ mod tests {
                 r#type: ProviderType::DeepL,
                 fields: HashMap::from([("appKey".to_owned(), "test-key".to_owned())]),
                 created_at: None,
+                preset_id: Some("deepl-pro".to_owned()),
             },
         );
         settings.save(&path).expect("failed to save settings");
@@ -800,6 +948,10 @@ mod tests {
             Some(Value::String("test-key".to_owned()))
         );
         assert!(json.pointer("/providers/deepl-main/id").is_none());
+        assert_eq!(
+            json.pointer("/providers/deepl-main/presetId").cloned(),
+            Some(Value::String("deepl-pro".to_owned()))
+        );
         assert_eq!(json.get("lastUpdated").and_then(Value::as_u64), Some(0));
     }
 
@@ -816,5 +968,213 @@ mod tests {
         assert!(json.get("appearance").is_some());
         assert!(json.get("advanced").is_some());
         assert!(json.get("lastUpdated").is_some());
+    }
+
+    #[test]
+    fn macos_seed_uses_google_web_and_keeps_system_available() {
+        let mut settings = Settings::default();
+        assert!(apply_catalog_seed_for(&mut settings, true));
+        assert_eq!(settings.catalog_seed_revision, 1);
+        assert!(settings.providers.contains_key("system"));
+        assert!(settings.providers.contains_key("google-web"));
+        assert_eq!(
+            settings.providers["google-web"].preset_id.as_deref(),
+            Some("google-web")
+        );
+        assert_eq!(
+            settings.general.default_translation_service,
+            "google-web+translation"
+        );
+        assert_eq!(
+            settings.services["google-web+translation"]
+                .fields
+                .get("enabled"),
+            Some(&"true".to_owned())
+        );
+        assert_eq!(
+            settings.services["system+translation"]
+                .fields
+                .get("enabled"),
+            Some(&"false".to_owned())
+        );
+        assert_eq!(
+            settings.general.translation_service_order,
+            vec![
+                "google-web+translation".to_owned(),
+                "system+translation".to_owned()
+            ]
+        );
+        assert!(!apply_catalog_seed_for(&mut settings, true));
+    }
+
+    #[test]
+    fn windows_seed_skips_system_and_enables_google_web() {
+        let mut settings = Settings::default();
+        assert!(apply_catalog_seed_for(&mut settings, false));
+        assert!(!settings.providers.contains_key("system"));
+        assert_eq!(
+            settings.general.default_translation_service,
+            "google-web+translation"
+        );
+        assert_eq!(
+            settings.services["google-web+translation"]
+                .fields
+                .get("enabled"),
+            Some(&"true".to_owned())
+        );
+        assert!(!settings.providers.contains_key("bing-web"));
+    }
+
+    #[test]
+    fn seed_preserves_existing_user_configuration() {
+        let mut settings = Settings::default();
+        settings.providers.insert(
+            "deepl-main".to_owned(),
+            ProviderConfigEntry {
+                id: "deepl-main".to_owned(),
+                r#type: ProviderType::DeepL,
+                fields: HashMap::from([("authKey".to_owned(), "ref".to_owned())]),
+                created_at: None,
+                preset_id: Some("deepl-pro".to_owned()),
+            },
+        );
+        settings.general.default_translation_service = "deepl-main+translation".to_owned();
+        assert!(apply_catalog_seed_for(&mut settings, true));
+        assert_eq!(settings.catalog_seed_revision, 1);
+        assert_eq!(settings.providers.len(), 1);
+        assert_eq!(
+            settings.general.default_translation_service,
+            "deepl-main+translation"
+        );
+        assert!(!settings.providers.contains_key("google-web"));
+    }
+
+    #[test]
+    fn seed_upgrades_the_previous_system_only_default() {
+        let mut settings = Settings::default();
+        settings.providers.insert(
+            "system".to_owned(),
+            ProviderConfigEntry {
+                id: "system".to_owned(),
+                r#type: ProviderType::System,
+                fields: HashMap::new(),
+                created_at: None,
+                preset_id: None,
+            },
+        );
+        settings.services.insert(
+            "system+translation".to_owned(),
+            ServiceConfigEntry {
+                id: "system+translation".to_owned(),
+                provider_id: "system".to_owned(),
+                r#type: ServiceType::Translation,
+                name: "System Translation".to_owned(),
+                fields: HashMap::new(),
+                created_at: None,
+            },
+        );
+        settings.general.default_translation_service = "system+translation".to_owned();
+
+        assert!(apply_catalog_seed_for(&mut settings, true));
+        assert!(settings.providers.contains_key("google-web"));
+        assert_eq!(
+            settings.general.default_translation_service,
+            "google-web+translation"
+        );
+        assert_eq!(
+            settings.services["system+translation"]
+                .fields
+                .get("enabled")
+                .map(String::as_str),
+            Some("false")
+        );
+        assert_eq!(
+            settings.services["system+translation"].name,
+            "System Translation"
+        );
+    }
+
+    #[test]
+    fn windows_seed_removes_the_previous_unsupported_system_default() {
+        let mut settings = Settings::default();
+        settings.providers.insert(
+            "system".to_owned(),
+            ProviderConfigEntry {
+                id: "system".to_owned(),
+                r#type: ProviderType::System,
+                fields: HashMap::new(),
+                created_at: None,
+                preset_id: None,
+            },
+        );
+
+        assert!(apply_catalog_seed_for(&mut settings, false));
+        assert!(!settings.providers.contains_key("system"));
+        assert!(settings.providers.contains_key("google-web"));
+        assert_eq!(
+            settings.general.default_translation_service,
+            "google-web+translation"
+        );
+    }
+
+    #[test]
+    fn deleted_default_is_not_recreated() {
+        let mut settings = Settings::default();
+        apply_catalog_seed_for(&mut settings, false);
+        settings.providers.remove("google-web");
+        settings.services.remove("google-web+translation");
+        settings.general.translation_service_order.clear();
+        settings.general.default_translation_service.clear();
+        assert!(!apply_catalog_seed_for(&mut settings, false));
+        assert!(settings.providers.is_empty());
+        assert!(settings.services.is_empty());
+    }
+
+    #[test]
+    fn translation_order_appends_missing_by_created_at_then_id() {
+        let stored = vec!["b+translation".to_owned()];
+        let ids = vec![
+            "a+translation".to_owned(),
+            "b+translation".to_owned(),
+            "c+translation".to_owned(),
+        ];
+        let created = HashMap::from([
+            ("a+translation".to_owned(), Some(20)),
+            ("b+translation".to_owned(), Some(1)),
+            ("c+translation".to_owned(), Some(20)),
+        ]);
+        assert_eq!(
+            effective_translation_service_order(&stored, &ids, &created),
+            vec![
+                "b+translation".to_owned(),
+                "a+translation".to_owned(),
+                "c+translation".to_owned()
+            ]
+        );
+    }
+
+    #[test]
+    fn secret_field_values_are_not_copied_into_engine_as_preset_metadata() {
+        let entry = ProviderConfigEntry {
+            id: "openai".to_owned(),
+            r#type: ProviderType::OpenAi,
+            fields: HashMap::from([
+                (
+                    "apiKey".to_owned(),
+                    "linguaray-secret://openai/apiKey".to_owned(),
+                ),
+                ("presetId".to_owned(), "openai".to_owned()),
+            ]),
+            created_at: None,
+            preset_id: Some("openai".to_owned()),
+        };
+        let config = provider_config_from_settings(&entry).unwrap();
+        assert!(!config.options.contains_key("presetId"));
+        assert_eq!(
+            config.options.get("apiKey"),
+            Some(&serde_yaml::Value::String(
+                "linguaray-secret://openai/apiKey".to_owned()
+            ))
+        );
     }
 }

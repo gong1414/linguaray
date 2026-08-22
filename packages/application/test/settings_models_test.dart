@@ -55,4 +55,46 @@ void main() {
     expect(preferences.inputSubmitMode, InputSubmitMode.commandEnter);
     expect(preferences.autoCopyDetectedText, isFalse);
   });
+
+  test('catalog options expose fields, network policy and direct-add', () {
+    const googleWeb = ProviderTypeOption(
+      id: 'google-web',
+      label: 'Google Web',
+      isLlm: false,
+      category: 'builtIn',
+      networkPolicy: 'unofficialWeb',
+      stability: 'experimental',
+      fields: [],
+    );
+    const openai = ProviderTypeOption(
+      id: 'openai',
+      label: 'OpenAI',
+      isLlm: true,
+      engineTypeId: 'openai',
+      fields: [
+        ProviderFieldSpec(
+          key: 'apiKey',
+          label: 'API key',
+          secret: true,
+          requiredField: true,
+        ),
+        ProviderFieldSpec(
+          key: 'baseUrl',
+          label: 'Base URL',
+          secret: false,
+          requiredField: false,
+          advanced: true,
+        ),
+      ],
+    );
+
+    expect(googleWeb.hasUserFields, isFalse);
+    expect(googleWeb.isExperimental, isTrue);
+    expect(googleWeb.isUnofficialWeb, isTrue);
+    expect(openai.hasUserFields, isTrue);
+    expect(
+      openai.fields.where((field) => field.advanced).map((field) => field.key),
+      ['baseUrl'],
+    );
+  });
 }

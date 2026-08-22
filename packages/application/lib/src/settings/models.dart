@@ -188,6 +188,9 @@ final class ProviderFieldSpec {
     required this.secret,
     required this.requiredField,
     this.placeholder,
+    this.advanced = false,
+    this.defaultValue,
+    this.labelKey,
   });
 
   final String key;
@@ -195,6 +198,9 @@ final class ProviderFieldSpec {
   final bool secret;
   final bool requiredField;
   final String? placeholder;
+  final bool advanced;
+  final String? defaultValue;
+  final String? labelKey;
 }
 
 final class ProviderTypeOption {
@@ -203,18 +209,41 @@ final class ProviderTypeOption {
     required this.label,
     required this.isLlm,
     required this.fields,
+    this.engineTypeId,
+    this.category = 'traditionalApi',
+    this.networkPolicy = 'officialApi',
+    this.stability = 'stable',
+    this.homepageUrl,
+    this.apiKeyUrl,
+    this.descriptionKey,
+    this.baseUrl = '',
+    this.modelsUrl = '',
     this.supportsTranslation = true,
     this.supportsOcr = false,
     this.supportsDictionary = false,
   });
 
+  /// Stable catalog preset id.
   final String id;
   final String label;
   final bool isLlm;
   final List<ProviderFieldSpec> fields;
+  final String? engineTypeId;
+  final String category;
+  final String networkPolicy;
+  final String stability;
+  final String? homepageUrl;
+  final String? apiKeyUrl;
+  final String? descriptionKey;
+  final String baseUrl;
+  final String modelsUrl;
   final bool supportsTranslation;
   final bool supportsOcr;
   final bool supportsDictionary;
+
+  bool get hasUserFields => fields.isNotEmpty;
+  bool get isExperimental => stability == 'experimental';
+  bool get isUnofficialWeb => networkPolicy == 'unofficialWeb';
 }
 
 final class ProviderRecord {
@@ -224,11 +253,13 @@ final class ProviderRecord {
     required this.displayName,
     required this.publicFields,
     required this.storedSecretKeys,
+    this.presetId,
     this.usableForTranslation = true,
   });
 
   final String id;
   final String typeId;
+  final String? presetId;
   final String displayName;
   final Map<String, String> publicFields;
   final Set<String> storedSecretKeys;
@@ -242,11 +273,15 @@ final class ProviderDraft {
     required this.id,
     required this.typeId,
     required this.fields,
+    this.presetId,
   });
 
   final String id;
+
+  /// Underlying engine adapter type (`deepl`, `openai_compatible`, …).
   final String typeId;
   final Map<String, String> fields;
+  final String? presetId;
 }
 
 final class ProviderTestResult {

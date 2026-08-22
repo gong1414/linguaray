@@ -12,8 +12,6 @@ import '../../models/translation_result_record.dart';
 import '../../platform/permission_controller.dart';
 import '../../platform/platform_types.dart';
 import '../../platform/trigger_controller.dart';
-import '../../routes/settings/provider_meta.dart' show isServiceEnabled;
-import '../../routes/settings/services.dart' show ServicesSettingsPage;
 import '../../services/app_windows.dart'
     show
         canResizeMiniTranslatorWindow,
@@ -26,8 +24,11 @@ import '../../services/history_store.dart';
 import '../../services/llm_stream.dart';
 import '../../services/runtime.dart';
 import '../../services/settings_store.dart';
+import '../../ui/settings/settings_intent_controller.dart';
 import '../../utils/language_util.dart';
 import '../../utils/platform_util.dart';
+import '../../utils/provider_util.dart'
+    show isLlmProviderType, isServiceEnabled;
 import '../../widgets/toast_host.dart' show showToast;
 import '../../widgets/ui.dart' show DesignThemeContext, PopoverPanel, ToastTone;
 import 'limited_functionality_banner.dart';
@@ -534,10 +535,7 @@ class _MiniTranslatorPageState extends State<MiniTranslatorPage>
     if (service.type == ServiceType.translation) {
       final providerType = provider?.type;
       final isLlmProvider =
-          providerType == ProviderType.openAi ||
-          providerType == ProviderType.anthropic ||
-          providerType == ProviderType.ollama ||
-          providerType == ProviderType.xAi;
+          providerType != null && isLlmProviderType(providerType);
 
       if (isLlmProvider) {
         // Streaming LLM translation — update UI progressively
@@ -709,16 +707,23 @@ class _MiniTranslatorPageState extends State<MiniTranslatorPage>
   }
 
   void _handleManageTargets() {
+    generalSettingsIntentController.request(
+      GeneralSettingsIntent.manageTranslationTargets,
+    );
     showSettingsWindow();
   }
 
   void _handleManageCommonLanguages() {
-    ServicesSettingsPage.pendingOpenCommonLanguages = true;
+    generalSettingsIntentController.request(
+      GeneralSettingsIntent.manageCommonLanguages,
+    );
     showSettingsWindow();
   }
 
   void _handleAddTarget() {
-    ServicesSettingsPage.pendingOpenAddTarget = true;
+    generalSettingsIntentController.request(
+      GeneralSettingsIntent.addTranslationTarget,
+    );
     showSettingsWindow();
   }
 
