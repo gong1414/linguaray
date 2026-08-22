@@ -51,6 +51,11 @@ final class GeneralSettingsLabels {
     this.submitModifierEnter = '',
     this.input = '',
     this.translationBehaviour = '',
+    this.translationTargets = '',
+    this.translationTargetsHint = '',
+    this.noTranslationTargets = '',
+    this.manageTranslationTargets = '',
+    this.autoDetect = '',
     this.error = '',
     this.errorMessage,
     this.retry = '',
@@ -72,6 +77,11 @@ final class GeneralSettingsLabels {
   final String submitModifierEnter;
   final String input;
   final String translationBehaviour;
+  final String translationTargets;
+  final String translationTargetsHint;
+  final String noTranslationTargets;
+  final String manageTranslationTargets;
+  final String autoDetect;
   final String error;
   final String Function(String? code)? errorMessage;
   final String retry;

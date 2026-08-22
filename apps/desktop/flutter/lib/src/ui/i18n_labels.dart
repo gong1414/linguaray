@@ -90,6 +90,7 @@ TranslationWorkspaceLabels translationWorkspaceLabels() {
     recoveryConfigureProvider: t.ui.recovery.configure_translation_provider,
     recoveryEditInput: t.ui.recovery.edit_input,
     recoveryChooseLanguage: t.ui.recovery.choose_language,
+    recoverySwitchToGoogleWeb: t.ui.recovery.switch_to_google_web,
   );
 }
 
@@ -210,6 +211,11 @@ GeneralSettingsLabels generalSettingsLabels() => GeneralSettingsLabels(
   submitModifierEnter: t.settings.general.row.submit_with_meta_enter_mac,
   input: t.settings.general.section.input,
   translationBehaviour: t.settings.general.section.translation_behaviour,
+  translationTargets: t.settings.general.section.translation_target,
+  translationTargetsHint: t.settings.general.row.translation_target_hint,
+  noTranslationTargets: t.settings.general.row.no_translation_targets,
+  manageTranslationTargets: t.settings.general.button.manage_targets,
+  autoDetect: t.mini_translator.language.auto_detect,
   error: t.ui.providers.save_failed,
   errorMessage: appErrorMessage,
   retry: t.workbench.translation.retry,

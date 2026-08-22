@@ -44,65 +44,65 @@ pub mod specs {
     spec!(
         OPENAI,
         "openai",
-        "https://api.openai.com",
-        "/v1/chat/completions",
-        "/v1/models",
+        "https://api.openai.com/v1",
+        "/chat/completions",
+        "/models",
         true
     );
     spec!(
         XAI,
         "xai",
-        "https://api.x.ai",
-        "/v1/chat/completions",
-        "/v1/models",
+        "https://api.x.ai/v1",
+        "/chat/completions",
+        "/models",
         true
     );
     spec!(
         DEEPSEEK,
         "deepseek",
-        "https://api.deepseek.com",
-        "/v1/chat/completions",
-        "/v1/models",
+        "https://api.deepseek.com/v1",
+        "/chat/completions",
+        "/models",
         true
     );
     spec!(
         QWEN,
         "qwen",
-        "https://dashscope.aliyuncs.com/compatible-mode",
-        "/v1/chat/completions",
-        "/v1/models",
+        "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        "/chat/completions",
+        "/models",
         true
     );
     spec!(
         ZHIPU,
         "zhipu",
-        "https://open.bigmodel.cn",
-        "/api/paas/v4/chat/completions",
-        "/api/paas/v4/models",
+        "https://open.bigmodel.cn/api/paas/v4",
+        "/chat/completions",
+        "/models",
         true
     );
     spec!(
         MOONSHOT,
         "moonshot",
-        "https://api.moonshot.cn",
-        "/v1/chat/completions",
-        "/v1/models",
+        "https://api.moonshot.cn/v1",
+        "/chat/completions",
+        "/models",
         true
     );
     spec!(
         DOUBAO,
         "doubao",
-        "https://ark.cn-beijing.volces.com",
-        "/api/v3/chat/completions",
-        "/api/v3/models",
+        "https://ark.cn-beijing.volces.com/api/v3",
+        "/chat/completions",
+        "/models",
         true
     );
     spec!(
         GROQ,
         "groq",
-        "https://api.groq.com/openai",
-        "/v1/chat/completions",
-        "/v1/models",
+        "https://api.groq.com/openai/v1",
+        "/chat/completions",
+        "/models",
         true
     );
     spec!(
@@ -114,13 +114,14 @@ pub mod specs {
         true
     );
     // Catch-all for self-hosted or aggregator endpoints (vLLM, LM Studio,
-    // LiteLLM, OpenRouter, SiliconFlow, ...): the user supplies the base URL.
+    // LiteLLM, OpenRouter, SiliconFlow, ...): the user supplies a versioned
+    // API root such as http://127.0.0.1:1234/v1.
     spec!(
         OPENAI_COMPATIBLE,
         "openai_compatible",
         "",
-        "/v1/chat/completions",
-        "/v1/models",
+        "/chat/completions",
+        "/models",
         false
     );
 }
@@ -135,6 +136,8 @@ pub struct OpenAiCompatibleProviderConfig {
     pub base_url: Option<String>,
     #[serde(rename = "defaultModel", alias = "default_model", default)]
     pub default_model: String,
+    #[serde(rename = "modelsUrl", alias = "models_url", default)]
+    pub models_url: Option<String>,
 }
 
 fn configured_default_model(default_model: &str) -> Result<String, String> {
@@ -173,11 +176,18 @@ impl OpenAiCompatibleProvider {
         }
         let default_model = configured_default_model(&config.default_model)?;
 
+        let models_url = config
+            .models_url
+            .as_deref()
+            .map(str::trim)
+            .filter(|url| !url.is_empty())
+            .map(str::to_owned);
         let llm_service = Arc::new(OpenAiCompatibleLlmService {
             spec,
             base_url,
             api_key,
             default_model,
+            models_url,
             client: reqwest::Client::new(),
         });
 
@@ -210,12 +220,13 @@ pub struct OpenAiCompatibleLlmService {
     base_url: String,
     api_key: String,
     default_model: String,
+    models_url: Option<String>,
     client: reqwest::Client,
 }
 
 impl OpenAiCompatibleLlmService {
-    fn join_url(&self, path: &str) -> String {
-        format!("{}{}", self.base_url.trim_end_matches('/'), path)
+    fn chat_url(&self) -> String {
+        crate::catalog::urls::openai_chat_completions_url(&self.base_url)
     }
 
     fn authorized(&self, request: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
@@ -276,10 +287,7 @@ impl OpenAiCompatibleLlmService {
     ) -> Result<reqwest::Response, LlmError> {
         let body = self.build_openai_body(request, stream);
         let response = self
-            .authorized(
-                self.client
-                    .post(self.join_url(self.spec.chat_completions_path)),
-            )
+            .authorized(self.client.post(self.chat_url()))
             .json(&body)
             .send()
             .await
@@ -288,6 +296,9 @@ impl OpenAiCompatibleLlmService {
         if !response.status().is_success() {
             let status = response.status();
             let body_text = response.text().await.unwrap_or_default();
+            let body_text = crate::catalog::urls::truncate_error_body(
+                &crate::catalog::urls::redact_secrets(&body_text, &[self.api_key.as_str()]),
+            );
             return Err(match status.as_u16() {
                 401 | 403 => LlmError::AuthError(body_text),
                 429 => LlmError::RateLimitError(body_text),
@@ -300,36 +311,41 @@ impl OpenAiCompatibleLlmService {
     }
 
     async fn list_models(&self) -> Result<Vec<String>, LlmError> {
-        let response = self
-            .authorized(self.client.get(self.join_url(self.spec.models_path)))
-            .send()
-            .await
-            .map_err(|e| LlmError::NetworkError(e.to_string()))?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let body = response.text().await.unwrap_or_default();
-            return Err(match status.as_u16() {
-                401 | 403 => LlmError::AuthError(body),
-                _ => LlmError::NetworkError(format!("HTTP {status}: {body}")),
-            });
-        }
-
-        let json: serde_json::Value = response
-            .json()
-            .await
-            .map_err(|e| LlmError::SerializationError(e.to_string()))?;
-
-        let models = json["data"]
-            .as_array()
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(|m| m["id"].as_str().map(String::from))
-                    .collect::<Vec<_>>()
-            })
-            .unwrap_or_default();
-
-        Ok(models)
+        let candidates = crate::catalog::urls::model_discovery_candidates(
+            &self.base_url,
+            self.models_url.as_deref(),
+        );
+        let secrets: Vec<&str> = if self.api_key.is_empty() {
+            Vec::new()
+        } else {
+            vec![self.api_key.as_str()]
+        };
+        let client = reqwest::Client::builder()
+            .timeout(crate::catalog::MODELS_FETCH_TIMEOUT)
+            .build()
+            .map_err(|error| LlmError::NetworkError(error.to_string()))?;
+        crate::catalog::fetch_models_with_candidates(&candidates, &secrets, |url| {
+            let client = client.clone();
+            let api_key = self.api_key.clone();
+            async move {
+                let mut request = client.get(&url);
+                if !api_key.is_empty() {
+                    request = request.header("Authorization", format!("Bearer {api_key}"));
+                }
+                let response = request.send().await.map_err(|error| error.to_string())?;
+                let status = response.status().as_u16();
+                let body = response.text().await.unwrap_or_default();
+                Ok((status, body))
+            }
+        })
+        .await
+        .map_err(|error| {
+            if error.contains("HTTP 401") || error.contains("HTTP 403") {
+                LlmError::AuthError(error)
+            } else {
+                LlmError::NetworkError(error)
+            }
+        })
     }
 }
 
@@ -442,6 +458,7 @@ mod tests {
             api_key: api_key.to_owned(),
             base_url: base_url.map(str::to_owned),
             default_model: model.to_owned(),
+            models_url: None,
         }
     }
 
@@ -454,9 +471,7 @@ mod tests {
         .expect("provider");
         assert_eq!(provider.name(), "deepseek");
         assert_eq!(
-            provider
-                .llm_service
-                .join_url(specs::DEEPSEEK.chat_completions_path),
+            provider.llm_service.chat_url(),
             "https://api.deepseek.com/v1/chat/completions"
         );
     }
@@ -467,9 +482,7 @@ mod tests {
             OpenAiCompatibleProvider::new(&specs::ZHIPU, config("sk-test", None, "glm-4.5"))
                 .expect("provider");
         assert_eq!(
-            provider
-                .llm_service
-                .join_url(specs::ZHIPU.chat_completions_path),
+            provider.llm_service.chat_url(),
             "https://open.bigmodel.cn/api/paas/v4/chat/completions"
         );
     }
@@ -533,9 +546,14 @@ mod tests {
         )
         .expect("provider");
         assert_eq!(
-            provider
-                .llm_service
-                .join_url(specs::OPENAI.chat_completions_path),
+            provider.llm_service.chat_url(),
+            "https://proxy.example.com/v1/chat/completions"
+        );
+        assert_eq!(
+            crate::catalog::urls::join_openai_path(
+                "https://proxy.example.com/v1",
+                "/v1/chat/completions"
+            ),
             "https://proxy.example.com/v1/chat/completions"
         );
     }

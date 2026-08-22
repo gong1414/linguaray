@@ -4,6 +4,11 @@
 #![allow(clippy::large_const_arrays)]
 
 mod api_server;
+mod catalog;
+pub use catalog::{
+    list_catalog_snapshot_models, list_provider_catalog, CatalogCategory, CatalogFieldSpec,
+    CatalogModelChoice, CatalogNetworkPolicy, CatalogProviderPreset, CatalogStability,
+};
 pub mod domain;
 mod remote;
 pub mod runtime;

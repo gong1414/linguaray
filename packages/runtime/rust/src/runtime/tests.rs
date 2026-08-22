@@ -1,4 +1,5 @@
 use super::*;
+use crate::domain::settings::ServiceType;
 
 fn unique_data_dir() -> PathBuf {
     std::env::temp_dir().join(format!(
@@ -137,6 +138,7 @@ fn hydrated_provider_secrets_never_enter_settings_json() {
                         ("apiKey".to_owned(), reference.to_owned()),
                         ("defaultModel".to_owned(), "gpt-4o-mini".to_owned()),
                     ]),
+                    None,
                 )
                 .await
                 .expect("failed to add provider");
@@ -305,7 +307,12 @@ fn system_dictionary_lookup_returns_structured_definitions() {
             runtime
                 .clone()
                 .settings()
-                .update_provider("system".to_owned(), "system".to_owned(), HashMap::new())
+                .update_provider(
+                    "system".to_owned(),
+                    "system".to_owned(),
+                    HashMap::new(),
+                    None,
+                )
                 .await
                 .expect("failed to add system provider");
         });
@@ -439,6 +446,7 @@ fn subscribe_receives_change_for_each_section() {
                     input_submit_mode: None,
                     double_click_copy_result: None,
                     common_languages: None,
+                    translation_service_order: None,
                 })
                 .await
                 .expect("update_general failed");
@@ -579,7 +587,12 @@ fn lookup_requires_word() {
             runtime
                 .clone()
                 .settings()
-                .update_provider("system".to_owned(), "system".to_owned(), HashMap::new())
+                .update_provider(
+                    "system".to_owned(),
+                    "system".to_owned(),
+                    HashMap::new(),
+                    None,
+                )
                 .await
                 .expect("failed to add system provider");
         });
@@ -796,4 +809,121 @@ fn prompt_template_is_untouched_when_nothing_matched() {
         render_prompt_template("Translate {{text}}.", "en", "zh", "hello", &[]),
         "Translate hello."
     );
+}
+
+#[test]
+fn first_launch_seeds_catalog_once() {
+    let data_dir = unique_data_dir();
+    let runtime = Runtime::new(data_dir.display().to_string()).expect("runtime");
+    block_on(async {
+        let settings = runtime.clone().settings();
+        let json = settings.get_json().await.expect("json");
+        let value = serde_json::from_str::<serde_json::Value>(&json).expect("parse");
+        assert_eq!(
+            value.get("catalogSeedRevision").and_then(|v| v.as_u64()),
+            Some(1)
+        );
+        let providers = settings.list_providers().await.expect("providers");
+        let ids: Vec<_> = providers
+            .iter()
+            .map(|provider| provider.id.as_str())
+            .collect();
+        if cfg!(target_os = "macos") {
+            assert!(ids.contains(&"system"));
+            assert!(ids.contains(&"google-web"));
+        } else {
+            assert!(!ids.contains(&"system"));
+            assert!(ids.contains(&"google-web"));
+        }
+        let general = settings.get_general().await.expect("general");
+        assert_eq!(
+            general.default_translation_service,
+            "google-web+translation"
+        );
+        let services = settings.list_services().await.expect("services");
+        let google = services
+            .iter()
+            .find(|service| service.id == "google-web+translation")
+            .expect("google-web service");
+        assert_ne!(
+            google.fields.get("enabled").map(String::as_str),
+            Some("false")
+        );
+    });
+}
+
+#[test]
+fn deleting_seeded_provider_does_not_recreate_it() {
+    let data_dir = unique_data_dir();
+    let runtime = Runtime::new(data_dir.display().to_string()).expect("runtime");
+    block_on(async {
+        let settings = runtime.clone().settings();
+        settings
+            .delete_provider("google-web".to_owned())
+            .await
+            .expect("delete");
+        let providers = settings.list_providers().await.expect("providers");
+        assert!(!providers.iter().any(|provider| provider.id == "google-web"));
+        let json = settings.get_json().await.expect("json");
+        assert!(json.contains("\"catalogSeedRevision\": 1"));
+        assert!(!json.contains("google-web"));
+    });
+}
+
+#[test]
+fn deleting_a_default_service_clears_the_stale_default_reference() {
+    let data_dir = unique_data_dir();
+    let runtime = Runtime::new(data_dir.display().to_string()).expect("runtime");
+    block_on(async {
+        let settings = runtime.clone().settings();
+        settings
+            .delete_service("google-web+translation".to_owned())
+            .await
+            .expect("delete");
+        let general = settings.get_general().await.expect("general");
+        assert!(general.default_translation_service.is_empty());
+        assert!(!general
+            .translation_service_order
+            .iter()
+            .any(|id| id == "google-web+translation"));
+    });
+}
+
+#[test]
+fn translation_service_order_is_persisted() {
+    let data_dir = unique_data_dir();
+    let runtime = Runtime::new(data_dir.display().to_string()).expect("runtime");
+    block_on(async {
+        let settings = runtime.clone().settings();
+        settings
+            .update_provider(
+                "bing-web".to_owned(),
+                "bing_web".to_owned(),
+                HashMap::new(),
+                Some("bing-web".to_owned()),
+            )
+            .await
+            .expect("add bing");
+        let order = settings
+            .set_translation_service_order(vec![
+                "bing-web+translation".to_owned(),
+                "google-web+translation".to_owned(),
+            ])
+            .await
+            .expect("order");
+        assert_eq!(
+            order.first().map(String::as_str),
+            Some("bing-web+translation")
+        );
+        let services = settings.list_services().await.expect("services");
+        let translation: Vec<_> = services
+            .into_iter()
+            .filter(|service| matches!(service.r#type, ServiceType::Translation))
+            .map(|service| service.id)
+            .collect();
+        assert_eq!(
+            translation.first().map(String::as_str),
+            Some("bing-web+translation")
+        );
+    });
 }

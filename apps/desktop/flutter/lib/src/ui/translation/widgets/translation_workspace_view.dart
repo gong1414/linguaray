@@ -47,6 +47,7 @@ final class TranslationWorkspaceLabels {
     this.recoveryConfigureProvider = '',
     this.recoveryEditInput = '',
     this.recoveryChooseLanguage = '',
+    this.recoverySwitchToGoogleWeb = '',
   });
 
   final String title;
@@ -88,6 +89,7 @@ final class TranslationWorkspaceLabels {
   final String recoveryConfigureProvider;
   final String recoveryEditInput;
   final String recoveryChooseLanguage;
+  final String recoverySwitchToGoogleWeb;
 }
 
 class TranslationWorkspaceView extends StatefulWidget {
@@ -980,6 +982,7 @@ class _ResultBody extends StatelessWidget {
         labels.recoveryConfigureProvider,
       RecoveryAction.editInput => labels.recoveryEditInput,
       RecoveryAction.chooseLanguage => labels.recoveryChooseLanguage,
+      RecoveryAction.switchToGoogleWeb => labels.recoverySwitchToGoogleWeb,
       _ => labels.retry,
     };
   }

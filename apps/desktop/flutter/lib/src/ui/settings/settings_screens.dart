@@ -9,9 +9,11 @@ import 'package:linguaray_application/linguaray_application.dart';
 
 import '../../config/dependencies.dart';
 import '../../i18n/i18n.dart';
-import '../../routes/settings/about.dart' show openExternalUrl;
+import '../../routes/settings/provider_catalog.dart';
+import '../../utils/external_url.dart';
 import '../i18n_labels.dart';
 import '../shared/status_message.dart';
+import 'settings_intent_controller.dart';
 import 'settings_labels.dart';
 import 'settings_shell_view.dart';
 import 'view_models/permissions_view_model.dart';
@@ -79,16 +81,61 @@ class SettingsHostScreen extends StatelessWidget {
   }
 }
 
-class GeneralSettingsScreen extends ConsumerWidget {
+class GeneralSettingsScreen extends ConsumerStatefulWidget {
   const GeneralSettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<GeneralSettingsScreen> createState() =>
+      _GeneralSettingsScreenState();
+}
+
+class _GeneralSettingsScreenState extends ConsumerState<GeneralSettingsScreen> {
+  bool _intentScheduled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    generalSettingsIntentController.addListener(_scheduleIntent);
+    _scheduleIntent();
+  }
+
+  @override
+  void dispose() {
+    generalSettingsIntentController.removeListener(_scheduleIntent);
+    super.dispose();
+  }
+
+  void _scheduleIntent() {
+    if (!mounted || _intentScheduled) return;
+    _intentScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      _intentScheduled = false;
+      if (!mounted) return;
+      final state = ref.read(generalSettingsViewModelProvider);
+      if (state.preferences == null || state.translationLanguages.isEmpty) {
+        return;
+      }
+      final intent = generalSettingsIntentController.takePending();
+      if (intent == null) return;
+      switch (intent) {
+        case GeneralSettingsIntent.manageCommonLanguages:
+          await _manageCommonLanguages(state);
+        case GeneralSettingsIntent.manageTranslationTargets:
+          await _manageTranslationTargets(state);
+        case GeneralSettingsIntent.addTranslationTarget:
+          await _addTranslationTarget(state);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(generalSettingsViewModelProvider);
     final preferences = state.preferences;
     if (preferences == null || state.loading) {
       return const Center(child: CircularProgressIndicator());
     }
+    if (generalSettingsIntentController.hasPending) _scheduleIntent();
     return GeneralSettingsView(
       labels: generalSettingsLabels(),
       preferences: preferences,
@@ -134,7 +181,313 @@ class GeneralSettingsScreen extends ConsumerWidget {
             .read(generalSettingsViewModelProvider.notifier)
             .setDoubleClickCopyResult(value),
       ),
+      onManageTranslationTargets: () => unawaited(
+        _manageTranslationTargets(ref.read(generalSettingsViewModelProvider)),
+      ),
     );
+  }
+
+  Future<void> _manageCommonLanguages(GeneralSettingsViewState state) async {
+    final preferences = state.preferences;
+    if (preferences == null) return;
+    final selected = {...preferences.commonLanguages};
+    final result = await showDialog<List<String>>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(t.settings.general.button.manage_languages),
+          content: SizedBox(
+            width: 420,
+            height: 400,
+            child: ListView(
+              children: [
+                for (final language in state.translationLanguages)
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(language.name),
+                    value: selected.contains(language.code),
+                    onChanged: (checked) => setDialogState(() {
+                      if (checked ?? false) {
+                        selected.add(language.code);
+                      } else {
+                        selected.remove(language.code);
+                      }
+                    }),
+                  ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(t.common.ui.button.cancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, selected.toList()),
+              child: Text(t.common.ui.button.save),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (result == null || !mounted) return;
+    await ref
+        .read(generalSettingsViewModelProvider.notifier)
+        .setCommonLanguages(result);
+  }
+
+  Future<void> _manageTranslationTargets(GeneralSettingsViewState state) async {
+    final preferences = state.preferences;
+    if (preferences == null) return;
+    final targets = [...preferences.translationTargets];
+    final result = await showDialog<List<TranslationTargetRule>>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(t.settings.general.button.manage_targets),
+          content: SizedBox(
+            width: 520,
+            height: 360,
+            child: targets.isEmpty
+                ? Center(
+                    child: Text(t.settings.general.row.no_translation_targets),
+                  )
+                : ListView.builder(
+                    itemCount: targets.length,
+                    itemBuilder: (context, index) {
+                      final target = targets[index];
+                      return ListTile(
+                        key: ValueKey(
+                          'translation-target-${target.source}-${target.target}',
+                        ),
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(
+                          '${_languageName(state, target.source, source: true)}'
+                          ' → ${_languageName(state, target.target)}',
+                        ),
+                        leading: Switch(
+                          value: target.enabled,
+                          onChanged: (enabled) => setDialogState(() {
+                            targets[index] = TranslationTargetRule(
+                              source: target.source,
+                              target: target.target,
+                              enabled: enabled,
+                            );
+                          }),
+                        ),
+                        trailing: Wrap(
+                          children: [
+                            IconButton(
+                              tooltip: t.common.ui.button.edit,
+                              icon: const Icon(Icons.edit_outlined),
+                              onPressed: () async {
+                                final edited = await _showTargetEditor(
+                                  state,
+                                  targets: targets,
+                                  editingIndex: index,
+                                );
+                                if (edited != null && context.mounted) {
+                                  setDialogState(() => targets[index] = edited);
+                                }
+                              },
+                            ),
+                            IconButton(
+                              tooltip: t.common.ui.button.delete,
+                              icon: const Icon(Icons.delete_outline),
+                              onPressed: () =>
+                                  setDialogState(() => targets.removeAt(index)),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+          ),
+          actions: [
+            TextButton.icon(
+              key: const ValueKey('add-translation-target'),
+              onPressed: () async {
+                final added = await _showTargetEditor(state, targets: targets);
+                if (added != null && context.mounted) {
+                  setDialogState(() => targets.add(added));
+                }
+              },
+              icon: const Icon(Icons.add),
+              label: Text(t.settings.general.button.add_target),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(t.common.ui.button.cancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, targets),
+              child: Text(t.common.ui.button.save),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (result == null || !mounted) return;
+    await ref
+        .read(generalSettingsViewModelProvider.notifier)
+        .setTranslationTargets(result);
+  }
+
+  Future<void> _addTranslationTarget(GeneralSettingsViewState state) async {
+    final preferences = state.preferences;
+    if (preferences == null) return;
+    final targets = [...preferences.translationTargets];
+    final added = await _showTargetEditor(state, targets: targets);
+    if (added == null || !mounted) return;
+    await ref
+        .read(generalSettingsViewModelProvider.notifier)
+        .setTranslationTargets([...targets, added]);
+  }
+
+  Future<TranslationTargetRule?> _showTargetEditor(
+    GeneralSettingsViewState state, {
+    required List<TranslationTargetRule> targets,
+    int? editingIndex,
+  }) async {
+    if (state.translationLanguages.isEmpty) return null;
+    final existing = editingIndex == null ? null : targets[editingIndex];
+    var source = existing?.source ?? 'auto';
+    var target = existing?.target ?? _defaultTarget(state.translationLanguages);
+    var enabled = existing?.enabled ?? true;
+
+    return showDialog<TranslationTargetRule>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final duplicate = targets.indexed.any(
+            (entry) =>
+                entry.$1 != editingIndex &&
+                entry.$2.source == source &&
+                entry.$2.target == target,
+          );
+          final sameLanguage = source != 'auto' && source == target;
+          final canSave = !duplicate && !sameLanguage;
+          return AlertDialog(
+            title: Text(
+              existing == null
+                  ? t.settings.general.editor.add_target_title
+                  : t.settings.general.editor.edit_target_title,
+            ),
+            content: SizedBox(
+              width: 440,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<String>(
+                    key: ValueKey('source-$source'),
+                    initialValue: source,
+                    decoration: InputDecoration(
+                      labelText: t.settings.general.editor.row.source_language,
+                    ),
+                    items: [
+                      DropdownMenuItem(
+                        value: 'auto',
+                        child: Text(t.mini_translator.language.auto_detect),
+                      ),
+                      for (final language in state.translationLanguages)
+                        DropdownMenuItem(
+                          value: language.code,
+                          child: Text(language.name),
+                        ),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) {
+                        setDialogState(() => source = value);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 14),
+                  DropdownButtonFormField<String>(
+                    key: ValueKey('target-$target'),
+                    initialValue: target,
+                    decoration: InputDecoration(
+                      labelText: t.settings.general.editor.row.target_language,
+                    ),
+                    items: [
+                      for (final language in state.translationLanguages)
+                        DropdownMenuItem(
+                          value: language.code,
+                          child: Text(language.name),
+                        ),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) {
+                        setDialogState(() => target = value);
+                      }
+                    },
+                  ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(t.settings.advanced.enable),
+                    value: enabled,
+                    onChanged: (value) => setDialogState(() => enabled = value),
+                  ),
+                  if (sameLanguage || duplicate)
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        sameLanguage
+                            ? t.settings.general.editor.same_language
+                            : t.settings.general.editor.duplicate,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: Text(t.common.ui.button.cancel),
+              ),
+              FilledButton(
+                onPressed: canSave
+                    ? () => Navigator.pop(
+                        dialogContext,
+                        TranslationTargetRule(
+                          source: source,
+                          target: target,
+                          enabled: enabled,
+                        ),
+                      )
+                    : null,
+                child: Text(t.common.ui.button.save),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  String _defaultTarget(List<LanguageChoice> languages) {
+    for (final preferred in const ['zh-Hans', 'en']) {
+      if (languages.any((language) => language.code == preferred)) {
+        return preferred;
+      }
+    }
+    return languages.first.code;
+  }
+
+  String _languageName(
+    GeneralSettingsViewState state,
+    String code, {
+    bool source = false,
+  }) {
+    if (source && code == 'auto') {
+      return t.mini_translator.language.auto_detect;
+    }
+    for (final language in state.translationLanguages) {
+      if (language.code == code) return language.name;
+    }
+    return code;
   }
 }
 
@@ -155,6 +508,11 @@ class ServicesSettingsScreen extends ConsumerWidget {
       ),
       onMakeDefault: (id) => unawaited(
         ref.read(servicesSettingsViewModelProvider.notifier).makeDefault(id),
+      ),
+      onReorderTranslation: (oldIndex, newIndex) => unawaited(
+        ref
+            .read(servicesSettingsViewModelProvider.notifier)
+            .reorderTranslation(oldIndex, newIndex),
       ),
       onConfigureProviders: () => context.go('/settings/providers'),
       onAdd: () => unawaited(_addService(context, ref)),
@@ -322,9 +680,12 @@ class _ProviderEditorDialog extends ConsumerStatefulWidget {
 
 class _ProviderEditorDialogState extends ConsumerState<_ProviderEditorDialog> {
   late String _id = widget.providerId ?? '';
-  late String _typeId = 'openai';
+  late String _presetId = '';
   final Map<String, String> _fields = {};
   Set<String> _storedSecrets = {};
+  List<String> _models = const [];
+  bool _loadingModels = false;
+  String? _modelsError;
 
   @override
   void initState() {
@@ -335,17 +696,66 @@ class _ProviderEditorDialogState extends ConsumerState<_ProviderEditorDialog> {
           .where((item) => item.id == widget.providerId)
           .firstOrNull;
       if (provider != null) {
-        _typeId = provider.typeId;
+        final selected = findProviderCatalogOption(
+          state.types,
+          presetId: provider.presetId,
+          engineTypeId: provider.typeId,
+        );
+        _presetId = selected?.id ?? provider.typeId;
+        if (selected != null) {
+          _fields.addAll(providerPresetInitialFields(selected));
+        }
         _fields.addAll(provider.publicFields);
         _storedSecrets = provider.storedSecretKeys;
       }
-    } else if (state.types.isNotEmpty) {
-      _typeId = state.types.first.id;
     }
   }
 
-  ProviderDraft get _draft =>
-      ProviderDraft(id: _id.trim(), typeId: _typeId, fields: Map.of(_fields));
+  ProviderTypeOption? get _selected => findProviderCatalogOption(
+    ref.read(providersSettingsViewModelProvider).types,
+    presetId: _presetId,
+  );
+
+  ProviderDraft get _draft {
+    final selected = _selected;
+    return ProviderDraft(
+      id: _id.trim(),
+      typeId: selected?.engineTypeId ?? selected?.id ?? '',
+      presetId: selected?.id,
+      fields: Map.of(_fields),
+    );
+  }
+
+  String _suggestId(String presetId, List<ProviderRecord> providers) {
+    final used = {for (final provider in providers) provider.id};
+    if (!used.contains(presetId)) return presetId;
+    for (var suffix = 2; ; suffix++) {
+      final candidate = '$presetId-$suffix';
+      if (!used.contains(candidate)) return candidate;
+    }
+  }
+
+  Future<void> _fetchModels() async {
+    setState(() {
+      _loadingModels = true;
+      _modelsError = null;
+    });
+    try {
+      final models = await ref
+          .read(workspaceSettingsRepositoryProvider)
+          .discoverProviderModels(_draft);
+      if (!mounted) return;
+      setState(() {
+        _models = models;
+        _modelsError = models.isEmpty ? t.settings.providers.model_empty : null;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _modelsError = t.settings.providers.model_failed);
+    } finally {
+      if (mounted) setState(() => _loadingModels = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -354,12 +764,15 @@ class _ProviderEditorDialogState extends ConsumerState<_ProviderEditorDialog> {
       labels: providersSettingsLabels(),
       types: state.types,
       draftId: _id,
-      typeId: _typeId,
+      typeId: _presetId,
       fields: _fields,
       storedSecretKeys: _storedSecrets,
       testing: state.testing,
       testResult: state.testResult,
       saving: state.saving,
+      models: _models,
+      loadingModels: _loadingModels,
+      modelsError: _modelsError,
       operationError: switch (state.operationErrorCode) {
         'validation_missing' => providersSettingsLabels().validationMissing,
         'save_failed' => providersSettingsLabels().saveFailed,
@@ -370,15 +783,29 @@ class _ProviderEditorDialogState extends ConsumerState<_ProviderEditorDialog> {
         ref.read(providersSettingsViewModelProvider.notifier).clearFeedback();
         setState(() => _id = value);
       },
-      onTypeChanged: (value) => setState(() {
-        ref.read(providersSettingsViewModelProvider.notifier).clearFeedback();
-        _typeId = value;
-        _fields.clear();
-      }),
+      onTypeChanged: (value) {
+        final selected = findProviderCatalogOption(
+          state.types,
+          presetId: value,
+        );
+        if (selected == null) return;
+        setState(() {
+          ref.read(providersSettingsViewModelProvider.notifier).clearFeedback();
+          _presetId = selected.id;
+          _fields
+            ..clear()
+            ..addAll(providerPresetInitialFields(selected));
+          if (widget.providerId == null) {
+            _id = _suggestId(selected.id, state.providers);
+          }
+          _storedSecrets = {};
+        });
+      },
       onFieldChanged: (key, value) {
         ref.read(providersSettingsViewModelProvider.notifier).clearFeedback();
         setState(() => _fields[key] = value);
       },
+      onFetchModels: () => unawaited(_fetchModels()),
       onTest: () => unawaited(
         ref.read(providersSettingsViewModelProvider.notifier).test(_draft),
       ),

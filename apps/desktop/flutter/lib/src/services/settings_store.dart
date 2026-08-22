@@ -49,6 +49,7 @@ class SettingsStore extends ChangeNotifier {
     inputSubmitMode: InputSubmitMode.enter,
     doubleClickCopyResult: true,
     commonLanguages: defaultCommonLanguages(),
+    translationServiceOrder: const [],
   );
   AppearanceSettings _appearance = AppearanceSettings(
     language: 'zh-Hans',
@@ -102,9 +103,12 @@ class SettingsStore extends ChangeNotifier {
   String get defaultDirectoryService => _general.defaultDirectoryService;
 
   Future<void> init() async {
+    // Appearance owns the user's app language. Load it before creating the
+    // first translation target so a Chinese installation does not persist an
+    // English target merely because slang still has its process default.
+    await reloadAppearance();
     await Future.wait([
       reloadGeneral(),
-      reloadAppearance(),
       reloadShortcuts(),
       reloadAdvanced(),
       reloadProviders(),
@@ -174,7 +178,9 @@ class SettingsStore extends ChangeNotifier {
             translationTargets: [
               TranslationTarget(
                 source: kAutoSource,
-                target: defaultTargetLanguage,
+                target: defaultTargetLanguageForAppLanguage(
+                  _appearance.language,
+                ),
                 enabled: true,
               ),
             ],

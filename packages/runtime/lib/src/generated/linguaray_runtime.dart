@@ -84,6 +84,503 @@ class FfiConverterApiServerInfo {
   }
 }
 
+class CatalogFieldSpec {
+  final String key;
+  final String labelKey;
+  final bool secret;
+  final bool required_;
+  final String? placeholder;
+  final bool advanced;
+  final String? defaultValue;
+  CatalogFieldSpec({
+    required this.key,
+    required this.labelKey,
+    required this.secret,
+    required this.required_,
+    this.placeholder,
+    required this.advanced,
+    this.defaultValue,
+  });
+}
+
+class FfiConverterCatalogFieldSpec {
+  static CatalogFieldSpec lift(RustBuffer buf) {
+    return FfiConverterCatalogFieldSpec.read(buf.asUint8List()).value;
+  }
+
+  static LiftRetVal<CatalogFieldSpec> read(Uint8List buf) {
+    int new_offset = buf.offsetInBytes;
+    final key_lifted = FfiConverterString.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final key = key_lifted.value;
+    new_offset += key_lifted.bytesRead;
+    final labelKey_lifted = FfiConverterString.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final labelKey = labelKey_lifted.value;
+    new_offset += labelKey_lifted.bytesRead;
+    final secret_lifted = FfiConverterBool.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final secret = secret_lifted.value;
+    new_offset += secret_lifted.bytesRead;
+    final required__lifted = FfiConverterBool.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final required_ = required__lifted.value;
+    new_offset += required__lifted.bytesRead;
+    final placeholder_lifted = FfiConverterOptionalString.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final placeholder = placeholder_lifted.value;
+    new_offset += placeholder_lifted.bytesRead;
+    final advanced_lifted = FfiConverterBool.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final advanced = advanced_lifted.value;
+    new_offset += advanced_lifted.bytesRead;
+    final defaultValue_lifted = FfiConverterOptionalString.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final defaultValue = defaultValue_lifted.value;
+    new_offset += defaultValue_lifted.bytesRead;
+    return LiftRetVal(
+      CatalogFieldSpec(
+        key: key,
+        labelKey: labelKey,
+        secret: secret,
+        required_: required_,
+        placeholder: placeholder,
+        advanced: advanced,
+        defaultValue: defaultValue,
+      ),
+      new_offset - buf.offsetInBytes,
+    );
+  }
+
+  static RustBuffer lower(CatalogFieldSpec value) {
+    final total_length =
+        FfiConverterString.allocationSize(value.key) +
+        FfiConverterString.allocationSize(value.labelKey) +
+        FfiConverterBool.allocationSize(value.secret) +
+        FfiConverterBool.allocationSize(value.required_) +
+        FfiConverterOptionalString.allocationSize(value.placeholder) +
+        FfiConverterBool.allocationSize(value.advanced) +
+        FfiConverterOptionalString.allocationSize(value.defaultValue) +
+        0;
+    final buf = Uint8List(total_length);
+    write(value, buf);
+    return toRustBuffer(buf);
+  }
+
+  static int write(CatalogFieldSpec value, Uint8List buf) {
+    int new_offset = buf.offsetInBytes;
+    new_offset += FfiConverterString.write(
+      value.key,
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    new_offset += FfiConverterString.write(
+      value.labelKey,
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    new_offset += FfiConverterBool.write(
+      value.secret,
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    new_offset += FfiConverterBool.write(
+      value.required_,
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    new_offset += FfiConverterOptionalString.write(
+      value.placeholder,
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    new_offset += FfiConverterBool.write(
+      value.advanced,
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    new_offset += FfiConverterOptionalString.write(
+      value.defaultValue,
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    return new_offset - buf.offsetInBytes;
+  }
+
+  static int allocationSize(CatalogFieldSpec value) {
+    return FfiConverterString.allocationSize(value.key) +
+        FfiConverterString.allocationSize(value.labelKey) +
+        FfiConverterBool.allocationSize(value.secret) +
+        FfiConverterBool.allocationSize(value.required_) +
+        FfiConverterOptionalString.allocationSize(value.placeholder) +
+        FfiConverterBool.allocationSize(value.advanced) +
+        FfiConverterOptionalString.allocationSize(value.defaultValue) +
+        0;
+  }
+}
+
+class CatalogModelChoice {
+  final String id;
+  final String name;
+  CatalogModelChoice({required this.id, required this.name});
+}
+
+class FfiConverterCatalogModelChoice {
+  static CatalogModelChoice lift(RustBuffer buf) {
+    return FfiConverterCatalogModelChoice.read(buf.asUint8List()).value;
+  }
+
+  static LiftRetVal<CatalogModelChoice> read(Uint8List buf) {
+    int new_offset = buf.offsetInBytes;
+    final id_lifted = FfiConverterString.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final id = id_lifted.value;
+    new_offset += id_lifted.bytesRead;
+    final name_lifted = FfiConverterString.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final name = name_lifted.value;
+    new_offset += name_lifted.bytesRead;
+    return LiftRetVal(
+      CatalogModelChoice(id: id, name: name),
+      new_offset - buf.offsetInBytes,
+    );
+  }
+
+  static RustBuffer lower(CatalogModelChoice value) {
+    final total_length =
+        FfiConverterString.allocationSize(value.id) +
+        FfiConverterString.allocationSize(value.name) +
+        0;
+    final buf = Uint8List(total_length);
+    write(value, buf);
+    return toRustBuffer(buf);
+  }
+
+  static int write(CatalogModelChoice value, Uint8List buf) {
+    int new_offset = buf.offsetInBytes;
+    new_offset += FfiConverterString.write(
+      value.id,
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    new_offset += FfiConverterString.write(
+      value.name,
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    return new_offset - buf.offsetInBytes;
+  }
+
+  static int allocationSize(CatalogModelChoice value) {
+    return FfiConverterString.allocationSize(value.id) +
+        FfiConverterString.allocationSize(value.name) +
+        0;
+  }
+}
+
+class CatalogProviderPreset {
+  final String id;
+  final String engineType;
+  final String protocol;
+  final CatalogCategory category;
+  final String name;
+  final String descriptionKey;
+  final String? homepageUrl;
+  final String? apiKeyUrl;
+  final String baseUrl;
+  final String modelsUrl;
+  final List<CatalogFieldSpec> fields;
+  final bool translation;
+  final bool dictionary;
+  final bool ocr;
+  final bool llm;
+  final bool supportedMacos;
+  final bool supportedWindows;
+  final CatalogNetworkPolicy networkPolicy;
+  final CatalogStability stability;
+  CatalogProviderPreset({
+    required this.id,
+    required this.engineType,
+    required this.protocol,
+    required this.category,
+    required this.name,
+    required this.descriptionKey,
+    this.homepageUrl,
+    this.apiKeyUrl,
+    required this.baseUrl,
+    required this.modelsUrl,
+    required this.fields,
+    required this.translation,
+    required this.dictionary,
+    required this.ocr,
+    required this.llm,
+    required this.supportedMacos,
+    required this.supportedWindows,
+    required this.networkPolicy,
+    required this.stability,
+  });
+}
+
+class FfiConverterCatalogProviderPreset {
+  static CatalogProviderPreset lift(RustBuffer buf) {
+    return FfiConverterCatalogProviderPreset.read(buf.asUint8List()).value;
+  }
+
+  static LiftRetVal<CatalogProviderPreset> read(Uint8List buf) {
+    int new_offset = buf.offsetInBytes;
+    final id_lifted = FfiConverterString.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final id = id_lifted.value;
+    new_offset += id_lifted.bytesRead;
+    final engineType_lifted = FfiConverterString.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final engineType = engineType_lifted.value;
+    new_offset += engineType_lifted.bytesRead;
+    final protocol_lifted = FfiConverterString.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final protocol = protocol_lifted.value;
+    new_offset += protocol_lifted.bytesRead;
+    final category_lifted = FfiConverterCatalogCategory.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final category = category_lifted.value;
+    new_offset += category_lifted.bytesRead;
+    final name_lifted = FfiConverterString.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final name = name_lifted.value;
+    new_offset += name_lifted.bytesRead;
+    final descriptionKey_lifted = FfiConverterString.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final descriptionKey = descriptionKey_lifted.value;
+    new_offset += descriptionKey_lifted.bytesRead;
+    final homepageUrl_lifted = FfiConverterOptionalString.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final homepageUrl = homepageUrl_lifted.value;
+    new_offset += homepageUrl_lifted.bytesRead;
+    final apiKeyUrl_lifted = FfiConverterOptionalString.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final apiKeyUrl = apiKeyUrl_lifted.value;
+    new_offset += apiKeyUrl_lifted.bytesRead;
+    final baseUrl_lifted = FfiConverterString.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final baseUrl = baseUrl_lifted.value;
+    new_offset += baseUrl_lifted.bytesRead;
+    final modelsUrl_lifted = FfiConverterString.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final modelsUrl = modelsUrl_lifted.value;
+    new_offset += modelsUrl_lifted.bytesRead;
+    final fields_lifted = FfiConverterSequenceCatalogFieldSpec.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final fields = fields_lifted.value;
+    new_offset += fields_lifted.bytesRead;
+    final translation_lifted = FfiConverterBool.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final translation = translation_lifted.value;
+    new_offset += translation_lifted.bytesRead;
+    final dictionary_lifted = FfiConverterBool.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final dictionary = dictionary_lifted.value;
+    new_offset += dictionary_lifted.bytesRead;
+    final ocr_lifted = FfiConverterBool.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final ocr = ocr_lifted.value;
+    new_offset += ocr_lifted.bytesRead;
+    final llm_lifted = FfiConverterBool.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final llm = llm_lifted.value;
+    new_offset += llm_lifted.bytesRead;
+    final supportedMacos_lifted = FfiConverterBool.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final supportedMacos = supportedMacos_lifted.value;
+    new_offset += supportedMacos_lifted.bytesRead;
+    final supportedWindows_lifted = FfiConverterBool.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final supportedWindows = supportedWindows_lifted.value;
+    new_offset += supportedWindows_lifted.bytesRead;
+    final networkPolicy_lifted = FfiConverterCatalogNetworkPolicy.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final networkPolicy = networkPolicy_lifted.value;
+    new_offset += networkPolicy_lifted.bytesRead;
+    final stability_lifted = FfiConverterCatalogStability.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final stability = stability_lifted.value;
+    new_offset += stability_lifted.bytesRead;
+    return LiftRetVal(
+      CatalogProviderPreset(
+        id: id,
+        engineType: engineType,
+        protocol: protocol,
+        category: category,
+        name: name,
+        descriptionKey: descriptionKey,
+        homepageUrl: homepageUrl,
+        apiKeyUrl: apiKeyUrl,
+        baseUrl: baseUrl,
+        modelsUrl: modelsUrl,
+        fields: fields,
+        translation: translation,
+        dictionary: dictionary,
+        ocr: ocr,
+        llm: llm,
+        supportedMacos: supportedMacos,
+        supportedWindows: supportedWindows,
+        networkPolicy: networkPolicy,
+        stability: stability,
+      ),
+      new_offset - buf.offsetInBytes,
+    );
+  }
+
+  static RustBuffer lower(CatalogProviderPreset value) {
+    final total_length =
+        FfiConverterString.allocationSize(value.id) +
+        FfiConverterString.allocationSize(value.engineType) +
+        FfiConverterString.allocationSize(value.protocol) +
+        FfiConverterCatalogCategory.allocationSize(value.category) +
+        FfiConverterString.allocationSize(value.name) +
+        FfiConverterString.allocationSize(value.descriptionKey) +
+        FfiConverterOptionalString.allocationSize(value.homepageUrl) +
+        FfiConverterOptionalString.allocationSize(value.apiKeyUrl) +
+        FfiConverterString.allocationSize(value.baseUrl) +
+        FfiConverterString.allocationSize(value.modelsUrl) +
+        FfiConverterSequenceCatalogFieldSpec.allocationSize(value.fields) +
+        FfiConverterBool.allocationSize(value.translation) +
+        FfiConverterBool.allocationSize(value.dictionary) +
+        FfiConverterBool.allocationSize(value.ocr) +
+        FfiConverterBool.allocationSize(value.llm) +
+        FfiConverterBool.allocationSize(value.supportedMacos) +
+        FfiConverterBool.allocationSize(value.supportedWindows) +
+        FfiConverterCatalogNetworkPolicy.allocationSize(value.networkPolicy) +
+        FfiConverterCatalogStability.allocationSize(value.stability) +
+        0;
+    final buf = Uint8List(total_length);
+    write(value, buf);
+    return toRustBuffer(buf);
+  }
+
+  static int write(CatalogProviderPreset value, Uint8List buf) {
+    int new_offset = buf.offsetInBytes;
+    new_offset += FfiConverterString.write(
+      value.id,
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    new_offset += FfiConverterString.write(
+      value.engineType,
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    new_offset += FfiConverterString.write(
+      value.protocol,
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    new_offset += FfiConverterCatalogCategory.write(
+      value.category,
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    new_offset += FfiConverterString.write(
+      value.name,
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    new_offset += FfiConverterString.write(
+      value.descriptionKey,
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    new_offset += FfiConverterOptionalString.write(
+      value.homepageUrl,
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    new_offset += FfiConverterOptionalString.write(
+      value.apiKeyUrl,
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    new_offset += FfiConverterString.write(
+      value.baseUrl,
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    new_offset += FfiConverterString.write(
+      value.modelsUrl,
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    new_offset += FfiConverterSequenceCatalogFieldSpec.write(
+      value.fields,
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    new_offset += FfiConverterBool.write(
+      value.translation,
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    new_offset += FfiConverterBool.write(
+      value.dictionary,
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    new_offset += FfiConverterBool.write(
+      value.ocr,
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    new_offset += FfiConverterBool.write(
+      value.llm,
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    new_offset += FfiConverterBool.write(
+      value.supportedMacos,
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    new_offset += FfiConverterBool.write(
+      value.supportedWindows,
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    new_offset += FfiConverterCatalogNetworkPolicy.write(
+      value.networkPolicy,
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    new_offset += FfiConverterCatalogStability.write(
+      value.stability,
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    return new_offset - buf.offsetInBytes;
+  }
+
+  static int allocationSize(CatalogProviderPreset value) {
+    return FfiConverterString.allocationSize(value.id) +
+        FfiConverterString.allocationSize(value.engineType) +
+        FfiConverterString.allocationSize(value.protocol) +
+        FfiConverterCatalogCategory.allocationSize(value.category) +
+        FfiConverterString.allocationSize(value.name) +
+        FfiConverterString.allocationSize(value.descriptionKey) +
+        FfiConverterOptionalString.allocationSize(value.homepageUrl) +
+        FfiConverterOptionalString.allocationSize(value.apiKeyUrl) +
+        FfiConverterString.allocationSize(value.baseUrl) +
+        FfiConverterString.allocationSize(value.modelsUrl) +
+        FfiConverterSequenceCatalogFieldSpec.allocationSize(value.fields) +
+        FfiConverterBool.allocationSize(value.translation) +
+        FfiConverterBool.allocationSize(value.dictionary) +
+        FfiConverterBool.allocationSize(value.ocr) +
+        FfiConverterBool.allocationSize(value.llm) +
+        FfiConverterBool.allocationSize(value.supportedMacos) +
+        FfiConverterBool.allocationSize(value.supportedWindows) +
+        FfiConverterCatalogNetworkPolicy.allocationSize(value.networkPolicy) +
+        FfiConverterCatalogStability.allocationSize(value.stability) +
+        0;
+  }
+}
+
 class GlossaryBook {
   final String id;
   final String name;
@@ -1660,6 +2157,7 @@ class GeneralSettings {
   final InputSubmitMode inputSubmitMode;
   final bool doubleClickCopyResult;
   final List<String> commonLanguages;
+  final List<String> translationServiceOrder;
   GeneralSettings({
     required this.launchAtLogin,
     required this.showInMenuBar,
@@ -1671,6 +2169,7 @@ class GeneralSettings {
     required this.inputSubmitMode,
     required this.doubleClickCopyResult,
     required this.commonLanguages,
+    required this.translationServiceOrder,
   });
 }
 
@@ -1732,6 +2231,11 @@ class FfiConverterGeneralSettings {
     );
     final commonLanguages = commonLanguages_lifted.value;
     new_offset += commonLanguages_lifted.bytesRead;
+    final translationServiceOrder_lifted = FfiConverterSequenceString.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final translationServiceOrder = translationServiceOrder_lifted.value;
+    new_offset += translationServiceOrder_lifted.bytesRead;
     return LiftRetVal(
       GeneralSettings(
         launchAtLogin: launchAtLogin,
@@ -1744,6 +2248,7 @@ class FfiConverterGeneralSettings {
         inputSubmitMode: inputSubmitMode,
         doubleClickCopyResult: doubleClickCopyResult,
         commonLanguages: commonLanguages,
+        translationServiceOrder: translationServiceOrder,
       ),
       new_offset - buf.offsetInBytes,
     );
@@ -1763,6 +2268,9 @@ class FfiConverterGeneralSettings {
         FfiConverterInputSubmitMode.allocationSize(value.inputSubmitMode) +
         FfiConverterBool.allocationSize(value.doubleClickCopyResult) +
         FfiConverterSequenceString.allocationSize(value.commonLanguages) +
+        FfiConverterSequenceString.allocationSize(
+          value.translationServiceOrder,
+        ) +
         0;
     final buf = Uint8List(total_length);
     write(value, buf);
@@ -1811,6 +2319,10 @@ class FfiConverterGeneralSettings {
       value.commonLanguages,
       Uint8List.view(buf.buffer, new_offset),
     );
+    new_offset += FfiConverterSequenceString.write(
+      value.translationServiceOrder,
+      Uint8List.view(buf.buffer, new_offset),
+    );
     return new_offset - buf.offsetInBytes;
   }
 
@@ -1827,6 +2339,9 @@ class FfiConverterGeneralSettings {
         FfiConverterInputSubmitMode.allocationSize(value.inputSubmitMode) +
         FfiConverterBool.allocationSize(value.doubleClickCopyResult) +
         FfiConverterSequenceString.allocationSize(value.commonLanguages) +
+        FfiConverterSequenceString.allocationSize(
+          value.translationServiceOrder,
+        ) +
         0;
   }
 }
@@ -1842,6 +2357,7 @@ class GeneralSettingsPatch {
   final InputSubmitMode? inputSubmitMode;
   final bool? doubleClickCopyResult;
   final List<String>? commonLanguages;
+  final List<String>? translationServiceOrder;
   GeneralSettingsPatch({
     this.launchAtLogin,
     this.showInMenuBar,
@@ -1853,6 +2369,7 @@ class GeneralSettingsPatch {
     this.inputSubmitMode,
     this.doubleClickCopyResult,
     this.commonLanguages,
+    this.translationServiceOrder,
   });
 }
 
@@ -1914,6 +2431,12 @@ class FfiConverterGeneralSettingsPatch {
     );
     final commonLanguages = commonLanguages_lifted.value;
     new_offset += commonLanguages_lifted.bytesRead;
+    final translationServiceOrder_lifted =
+        FfiConverterOptionalSequenceString.read(
+          Uint8List.view(buf.buffer, new_offset),
+        );
+    final translationServiceOrder = translationServiceOrder_lifted.value;
+    new_offset += translationServiceOrder_lifted.bytesRead;
     return LiftRetVal(
       GeneralSettingsPatch(
         launchAtLogin: launchAtLogin,
@@ -1926,6 +2449,7 @@ class FfiConverterGeneralSettingsPatch {
         inputSubmitMode: inputSubmitMode,
         doubleClickCopyResult: doubleClickCopyResult,
         commonLanguages: commonLanguages,
+        translationServiceOrder: translationServiceOrder,
       ),
       new_offset - buf.offsetInBytes,
     );
@@ -1952,6 +2476,9 @@ class FfiConverterGeneralSettingsPatch {
         FfiConverterOptionalBool.allocationSize(value.doubleClickCopyResult) +
         FfiConverterOptionalSequenceString.allocationSize(
           value.commonLanguages,
+        ) +
+        FfiConverterOptionalSequenceString.allocationSize(
+          value.translationServiceOrder,
         ) +
         0;
     final buf = Uint8List(total_length);
@@ -2001,6 +2528,10 @@ class FfiConverterGeneralSettingsPatch {
       value.commonLanguages,
       Uint8List.view(buf.buffer, new_offset),
     );
+    new_offset += FfiConverterOptionalSequenceString.write(
+      value.translationServiceOrder,
+      Uint8List.view(buf.buffer, new_offset),
+    );
     return new_offset - buf.offsetInBytes;
   }
 
@@ -2025,6 +2556,9 @@ class FfiConverterGeneralSettingsPatch {
         FfiConverterOptionalSequenceString.allocationSize(
           value.commonLanguages,
         ) +
+        FfiConverterOptionalSequenceString.allocationSize(
+          value.translationServiceOrder,
+        ) +
         0;
   }
 }
@@ -2034,11 +2568,13 @@ class ProviderConfigEntry {
   final ProviderType type;
   final Map<String, String> fields;
   final int? createdAt;
+  final String? presetId;
   ProviderConfigEntry({
     required this.id,
     required this.type,
     required this.fields,
     this.createdAt,
+    this.presetId,
   });
 }
 
@@ -2069,12 +2605,18 @@ class FfiConverterProviderConfigEntry {
     );
     final createdAt = createdAt_lifted.value;
     new_offset += createdAt_lifted.bytesRead;
+    final presetId_lifted = FfiConverterOptionalString.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final presetId = presetId_lifted.value;
+    new_offset += presetId_lifted.bytesRead;
     return LiftRetVal(
       ProviderConfigEntry(
         id: id,
         type: type,
         fields: fields,
         createdAt: createdAt,
+        presetId: presetId,
       ),
       new_offset - buf.offsetInBytes,
     );
@@ -2086,6 +2628,7 @@ class FfiConverterProviderConfigEntry {
         FfiConverterProviderType.allocationSize(value.type) +
         FfiConverterMapStringToString.allocationSize(value.fields) +
         FfiConverterOptionalUInt64.allocationSize(value.createdAt) +
+        FfiConverterOptionalString.allocationSize(value.presetId) +
         0;
     final buf = Uint8List(total_length);
     write(value, buf);
@@ -2110,6 +2653,10 @@ class FfiConverterProviderConfigEntry {
       value.createdAt,
       Uint8List.view(buf.buffer, new_offset),
     );
+    new_offset += FfiConverterOptionalString.write(
+      value.presetId,
+      Uint8List.view(buf.buffer, new_offset),
+    );
     return new_offset - buf.offsetInBytes;
   }
 
@@ -2118,6 +2665,7 @@ class FfiConverterProviderConfigEntry {
         FfiConverterProviderType.allocationSize(value.type) +
         FfiConverterMapStringToString.allocationSize(value.fields) +
         FfiConverterOptionalUInt64.allocationSize(value.createdAt) +
+        FfiConverterOptionalString.allocationSize(value.presetId) +
         0;
   }
 }
@@ -4944,6 +5492,130 @@ class FfiConverterWordTense {
   }
 }
 
+enum CatalogCategory {
+  builtIn,
+  traditionalApi,
+  llmOfficial,
+  aggregator,
+  localOrSelfHosted,
+}
+
+class FfiConverterCatalogCategory {
+  static LiftRetVal<CatalogCategory> read(Uint8List buf) {
+    final index = buf.buffer.asByteData(buf.offsetInBytes).getInt32(0);
+    switch (index) {
+      case 1:
+        return LiftRetVal(CatalogCategory.builtIn, 4);
+      case 2:
+        return LiftRetVal(CatalogCategory.traditionalApi, 4);
+      case 3:
+        return LiftRetVal(CatalogCategory.llmOfficial, 4);
+      case 4:
+        return LiftRetVal(CatalogCategory.aggregator, 4);
+      case 5:
+        return LiftRetVal(CatalogCategory.localOrSelfHosted, 4);
+      default:
+        throw UniffiInternalError(
+          UniffiInternalError.unexpectedEnumCase,
+          "Unable to determine enum variant",
+        );
+    }
+  }
+
+  static CatalogCategory lift(RustBuffer buffer) {
+    return FfiConverterCatalogCategory.read(buffer.asUint8List()).value;
+  }
+
+  static RustBuffer lower(CatalogCategory input) {
+    return toRustBuffer(createUint8ListFromInt(input.index + 1));
+  }
+
+  static int allocationSize(CatalogCategory _value) {
+    return 4;
+  }
+
+  static int write(CatalogCategory value, Uint8List buf) {
+    buf.buffer.asByteData(buf.offsetInBytes).setInt32(0, value.index + 1);
+    return 4;
+  }
+}
+
+enum CatalogNetworkPolicy { localOnly, officialApi, unofficialWeb, selfHosted }
+
+class FfiConverterCatalogNetworkPolicy {
+  static LiftRetVal<CatalogNetworkPolicy> read(Uint8List buf) {
+    final index = buf.buffer.asByteData(buf.offsetInBytes).getInt32(0);
+    switch (index) {
+      case 1:
+        return LiftRetVal(CatalogNetworkPolicy.localOnly, 4);
+      case 2:
+        return LiftRetVal(CatalogNetworkPolicy.officialApi, 4);
+      case 3:
+        return LiftRetVal(CatalogNetworkPolicy.unofficialWeb, 4);
+      case 4:
+        return LiftRetVal(CatalogNetworkPolicy.selfHosted, 4);
+      default:
+        throw UniffiInternalError(
+          UniffiInternalError.unexpectedEnumCase,
+          "Unable to determine enum variant",
+        );
+    }
+  }
+
+  static CatalogNetworkPolicy lift(RustBuffer buffer) {
+    return FfiConverterCatalogNetworkPolicy.read(buffer.asUint8List()).value;
+  }
+
+  static RustBuffer lower(CatalogNetworkPolicy input) {
+    return toRustBuffer(createUint8ListFromInt(input.index + 1));
+  }
+
+  static int allocationSize(CatalogNetworkPolicy _value) {
+    return 4;
+  }
+
+  static int write(CatalogNetworkPolicy value, Uint8List buf) {
+    buf.buffer.asByteData(buf.offsetInBytes).setInt32(0, value.index + 1);
+    return 4;
+  }
+}
+
+enum CatalogStability { stable, experimental }
+
+class FfiConverterCatalogStability {
+  static LiftRetVal<CatalogStability> read(Uint8List buf) {
+    final index = buf.buffer.asByteData(buf.offsetInBytes).getInt32(0);
+    switch (index) {
+      case 1:
+        return LiftRetVal(CatalogStability.stable, 4);
+      case 2:
+        return LiftRetVal(CatalogStability.experimental, 4);
+      default:
+        throw UniffiInternalError(
+          UniffiInternalError.unexpectedEnumCase,
+          "Unable to determine enum variant",
+        );
+    }
+  }
+
+  static CatalogStability lift(RustBuffer buffer) {
+    return FfiConverterCatalogStability.read(buffer.asUint8List()).value;
+  }
+
+  static RustBuffer lower(CatalogStability input) {
+    return toRustBuffer(createUint8ListFromInt(input.index + 1));
+  }
+
+  static int allocationSize(CatalogStability _value) {
+    return 4;
+  }
+
+  static int write(CatalogStability value, Uint8List buf) {
+    buf.buffer.asByteData(buf.offsetInBytes).setInt32(0, value.index + 1);
+    return 4;
+  }
+}
+
 enum GlossaryIssueKind { missingTranslation, forbiddenUsed }
 
 class FfiConverterGlossaryIssueKind {
@@ -5188,6 +5860,11 @@ enum ProviderType {
   openAiCompatible,
   youdao,
   system,
+  googleWeb,
+  bingWeb,
+  tencentTransmartWeb,
+  libreTranslate,
+  mTranServer,
 }
 
 class FfiConverterProviderType {
@@ -5232,6 +5909,16 @@ class FfiConverterProviderType {
         return LiftRetVal(ProviderType.youdao, 4);
       case 19:
         return LiftRetVal(ProviderType.system, 4);
+      case 20:
+        return LiftRetVal(ProviderType.googleWeb, 4);
+      case 21:
+        return LiftRetVal(ProviderType.bingWeb, 4);
+      case 22:
+        return LiftRetVal(ProviderType.tencentTransmartWeb, 4);
+      case 23:
+        return LiftRetVal(ProviderType.libreTranslate, 4);
+      case 24:
+        return LiftRetVal(ProviderType.mTranServer, 4);
       default:
         throw UniffiInternalError(
           UniffiInternalError.unexpectedEnumCase,
@@ -6548,6 +7235,11 @@ class RuntimePermission implements RuntimePermissionInterface {
 abstract class RuntimeSettingsInterface {
   Future<ProviderConfigEntry?> deleteProvider({required String providerId});
   Future<ServiceConfigEntry?> deleteService({required String serviceId});
+  Future<List<String>> discoverProviderModels({
+    required String providerId,
+    required String providerType,
+    required Map<String, String> fields,
+  });
   Future<String> generateProviderId({required String providerType});
   Future<List<TranslationTarget>> getActiveTranslationTargets({
     required List<TranslationTarget> targets,
@@ -6568,6 +7260,9 @@ abstract class RuntimeSettingsInterface {
     required String providerId,
     required Map<String, String> secrets,
   });
+  Future<List<String>> setTranslationServiceOrder({
+    required List<String> order,
+  });
   SettingsSubscription subscribe();
   Future<int> testProvider({
     required String providerId,
@@ -6585,6 +7280,7 @@ abstract class RuntimeSettingsInterface {
     required String providerId,
     required String providerType,
     required Map<String, String> fields,
+    required String? presetId,
   });
   Future<ServiceConfigEntry> updateService({
     required String serviceId,
@@ -6671,6 +7367,27 @@ class RuntimeSettings implements RuntimeSettingsInterface {
       ffi_linguaray_runtime_rust_future_complete_rust_buffer,
       ffi_linguaray_runtime_rust_future_free_rust_buffer,
       FfiConverterOptionalServiceConfigEntry.lift,
+      runtimeExceptionErrorHandler,
+    );
+  }
+
+  Future<List<String>> discoverProviderModels({
+    required String providerId,
+    required String providerType,
+    required Map<String, String> fields,
+  }) {
+    return uniffiRustCallAsync(
+      () =>
+          uniffi_linguaray_runtime_fn_method_runtimesettings_discover_provider_models(
+            uniffiClonePointer(),
+            FfiConverterString.lower(providerId),
+            FfiConverterString.lower(providerType),
+            FfiConverterMapStringToString.lower(fields),
+          ),
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
+      FfiConverterSequenceString.lift,
       runtimeExceptionErrorHandler,
     );
   }
@@ -6874,6 +7591,23 @@ class RuntimeSettings implements RuntimeSettingsInterface {
     );
   }
 
+  Future<List<String>> setTranslationServiceOrder({
+    required List<String> order,
+  }) {
+    return uniffiRustCallAsync(
+      () =>
+          uniffi_linguaray_runtime_fn_method_runtimesettings_set_translation_service_order(
+            uniffiClonePointer(),
+            FfiConverterSequenceString.lower(order),
+          ),
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
+      FfiConverterSequenceString.lift,
+      runtimeExceptionErrorHandler,
+    );
+  }
+
   SettingsSubscription subscribe() {
     return rustCallWithLifter(
       (status) => uniffi_linguaray_runtime_fn_method_runtimesettings_subscribe(
@@ -6956,6 +7690,7 @@ class RuntimeSettings implements RuntimeSettingsInterface {
     required String providerId,
     required String providerType,
     required Map<String, String> fields,
+    required String? presetId,
   }) {
     return uniffiRustCallAsync(
       () => uniffi_linguaray_runtime_fn_method_runtimesettings_update_provider(
@@ -6963,6 +7698,7 @@ class RuntimeSettings implements RuntimeSettingsInterface {
         FfiConverterString.lower(providerId),
         FfiConverterString.lower(providerType),
         FfiConverterMapStringToString.lower(fields),
+        FfiConverterOptionalString.lower(presetId),
       ),
       ffi_linguaray_runtime_rust_future_poll_rust_buffer,
       ffi_linguaray_runtime_rust_future_complete_rust_buffer,
@@ -9371,6 +10107,142 @@ class FfiConverterOptionalVocabularyEntry {
   }
 }
 
+class FfiConverterSequenceCatalogFieldSpec {
+  static List<CatalogFieldSpec> lift(RustBuffer buf) {
+    return FfiConverterSequenceCatalogFieldSpec.read(buf.asUint8List()).value;
+  }
+
+  static LiftRetVal<List<CatalogFieldSpec>> read(Uint8List buf) {
+    List<CatalogFieldSpec> res = [];
+    final length = buf.buffer.asByteData(buf.offsetInBytes).getInt32(0);
+    int offset = buf.offsetInBytes + 4;
+    for (var i = 0; i < length; i++) {
+      final ret = FfiConverterCatalogFieldSpec.read(
+        Uint8List.view(buf.buffer, offset),
+      );
+      offset += ret.bytesRead;
+      res.add(ret.value);
+    }
+    return LiftRetVal(res, offset - buf.offsetInBytes);
+  }
+
+  static int write(List<CatalogFieldSpec> value, Uint8List buf) {
+    buf.buffer.asByteData(buf.offsetInBytes).setInt32(0, value.length);
+    int offset = buf.offsetInBytes + 4;
+    for (var i = 0; i < value.length; i++) {
+      offset += FfiConverterCatalogFieldSpec.write(
+        value[i],
+        Uint8List.view(buf.buffer, offset),
+      );
+    }
+    return offset - buf.offsetInBytes;
+  }
+
+  static int allocationSize(List<CatalogFieldSpec> value) {
+    return value
+            .map((l) => FfiConverterCatalogFieldSpec.allocationSize(l))
+            .fold(0, (a, b) => a + b) +
+        4;
+  }
+
+  static RustBuffer lower(List<CatalogFieldSpec> value) {
+    final buf = Uint8List(allocationSize(value));
+    write(value, buf);
+    return toRustBuffer(buf);
+  }
+}
+
+class FfiConverterSequenceCatalogModelChoice {
+  static List<CatalogModelChoice> lift(RustBuffer buf) {
+    return FfiConverterSequenceCatalogModelChoice.read(buf.asUint8List()).value;
+  }
+
+  static LiftRetVal<List<CatalogModelChoice>> read(Uint8List buf) {
+    List<CatalogModelChoice> res = [];
+    final length = buf.buffer.asByteData(buf.offsetInBytes).getInt32(0);
+    int offset = buf.offsetInBytes + 4;
+    for (var i = 0; i < length; i++) {
+      final ret = FfiConverterCatalogModelChoice.read(
+        Uint8List.view(buf.buffer, offset),
+      );
+      offset += ret.bytesRead;
+      res.add(ret.value);
+    }
+    return LiftRetVal(res, offset - buf.offsetInBytes);
+  }
+
+  static int write(List<CatalogModelChoice> value, Uint8List buf) {
+    buf.buffer.asByteData(buf.offsetInBytes).setInt32(0, value.length);
+    int offset = buf.offsetInBytes + 4;
+    for (var i = 0; i < value.length; i++) {
+      offset += FfiConverterCatalogModelChoice.write(
+        value[i],
+        Uint8List.view(buf.buffer, offset),
+      );
+    }
+    return offset - buf.offsetInBytes;
+  }
+
+  static int allocationSize(List<CatalogModelChoice> value) {
+    return value
+            .map((l) => FfiConverterCatalogModelChoice.allocationSize(l))
+            .fold(0, (a, b) => a + b) +
+        4;
+  }
+
+  static RustBuffer lower(List<CatalogModelChoice> value) {
+    final buf = Uint8List(allocationSize(value));
+    write(value, buf);
+    return toRustBuffer(buf);
+  }
+}
+
+class FfiConverterSequenceCatalogProviderPreset {
+  static List<CatalogProviderPreset> lift(RustBuffer buf) {
+    return FfiConverterSequenceCatalogProviderPreset.read(buf.asUint8List())
+        .value;
+  }
+
+  static LiftRetVal<List<CatalogProviderPreset>> read(Uint8List buf) {
+    List<CatalogProviderPreset> res = [];
+    final length = buf.buffer.asByteData(buf.offsetInBytes).getInt32(0);
+    int offset = buf.offsetInBytes + 4;
+    for (var i = 0; i < length; i++) {
+      final ret = FfiConverterCatalogProviderPreset.read(
+        Uint8List.view(buf.buffer, offset),
+      );
+      offset += ret.bytesRead;
+      res.add(ret.value);
+    }
+    return LiftRetVal(res, offset - buf.offsetInBytes);
+  }
+
+  static int write(List<CatalogProviderPreset> value, Uint8List buf) {
+    buf.buffer.asByteData(buf.offsetInBytes).setInt32(0, value.length);
+    int offset = buf.offsetInBytes + 4;
+    for (var i = 0; i < value.length; i++) {
+      offset += FfiConverterCatalogProviderPreset.write(
+        value[i],
+        Uint8List.view(buf.buffer, offset),
+      );
+    }
+    return offset - buf.offsetInBytes;
+  }
+
+  static int allocationSize(List<CatalogProviderPreset> value) {
+    return value
+            .map((l) => FfiConverterCatalogProviderPreset.allocationSize(l))
+            .fold(0, (a, b) => a + b) +
+        4;
+  }
+
+  static RustBuffer lower(List<CatalogProviderPreset> value) {
+    final buf = Uint8List(allocationSize(value));
+    write(value, buf);
+    return toRustBuffer(buf);
+  }
+}
+
 class FfiConverterSequenceChatChoice {
   static List<ChatChoice> lift(RustBuffer buf) {
     return FfiConverterSequenceChatChoice.read(buf.asUint8List()).value;
@@ -10979,6 +11851,25 @@ WordTense echoWordTense({required WordTense wordTense}) {
   );
 }
 
+List<CatalogModelChoice> listCatalogSnapshotModels({required String presetId}) {
+  return rustCallWithLifter(
+    (status) => uniffi_linguaray_runtime_fn_func_list_catalog_snapshot_models(
+      FfiConverterString.lower(presetId),
+      status,
+    ),
+    FfiConverterSequenceCatalogModelChoice.lift,
+    null,
+  );
+}
+
+List<CatalogProviderPreset> listProviderCatalog() {
+  return rustCallWithLifter(
+    (status) => uniffi_linguaray_runtime_fn_func_list_provider_catalog(status),
+    FfiConverterSequenceCatalogProviderPreset.lift,
+    null,
+  );
+}
+
 @Native<Pointer<Void> Function(Pointer<Void>, Pointer<RustCallStatus>)>(
   assetId: _uniffiAssetId,
 )
@@ -11550,6 +12441,17 @@ uniffi_linguaray_runtime_fn_method_runtimesettings_delete_service(
   RustBuffer service_id,
 );
 
+@Native<
+  Pointer<Void> Function(Pointer<Void>, RustBuffer, RustBuffer, RustBuffer)
+>(assetId: _uniffiAssetId)
+external Pointer<Void>
+uniffi_linguaray_runtime_fn_method_runtimesettings_discover_provider_models(
+  Pointer<Void> ptr,
+  RustBuffer provider_id,
+  RustBuffer provider_type,
+  RustBuffer fields,
+);
+
 @Native<Pointer<Void> Function(Pointer<Void>, RustBuffer)>(
   assetId: _uniffiAssetId,
 )
@@ -11652,6 +12554,15 @@ uniffi_linguaray_runtime_fn_method_runtimesettings_set_provider_secrets(
   RustBuffer secrets,
 );
 
+@Native<Pointer<Void> Function(Pointer<Void>, RustBuffer)>(
+  assetId: _uniffiAssetId,
+)
+external Pointer<Void>
+uniffi_linguaray_runtime_fn_method_runtimesettings_set_translation_service_order(
+  Pointer<Void> ptr,
+  RustBuffer order,
+);
+
 @Native<Pointer<Void> Function(Pointer<Void>, Pointer<RustCallStatus>)>(
   assetId: _uniffiAssetId,
 )
@@ -11700,7 +12611,13 @@ uniffi_linguaray_runtime_fn_method_runtimesettings_update_general(
 );
 
 @Native<
-  Pointer<Void> Function(Pointer<Void>, RustBuffer, RustBuffer, RustBuffer)
+  Pointer<Void> Function(
+    Pointer<Void>,
+    RustBuffer,
+    RustBuffer,
+    RustBuffer,
+    RustBuffer,
+  )
 >(assetId: _uniffiAssetId)
 external Pointer<Void>
 uniffi_linguaray_runtime_fn_method_runtimesettings_update_provider(
@@ -11708,6 +12625,7 @@ uniffi_linguaray_runtime_fn_method_runtimesettings_update_provider(
   RustBuffer provider_id,
   RustBuffer provider_type,
   RustBuffer fields,
+  RustBuffer preset_id,
 );
 
 @Native<
@@ -12081,6 +12999,20 @@ external RustBuffer uniffi_linguaray_runtime_fn_func_echo_word_tag(
 )
 external RustBuffer uniffi_linguaray_runtime_fn_func_echo_word_tense(
   RustBuffer word_tense,
+  Pointer<RustCallStatus> uniffiStatus,
+);
+
+@Native<RustBuffer Function(RustBuffer, Pointer<RustCallStatus>)>(
+  assetId: _uniffiAssetId,
+)
+external RustBuffer
+uniffi_linguaray_runtime_fn_func_list_catalog_snapshot_models(
+  RustBuffer preset_id,
+  Pointer<RustCallStatus> uniffiStatus,
+);
+
+@Native<RustBuffer Function(Pointer<RustCallStatus>)>(assetId: _uniffiAssetId)
+external RustBuffer uniffi_linguaray_runtime_fn_func_list_provider_catalog(
   Pointer<RustCallStatus> uniffiStatus,
 );
 
@@ -12534,6 +13466,13 @@ external int uniffi_linguaray_runtime_checksum_func_echo_word_tag();
 external int uniffi_linguaray_runtime_checksum_func_echo_word_tense();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
+external int
+uniffi_linguaray_runtime_checksum_func_list_catalog_snapshot_models();
+
+@Native<Uint16 Function()>(assetId: _uniffiAssetId)
+external int uniffi_linguaray_runtime_checksum_func_list_provider_catalog();
+
+@Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int uniffi_linguaray_runtime_checksum_method_runtimeapiserver_info();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
@@ -12695,6 +13634,10 @@ uniffi_linguaray_runtime_checksum_method_runtimesettings_delete_service();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
+uniffi_linguaray_runtime_checksum_method_runtimesettings_discover_provider_models();
+
+@Native<Uint16 Function()>(assetId: _uniffiAssetId)
+external int
 uniffi_linguaray_runtime_checksum_method_runtimesettings_generate_provider_id();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
@@ -12748,6 +13691,10 @@ uniffi_linguaray_runtime_checksum_method_runtimesettings_reset_shortcuts();
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
 uniffi_linguaray_runtime_checksum_method_runtimesettings_set_provider_secrets();
+
+@Native<Uint16 Function()>(assetId: _uniffiAssetId)
+external int
+uniffi_linguaray_runtime_checksum_method_runtimesettings_set_translation_service_order();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
@@ -12929,6 +13876,13 @@ void _checkApiChecksums() {
   if (uniffi_linguaray_runtime_checksum_func_echo_word_tense() != 26227) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
+  if (uniffi_linguaray_runtime_checksum_func_list_catalog_snapshot_models() !=
+      57448) {
+    throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
+  }
+  if (uniffi_linguaray_runtime_checksum_func_list_provider_catalog() != 59754) {
+    throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
+  }
   if (uniffi_linguaray_runtime_checksum_method_runtimeapiserver_info() !=
       8149) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
@@ -13097,6 +14051,10 @@ void _checkApiChecksums() {
       18787) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
+  if (uniffi_linguaray_runtime_checksum_method_runtimesettings_discover_provider_models() !=
+      52945) {
+    throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
+  }
   if (uniffi_linguaray_runtime_checksum_method_runtimesettings_generate_provider_id() !=
       32771) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
@@ -13153,6 +14111,10 @@ void _checkApiChecksums() {
       37353) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
+  if (uniffi_linguaray_runtime_checksum_method_runtimesettings_set_translation_service_order() !=
+      52277) {
+    throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
+  }
   if (uniffi_linguaray_runtime_checksum_method_runtimesettings_subscribe() !=
       61804) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
@@ -13174,7 +14136,7 @@ void _checkApiChecksums() {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
   if (uniffi_linguaray_runtime_checksum_method_runtimesettings_update_provider() !=
-      5640) {
+      26398) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
   if (uniffi_linguaray_runtime_checksum_method_runtimesettings_update_service() !=

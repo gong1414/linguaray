@@ -4,13 +4,17 @@ import 'package:linguaray_application/linguaray_application.dart';
 import 'package:linguaray_runtime/linguaray_runtime.dart'
     as rt
     show InputSubmitMode;
+import 'package:linguaray_runtime/linguaray_runtime.dart'
+    show listCatalogSnapshotModels, listProviderCatalog;
 
+import '../platform/secret_fields.dart';
 import '../platform/secret_store.dart';
-import '../routes/settings/provider_meta.dart';
+import '../routes/settings/provider_catalog.dart';
 import '../services/runtime.dart' hide InputSubmitMode;
 import '../services/settings_store.dart';
 import '../utils/env.dart';
 import '../utils/language_util.dart';
+import '../utils/provider_util.dart';
 
 final class RuntimeWorkspaceSettingsRepository
     implements WorkspaceSettingsRepository {
@@ -302,37 +306,26 @@ final class RuntimeWorkspaceSettingsRepository
 
   @override
   Future<List<ProviderTypeOption>> listProviderTypes() async {
-    return [
-      for (final type in kKnownProviderTypes)
-        ProviderTypeOption(
-          id: providerTypeValue(type),
-          label: providerTypeDisplayName(type),
-          isLlm: isLlmProviderType(type),
-          fields: [
-            for (final key in kProviderFields[type] ?? const <String>[])
-              ProviderFieldSpec(
-                key: key,
-                label: key,
-                secret: isSecretField(key),
-                requiredField:
-                    (kRequiredProviderFields[type] ?? const <String>[])
-                        .contains(key),
-                placeholder: key == 'baseUrl' ? defaultBaseUrl(type) : null,
-              ),
-          ],
-        ),
-    ];
+    return providerTypeOptionsFromCatalog(listProviderCatalog());
   }
 
   @override
   Future<List<ProviderRecord>> listProviders() async {
     await _store.reloadProviders();
+    final catalog = providerTypeOptionsFromCatalog(listProviderCatalog());
     return [
       for (final provider in _store.providers)
         ProviderRecord(
           id: provider.id,
           typeId: providerTypeValue(provider.type),
-          displayName: providerTypeDisplayName(provider.type),
+          presetId: provider.presetId,
+          displayName:
+              findProviderCatalogOption(
+                catalog,
+                presetId: provider.presetId,
+                engineTypeId: providerTypeValue(provider.type),
+              )?.label ??
+              providerTypeDisplayName(provider.type),
           publicFields: {
             for (final entry in provider.fields.entries)
               if (!isSecretField(entry.key)) entry.key: entry.value,
@@ -363,6 +356,7 @@ final class RuntimeWorkspaceSettingsRepository
       providerId: draft.id,
       providerType: providerTypeValue(type),
       fields: protected,
+      presetId: draft.presetId,
     );
     await _credentials.hydrateProvider(provider);
     await Future.wait([_store.reloadProviders(), _store.reloadServices()]);
@@ -411,6 +405,72 @@ final class RuntimeWorkspaceSettingsRepository
         errorCode: 'network_error',
       );
     }
+  }
+
+  @override
+  Future<List<String>> discoverProviderModels(ProviderDraft draft) async {
+    final type = _typeFromId(draft.typeId);
+    final existing = _store.providers
+        .where((item) => item.id == draft.id)
+        .firstOrNull;
+    if (draft.id.trim().isEmpty) {
+      throw ArgumentError.value(draft.id, 'id', 'Provider ID is required');
+    }
+    final catalog = providerTypeOptionsFromCatalog(listProviderCatalog());
+    final option = findProviderCatalogOption(
+      catalog,
+      presetId: draft.presetId,
+      engineTypeId: draft.typeId,
+    );
+    final snapshot = listCatalogSnapshotModels(presetId: draft.presetId ?? '');
+    final snapshotIds = [for (final model in snapshot) model.id];
+    for (final field in option?.fields ?? const <ProviderFieldSpec>[]) {
+      if (!field.requiredField || field.key == 'defaultModel') continue;
+      final value = draft.fields[field.key]?.trim() ?? '';
+      final existingValue = existing?.fields[field.key];
+      final keepsStoredSecret =
+          isSecretField(field.key) &&
+          existingValue != null &&
+          _credentials.isReference(existingValue);
+      if (value.isEmpty && !keepsStoredSecret) {
+        if (snapshotIds.isNotEmpty) return snapshotIds;
+        throw ArgumentError.value(
+          field.key,
+          'fields',
+          'Required field missing',
+        );
+      }
+    }
+    final fields = _credentials.materializeFields(
+      providerId: draft.id,
+      fields: draft.fields,
+      existingFields: existing?.fields ?? const {},
+    );
+    if (isLlmProviderType(type) &&
+        (fields['defaultModel']?.trim().isEmpty ?? true)) {
+      fields['defaultModel'] = '__model_discovery__';
+    }
+    List<String> live;
+    try {
+      live = await runtime.settings().discoverProviderModels(
+        providerId: draft.id,
+        providerType: providerTypeValue(type),
+        fields: fields,
+      );
+    } catch (_) {
+      if (snapshotIds.isNotEmpty) return snapshotIds;
+      rethrow;
+    }
+    final out = <String>[];
+    final saved = draft.fields['defaultModel']?.trim();
+    if (saved != null && saved.isNotEmpty) out.add(saved);
+    for (final id in live) {
+      if (!out.contains(id)) out.add(id);
+    }
+    for (final model in snapshot) {
+      if (!out.contains(model.id)) out.add(model.id);
+    }
+    return out;
   }
 
   @override
@@ -498,12 +558,7 @@ final class RuntimeWorkspaceSettingsRepository
     );
   }
 
-  ProviderType _typeFromId(String id) {
-    for (final type in kKnownProviderTypes) {
-      if (providerTypeValue(type) == id) return type;
-    }
-    throw ArgumentError.value(id, 'typeId', 'Unknown provider type');
-  }
+  ProviderType _typeFromId(String id) => parseProviderType(id);
 
   void _validateProviderDraft(
     ProviderDraft draft, {
@@ -511,18 +566,75 @@ final class RuntimeWorkspaceSettingsRepository
     required ProviderConfigEntry? existing,
   }) {
     if (draft.id.trim().isEmpty) {
-      throw ArgumentError.value(draft.id, 'id', 'Provider ID is required');
+      throw ArgumentError.value(
+        draft.id,
+        'id',
+        'Provider ID is required for ${providerTypeValue(type)}',
+      );
     }
-    for (final key in kRequiredProviderFields[type] ?? const <String>[]) {
-      final value = draft.fields[key]?.trim() ?? '';
-      final existingValue = existing?.fields[key];
+    final catalog = providerTypeOptionsFromCatalog(listProviderCatalog());
+    final option = findProviderCatalogOption(
+      catalog,
+      presetId: draft.presetId,
+      engineTypeId: draft.typeId,
+    );
+    for (final field in option?.fields ?? const <ProviderFieldSpec>[]) {
+      if (!field.requiredField) continue;
+      final value = draft.fields[field.key]?.trim() ?? '';
+      final existingValue = existing?.fields[field.key];
       final keepsStoredSecret =
-          isSecretField(key) &&
+          isSecretField(field.key) &&
           existingValue != null &&
           _credentials.isReference(existingValue);
       if (value.isEmpty && !keepsStoredSecret) {
-        throw ArgumentError.value(key, 'fields', 'Required field is missing');
+        throw ArgumentError.value(
+          field.key,
+          'fields',
+          'Required field is missing',
+        );
       }
     }
+  }
+
+  @override
+  Future<List<String>> listProviderModels(String providerId) async {
+    try {
+      final live = await runtime.settings().listModels(providerId: providerId);
+      final provider = _store.providers
+          .where((item) => item.id == providerId)
+          .firstOrNull;
+      final snapshot = listCatalogSnapshotModels(
+        presetId: provider?.presetId ?? '',
+      );
+      final saved = provider?.fields['defaultModel']?.trim();
+      final out = <String>[];
+      if (saved != null && saved.isNotEmpty) out.add(saved);
+      for (final id in live) {
+        if (!out.contains(id)) out.add(id);
+      }
+      for (final model in snapshot) {
+        if (!out.contains(model.id)) out.add(model.id);
+      }
+      return out;
+    } catch (_) {
+      final provider = _store.providers
+          .where((item) => item.id == providerId)
+          .firstOrNull;
+      final snapshot = listCatalogSnapshotModels(
+        presetId: provider?.presetId ?? '',
+      );
+      final saved = provider?.fields['defaultModel']?.trim();
+      return [
+        if (saved != null && saved.isNotEmpty) saved,
+        for (final model in snapshot) model.id,
+      ];
+    }
+  }
+
+  @override
+  Future<void> reorderTranslationServices(List<String> serviceIds) async {
+    await runtime.settings().setTranslationServiceOrder(order: serviceIds);
+    await _store.reloadGeneral();
+    await _store.reloadServices();
   }
 }

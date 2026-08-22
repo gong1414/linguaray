@@ -102,6 +102,13 @@ final class GeneralSettingsViewModel
         ref.read(workspaceSettingsRepositoryProvider).setCommonLanguages(codes),
   );
 
+  Future<void> setTranslationTargets(List<TranslationTargetRule> targets) =>
+      _run(
+        () => ref
+            .read(workspaceSettingsRepositoryProvider)
+            .setTranslationTargets(targets),
+      );
+
   Future<void> setInputSubmitMode(InputSubmitMode mode) => _run(
     () =>
         ref.read(workspaceSettingsRepositoryProvider).setInputSubmitMode(mode),
@@ -187,6 +194,29 @@ final class ServicesSettingsViewModel
       } else {
         await repository.setDefaultTranslationService(id);
       }
+      await reload();
+    } catch (_) {
+      state = ServicesSettingsViewState(
+        services: state.services,
+        loading: false,
+        operationErrorCode: AppErrorCode.unknown.wireName,
+      );
+    }
+  }
+
+  Future<void> reorderTranslation(int oldIndex, int newIndex) async {
+    final translation = state.services
+        .where((service) => service.kind == 'translation')
+        .toList();
+    if (oldIndex < 0 || oldIndex >= translation.length) return;
+    final item = translation.removeAt(oldIndex);
+    translation.insert(newIndex.clamp(0, translation.length), item);
+    try {
+      await ref
+          .read(workspaceSettingsRepositoryProvider)
+          .reorderTranslationServices([
+            for (final service in translation) service.id,
+          ]);
       await reload();
     } catch (_) {
       state = ServicesSettingsViewState(
@@ -343,9 +373,14 @@ final class ProvidersSettingsViewModel
 
   String? _validationError(ProviderDraft draft) {
     if (draft.id.trim().isEmpty) return 'validation_missing';
-    final type = state.types
-        .where((item) => item.id == draft.typeId)
-        .firstOrNull;
+    final type =
+        state.types.where((item) => item.id == draft.presetId).firstOrNull ??
+        state.types
+            .where(
+              (item) =>
+                  item.engineTypeId == draft.typeId || item.id == draft.typeId,
+            )
+            .firstOrNull;
     if (type == null) return 'validation_missing';
     final existing = state.providers
         .where((item) => item.id == draft.id)

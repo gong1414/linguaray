@@ -54,6 +54,11 @@ pub enum ProviderType {
     OpenAiCompatible,
     Youdao,
     System,
+    GoogleWeb,
+    BingWeb,
+    TencentTransmartWeb,
+    LibreTranslate,
+    MTranServer,
 }
 
 type DetectLanguageRequest = core::DetectLanguageRequest;

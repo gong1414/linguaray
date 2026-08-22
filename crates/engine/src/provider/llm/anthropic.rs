@@ -94,7 +94,7 @@ impl HttpClient {
     }
 
     fn join_url(&self, path: &str) -> String {
-        format!("{}{}", self.base_url.trim_end_matches('/'), path)
+        crate::catalog::urls::join_openai_path(&self.base_url, path)
     }
 }
 

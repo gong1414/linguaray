@@ -2174,6 +2174,14 @@ public protocol RuntimeSettingsProtocol: AnyObject, Sendable {
 
   func deleteService(serviceId: String) async throws -> ServiceConfigEntry?
 
+  /**
+   * Discovers models using an in-memory provider draft. Unlike
+   * `list_models`, this does not require the provider to be saved first and
+   * never writes credentials or provisional settings to disk.
+   */
+  func discoverProviderModels(providerId: String, providerType: String, fields: [String: String])
+    async throws -> [String]
+
   func generateProviderId(providerType: String) async throws -> String
 
   /**
@@ -2216,6 +2224,8 @@ public protocol RuntimeSettingsProtocol: AnyObject, Sendable {
    */
   func setProviderSecrets(providerId: String, secrets: [String: String]) async throws
 
+  func setTranslationServiceOrder(order: [String]) async throws -> [String]
+
   /**
    * Returns a fresh subscription that starts receiving
    * [`SettingsChange`] events emitted **after** this call. Existing
@@ -2242,8 +2252,9 @@ public protocol RuntimeSettingsProtocol: AnyObject, Sendable {
 
   func updateGeneral(patch: GeneralSettingsPatch) async throws -> GeneralSettings
 
-  func updateProvider(providerId: String, providerType: String, fields: [String: String])
-    async throws -> ProviderConfigEntry
+  func updateProvider(
+    providerId: String, providerType: String, fields: [String: String], presetId: String?
+  ) async throws -> ProviderConfigEntry
 
   func updateService(
     serviceId: String, providerId: String, serviceType: ServiceType, name: String,
@@ -2333,6 +2344,31 @@ open class RuntimeSettings: RuntimeSettingsProtocol, @unchecked Sendable {
         completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
         freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
         liftFunc: FfiConverterOptionTypeServiceConfigEntry.lift,
+        errorHandler: FfiConverterTypeRuntimeError_lift
+      )
+  }
+
+  /**
+   * Discovers models using an in-memory provider draft. Unlike
+   * `list_models`, this does not require the provider to be saved first and
+   * never writes credentials or provisional settings to disk.
+   */
+  open func discoverProviderModels(
+    providerId: String, providerType: String, fields: [String: String]
+  ) async throws -> [String] {
+    return
+      try await uniffiRustCallAsync(
+        rustFutureFunc: {
+          uniffi_linguaray_runtime_fn_method_runtimesettings_discover_provider_models(
+            self.uniffiCloneHandle(),
+            FfiConverterString.lower(providerId), FfiConverterString.lower(providerType),
+            FfiConverterDictionaryStringString.lower(fields)
+          )
+        },
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
+        liftFunc: FfiConverterSequenceString.lift,
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
   }
@@ -2592,6 +2628,23 @@ open class RuntimeSettings: RuntimeSettingsProtocol, @unchecked Sendable {
       )
   }
 
+  open func setTranslationServiceOrder(order: [String]) async throws -> [String] {
+    return
+      try await uniffiRustCallAsync(
+        rustFutureFunc: {
+          uniffi_linguaray_runtime_fn_method_runtimesettings_set_translation_service_order(
+            self.uniffiCloneHandle(),
+            FfiConverterSequenceString.lower(order)
+          )
+        },
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
+        liftFunc: FfiConverterSequenceString.lift,
+        errorHandler: FfiConverterTypeRuntimeError_lift
+      )
+  }
+
   /**
    * Returns a fresh subscription that starts receiving
    * [`SettingsChange`] events emitted **after** this call. Existing
@@ -2687,16 +2740,17 @@ open class RuntimeSettings: RuntimeSettingsProtocol, @unchecked Sendable {
       )
   }
 
-  open func updateProvider(providerId: String, providerType: String, fields: [String: String])
-    async throws -> ProviderConfigEntry
-  {
+  open func updateProvider(
+    providerId: String, providerType: String, fields: [String: String], presetId: String?
+  ) async throws -> ProviderConfigEntry {
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
           uniffi_linguaray_runtime_fn_method_runtimesettings_update_provider(
             self.uniffiCloneHandle(),
             FfiConverterString.lower(providerId), FfiConverterString.lower(providerType),
-            FfiConverterDictionaryStringString.lower(fields)
+            FfiConverterDictionaryStringString.lower(fields),
+            FfiConverterOptionString.lower(presetId)
           )
         },
         pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
@@ -3792,6 +3846,261 @@ public func FfiConverterTypeAppearanceSettingsPatch_lower(_ value: AppearanceSet
   return FfiConverterTypeAppearanceSettingsPatch.lower(value)
 }
 
+public struct CatalogFieldSpec: Equatable, Hashable {
+  public var key: String
+  public var labelKey: String
+  public var secret: Bool
+  public var required: Bool
+  public var placeholder: String?
+  public var advanced: Bool
+  public var defaultValue: String?
+
+  // Default memberwise initializers are never public by default, so we
+  // declare one manually.
+  public init(
+    key: String, labelKey: String, secret: Bool, required: Bool, placeholder: String?,
+    advanced: Bool, defaultValue: String?
+  ) {
+    self.key = key
+    self.labelKey = labelKey
+    self.secret = secret
+    self.required = required
+    self.placeholder = placeholder
+    self.advanced = advanced
+    self.defaultValue = defaultValue
+  }
+
+}
+
+#if compiler(>=6)
+  extension CatalogFieldSpec: Sendable {}
+#endif
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeCatalogFieldSpec: FfiConverterRustBuffer {
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws
+    -> CatalogFieldSpec
+  {
+    return
+      try CatalogFieldSpec(
+        key: FfiConverterString.read(from: &buf),
+        labelKey: FfiConverterString.read(from: &buf),
+        secret: FfiConverterBool.read(from: &buf),
+        required: FfiConverterBool.read(from: &buf),
+        placeholder: FfiConverterOptionString.read(from: &buf),
+        advanced: FfiConverterBool.read(from: &buf),
+        defaultValue: FfiConverterOptionString.read(from: &buf)
+      )
+  }
+
+  public static func write(_ value: CatalogFieldSpec, into buf: inout [UInt8]) {
+    FfiConverterString.write(value.key, into: &buf)
+    FfiConverterString.write(value.labelKey, into: &buf)
+    FfiConverterBool.write(value.secret, into: &buf)
+    FfiConverterBool.write(value.required, into: &buf)
+    FfiConverterOptionString.write(value.placeholder, into: &buf)
+    FfiConverterBool.write(value.advanced, into: &buf)
+    FfiConverterOptionString.write(value.defaultValue, into: &buf)
+  }
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCatalogFieldSpec_lift(_ buf: RustBuffer) throws -> CatalogFieldSpec {
+  return try FfiConverterTypeCatalogFieldSpec.lift(buf)
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCatalogFieldSpec_lower(_ value: CatalogFieldSpec) -> RustBuffer {
+  return FfiConverterTypeCatalogFieldSpec.lower(value)
+}
+
+public struct CatalogModelChoice: Equatable, Hashable {
+  public var id: String
+  public var name: String
+
+  // Default memberwise initializers are never public by default, so we
+  // declare one manually.
+  public init(id: String, name: String) {
+    self.id = id
+    self.name = name
+  }
+
+}
+
+#if compiler(>=6)
+  extension CatalogModelChoice: Sendable {}
+#endif
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeCatalogModelChoice: FfiConverterRustBuffer {
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws
+    -> CatalogModelChoice
+  {
+    return
+      try CatalogModelChoice(
+        id: FfiConverterString.read(from: &buf),
+        name: FfiConverterString.read(from: &buf)
+      )
+  }
+
+  public static func write(_ value: CatalogModelChoice, into buf: inout [UInt8]) {
+    FfiConverterString.write(value.id, into: &buf)
+    FfiConverterString.write(value.name, into: &buf)
+  }
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCatalogModelChoice_lift(_ buf: RustBuffer) throws -> CatalogModelChoice
+{
+  return try FfiConverterTypeCatalogModelChoice.lift(buf)
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCatalogModelChoice_lower(_ value: CatalogModelChoice) -> RustBuffer {
+  return FfiConverterTypeCatalogModelChoice.lower(value)
+}
+
+public struct CatalogProviderPreset: Equatable, Hashable {
+  public var id: String
+  public var engineType: String
+  public var `protocol`: String
+  public var category: CatalogCategory
+  public var name: String
+  public var descriptionKey: String
+  public var homepageUrl: String?
+  public var apiKeyUrl: String?
+  public var baseUrl: String
+  public var modelsUrl: String
+  public var fields: [CatalogFieldSpec]
+  public var translation: Bool
+  public var dictionary: Bool
+  public var ocr: Bool
+  public var llm: Bool
+  public var supportedMacos: Bool
+  public var supportedWindows: Bool
+  public var networkPolicy: CatalogNetworkPolicy
+  public var stability: CatalogStability
+
+  // Default memberwise initializers are never public by default, so we
+  // declare one manually.
+  public init(
+    id: String, engineType: String, `protocol`: String, category: CatalogCategory, name: String,
+    descriptionKey: String, homepageUrl: String?, apiKeyUrl: String?, baseUrl: String,
+    modelsUrl: String, fields: [CatalogFieldSpec], translation: Bool, dictionary: Bool, ocr: Bool,
+    llm: Bool, supportedMacos: Bool, supportedWindows: Bool, networkPolicy: CatalogNetworkPolicy,
+    stability: CatalogStability
+  ) {
+    self.id = id
+    self.engineType = engineType
+    self.`protocol` = `protocol`
+    self.category = category
+    self.name = name
+    self.descriptionKey = descriptionKey
+    self.homepageUrl = homepageUrl
+    self.apiKeyUrl = apiKeyUrl
+    self.baseUrl = baseUrl
+    self.modelsUrl = modelsUrl
+    self.fields = fields
+    self.translation = translation
+    self.dictionary = dictionary
+    self.ocr = ocr
+    self.llm = llm
+    self.supportedMacos = supportedMacos
+    self.supportedWindows = supportedWindows
+    self.networkPolicy = networkPolicy
+    self.stability = stability
+  }
+
+}
+
+#if compiler(>=6)
+  extension CatalogProviderPreset: Sendable {}
+#endif
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeCatalogProviderPreset: FfiConverterRustBuffer {
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws
+    -> CatalogProviderPreset
+  {
+    return
+      try CatalogProviderPreset(
+        id: FfiConverterString.read(from: &buf),
+        engineType: FfiConverterString.read(from: &buf),
+        protocol: FfiConverterString.read(from: &buf),
+        category: FfiConverterTypeCatalogCategory.read(from: &buf),
+        name: FfiConverterString.read(from: &buf),
+        descriptionKey: FfiConverterString.read(from: &buf),
+        homepageUrl: FfiConverterOptionString.read(from: &buf),
+        apiKeyUrl: FfiConverterOptionString.read(from: &buf),
+        baseUrl: FfiConverterString.read(from: &buf),
+        modelsUrl: FfiConverterString.read(from: &buf),
+        fields: FfiConverterSequenceTypeCatalogFieldSpec.read(from: &buf),
+        translation: FfiConverterBool.read(from: &buf),
+        dictionary: FfiConverterBool.read(from: &buf),
+        ocr: FfiConverterBool.read(from: &buf),
+        llm: FfiConverterBool.read(from: &buf),
+        supportedMacos: FfiConverterBool.read(from: &buf),
+        supportedWindows: FfiConverterBool.read(from: &buf),
+        networkPolicy: FfiConverterTypeCatalogNetworkPolicy.read(from: &buf),
+        stability: FfiConverterTypeCatalogStability.read(from: &buf)
+      )
+  }
+
+  public static func write(_ value: CatalogProviderPreset, into buf: inout [UInt8]) {
+    FfiConverterString.write(value.id, into: &buf)
+    FfiConverterString.write(value.engineType, into: &buf)
+    FfiConverterString.write(value.`protocol`, into: &buf)
+    FfiConverterTypeCatalogCategory.write(value.category, into: &buf)
+    FfiConverterString.write(value.name, into: &buf)
+    FfiConverterString.write(value.descriptionKey, into: &buf)
+    FfiConverterOptionString.write(value.homepageUrl, into: &buf)
+    FfiConverterOptionString.write(value.apiKeyUrl, into: &buf)
+    FfiConverterString.write(value.baseUrl, into: &buf)
+    FfiConverterString.write(value.modelsUrl, into: &buf)
+    FfiConverterSequenceTypeCatalogFieldSpec.write(value.fields, into: &buf)
+    FfiConverterBool.write(value.translation, into: &buf)
+    FfiConverterBool.write(value.dictionary, into: &buf)
+    FfiConverterBool.write(value.ocr, into: &buf)
+    FfiConverterBool.write(value.llm, into: &buf)
+    FfiConverterBool.write(value.supportedMacos, into: &buf)
+    FfiConverterBool.write(value.supportedWindows, into: &buf)
+    FfiConverterTypeCatalogNetworkPolicy.write(value.networkPolicy, into: &buf)
+    FfiConverterTypeCatalogStability.write(value.stability, into: &buf)
+  }
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCatalogProviderPreset_lift(_ buf: RustBuffer) throws
+  -> CatalogProviderPreset
+{
+  return try FfiConverterTypeCatalogProviderPreset.lift(buf)
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCatalogProviderPreset_lower(_ value: CatalogProviderPreset)
+  -> RustBuffer
+{
+  return FfiConverterTypeCatalogProviderPreset.lower(value)
+}
+
 public struct ChatChoice: Equatable, Hashable {
   public var index: UInt32
   public var message: ChatMessage
@@ -4122,6 +4431,7 @@ public struct GeneralSettings: Equatable, Hashable {
    * remaining languages collapsed into a secondary "More languages..." menu.
    */
   public var commonLanguages: [String]
+  public var translationServiceOrder: [String]
 
   // Default memberwise initializers are never public by default, so we
   // declare one manually.
@@ -4135,7 +4445,7 @@ public struct GeneralSettings: Equatable, Hashable {
      * These languages appear first in language selection menus, with the
      * remaining languages collapsed into a secondary "More languages..." menu.
      */
-    commonLanguages: [String]
+    commonLanguages: [String], translationServiceOrder: [String]
   ) {
     self.launchAtLogin = launchAtLogin
     self.showInMenuBar = showInMenuBar
@@ -4147,6 +4457,7 @@ public struct GeneralSettings: Equatable, Hashable {
     self.inputSubmitMode = inputSubmitMode
     self.doubleClickCopyResult = doubleClickCopyResult
     self.commonLanguages = commonLanguages
+    self.translationServiceOrder = translationServiceOrder
   }
 
 }
@@ -4173,7 +4484,8 @@ public struct FfiConverterTypeGeneralSettings: FfiConverterRustBuffer {
         translationTargets: FfiConverterSequenceTypeTranslationTarget.read(from: &buf),
         inputSubmitMode: FfiConverterTypeInputSubmitMode.read(from: &buf),
         doubleClickCopyResult: FfiConverterBool.read(from: &buf),
-        commonLanguages: FfiConverterSequenceString.read(from: &buf)
+        commonLanguages: FfiConverterSequenceString.read(from: &buf),
+        translationServiceOrder: FfiConverterSequenceString.read(from: &buf)
       )
   }
 
@@ -4188,6 +4500,7 @@ public struct FfiConverterTypeGeneralSettings: FfiConverterRustBuffer {
     FfiConverterTypeInputSubmitMode.write(value.inputSubmitMode, into: &buf)
     FfiConverterBool.write(value.doubleClickCopyResult, into: &buf)
     FfiConverterSequenceString.write(value.commonLanguages, into: &buf)
+    FfiConverterSequenceString.write(value.translationServiceOrder, into: &buf)
   }
 }
 
@@ -4216,6 +4529,7 @@ public struct GeneralSettingsPatch: Equatable, Hashable {
   public var inputSubmitMode: InputSubmitMode?
   public var doubleClickCopyResult: Bool?
   public var commonLanguages: [String]?
+  public var translationServiceOrder: [String]?
 
   // Default memberwise initializers are never public by default, so we
   // declare one manually.
@@ -4223,7 +4537,8 @@ public struct GeneralSettingsPatch: Equatable, Hashable {
     launchAtLogin: Bool?, showInMenuBar: Bool?, defaultOcrService: String?,
     autoCopyDetectedText: Bool?, defaultDirectoryService: String?,
     defaultTranslationService: String?, translationTargets: [TranslationTarget]?,
-    inputSubmitMode: InputSubmitMode?, doubleClickCopyResult: Bool?, commonLanguages: [String]?
+    inputSubmitMode: InputSubmitMode?, doubleClickCopyResult: Bool?, commonLanguages: [String]?,
+    translationServiceOrder: [String]?
   ) {
     self.launchAtLogin = launchAtLogin
     self.showInMenuBar = showInMenuBar
@@ -4235,6 +4550,7 @@ public struct GeneralSettingsPatch: Equatable, Hashable {
     self.inputSubmitMode = inputSubmitMode
     self.doubleClickCopyResult = doubleClickCopyResult
     self.commonLanguages = commonLanguages
+    self.translationServiceOrder = translationServiceOrder
   }
 
 }
@@ -4261,7 +4577,8 @@ public struct FfiConverterTypeGeneralSettingsPatch: FfiConverterRustBuffer {
         translationTargets: FfiConverterOptionSequenceTypeTranslationTarget.read(from: &buf),
         inputSubmitMode: FfiConverterOptionTypeInputSubmitMode.read(from: &buf),
         doubleClickCopyResult: FfiConverterOptionBool.read(from: &buf),
-        commonLanguages: FfiConverterOptionSequenceString.read(from: &buf)
+        commonLanguages: FfiConverterOptionSequenceString.read(from: &buf),
+        translationServiceOrder: FfiConverterOptionSequenceString.read(from: &buf)
       )
   }
 
@@ -4276,6 +4593,7 @@ public struct FfiConverterTypeGeneralSettingsPatch: FfiConverterRustBuffer {
     FfiConverterOptionTypeInputSubmitMode.write(value.inputSubmitMode, into: &buf)
     FfiConverterOptionBool.write(value.doubleClickCopyResult, into: &buf)
     FfiConverterOptionSequenceString.write(value.commonLanguages, into: &buf)
+    FfiConverterOptionSequenceString.write(value.translationServiceOrder, into: &buf)
   }
 }
 
@@ -5320,6 +5638,7 @@ public struct ProviderConfigEntry: Equatable, Hashable {
    * older version of the settings file.
    */
   public var createdAt: UInt64?
+  public var presetId: String?
 
   // Default memberwise initializers are never public by default, so we
   // declare one manually.
@@ -5334,12 +5653,13 @@ public struct ProviderConfigEntry: Equatable, Hashable {
      * provider is first created; `None` for providers migrated from an
      * older version of the settings file.
      */
-    createdAt: UInt64?
+    createdAt: UInt64?, presetId: String?
   ) {
     self.id = id
     self.type = type
     self.fields = fields
     self.createdAt = createdAt
+    self.presetId = presetId
   }
 
 }
@@ -5360,7 +5680,8 @@ public struct FfiConverterTypeProviderConfigEntry: FfiConverterRustBuffer {
         id: FfiConverterString.read(from: &buf),
         type: FfiConverterTypeProviderType.read(from: &buf),
         fields: FfiConverterDictionaryStringString.read(from: &buf),
-        createdAt: FfiConverterOptionUInt64.read(from: &buf)
+        createdAt: FfiConverterOptionUInt64.read(from: &buf),
+        presetId: FfiConverterOptionString.read(from: &buf)
       )
   }
 
@@ -5369,6 +5690,7 @@ public struct FfiConverterTypeProviderConfigEntry: FfiConverterRustBuffer {
     FfiConverterTypeProviderType.write(value.type, into: &buf)
     FfiConverterDictionaryStringString.write(value.fields, into: &buf)
     FfiConverterOptionUInt64.write(value.createdAt, into: &buf)
+    FfiConverterOptionString.write(value.presetId, into: &buf)
   }
 }
 
@@ -6781,6 +7103,222 @@ public func FfiConverterTypeWordTense_lower(_ value: WordTense) -> RustBuffer {
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
+public enum CatalogCategory: Equatable, Hashable {
+
+  case builtIn
+  case traditionalApi
+  case llmOfficial
+  case aggregator
+  case localOrSelfHosted
+
+}
+
+#if compiler(>=6)
+  extension CatalogCategory: Sendable {}
+#endif
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeCatalogCategory: FfiConverterRustBuffer {
+  typealias SwiftType = CatalogCategory
+
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws
+    -> CatalogCategory
+  {
+    let variant: Int32 = try readInt(&buf)
+    switch variant {
+
+    case 1: return .builtIn
+
+    case 2: return .traditionalApi
+
+    case 3: return .llmOfficial
+
+    case 4: return .aggregator
+
+    case 5: return .localOrSelfHosted
+
+    default: throw UniffiInternalError.unexpectedEnumCase
+    }
+  }
+
+  public static func write(_ value: CatalogCategory, into buf: inout [UInt8]) {
+    switch value {
+
+    case .builtIn:
+      writeInt(&buf, Int32(1))
+
+    case .traditionalApi:
+      writeInt(&buf, Int32(2))
+
+    case .llmOfficial:
+      writeInt(&buf, Int32(3))
+
+    case .aggregator:
+      writeInt(&buf, Int32(4))
+
+    case .localOrSelfHosted:
+      writeInt(&buf, Int32(5))
+
+    }
+  }
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCatalogCategory_lift(_ buf: RustBuffer) throws -> CatalogCategory {
+  return try FfiConverterTypeCatalogCategory.lift(buf)
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCatalogCategory_lower(_ value: CatalogCategory) -> RustBuffer {
+  return FfiConverterTypeCatalogCategory.lower(value)
+}
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
+public enum CatalogNetworkPolicy: Equatable, Hashable {
+
+  case localOnly
+  case officialApi
+  case unofficialWeb
+  case selfHosted
+
+}
+
+#if compiler(>=6)
+  extension CatalogNetworkPolicy: Sendable {}
+#endif
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeCatalogNetworkPolicy: FfiConverterRustBuffer {
+  typealias SwiftType = CatalogNetworkPolicy
+
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws
+    -> CatalogNetworkPolicy
+  {
+    let variant: Int32 = try readInt(&buf)
+    switch variant {
+
+    case 1: return .localOnly
+
+    case 2: return .officialApi
+
+    case 3: return .unofficialWeb
+
+    case 4: return .selfHosted
+
+    default: throw UniffiInternalError.unexpectedEnumCase
+    }
+  }
+
+  public static func write(_ value: CatalogNetworkPolicy, into buf: inout [UInt8]) {
+    switch value {
+
+    case .localOnly:
+      writeInt(&buf, Int32(1))
+
+    case .officialApi:
+      writeInt(&buf, Int32(2))
+
+    case .unofficialWeb:
+      writeInt(&buf, Int32(3))
+
+    case .selfHosted:
+      writeInt(&buf, Int32(4))
+
+    }
+  }
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCatalogNetworkPolicy_lift(_ buf: RustBuffer) throws
+  -> CatalogNetworkPolicy
+{
+  return try FfiConverterTypeCatalogNetworkPolicy.lift(buf)
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCatalogNetworkPolicy_lower(_ value: CatalogNetworkPolicy) -> RustBuffer
+{
+  return FfiConverterTypeCatalogNetworkPolicy.lower(value)
+}
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
+public enum CatalogStability: Equatable, Hashable {
+
+  case stable
+  case experimental
+
+}
+
+#if compiler(>=6)
+  extension CatalogStability: Sendable {}
+#endif
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeCatalogStability: FfiConverterRustBuffer {
+  typealias SwiftType = CatalogStability
+
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws
+    -> CatalogStability
+  {
+    let variant: Int32 = try readInt(&buf)
+    switch variant {
+
+    case 1: return .stable
+
+    case 2: return .experimental
+
+    default: throw UniffiInternalError.unexpectedEnumCase
+    }
+  }
+
+  public static func write(_ value: CatalogStability, into buf: inout [UInt8]) {
+    switch value {
+
+    case .stable:
+      writeInt(&buf, Int32(1))
+
+    case .experimental:
+      writeInt(&buf, Int32(2))
+
+    }
+  }
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCatalogStability_lift(_ buf: RustBuffer) throws -> CatalogStability {
+  return try FfiConverterTypeCatalogStability.lift(buf)
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCatalogStability_lower(_ value: CatalogStability) -> RustBuffer {
+  return FfiConverterTypeCatalogStability.lower(value)
+}
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
 public enum ChatRole: Equatable, Hashable {
 
   case system
@@ -7065,6 +7603,11 @@ public enum ProviderType: Equatable, Hashable {
   case openAiCompatible
   case youdao
   case system
+  case googleWeb
+  case bingWeb
+  case tencentTransmartWeb
+  case libreTranslate
+  case mTranServer
 
 }
 
@@ -7119,6 +7662,16 @@ public struct FfiConverterTypeProviderType: FfiConverterRustBuffer {
     case 18: return .youdao
 
     case 19: return .system
+
+    case 20: return .googleWeb
+
+    case 21: return .bingWeb
+
+    case 22: return .tencentTransmartWeb
+
+    case 23: return .libreTranslate
+
+    case 24: return .mTranServer
 
     default: throw UniffiInternalError.unexpectedEnumCase
     }
@@ -7183,6 +7736,21 @@ public struct FfiConverterTypeProviderType: FfiConverterRustBuffer {
 
     case .system:
       writeInt(&buf, Int32(19))
+
+    case .googleWeb:
+      writeInt(&buf, Int32(20))
+
+    case .bingWeb:
+      writeInt(&buf, Int32(21))
+
+    case .tencentTransmartWeb:
+      writeInt(&buf, Int32(22))
+
+    case .libreTranslate:
+      writeInt(&buf, Int32(23))
+
+    case .mTranServer:
+      writeInt(&buf, Int32(24))
 
     }
   }
@@ -8393,6 +8961,87 @@ private struct FfiConverterSequenceString: FfiConverterRustBuffer {
 #if swift(>=5.8)
   @_documentation(visibility: private)
 #endif
+private struct FfiConverterSequenceTypeCatalogFieldSpec: FfiConverterRustBuffer {
+  typealias SwiftType = [CatalogFieldSpec]
+
+  public static func write(_ value: [CatalogFieldSpec], into buf: inout [UInt8]) {
+    let len = Int32(value.count)
+    writeInt(&buf, len)
+    for item in value {
+      FfiConverterTypeCatalogFieldSpec.write(item, into: &buf)
+    }
+  }
+
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws
+    -> [CatalogFieldSpec]
+  {
+    let len: Int32 = try readInt(&buf)
+    var seq = [CatalogFieldSpec]()
+    seq.reserveCapacity(Int(len))
+    for _ in 0..<len {
+      seq.append(try FfiConverterTypeCatalogFieldSpec.read(from: &buf))
+    }
+    return seq
+  }
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+private struct FfiConverterSequenceTypeCatalogModelChoice: FfiConverterRustBuffer {
+  typealias SwiftType = [CatalogModelChoice]
+
+  public static func write(_ value: [CatalogModelChoice], into buf: inout [UInt8]) {
+    let len = Int32(value.count)
+    writeInt(&buf, len)
+    for item in value {
+      FfiConverterTypeCatalogModelChoice.write(item, into: &buf)
+    }
+  }
+
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws
+    -> [CatalogModelChoice]
+  {
+    let len: Int32 = try readInt(&buf)
+    var seq = [CatalogModelChoice]()
+    seq.reserveCapacity(Int(len))
+    for _ in 0..<len {
+      seq.append(try FfiConverterTypeCatalogModelChoice.read(from: &buf))
+    }
+    return seq
+  }
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+private struct FfiConverterSequenceTypeCatalogProviderPreset: FfiConverterRustBuffer {
+  typealias SwiftType = [CatalogProviderPreset]
+
+  public static func write(_ value: [CatalogProviderPreset], into buf: inout [UInt8]) {
+    let len = Int32(value.count)
+    writeInt(&buf, len)
+    for item in value {
+      FfiConverterTypeCatalogProviderPreset.write(item, into: &buf)
+    }
+  }
+
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws
+    -> [CatalogProviderPreset]
+  {
+    let len: Int32 = try readInt(&buf)
+    var seq = [CatalogProviderPreset]()
+    seq.reserveCapacity(Int(len))
+    for _ in 0..<len {
+      seq.append(try FfiConverterTypeCatalogProviderPreset.read(from: &buf))
+    }
+    return seq
+  }
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
 private struct FfiConverterSequenceTypeChatChoice: FfiConverterRustBuffer {
   typealias SwiftType = [ChatChoice]
 
@@ -9274,6 +9923,22 @@ public func echoWordTense(wordTense: WordTense) -> WordTense {
       )
     })
 }
+public func listCatalogSnapshotModels(presetId: String) -> [CatalogModelChoice] {
+  return try! FfiConverterSequenceTypeCatalogModelChoice.lift(
+    try! rustCall {
+      uniffi_linguaray_runtime_fn_func_list_catalog_snapshot_models(
+        FfiConverterString.lower(presetId), $0
+      )
+    })
+}
+public func listProviderCatalog() -> [CatalogProviderPreset] {
+  return try! FfiConverterSequenceTypeCatalogProviderPreset.lift(
+    try! rustCall {
+      uniffi_linguaray_runtime_fn_func_list_provider_catalog(
+        $0
+      )
+    })
+}
 
 private enum InitializationResult {
   case ok
@@ -9354,6 +10019,12 @@ private let initializationResult: InitializationResult = {
     return InitializationResult.apiChecksumMismatch
   }
   if uniffi_linguaray_runtime_checksum_func_echo_word_tense() != 26227 {
+    return InitializationResult.apiChecksumMismatch
+  }
+  if uniffi_linguaray_runtime_checksum_func_list_catalog_snapshot_models() != 57448 {
+    return InitializationResult.apiChecksumMismatch
+  }
+  if uniffi_linguaray_runtime_checksum_func_list_provider_catalog() != 59754 {
     return InitializationResult.apiChecksumMismatch
   }
   if uniffi_linguaray_runtime_checksum_method_runtimeapiserver_info() != 8149 {
@@ -9499,6 +10170,9 @@ private let initializationResult: InitializationResult = {
   if uniffi_linguaray_runtime_checksum_method_runtimesettings_delete_service() != 18787 {
     return InitializationResult.apiChecksumMismatch
   }
+  if uniffi_linguaray_runtime_checksum_method_runtimesettings_discover_provider_models() != 52945 {
+    return InitializationResult.apiChecksumMismatch
+  }
   if uniffi_linguaray_runtime_checksum_method_runtimesettings_generate_provider_id() != 32771 {
     return InitializationResult.apiChecksumMismatch
   }
@@ -9543,6 +10217,11 @@ private let initializationResult: InitializationResult = {
   if uniffi_linguaray_runtime_checksum_method_runtimesettings_set_provider_secrets() != 37353 {
     return InitializationResult.apiChecksumMismatch
   }
+  if uniffi_linguaray_runtime_checksum_method_runtimesettings_set_translation_service_order()
+    != 52277
+  {
+    return InitializationResult.apiChecksumMismatch
+  }
   if uniffi_linguaray_runtime_checksum_method_runtimesettings_subscribe() != 61804 {
     return InitializationResult.apiChecksumMismatch
   }
@@ -9558,7 +10237,7 @@ private let initializationResult: InitializationResult = {
   if uniffi_linguaray_runtime_checksum_method_runtimesettings_update_general() != 40188 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_linguaray_runtime_checksum_method_runtimesettings_update_provider() != 5640 {
+  if uniffi_linguaray_runtime_checksum_method_runtimesettings_update_provider() != 26398 {
     return InitializationResult.apiChecksumMismatch
   }
   if uniffi_linguaray_runtime_checksum_method_runtimesettings_update_service() != 45329 {

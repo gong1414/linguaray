@@ -117,12 +117,14 @@ void focusWorkbenchWindow() {
   final switchGeneration = ++_surfaceSwitchGeneration;
   _requestedSurface = AppSurface.workbench;
 
-  // Resizing a top-right compact window expands its native frame before the
-  // Flutter backing surface receives the new metrics. Keeping it visible in
-  // that interval exposes the desktop as a white strip beside the old 396 px
-  // surface. Hide only for the cross-surface transition and reveal it after
-  // the first workbench frame has been laid out.
-  if (switchedSurface) window.hide();
+  // Keep the native host alive while it expands so Flutter continues to
+  // produce frames. A hidden macOS window can stop scheduling frames, leaving
+  // the compact surface mounted forever. Opacity prevents the intermediate
+  // 396 px backing surface from flashing as a white strip.
+  if (switchedSurface) {
+    window.opacity = 0;
+    if (!window.isVisible) window.showInactive();
+  }
 
   window.title = kWorkbenchWindowTitle;
   window.titleBarStyle = TitleBarStyle.hidden;
@@ -143,24 +145,18 @@ void focusWorkbenchWindow() {
   if (window.isMinimized) window.restore();
 
   if (switchedSurface) {
-    // Keep the compact surface mounted while the native host expands. Mounting
-    // the 840 px workbench into the 396 px quick-window constraints for even
-    // one frame causes real overflows in the toolbar and settings rail.
+    // Resize first, then mount the workbench while the host is transparent.
+    // The post-frame callback reveals only the fully laid-out surface.
+    appSurface.value = AppSurface.workbench;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (switchGeneration != _surfaceSwitchGeneration) return;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (switchGeneration != _surfaceSwitchGeneration) return;
-        appSurface.value = AppSurface.workbench;
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (switchGeneration != _surfaceSwitchGeneration) return;
-          window.show();
-          window.focus();
-        });
-        WidgetsBinding.instance.scheduleFrame();
-      });
-      WidgetsBinding.instance.scheduleFrame();
+      window.opacity = 1;
+      window.show();
+      window.focus();
     });
+    WidgetsBinding.instance.scheduleFrame();
   } else {
+    window.opacity = 1;
     window.show();
     window.focus();
   }
@@ -197,6 +193,7 @@ Future<void> showMiniTranslatorWindow({
   final window = miniTranslatorWindowController.window;
   _surfaceSwitchGeneration++;
   _requestedSurface = AppSurface.miniTranslator;
+  window.opacity = 1;
   final switchedSurface = appSurface.value != AppSurface.miniTranslator;
   if (switchedSurface) {
     appSurface.value = AppSurface.miniTranslator;
