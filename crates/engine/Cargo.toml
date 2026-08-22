@@ -47,7 +47,6 @@ zhipu = []
 linguaray-core = { path = "../core" }
 async-trait.workspace = true
 base64.workspace = true
-getrandom.workspace = true
 hmac.workspace = true
 md5.workspace = true
 futures-util = "0.3"
