@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:beyondtranslate_runtime/beyondtranslate_runtime.dart' as rp;
+import 'package:linguaray_runtime/linguaray_runtime.dart' as rp;
 
 void main() {
-  // NOTE: these tests resolve `package:beyondtranslate_runtime/uniffi:beyondtranslate_runtime` via
+  // NOTE: these tests resolve `package:linguaray_runtime/uniffi:linguaray_runtime` via
   // Dart's native-assets system. Run them with native assets enabled:
   //
   //     flutter config --enable-native-assets

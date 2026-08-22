@@ -1,12 +1,12 @@
 import 'dart:io';
 
-import 'package:beyondtranslate_runtime/beyondtranslate_runtime.dart';
+import 'package:linguaray_runtime/linguaray_runtime.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 
 // Re-export uniffi-generated types so that files importing this service do
-// not need a separate import of beyondtranslate_runtime.
-export 'package:beyondtranslate_runtime/beyondtranslate_runtime.dart'
+// not need a separate import of linguaray_runtime.
+export 'package:linguaray_runtime/linguaray_runtime.dart'
     show
         // Settings types
         AdvancedSettings,

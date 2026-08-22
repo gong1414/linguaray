@@ -7,7 +7,7 @@ final class MacWindowAppearancePlugin: NSObject, FlutterPlugin {
 
   static func register(with registrar: FlutterPluginRegistrar) {
     let channel = FlutterMethodChannel(
-      name: "beyondtranslate/mac_window_appearance",
+      name: "linguaray/mac_window_appearance",
       binaryMessenger: registrar.messenger
     )
     registrar.addMethodCallDelegate(MacWindowAppearancePlugin(), channel: channel)

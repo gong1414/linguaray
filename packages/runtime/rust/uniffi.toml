@@ -8,5 +8,5 @@
 async_runtime = "tokio"
 
 [bindings.dart]
-package_name = "beyondtranslate_runtime"
-cdylib_name = "beyondtranslate_runtime"
+package_name = "linguaray_runtime"
+cdylib_name = "linguaray_runtime"

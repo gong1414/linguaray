@@ -1,13 +1,13 @@
-import 'package:beyondtranslate_desktop/main.dart' as app;
-import 'package:beyondtranslate_desktop/src/platform/permission_controller.dart';
-import 'package:beyondtranslate_desktop/src/platform/platform_types.dart';
-import 'package:beyondtranslate_desktop/src/platform/trigger_controller.dart';
-import 'package:beyondtranslate_desktop/src/routes/mini_translator/mini_translator.dart';
-import 'package:beyondtranslate_desktop/src/services/app_windows.dart';
-import 'package:beyondtranslate_desktop/src/services/shortcut_service/shortcut_service.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
+import 'package:linguaray_desktop/main.dart' as app;
+import 'package:linguaray_desktop/src/platform/permission_controller.dart';
+import 'package:linguaray_desktop/src/platform/platform_types.dart';
+import 'package:linguaray_desktop/src/platform/trigger_controller.dart';
+import 'package:linguaray_desktop/src/routes/mini_translator/mini_translator.dart';
+import 'package:linguaray_desktop/src/services/app_windows.dart';
+import 'package:linguaray_desktop/src/services/shortcut_service/shortcut_service.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();

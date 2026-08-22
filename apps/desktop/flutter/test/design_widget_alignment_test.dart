@@ -1,13 +1,13 @@
-import 'package:beyondtranslate_desktop/src/widgets/blocks.dart';
-import 'package:beyondtranslate_desktop/src/widgets/icon_action_button.dart';
-import 'package:beyondtranslate_desktop/src/widgets/language_selector.dart';
-import 'package:beyondtranslate_desktop/src/widgets/navigation_item.dart';
-import 'package:beyondtranslate_desktop/src/widgets/swap_pair.dart';
-import 'package:beyondtranslate_desktop/src/widgets/ui.dart';
-import 'package:beyondtranslate_desktop/src/widgets/workbench.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart' hide IconButton;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:linguaray_desktop/src/widgets/blocks.dart';
+import 'package:linguaray_desktop/src/widgets/icon_action_button.dart';
+import 'package:linguaray_desktop/src/widgets/language_selector.dart';
+import 'package:linguaray_desktop/src/widgets/navigation_item.dart';
+import 'package:linguaray_desktop/src/widgets/swap_pair.dart';
+import 'package:linguaray_desktop/src/widgets/ui.dart';
+import 'package:linguaray_desktop/src/widgets/workbench.dart';
 
 void main() {
   Widget specimen(Widget child) {

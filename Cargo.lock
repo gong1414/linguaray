@@ -143,77 +143,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "beyondtranslate-api-core"
-version = "0.1.0"
-dependencies = [
- "beyondtranslate-core",
- "beyondtranslate-engine",
- "serde",
- "serde_json",
- "serde_yaml",
-]
-
-[[package]]
-name = "beyondtranslate-core"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "reqwest",
- "serde",
- "serde_json",
- "thiserror 2.0.20",
- "tokio",
-]
-
-[[package]]
-name = "beyondtranslate-engine"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "base64",
- "beyondtranslate-core",
- "futures-util",
- "getrandom 0.2.17",
- "hmac",
- "md5",
- "objc2",
- "objc2-core-graphics",
- "rand 0.8.7",
- "reqwest",
- "serde",
- "serde_json",
- "serde_yaml",
- "sha1",
- "sha2",
- "thiserror 2.0.20",
- "tokio",
- "windows",
-]
-
-[[package]]
-name = "beyondtranslate_runtime"
-version = "0.1.0"
-dependencies = [
- "aho-corasick",
- "anyhow",
- "arboard",
- "beyondtranslate-api-core",
- "beyondtranslate-core",
- "beyondtranslate-engine",
- "camino",
- "objc2",
- "serde",
- "serde_json",
- "serde_yaml",
- "struct-patch",
- "thiserror 2.0.20",
- "tokio",
- "uniffi",
- "uniffi-dart",
- "uniffi_testing",
-]
-
-[[package]]
 name = "bitflags"
 version = "2.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1015,6 +944,77 @@ name = "libc"
 version = "0.2.189"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3eaf3ede3fee6db1a4c2ee091bf8a8b4dccdc6d17f656fb07896ee72867612f2"
+
+[[package]]
+name = "linguaray-api-core"
+version = "0.1.0"
+dependencies = [
+ "linguaray-core",
+ "linguaray-engine",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+]
+
+[[package]]
+name = "linguaray-core"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "tokio",
+]
+
+[[package]]
+name = "linguaray-engine"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "base64",
+ "futures-util",
+ "getrandom 0.2.17",
+ "hmac",
+ "linguaray-core",
+ "md5",
+ "objc2",
+ "objc2-core-graphics",
+ "rand 0.8.7",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "sha1",
+ "sha2",
+ "thiserror 2.0.20",
+ "tokio",
+ "windows",
+]
+
+[[package]]
+name = "linguaray_runtime"
+version = "0.1.0"
+dependencies = [
+ "aho-corasick",
+ "anyhow",
+ "arboard",
+ "camino",
+ "linguaray-api-core",
+ "linguaray-core",
+ "linguaray-engine",
+ "objc2",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "struct-patch",
+ "thiserror 2.0.20",
+ "tokio",
+ "uniffi",
+ "uniffi-dart",
+ "uniffi_testing",
+]
 
 [[package]]
 name = "linux-raw-sys"

@@ -370,7 +370,7 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .expect("time went backwards")
             .as_nanos();
-        std::env::temp_dir().join(format!("beyondtranslate-history-{unique}"))
+        std::env::temp_dir().join(format!("linguaray-history-{unique}"))
     }
 
     fn input(source: &str, translation: &str) -> HistoryEntryInput {

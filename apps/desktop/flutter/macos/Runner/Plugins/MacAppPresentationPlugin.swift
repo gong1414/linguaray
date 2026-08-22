@@ -17,7 +17,7 @@ import FlutterMacOS
 /// It also carries the two menu/Dock events that only AppKit sees back to Dart:
 /// a click on the Dock icon, and the Preferences… item (⌘,).
 final class MacAppPresentationPlugin: NSObject, FlutterPlugin {
-  static let channelName = "beyondtranslate/mac_app_presentation"
+  static let channelName = "linguaray/mac_app_presentation"
 
   /// Set by [register] so `AppDelegate` can forward AppKit callbacks without
   /// threading the instance through the engine registrar.

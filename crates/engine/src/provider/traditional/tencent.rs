@@ -3,11 +3,11 @@
 use crate::common::http_client::HttpClient;
 use async_trait::async_trait;
 use base64::{engine::general_purpose::STANDARD, Engine as _};
-use beyondtranslate_core::{
+use hmac::{Hmac, Mac};
+use linguaray_core::{
     DetectLanguageRequest, DetectLanguageResponse, Provider, TextDetection, TextTranslation,
     TranslateRequest, TranslateResponse, TranslationError, TranslationService,
 };
-use hmac::{Hmac, Mac};
 use rand::random;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};

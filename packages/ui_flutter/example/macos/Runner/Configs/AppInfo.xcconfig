@@ -5,7 +5,7 @@
 // 'flutter create' template.
 
 // The application's name. By default this is also the title of the Flutter window.
-PRODUCT_NAME = beyondtranslate_ui_example
+PRODUCT_NAME = linguaray_ui_example
 
 // The application's bundle identifier
 PRODUCT_BUNDLE_IDENTIFIER = io.github.gong1414.linguaray.uiExample

@@ -14,7 +14,7 @@ pub use runtime::{
     SettingsChange, SettingsSubscription, StreamCallback,
 };
 
-use beyondtranslate_core::{
+use linguaray_core::{
     DetectLanguageRequest, DetectLanguageResponse, LanguagePair, LookUpRequest, LookUpResponse,
     RecognizeTextRequest, RecognizeTextResponse, RecognizedRect, TextDetection, TextRecognition,
     TextTranslation, TranslateRequest, TranslateResponse, WordDefinition, WordEtymology, WordImage,

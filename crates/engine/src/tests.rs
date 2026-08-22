@@ -227,7 +227,7 @@ fn reads_yaml_from_file() {
         .duration_since(UNIX_EPOCH)
         .expect("valid time")
         .as_nanos();
-    let path = env::temp_dir().join(format!("beyondtranslate-engine-{suffix}.yaml"));
+    let path = env::temp_dir().join(format!("linguaray-engine-{suffix}.yaml"));
     fs::write(
         &path,
         r#"

@@ -1,5 +1,5 @@
-import 'package:beyondtranslate_ui/src/theme/theme.dart';
 import 'package:flutter/widgets.dart';
+import 'package:linguaray_ui/src/theme/theme.dart';
 
 /// The menu-bar popover shell: a padded tray whose contents sit on an inner
 /// card, so the tray colour reads as a frame around the result.

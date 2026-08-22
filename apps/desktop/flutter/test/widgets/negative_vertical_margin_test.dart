@@ -1,6 +1,6 @@
-import 'package:beyondtranslate_desktop/src/widgets/negative_vertical_margin.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:linguaray_desktop/src/widgets/negative_vertical_margin.dart';
 
 /// A stand-in for the 重译 chip: 11px of text inside 6px of padding.
 Widget chip() {

@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use beyondtranslate_core::{
+use linguaray_core::{
     ChatMessage, DetectLanguageRequest, DetectLanguageResponse, LanguageInfo, LanguagePair,
     LookUpRequest, LookUpResponse, RecognizeTextRequest, RecognizeTextResponse, TranslateRequest,
     TranslateResponse,
@@ -29,8 +29,8 @@ use crate::domain::settings::{
 };
 use crate::domain::text_extractor;
 use crate::RuntimeApiServer;
-use beyondtranslate_core::TranslationTarget;
-use beyondtranslate_engine::prompt::GlossaryTerm;
+use linguaray_core::TranslationTarget;
+use linguaray_engine::prompt::GlossaryTerm;
 
 /// Error type returned by all uniffi-exported Runtime methods.
 #[derive(Debug, thiserror::Error, uniffi::Error)]
@@ -90,7 +90,7 @@ const EVENT_CHANNEL_CAPACITY: usize = 64;
 
 struct RuntimeState {
     settings: Settings,
-    engine: beyondtranslate_engine::Engine,
+    engine: linguaray_engine::Engine,
     /// Credentials hydrated from the OS secure store for this process only.
     /// Persisted settings contain opaque references instead of these values.
     provider_secrets: HashMap<String, HashMap<String, String>>,
@@ -106,7 +106,7 @@ impl RuntimeState {
                 "system".to_owned(),
                 ProviderConfigEntry {
                     id: "system".to_owned(),
-                    r#type: beyondtranslate_engine::ProviderType::System,
+                    r#type: linguaray_engine::ProviderType::System,
                     fields: HashMap::new(),
                     created_at: None,
                 },
@@ -356,12 +356,12 @@ impl Runtime {
 
     /// Returns the curated language list supported by the app.
     pub fn list_languages(&self) -> Vec<LanguageInfo> {
-        beyondtranslate_engine::all_languages()
+        linguaray_engine::all_languages()
     }
 
     /// Returns languages supported by the app UI.
     pub fn list_app_languages(&self) -> Vec<LanguageInfo> {
-        beyondtranslate_engine::app_languages()
+        linguaray_engine::app_languages()
     }
 }
 
@@ -370,19 +370,19 @@ impl Runtime {
         &self,
         provider_id: String,
         request: TranslateRequest,
-    ) -> Result<TranslateResponse, beyondtranslate_api_core::ApiError> {
-        let request = beyondtranslate_api_core::translate_request(request)?;
+    ) -> Result<TranslateResponse, linguaray_api_core::ApiError> {
+        let request = linguaray_api_core::translate_request(request)?;
         let provider = {
             let state = self.inner.state.read().await;
             state
                 .engine
                 .require(&provider_id)
-                .map_err(beyondtranslate_api_core::ApiError::from_engine_error)?
+                .map_err(linguaray_api_core::ApiError::from_engine_error)?
                 .clone()
         };
         let service = provider.translation().ok_or_else(|| {
-            beyondtranslate_api_core::ApiError::from_engine_error(
-                beyondtranslate_engine::EngineError::TranslationNotSupported(provider_id.clone()),
+            linguaray_api_core::ApiError::from_engine_error(
+                linguaray_engine::EngineError::TranslationNotSupported(provider_id.clone()),
             )
         })?;
 
@@ -393,19 +393,19 @@ impl Runtime {
         &self,
         provider_id: String,
         request: DetectLanguageRequest,
-    ) -> Result<DetectLanguageResponse, beyondtranslate_api_core::ApiError> {
-        let request = beyondtranslate_api_core::detect_language_request(request)?;
+    ) -> Result<DetectLanguageResponse, linguaray_api_core::ApiError> {
+        let request = linguaray_api_core::detect_language_request(request)?;
         let provider = {
             let state = self.inner.state.read().await;
             state
                 .engine
                 .require(&provider_id)
-                .map_err(beyondtranslate_api_core::ApiError::from_engine_error)?
+                .map_err(linguaray_api_core::ApiError::from_engine_error)?
                 .clone()
         };
         let service = provider.translation().ok_or_else(|| {
-            beyondtranslate_api_core::ApiError::from_engine_error(
-                beyondtranslate_engine::EngineError::TranslationNotSupported(provider_id.clone()),
+            linguaray_api_core::ApiError::from_engine_error(
+                linguaray_engine::EngineError::TranslationNotSupported(provider_id.clone()),
             )
         })?;
 
@@ -415,18 +415,18 @@ impl Runtime {
     pub(crate) async fn api_supported_language_pairs(
         &self,
         provider_id: String,
-    ) -> Result<Vec<LanguagePair>, beyondtranslate_api_core::ApiError> {
+    ) -> Result<Vec<LanguagePair>, linguaray_api_core::ApiError> {
         let provider = {
             let state = self.inner.state.read().await;
             state
                 .engine
                 .require(&provider_id)
-                .map_err(beyondtranslate_api_core::ApiError::from_engine_error)?
+                .map_err(linguaray_api_core::ApiError::from_engine_error)?
                 .clone()
         };
         let service = provider.translation().ok_or_else(|| {
-            beyondtranslate_api_core::ApiError::from_engine_error(
-                beyondtranslate_engine::EngineError::TranslationNotSupported(provider_id.clone()),
+            linguaray_api_core::ApiError::from_engine_error(
+                linguaray_engine::EngineError::TranslationNotSupported(provider_id.clone()),
             )
         })?;
 
@@ -440,19 +440,19 @@ impl Runtime {
         &self,
         provider_id: String,
         request: LookUpRequest,
-    ) -> Result<LookUpResponse, beyondtranslate_api_core::ApiError> {
-        let request = beyondtranslate_api_core::lookup_request(request)?;
+    ) -> Result<LookUpResponse, linguaray_api_core::ApiError> {
+        let request = linguaray_api_core::lookup_request(request)?;
         let provider = {
             let state = self.inner.state.read().await;
             state
                 .engine
                 .require(&provider_id)
-                .map_err(beyondtranslate_api_core::ApiError::from_engine_error)?
+                .map_err(linguaray_api_core::ApiError::from_engine_error)?
                 .clone()
         };
         let service = provider.dictionary().ok_or_else(|| {
-            beyondtranslate_api_core::ApiError::from_engine_error(
-                beyondtranslate_engine::EngineError::DictionaryNotSupported(provider_id.clone()),
+            linguaray_api_core::ApiError::from_engine_error(
+                linguaray_engine::EngineError::DictionaryNotSupported(provider_id.clone()),
             )
         })?;
 
@@ -671,7 +671,7 @@ fn render_prompt_template(
         .replace("{{sourceLanguage}}", source_language)
         .replace("{{targetLanguage}}", target_language)
         .replace("{{text}}", text);
-    let block = beyondtranslate_engine::prompt::glossary_constraints(glossary);
+    let block = linguaray_engine::prompt::glossary_constraints(glossary);
 
     if rendered.contains(GLOSSARY_PLACEHOLDER) {
         return rendered.replace(GLOSSARY_PLACEHOLDER, block.as_deref().unwrap_or_default());
@@ -1402,16 +1402,16 @@ impl RuntimeTranslation {
                         &terms,
                     )
                 } else {
-                    beyondtranslate_engine::prompt::translate_text_system_prompt(
+                    linguaray_engine::prompt::translate_text_system_prompt(
                         source_language.as_deref().unwrap_or("auto"),
                         &target_language,
                         None,
                         &terms,
                     )
                 };
-                let user_prompt = beyondtranslate_engine::prompt::translate_text_user_prompt(&text);
+                let user_prompt = linguaray_engine::prompt::translate_text_user_prompt(&text);
                 let response = llm_service
-                    .chat(beyondtranslate_core::ChatRequest {
+                    .chat(linguaray_core::ChatRequest {
                         model,
                         messages: vec![
                             ChatMessage::system(system_prompt),
@@ -1430,7 +1430,7 @@ impl RuntimeTranslation {
                     .map(|choice| choice.message.content.clone())
                     .ok_or_else(|| "no response from llm".to_owned())?;
                 Ok(TranslateResponse {
-                    translations: vec![beyondtranslate_core::TextTranslation {
+                    translations: vec![linguaray_core::TextTranslation {
                         text: content,
                         detected_source_language: None,
                         audio_url: None,
@@ -1499,11 +1499,11 @@ impl RuntimeTranslation {
                 let user_prompt = format!("Detect the language of this text:\n\n{text}");
 
                 let response = llm_service
-                    .chat(beyondtranslate_core::ChatRequest {
+                    .chat(linguaray_core::ChatRequest {
                         model,
                         messages: vec![
-                            beyondtranslate_core::ChatMessage::system(system_prompt),
-                            beyondtranslate_core::ChatMessage::user(user_prompt),
+                            linguaray_core::ChatMessage::system(system_prompt),
+                            linguaray_core::ChatMessage::user(user_prompt),
                         ],
                         temperature: Some(0.0),
                         max_tokens: Some(16),
@@ -1527,9 +1527,9 @@ impl RuntimeTranslation {
                     "auto".to_string()
                 };
 
-                let detections: Vec<beyondtranslate_core::TextDetection> = texts
+                let detections: Vec<linguaray_core::TextDetection> = texts
                     .iter()
-                    .map(|t| beyondtranslate_core::TextDetection {
+                    .map(|t| linguaray_core::TextDetection {
                         detected_language: code.clone(),
                         text: t.clone(),
                     })
@@ -1613,8 +1613,8 @@ impl RuntimeLlm {
     async fn chat_impl(
         &self,
         model: String,
-        messages: Vec<beyondtranslate_core::ChatMessage>,
-    ) -> Result<beyondtranslate_core::ChatResponse, String> {
+        messages: Vec<linguaray_core::ChatMessage>,
+    ) -> Result<linguaray_core::ChatResponse, String> {
         let service_id = self.service_id.clone();
         let runtime = self.runtime.clone();
         run_on_worker_thread(move || async move {
@@ -1637,7 +1637,7 @@ impl RuntimeLlm {
                 .ok_or_else(|| format!("provider `{provider_id}` does not support llm"))?;
 
             llm_service
-                .chat(beyondtranslate_core::ChatRequest {
+                .chat(linguaray_core::ChatRequest {
                     model,
                     messages,
                     temperature: None,
@@ -1676,15 +1676,14 @@ impl RuntimeLlm {
                 .map(str::to_owned)
                 .or_else(|| llm_service.available_models().into_iter().next())
                 .ok_or_else(|| "llm default model must be configured".to_owned())?;
-            let system_prompt =
-                beyondtranslate_engine::prompt::polish_translation_system_prompt(&style);
+            let system_prompt = linguaray_engine::prompt::polish_translation_system_prompt(&style);
 
             let response = llm_service
-                .chat(beyondtranslate_core::ChatRequest {
+                .chat(linguaray_core::ChatRequest {
                     model,
                     messages: vec![
-                        beyondtranslate_core::ChatMessage::system(system_prompt),
-                        beyondtranslate_core::ChatMessage::user(text),
+                        linguaray_core::ChatMessage::system(system_prompt),
+                        linguaray_core::ChatMessage::user(text),
                     ],
                     temperature: None,
                     max_tokens: None,
@@ -1728,15 +1727,15 @@ impl RuntimeLlm {
                 .map(str::to_owned)
                 .or_else(|| llm_service.available_models().into_iter().next())
                 .ok_or_else(|| "llm default model must be configured".to_owned())?;
-            let system_prompt = beyondtranslate_engine::prompt::explain_translation_system_prompt();
+            let system_prompt = linguaray_engine::prompt::explain_translation_system_prompt();
             let user_prompt = format!("Source text: {source}\n\nTranslation: {translation}");
 
             let response = llm_service
-                .chat(beyondtranslate_core::ChatRequest {
+                .chat(linguaray_core::ChatRequest {
                     model,
                     messages: vec![
-                        beyondtranslate_core::ChatMessage::system(system_prompt),
-                        beyondtranslate_core::ChatMessage::user(user_prompt),
+                        linguaray_core::ChatMessage::system(system_prompt),
+                        linguaray_core::ChatMessage::user(user_prompt),
                     ],
                     temperature: None,
                     max_tokens: None,
@@ -1791,21 +1790,20 @@ impl RuntimeLlm {
                 .map(str::to_owned)
                 .or_else(|| llm_service.available_models().into_iter().next())
                 .ok_or_else(|| "llm default model must be configured".to_owned())?;
-            let system_prompt =
-                beyondtranslate_engine::prompt::alternative_translations_system_prompt(
-                    count,
-                    style.as_deref(),
-                );
+            let system_prompt = linguaray_engine::prompt::alternative_translations_system_prompt(
+                count,
+                style.as_deref(),
+            );
             let user_prompt = format!(
                 "Source language: {source_lang}\nTarget language: {target_lang}\nText: {text}"
             );
 
             let response = llm_service
-                .chat(beyondtranslate_core::ChatRequest {
+                .chat(linguaray_core::ChatRequest {
                     model,
                     messages: vec![
-                        beyondtranslate_core::ChatMessage::system(system_prompt),
-                        beyondtranslate_core::ChatMessage::user(user_prompt),
+                        linguaray_core::ChatMessage::system(system_prompt),
+                        linguaray_core::ChatMessage::user(user_prompt),
                     ],
                     temperature: None,
                     max_tokens: None,
@@ -1869,21 +1867,21 @@ impl RuntimeLlm {
                 let system_prompt = if let Some(system_prompt) = resolved.field("systemPrompt") {
                     render_prompt_template(system_prompt, &source_lang, &target_lang, &text, &terms)
                 } else {
-                    beyondtranslate_engine::prompt::translate_text_system_prompt(
+                    linguaray_engine::prompt::translate_text_system_prompt(
                         &source_lang,
                         &target_lang,
                         None,
                         &terms,
                     )
                 };
-                let user_prompt = beyondtranslate_engine::prompt::translate_text_user_prompt(&text);
+                let user_prompt = linguaray_engine::prompt::translate_text_user_prompt(&text);
 
                 let receiver = llm_service
-                    .chat_stream(beyondtranslate_core::ChatRequest {
+                    .chat_stream(linguaray_core::ChatRequest {
                         model,
                         messages: vec![
-                            beyondtranslate_core::ChatMessage::system(system_prompt),
-                            beyondtranslate_core::ChatMessage::user(user_prompt),
+                            linguaray_core::ChatMessage::system(system_prompt),
+                            linguaray_core::ChatMessage::user(user_prompt),
                         ],
                         temperature: Some(0.3),
                         max_tokens: Some(4096),
@@ -1918,7 +1916,7 @@ impl RuntimeLlm {
                     format!("provider `{provider_id}` does not support translation")
                 })?;
                 let response = translation_service
-                    .translate(beyondtranslate_core::TranslateRequest {
+                    .translate(linguaray_core::TranslateRequest {
                         source_language: Some(source_lang.clone()),
                         target_language: Some(target_lang),
                         text: text.clone(),
@@ -1942,8 +1940,8 @@ impl RuntimeLlm {
     pub async fn chat(
         &self,
         model: String,
-        messages: Vec<beyondtranslate_core::ChatMessage>,
-    ) -> Result<beyondtranslate_core::ChatResponse, RuntimeError> {
+        messages: Vec<linguaray_core::ChatMessage>,
+    ) -> Result<linguaray_core::ChatResponse, RuntimeError> {
         self.chat_impl(model, messages).await.map_err(Into::into)
     }
 
@@ -1989,7 +1987,7 @@ impl RuntimeLlm {
         let callback_for_worker = callback.clone();
 
         if let Err(error) = thread::Builder::new()
-            .name("beyondtranslate-engine-bridge".to_owned())
+            .name("linguaray-engine-bridge".to_owned())
             .spawn(move || {
                 let result = tokio::runtime::Builder::new_current_thread()
                     .enable_all()
@@ -2203,7 +2201,7 @@ fn capture_screenshot() -> Result<String, String> {
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis();
-    let file_name = format!("beyondtranslate-screenshot-{timestamp}.png");
+    let file_name = format!("linguaray-screenshot-{timestamp}.png");
     let path = std::env::temp_dir().join(&file_name);
     let path_str = path
         .to_str()
@@ -2275,7 +2273,7 @@ where
     let (sender, receiver) = tokio::sync::oneshot::channel();
 
     thread::Builder::new()
-        .name("beyondtranslate-engine-bridge".to_owned())
+        .name("linguaray-engine-bridge".to_owned())
         .spawn(move || {
             let result = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
@@ -2298,7 +2296,7 @@ mod tests {
 
     fn unique_data_dir() -> PathBuf {
         std::env::temp_dir().join(format!(
-            "beyondtranslate-runtime-{}",
+            "linguaray-runtime-{}",
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .expect("time went backwards")

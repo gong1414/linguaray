@@ -1,7 +1,7 @@
-import 'package:beyondtranslate_ui/src/theme/text_styles.dart';
-import 'package:beyondtranslate_ui/src/theme/theme.dart';
-import 'package:beyondtranslate_ui/src/theme/tokens.dart';
 import 'package:flutter/widgets.dart';
+import 'package:linguaray_ui/src/theme/text_styles.dart';
+import 'package:linguaray_ui/src/theme/theme.dart';
+import 'package:linguaray_ui/src/theme/tokens.dart';
 
 enum LabelTone { subtle, faint, accent, warn, danger }
 

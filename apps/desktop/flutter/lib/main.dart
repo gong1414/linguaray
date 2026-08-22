@@ -1,6 +1,5 @@
-import 'package:beyondtranslate_runtime/beyondtranslate_runtime.dart'
-    as beyondtranslate_runtime;
 import 'package:flutter/material.dart';
+import 'package:linguaray_runtime/linguaray_runtime.dart' as linguaray_runtime;
 
 import 'src/i18n/i18n.dart';
 import 'src/platform/onboarding_controller.dart';
@@ -15,7 +14,7 @@ Future<void> _ensureInitialized() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Fail fast if the committed Dart bindings do not match the bundled
   // native library (API version / checksum mismatch).
-  beyondtranslate_runtime.ensureInitialized();
+  linguaray_runtime.ensureInitialized();
   await initRuntime();
   debugPrint('[LinguaRay] Rust runtime initialized.');
 

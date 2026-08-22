@@ -1,6 +1,6 @@
-import 'package:beyondtranslate_desktop/src/services/app_windows.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:linguaray_desktop/src/services/app_windows.dart';
 
 void main() {
   group('quick window placement', () {

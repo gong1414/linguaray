@@ -1,6 +1,6 @@
-import 'package:beyondtranslate_ui/beyondtranslate_ui.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:linguaray_ui/linguaray_ui.dart';
 
 /// The fixed geometry the React kit pins with Tailwind height utilities. These
 /// are the metrics a font's own line box would otherwise drift off, so they are

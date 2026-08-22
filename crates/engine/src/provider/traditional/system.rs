@@ -1,13 +1,13 @@
 use async_trait::async_trait;
 use base64::Engine;
-use beyondtranslate_core::{
+use linguaray_core::{
     DetectLanguageRequest, DetectLanguageResponse, DictionaryError, DictionaryService,
     LookUpRequest, LookUpResponse, OcrError, OcrService, Provider, RecognizeTextRequest,
     RecognizeTextResponse, TranslateRequest, TranslateResponse, TranslationError,
     TranslationService,
 };
 #[cfg(target_os = "macos")]
-use beyondtranslate_core::{
+use linguaray_core::{
     RecognizedRect, TextDetection, TextRecognition, TextTranslation, WordDefinition,
     WordPronunciation,
 };

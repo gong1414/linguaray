@@ -1,7 +1,7 @@
 # LinguaRay UI
 
 The reusable Flutter design system for LinguaRay. The internal package name
-remains `beyondtranslate_ui` for upstream compatibility; user-facing branding
+remains `linguaray_ui` for upstream compatibility; user-facing branding
 and product components belong to LinguaRay.
 
 Primitives only, which is where React draws the line too: no translation,
@@ -13,7 +13,7 @@ The [widget map](#widget-map) below names both halves.
 ## Using it
 
 ```dart
-import 'package:beyondtranslate_ui/beyondtranslate_ui.dart' as ui;
+import 'package:linguaray_ui/linguaray_ui.dart' as ui;
 
 ui.DesignThemeProvider(
   theme: ui.DesignThemeName.studioLight,

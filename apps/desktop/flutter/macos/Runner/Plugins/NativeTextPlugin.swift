@@ -12,7 +12,7 @@ import FlutterMacOS
 /// The companion to `NativeTextFieldPlugin`: same channel shape, same style
 /// encoding, but never editable.
 final class NativeTextPlugin: NSObject {
-  static let viewType = "beyondtranslate/native_text"
+  static let viewType = "linguaray/native_text"
 
   static func register(with registrar: FlutterPluginRegistrar) {
     registrar.register(
@@ -74,7 +74,7 @@ private final class NativeTextView: NSView {
   ) {
     let args = arguments ?? [:]
     channel = FlutterMethodChannel(
-      name: "beyondtranslate/native_text/\(viewId)",
+      name: "linguaray/native_text/\(viewId)",
       binaryMessenger: messenger
     )
     padding = NativeTextView.decodePadding(args["padding"])

@@ -1,10 +1,10 @@
-import 'package:beyondtranslate_desktop/src/i18n/i18n.dart';
-import 'package:beyondtranslate_desktop/src/routes/workbench/glossary_dialogs.dart';
-import 'package:beyondtranslate_desktop/src/widgets/ui.dart'
-    show DesignThemeProvider, OptionCard;
-import 'package:beyondtranslate_runtime/beyondtranslate_runtime.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:linguaray_desktop/src/i18n/i18n.dart';
+import 'package:linguaray_desktop/src/routes/workbench/glossary_dialogs.dart';
+import 'package:linguaray_desktop/src/widgets/ui.dart'
+    show DesignThemeProvider, OptionCard;
+import 'package:linguaray_runtime/linguaray_runtime.dart';
 
 /// These sheets live inside a scrolling [DialogBody], which hands its children
 /// an unbounded height — the one constraint a `CrossAxisAlignment.stretch` row

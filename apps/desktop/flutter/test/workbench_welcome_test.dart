@@ -1,10 +1,9 @@
 import 'dart:io';
 
-import 'package:beyondtranslate_desktop/src/routes/workbench/welcome.dart';
-import 'package:beyondtranslate_desktop/src/widgets/ui.dart'
-    show DesignThemeProvider;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:linguaray_desktop/src/routes/workbench/welcome.dart';
+import 'package:linguaray_desktop/src/widgets/ui.dart' show DesignThemeProvider;
 
 void main() {
   testWidgets('welcome actions wrap without overflowing a narrow viewport', (

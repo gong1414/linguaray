@@ -1,6 +1,6 @@
 /// The app's single door to the design system.
 ///
-/// Pages and widgets import this file, never `package:beyondtranslate_ui/…`
+/// Pages and widgets import this file, never `package:linguaray_ui/…`
 /// directly, so the package stays swappable from one place. Import only the
 /// names a file actually uses:
 ///
@@ -9,7 +9,7 @@
 /// ```
 ///
 /// The package holds primitives only — the same boundary React draws around
-/// `@beyondtranslate/ui`. The product's own widgets that compose them sit beside
+/// `@linguaray/ui`. The product's own widgets that compose them sit beside
 /// this file (`swap_pair.dart`, `blocks.dart`, `list_tile.dart`, …) and are
 /// imported directly, not through here.
 ///
@@ -24,4 +24,4 @@
 /// `DesignTypographyStyles`.
 library;
 
-export 'package:beyondtranslate_ui/beyondtranslate_ui.dart';
+export 'package:linguaray_ui/linguaray_ui.dart';

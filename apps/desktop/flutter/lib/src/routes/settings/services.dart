@@ -1,6 +1,6 @@
-import 'package:beyondtranslate_runtime/beyondtranslate_runtime.dart';
 import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
+import 'package:linguaray_runtime/linguaray_runtime.dart';
 
 import '../../features.dart';
 import '../../i18n/i18n.dart';

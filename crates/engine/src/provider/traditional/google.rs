@@ -1,7 +1,7 @@
 #![cfg_attr(not(feature = "google"), allow(dead_code))]
 
 use async_trait::async_trait;
-use beyondtranslate_core::{
+use linguaray_core::{
     DetectLanguageRequest, DetectLanguageResponse, Provider, TextDetection, TextTranslation,
     TranslateRequest, TranslateResponse, TranslationError, TranslationService,
 };

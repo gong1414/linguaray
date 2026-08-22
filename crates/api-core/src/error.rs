@@ -1,5 +1,5 @@
-use beyondtranslate_core::{DictionaryError, TranslationError};
-use beyondtranslate_engine::EngineError;
+use linguaray_core::{DictionaryError, TranslationError};
+use linguaray_engine::EngineError;
 use serde::Serialize;
 
 #[derive(Debug, Clone, Serialize)]
@@ -140,7 +140,7 @@ impl From<DictionaryError> for ApiError {
 
 #[cfg(test)]
 mod tests {
-    use beyondtranslate_core::TranslationError;
+    use linguaray_core::TranslationError;
 
     use super::ApiError;
 

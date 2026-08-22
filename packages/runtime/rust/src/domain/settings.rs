@@ -3,8 +3,8 @@ use std::fs;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use beyondtranslate_core::TranslationTarget;
-use beyondtranslate_engine::{ProviderConfig, ProviderType};
+use linguaray_core::TranslationTarget;
+use linguaray_engine::{ProviderConfig, ProviderType};
 use serde::ser::SerializeMap;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
@@ -508,7 +508,7 @@ mod tests {
             .expect("time went backwards")
             .as_nanos();
         std::env::temp_dir()
-            .join(format!("beyondtranslate-settings-{unique}"))
+            .join(format!("linguaray-settings-{unique}"))
             .join("settings.json")
     }
 

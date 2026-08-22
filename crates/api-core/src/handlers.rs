@@ -1,4 +1,4 @@
-use beyondtranslate_core::{DetectLanguageRequest, LanguagePair, LookUpRequest, TranslateRequest};
+use linguaray_core::{DetectLanguageRequest, LanguagePair, LookUpRequest, TranslateRequest};
 use serde::Serialize;
 use serde_json::Value;
 
@@ -128,7 +128,7 @@ pub fn supported_language_pairs(pairs: Vec<LanguagePair>) -> Vec<LanguagePair> {
 
 #[cfg(test)]
 mod tests {
-    use beyondtranslate_core::{DetectLanguageRequest, TranslateRequest};
+    use linguaray_core::{DetectLanguageRequest, TranslateRequest};
 
     use super::{detect_language_request, openapi_document, translate_request};
 

@@ -1,7 +1,7 @@
-import 'package:beyondtranslate_desktop/src/services/shortcut_service/shortcut_service.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hotkey_manager/hotkey_manager.dart';
+import 'package:linguaray_desktop/src/services/shortcut_service/shortcut_service.dart';
 
 void main() {
   test('parses stored desktop accelerators', () {

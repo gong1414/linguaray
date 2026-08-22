@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:beyondtranslate_runtime/beyondtranslate_runtime.dart';
+import 'package:linguaray_runtime/linguaray_runtime.dart';
 
 import 'runtime.dart';
 

@@ -128,7 +128,7 @@ def render_rust_file(languages: list[dict[str, Any]], input_path: Path) -> str:
         GENERATED_HEADER,
         f"// Source: {source_path}",
         "",
-        "use beyondtranslate_core::LanguageInfo;",
+        "use linguaray_core::LanguageInfo;",
         "",
         "/// Returns the curated language list supported by the app.",
         "pub fn all_languages() -> Vec<LanguageInfo> {",

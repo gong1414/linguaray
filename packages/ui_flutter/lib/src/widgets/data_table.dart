@@ -1,7 +1,7 @@
-import 'package:beyondtranslate_ui/src/theme/text_styles.dart';
-import 'package:beyondtranslate_ui/src/theme/theme.dart';
-import 'package:beyondtranslate_ui/src/widgets/pressable.dart';
 import 'package:flutter/widgets.dart';
+import 'package:linguaray_ui/src/theme/text_styles.dart';
+import 'package:linguaray_ui/src/theme/theme.dart';
+import 'package:linguaray_ui/src/widgets/pressable.dart';
 
 /// The glossary table is a column of flex rows rather than a real table: rows
 /// are clickable and column widths are fixed by the design.

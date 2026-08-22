@@ -1,7 +1,7 @@
 import 'dart:async';
 
-import 'package:beyondtranslate_runtime/beyondtranslate_runtime.dart';
 import 'package:flutter/foundation.dart';
+import 'package:linguaray_runtime/linguaray_runtime.dart';
 
 import 'runtime.dart' as runtime_service;
 

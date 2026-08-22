@@ -1,5 +1,4 @@
-import 'package:beyondtranslate_runtime/beyondtranslate_runtime.dart'
-    show InputSubmitMode;
+import 'package:linguaray_runtime/linguaray_runtime.dart' show InputSubmitMode;
 
 import 'platform_util.dart';
 

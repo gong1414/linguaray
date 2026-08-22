@@ -15,15 +15,15 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:beyondtranslate_desktop/src/widgets/avatar.dart';
-import 'package:beyondtranslate_desktop/src/widgets/blocks.dart';
-import 'package:beyondtranslate_desktop/src/widgets/data_display.dart';
-import 'package:beyondtranslate_desktop/src/widgets/list_tile.dart';
-import 'package:beyondtranslate_desktop/src/widgets/swap_pair.dart';
-import 'package:beyondtranslate_desktop/src/widgets/ui.dart';
 import 'package:flutter/services.dart' show FontLoader;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:linguaray_desktop/src/widgets/avatar.dart';
+import 'package:linguaray_desktop/src/widgets/blocks.dart';
+import 'package:linguaray_desktop/src/widgets/data_display.dart';
+import 'package:linguaray_desktop/src/widgets/list_tile.dart';
+import 'package:linguaray_desktop/src/widgets/swap_pair.dart';
+import 'package:linguaray_desktop/src/widgets/ui.dart';
 
 import 'support/golden_comparator.dart';
 

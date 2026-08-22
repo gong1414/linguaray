@@ -7,8 +7,8 @@ use std::sync::{
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
-use beyondtranslate_api_core::{error_envelope, success_envelope, ApiError};
-use beyondtranslate_core::{DetectLanguageRequest, LookUpRequest, TranslateRequest};
+use linguaray_api_core::{error_envelope, success_envelope, ApiError};
+use linguaray_core::{DetectLanguageRequest, LookUpRequest, TranslateRequest};
 use serde::Serialize;
 
 use crate::runtime::{Runtime, RuntimeError};
@@ -59,7 +59,7 @@ impl RuntimeApiServer {
 
         let thread_state = state.clone();
         let handle = thread::Builder::new()
-            .name("beyondtranslate-api-server".to_owned())
+            .name("linguaray-api-server".to_owned())
             .spawn(move || serve(listener, runtime, thread_state))
             .map_err(|error| RuntimeError::from(format!("failed to spawn API server: {error}")))?;
 
@@ -125,7 +125,7 @@ fn serve(listener: TcpListener, runtime: Runtime, state: Arc<ServerState>) {
         };
         let runtime = runtime.clone();
         thread::Builder::new()
-            .name("beyondtranslate-api-request".to_owned())
+            .name("linguaray-api-request".to_owned())
             .spawn(move || {
                 let _ = handle_stream(stream, runtime);
             })
@@ -248,16 +248,16 @@ fn dispatch(request: HttpRequest, runtime: Runtime) -> HttpResponse {
     }
 
     match (request.method.as_str(), request.path.as_str()) {
-        ("GET", "/") => json_ok(beyondtranslate_api_core::index("/")),
-        ("GET", "/health") => json_ok(beyondtranslate_api_core::health()),
-        ("GET", "/openapi.json") => match beyondtranslate_api_core::openapi_document() {
+        ("GET", "/") => json_ok(linguaray_api_core::index("/")),
+        ("GET", "/health") => json_ok(linguaray_api_core::health()),
+        ("GET", "/openapi.json") => match linguaray_api_core::openapi_document() {
             Ok(document) => json_ok(document),
             Err(error) => json_error(error),
         },
         ("GET", "/reference") => HttpResponse {
             status: 200,
             content_type: "text/html; charset=utf-8",
-            body: beyondtranslate_api_core::reference_html().into_bytes(),
+            body: linguaray_api_core::reference_html().into_bytes(),
         },
         _ => dispatch_provider_route(request, runtime),
     }
@@ -288,7 +288,7 @@ fn dispatch_provider_route(request: HttpRequest, runtime: Runtime) -> HttpRespon
             route_provider(&request.path, "/translations/", "/supported-language-pairs")
         {
             return match block_on_api(runtime.api_supported_language_pairs(provider)) {
-                Ok(pairs) => json_ok(beyondtranslate_api_core::supported_language_pairs(pairs)),
+                Ok(pairs) => json_ok(linguaray_api_core::supported_language_pairs(pairs)),
                 Err(error) => json_error(error),
             };
         }
@@ -407,7 +407,7 @@ mod tests {
 
     fn unique_data_dir() -> PathBuf {
         std::env::temp_dir().join(format!(
-            "beyondtranslate-api-server-{}",
+            "linguaray-api-server-{}",
             SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .expect("time went backwards")

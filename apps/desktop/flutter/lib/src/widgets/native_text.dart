@@ -4,8 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
-const String _kViewType = 'beyondtranslate/native_text';
-const String _kChannelPrefix = 'beyondtranslate/native_text';
+const String _kViewType = 'linguaray/native_text';
+const String _kChannelPrefix = 'linguaray/native_text';
 
 /// A run of read-only text drawn by AppKit's `NSTextView`.
 ///

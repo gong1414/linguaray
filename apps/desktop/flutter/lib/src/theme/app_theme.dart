@@ -91,7 +91,7 @@ enum DesignThemeFamily {
 
 /// The design tokens behind a family / brightness pair.
 ///
-/// Everything visual in the app comes from `beyondtranslate_ui`; this only
+/// Everything visual in the app comes from `linguaray_ui`; this only
 /// picks which token set a Material [Brightness] maps to.
 DesignTokens tokensFor(
   Brightness brightness, {

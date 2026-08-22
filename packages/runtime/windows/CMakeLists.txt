@@ -3,11 +3,11 @@
 # Flutter native assets, so there is no additional CMake target to build here.
 cmake_minimum_required(VERSION 3.14)
 
-project(beyondtranslate_runtime LANGUAGES CXX)
+project(linguaray_runtime LANGUAGES CXX)
 
 # Keep this variable defined because generated_plugins.cmake appends it to the
 # application's bundled libraries. The native-assets hook supplies the DLL.
-set(beyondtranslate_runtime_bundled_libraries
+set(linguaray_runtime_bundled_libraries
   ""
   PARENT_SCOPE
 )

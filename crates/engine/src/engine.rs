@@ -5,9 +5,7 @@ use std::{
     sync::Arc,
 };
 
-use beyondtranslate_core::{
-    DictionaryService, LlmService, OcrService, Provider, TranslationService,
-};
+use linguaray_core::{DictionaryService, LlmService, OcrService, Provider, TranslationService};
 use serde::{Deserialize, Serialize};
 use serde_yaml::{Mapping, Value};
 use thiserror::Error;

@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 
 class MacWindowAppearance {
   static const MethodChannel _channel = MethodChannel(
-    'beyondtranslate/mac_window_appearance',
+    'linguaray/mac_window_appearance',
   );
 
   static Future<void> apply(String title) async {

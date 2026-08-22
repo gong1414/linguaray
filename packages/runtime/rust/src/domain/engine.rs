@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashMap};
 
-use beyondtranslate_engine::{Engine, EngineConfig, ProviderConfig};
+use linguaray_engine::{Engine, EngineConfig, ProviderConfig};
 
 use crate::domain::settings::{provider_config_from_settings, Settings};
 
@@ -38,7 +38,7 @@ pub fn build_from_settings_with_secrets(
 pub fn build_from_engine_config(config: &EngineConfig) -> Result<Engine, String> {
     let config_text = serde_yaml::to_string(config)
         .map_err(|error| format!("failed to encode engine config yaml: {error}"))?;
-    beyondtranslate_engine::from_yaml_str(&config_text).map_err(|error| error.to_string())
+    linguaray_engine::from_yaml_str(&config_text).map_err(|error| error.to_string())
 }
 
 pub fn build_from_provider_config(

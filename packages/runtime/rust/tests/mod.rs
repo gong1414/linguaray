@@ -13,7 +13,7 @@ use uniffi_testing::UniFFITestHelper;
 /// Mirrors the upstream `fixtures/hello_world` pattern from uniffi-dart.
 /// Skipped automatically in CI environments that don't have `dart` on PATH.
 #[test]
-fn beyondtranslate_runtime() -> Result<()> {
+fn linguaray_runtime() -> Result<()> {
     if std::process::Command::new("dart")
         .arg("--version")
         .output()
@@ -26,12 +26,12 @@ fn beyondtranslate_runtime() -> Result<()> {
 }
 
 fn run_dart_test_with_library_mode() -> Result<()> {
-    let test_helper = UniFFITestHelper::new("beyondtranslate_runtime")?;
+    let test_helper = UniFFITestHelper::new("linguaray_runtime")?;
     let manifest_dir = Utf8PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let temp_root = Utf8PathBuf::from_path_buf(std::env::temp_dir())
         .expect("temp dir path is not valid UTF-8")
         .join(format!(
-            "beyondtranslate_runtime_uniffi_test_{}",
+            "linguaray_runtime_uniffi_test_{}",
             std::process::id()
         ));
 
@@ -75,7 +75,7 @@ fn write_pubspec(out_dir: &Utf8Path) -> Result<()> {
     let mut pubspec = File::create(out_dir.join("pubspec.yaml"))?;
     pubspec.write_all(
         br#"
-name: beyondtranslate_runtime
+name: linguaray_runtime
 description: testing module for uniffi
 version: 1.0.0
 
@@ -133,8 +133,8 @@ fn copy_fixture_tests(manifest_dir: &Utf8Path, out_dir: &Utf8Path) -> Result<()>
     let test_outdir = out_dir.join("test");
     create_dir_all(&test_outdir)?;
     copy(
-        manifest_dir.join("test/beyondtranslate_runtime_test.dart"),
-        test_outdir.join("beyondtranslate_runtime_test.dart"),
+        manifest_dir.join("test/linguaray_runtime_test.dart"),
+        test_outdir.join("linguaray_runtime_test.dart"),
     )?;
     Ok(())
 }

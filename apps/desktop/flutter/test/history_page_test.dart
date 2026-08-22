@@ -1,12 +1,12 @@
-import 'package:beyondtranslate_desktop/src/i18n/i18n.dart';
-import 'package:beyondtranslate_desktop/src/routes/workbench/library.dart';
-import 'package:beyondtranslate_desktop/src/services/history_store.dart';
-import 'package:beyondtranslate_desktop/src/widgets/native_menu.dart';
-import 'package:beyondtranslate_desktop/src/widgets/ui.dart';
-import 'package:beyondtranslate_runtime/beyondtranslate_runtime.dart';
 import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import 'package:flutter/material.dart' hide Checkbox;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:linguaray_desktop/src/i18n/i18n.dart';
+import 'package:linguaray_desktop/src/routes/workbench/library.dart';
+import 'package:linguaray_desktop/src/services/history_store.dart';
+import 'package:linguaray_desktop/src/widgets/native_menu.dart';
+import 'package:linguaray_desktop/src/widgets/ui.dart';
+import 'package:linguaray_runtime/linguaray_runtime.dart';
 
 void main() {
   setUpAll(() async => LocaleSettings.setLocale(AppLocale.zhHans));

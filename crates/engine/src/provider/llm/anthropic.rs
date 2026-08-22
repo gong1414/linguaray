@@ -1,7 +1,7 @@
 use std::sync::{mpsc, Arc};
 
 use async_trait::async_trait;
-use beyondtranslate_core::{
+use linguaray_core::{
     ChatMessage, ChatRequest, ChatResponse, ChatRole, LlmError, LlmService, LlmStreamReceiver,
     Provider, ResponseFormat, StreamChunk,
 };
@@ -403,7 +403,7 @@ fn parse_anthropic_response(raw: &Value) -> ChatResponse {
     let stop_reason = raw["stop_reason"].as_str().map(|s| s.to_string());
 
     let message = ChatMessage::assistant(content_text);
-    let choice = beyondtranslate_core::ChatChoice {
+    let choice = linguaray_core::ChatChoice {
         index: 0,
         message,
         finish_reason: stop_reason,
@@ -412,7 +412,7 @@ fn parse_anthropic_response(raw: &Value) -> ChatResponse {
     let usage = raw.get("usage").map(|u| {
         let input = u["input_tokens"].as_u64().unwrap_or(0) as u32;
         let output = u["output_tokens"].as_u64().unwrap_or(0) as u32;
-        beyondtranslate_core::ChatUsage {
+        linguaray_core::ChatUsage {
             prompt_tokens: input,
             completion_tokens: output,
             total_tokens: input + output,

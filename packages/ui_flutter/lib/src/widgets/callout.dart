@@ -1,6 +1,6 @@
-import 'package:beyondtranslate_ui/src/theme/text_styles.dart';
-import 'package:beyondtranslate_ui/src/theme/theme.dart';
 import 'package:flutter/widgets.dart';
+import 'package:linguaray_ui/src/theme/text_styles.dart';
+import 'package:linguaray_ui/src/theme/theme.dart';
 
 enum CalloutTone {
   /// Progress / in-flight notice — 正在测试连接 · 已用 1.4s.

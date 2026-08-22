@@ -1,9 +1,9 @@
 import 'dart:ui';
 
-import 'package:beyondtranslate_desktop/src/i18n/i18n.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:linguaray_desktop/src/i18n/i18n.dart';
 
 /// The shape of the app: a `MaterialApp.router` whose shell and pages read the
 /// global `t`. Everything under the router lives in `Overlay` entries, so an

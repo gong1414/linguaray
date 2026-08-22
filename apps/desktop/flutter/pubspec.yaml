@@ -1,4 +1,4 @@
-name: beyondtranslate_desktop
+name: linguaray_desktop
 description: A privacy-first desktop translation app built with Flutter and Rust.
 homepage: https://github.com/gong1414/linguaray
 publish_to: "none"
@@ -9,8 +9,8 @@ environment:
   sdk: ">=3.6.0 <4.0.0"
 
 dependencies:
-  beyondtranslate_runtime: ^0.0.1
-  beyondtranslate_ui: ^0.1.0
+  linguaray_runtime: ^0.0.1
+  linguaray_ui: ^0.1.0
 
   collection: ^1.18.0
   dio: ^5.9.2

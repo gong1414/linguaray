@@ -1,4 +1,4 @@
-name: beyondtranslate_runtime
+name: linguaray_runtime
 description: Rust-backed plugin for LinguaRay. Dart bindings via uniffi-dart, Swift bindings via uniffi-rs.
 version: 0.0.1
 publish_to: "none"
@@ -31,16 +31,16 @@ flutter:
       ios:
         # iOS is FFI-only for now. To call the Swift binding from native iOS
         # code, mirror the macOS setup: drop a `Package.swift` under
-        # `ios/beyondtranslate_runtime/` and add `pluginClass: BeyondtranslateRuntimePlugin` here.
+        # `ios/linguaray_runtime/` and add `pluginClass: LinguarayRuntimePlugin` here.
         ffiPlugin: true
       linux:
         ffiPlugin: true
       macos:
         # `pluginClass` makes Flutter's macOS tooling pick up the SPM
-        # package shipped at `macos/beyondtranslate_runtime/`. The class itself is a
+        # package shipped at `macos/linguaray_runtime/`. The class itself is a
         # thin `FlutterPlugin` stub that `dlopen`s the bundled cdylib so
         # that native Swift call sites can resolve uniffi FFI symbols.
         ffiPlugin: true
-        pluginClass: BeyondtranslateRuntimePlugin
+        pluginClass: LinguarayRuntimePlugin
       windows:
         ffiPlugin: true

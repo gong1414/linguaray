@@ -5,12 +5,12 @@
 // AppKit owns the mouse over a platform view, so 双击复制 cannot ride on a
 // surrounding `GestureDetector` — the callback lives on the widget, and both
 // paths have to honour it.
-import 'package:beyondtranslate_desktop/src/widgets/native_text.dart';
-import 'package:beyondtranslate_desktop/src/widgets/translation_text.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' show SelectableText;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:linguaray_desktop/src/widgets/native_text.dart';
+import 'package:linguaray_desktop/src/widgets/translation_text.dart';
 
 void main() {
   /// [testWidgets] with the target platform pinned for the length of the body —
