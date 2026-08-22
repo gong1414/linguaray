@@ -502,6 +502,26 @@ mod tests {
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
 
+    #[test]
+    fn provider_entry_config_round_trip_preserves_identity_and_fields() {
+        let entry = ProviderConfigEntry {
+            id: "deepl-main".to_owned(),
+            r#type: ProviderType::DeepL,
+            fields: HashMap::from([
+                ("apiKey".to_owned(), "test-key".to_owned()),
+                ("defaultModel".to_owned(), "gpt-4o-mini".to_owned()),
+            ]),
+            created_at: Some(1_700_000_000),
+        };
+        let config = provider_config_from_settings(&entry).unwrap();
+        let back = provider_entry_from_config("deepl-main", &config).unwrap();
+        // created_at is entry metadata that deliberately does not live in the
+        // engine-side config; everything else must survive the round trip.
+        assert_eq!(back.id, entry.id);
+        assert_eq!(back.r#type, entry.r#type);
+        assert_eq!(back.fields, entry.fields);
+    }
+
     fn temp_settings_file() -> PathBuf {
         let unique = SystemTime::now()
             .duration_since(UNIX_EPOCH)

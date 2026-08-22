@@ -448,7 +448,10 @@ pub fn from_yaml_str(content: &str) -> Result<Engine, EngineError> {
     from_config(config)
 }
 
-fn from_config(config: EngineConfig) -> Result<Engine, EngineError> {
+/// Builds an [`Engine`] straight from an in-memory [`EngineConfig`], without
+/// a serialize/parse round-trip. Prefer this over `from_yaml_str` when the
+/// config is already structured.
+pub fn from_config(config: EngineConfig) -> Result<Engine, EngineError> {
     let mut registry = Engine::new();
 
     for (provider_id, config) in config.providers {

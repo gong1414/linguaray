@@ -32,13 +32,11 @@ pub fn build_from_settings_with_secrets(
         );
     }
 
-    build_from_engine_config(&EngineConfig { providers })
+    build_from_engine_config(EngineConfig { providers })
 }
 
-pub fn build_from_engine_config(config: &EngineConfig) -> Result<Engine, String> {
-    let config_text = serde_yaml::to_string(config)
-        .map_err(|error| format!("failed to encode engine config yaml: {error}"))?;
-    linguaray_engine::from_yaml_str(&config_text).map_err(|error| error.to_string())
+pub fn build_from_engine_config(config: EngineConfig) -> Result<Engine, String> {
+    linguaray_engine::from_config(config).map_err(|error| error.to_string())
 }
 
 pub fn build_from_provider_config(
@@ -54,7 +52,7 @@ pub fn build_from_provider_config(
     let mut providers = BTreeMap::new();
     providers.insert(provider_id.to_owned(), provider_config);
 
-    build_from_engine_config(&EngineConfig { providers })
+    build_from_engine_config(EngineConfig { providers })
 }
 
 pub fn parse_provider_config(input: &str) -> Result<ProviderConfig, String> {
@@ -77,5 +75,22 @@ mod tests {
         let engine =
             build_from_provider_config("deepl-main", "type: deepl\napi_key: test-key").unwrap();
         assert_eq!(engine.names(), vec!["deepl-main"]);
+    }
+
+    #[test]
+    fn direct_construction_matches_the_yaml_path() {
+        let config_text = "deepl-main:\n  type: deepl\n  api_key: test-key";
+        let parsed: EngineConfig = serde_yaml::from_str(config_text).unwrap();
+        let direct = build_from_engine_config(parsed).unwrap();
+        let via_yaml = linguaray_engine::from_yaml_str(config_text).unwrap();
+        assert_eq!(direct.names(), via_yaml.names());
+        let direct_error = direct.translation("deepl-main").err();
+        let yaml_error = via_yaml.translation("deepl-main").err();
+        // Both paths must agree, whether or not the service is available.
+        assert_eq!(direct_error.is_some(), yaml_error.is_some());
+        assert_eq!(
+            direct_error.map(|e| e.to_string()),
+            yaml_error.map(|e| e.to_string())
+        );
     }
 }
