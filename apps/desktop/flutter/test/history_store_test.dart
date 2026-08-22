@@ -49,50 +49,51 @@ void main() {
     expect(store.entries.single.source, 'build failed');
   });
 
-  test('translation session deduplicates retries and resets for new source',
-      () async {
-    final store = HistoryStore(gateway: _FakeHistoryGateway());
-    final session = TranslationHistorySession(store: store);
-    addTearDown(store.dispose);
-    await store.init();
+  test(
+    'translation session deduplicates retries and resets for new source',
+    () async {
+      final store = HistoryStore(gateway: _FakeHistoryGateway());
+      final session = TranslationHistorySession(store: store);
+      addTearDown(store.dispose);
+      await store.init();
 
-    expect(session.beginSource('hello'), isFalse);
-    final first = (await session.save(_input(source: 'hello')))!;
-    expect(store.counts.all, 1);
+      expect(session.beginSource('hello'), isFalse);
+      final first = (await session.save(_input(source: 'hello')))!;
+      expect(store.counts.all, 1);
 
-    expect(session.beginSource('hello'), isFalse);
-    final retry = await session.save(
-      _input(source: 'hello', translation: '您好'),
-    );
-    expect(retry!.id, first.id);
-    expect(store.counts.all, 1);
+      expect(session.beginSource('hello'), isFalse);
+      final retry = await session.save(
+        _input(source: 'hello', translation: '您好'),
+      );
+      expect(retry!.id, first.id);
+      expect(store.counts.all, 1);
 
-    await session.toggleFavorite();
-    expect(session.favorite, isTrue);
-    expect(session.beginSource('different'), isTrue);
-    expect(session.entryId, isNull);
-    expect(session.favorite, isFalse);
-    final next = await session.save(_input(source: 'different'));
-    expect(next!.id, isNot(first.id));
-    expect(store.counts.all, 2);
-  });
+      await session.toggleFavorite();
+      expect(session.favorite, isTrue);
+      expect(session.beginSource('different'), isTrue);
+      expect(session.entryId, isNull);
+      expect(session.favorite, isFalse);
+      final next = await session.save(_input(source: 'different'));
+      expect(next!.id, isNot(first.id));
+      expect(store.counts.all, 2);
+    },
+  );
 }
 
 HistoryEntryInput _input({
   String? id,
   required String source,
   String translation = '你好',
-}) =>
-    HistoryEntryInput(
-      id: id,
-      source: source,
-      translation: translation,
-      sourceLanguage: 'en',
-      targetLanguage: 'zh-Hans',
-      serviceId: 'system+translation',
-      serviceName: 'System',
-      edited: false,
-    );
+}) => HistoryEntryInput(
+  id: id,
+  source: source,
+  translation: translation,
+  sourceLanguage: 'en',
+  targetLanguage: 'zh-Hans',
+  serviceId: 'system+translation',
+  serviceName: 'System',
+  edited: false,
+);
 
 class _FakeHistoryGateway implements HistoryGateway {
   final List<HistoryEntry> _entries = [];
@@ -100,10 +101,10 @@ class _FakeHistoryGateway implements HistoryGateway {
 
   @override
   Future<HistoryCounts> counts() async => HistoryCounts(
-        all: _entries.length,
-        favorites: _entries.where((entry) => entry.favorite).length,
-        edited: _entries.where((entry) => entry.edited).length,
-      );
+    all: _entries.length,
+    favorites: _entries.where((entry) => entry.favorite).length,
+    edited: _entries.where((entry) => entry.edited).length,
+  );
 
   @override
   Future<int> deleteEntries(List<String> entryIds) async {

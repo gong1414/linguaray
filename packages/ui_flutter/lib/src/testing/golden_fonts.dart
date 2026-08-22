@@ -17,7 +17,7 @@ import 'package:linguaray_ui/src/theme/tokens.dart';
 /// asset bundle: the bundle's root depends on which directory `flutter test`
 /// was invoked from, and these goldens have to render the same either way.
 Directory _packageRoot(String package) {
-  for (var dir = Directory.current;; dir = dir.parent) {
+  for (var dir = Directory.current; ; dir = dir.parent) {
     final config = File('${dir.path}/.dart_tool/package_config.json');
     if (config.existsSync()) {
       final packages =

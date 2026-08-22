@@ -23,10 +23,10 @@ const List<CaptionButton> kDefaultCaptionButtons = [
 const Color _kWindowsCloseHover = Color(0xFFC42B1C);
 
 String _defaultLabel(CaptionButton button) => switch (button) {
-      CaptionButton.minimize => '最小化',
-      CaptionButton.maximize => '最大化',
-      CaptionButton.close => '关闭',
-    };
+  CaptionButton.minimize => '最小化',
+  CaptionButton.maximize => '最大化',
+  CaptionButton.close => '关闭',
+};
 
 /// Windows caption buttons: 46px strips flush with the window's top-right
 /// corner. Hover paints the whole strip — close in the system's red — rather

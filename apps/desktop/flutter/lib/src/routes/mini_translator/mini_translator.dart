@@ -234,26 +234,26 @@ class _MiniTranslatorPageState extends State<MiniTranslatorPage>
   void _registerWindowEvents() {
     _windowFocusedListenerId = nativeapi.WindowManager.instance
         .on<nativeapi.WindowFocusedEvent>((event) {
-      if (event.windowId == _window.id) {
-        _focusNode.requestFocus();
-        unawaited(_refreshPermissions());
-      }
-    });
+          if (event.windowId == _window.id) {
+            _focusNode.requestFocus();
+            unawaited(_refreshPermissions());
+          }
+        });
     _windowBlurredListenerId = nativeapi.WindowManager.instance
         .on<nativeapi.WindowBlurredEvent>((event) {
-      if (event.windowId == _window.id) {
-        _focusNode.unfocus();
-        if (!_window.isAlwaysOnTop) {
-          hideMiniTranslatorWindow();
-        }
-      }
-    });
+          if (event.windowId == _window.id) {
+            _focusNode.unfocus();
+            if (!_window.isAlwaysOnTop) {
+              hideMiniTranslatorWindow();
+            }
+          }
+        });
     _windowMovedListenerId = nativeapi.WindowManager.instance
         .on<nativeapi.WindowMovedEvent>((event) {
-      if (event.windowId == _window.id) {
-        _lastShownPosition = event.position;
-      }
-    });
+          if (event.windowId == _window.id) {
+            _lastShownPosition = event.position;
+          }
+        });
   }
 
   void _unregisterWindowEvents() {
@@ -531,7 +531,8 @@ class _MiniTranslatorPageState extends State<MiniTranslatorPage>
 
     if (service.type == ServiceType.translation) {
       final providerType = provider?.type;
-      final isLlmProvider = providerType == ProviderType.openAi ||
+      final isLlmProvider =
+          providerType == ProviderType.openAi ||
           providerType == ProviderType.anthropic ||
           providerType == ProviderType.ollama ||
           providerType == ProviderType.xAi;
@@ -843,8 +844,9 @@ class _MiniTranslatorPageState extends State<MiniTranslatorPage>
   Widget _buildBody(BuildContext context) {
     final hasTranslation =
         preferredTranslation(_translationResultList, _preferredServiceId) !=
-            null;
-    final noResult = _querySubmitted &&
+        null;
+    final noResult =
+        _querySubmitted &&
         allServicesFailed(_translationResultList, _translationServiceIds);
 
     return Column(
@@ -868,7 +870,8 @@ class _MiniTranslatorPageState extends State<MiniTranslatorPage>
                 targetLanguageName: _selectedTargetLanguage == null
                     ? null
                     : getLanguageName(_selectedTargetLanguage!),
-                sourceLabel: '${t.workbench.translation.source} · '
+                sourceLabel:
+                    '${t.workbench.translation.source} · '
                     '${getSourceDisplayName(_detectedLanguage ?? _sourceLanguage)}',
                 onChanged: (v) => _handleTextChanged(v),
                 onSubmitted: _handleButtonTappedTrans,
@@ -925,7 +928,8 @@ class _MiniTranslatorPageState extends State<MiniTranslatorPage>
             SingleActivator(
               LogicalKeyboardKey(LogicalKeyboardKey.digit1.keyId + digit - 1),
               alt: true,
-            ): () => _handlePreferServiceAt(digit - 1),
+            ): () =>
+                _handlePreferServiceAt(digit - 1),
         },
         child: SingleChildScrollView(
           controller: _scrollController,
@@ -942,8 +946,8 @@ class _MiniTranslatorPageState extends State<MiniTranslatorPage>
                 persistentTargets: settingsStore.general.translationTargets,
                 commonLanguageCodes:
                     settingsStore.general.commonLanguages.isNotEmpty
-                        ? settingsStore.general.commonLanguages
-                        : defaultCommonLanguages(),
+                    ? settingsStore.general.commonLanguages
+                    : defaultCommonLanguages(),
                 onSourceChanged: _handleSourceChanged,
                 onTargetLanguageChanged: _handleTargetLanguageChanged,
                 onConfigTargetSelected: _handleConfigTargetSelected,

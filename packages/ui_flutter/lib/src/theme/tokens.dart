@@ -343,10 +343,9 @@ class DesignTokens {
     this.metrics = const DesignMetrics(),
     this.typography = const DesignTypography(),
     this.shadows = const DesignShadows(),
-    Color? selection,
-    Color? selectionFg,
-  })  : _selection = selection,
-        _selectionFg = selectionFg;
+    this._selection,
+    this._selectionFg,
+  });
 
   final Brightness brightness;
   final DesignColors colors;
@@ -372,17 +371,16 @@ class DesignTokens {
     Color? selection,
     Color? selectionFg,
     DesignTypography? typography,
-  }) =>
-      DesignTokens(
-        brightness: brightness,
-        colors: colors,
-        radii: radii,
-        metrics: metrics,
-        typography: typography ?? this.typography,
-        shadows: shadows,
-        backdrop: backdrop,
-        progressGradient: progressGradient,
-        selection: selection ?? _selection,
-        selectionFg: selectionFg ?? _selectionFg,
-      );
+  }) => DesignTokens(
+    brightness: brightness,
+    colors: colors,
+    radii: radii,
+    metrics: metrics,
+    typography: typography ?? this.typography,
+    shadows: shadows,
+    backdrop: backdrop,
+    progressGradient: progressGradient,
+    selection: selection ?? _selection,
+    selectionFg: selectionFg ?? _selectionFg,
+  );
 }

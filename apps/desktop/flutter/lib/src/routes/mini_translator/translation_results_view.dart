@@ -37,8 +37,9 @@ typedef ServiceTranslation = ({
 List<ServiceTranslation> serviceTranslations(List<TranslationResult> results) {
   final translations = <ServiceTranslation>[];
   for (final result in results) {
-    for (final record in result.translationResultRecordList ??
-        const <TranslationResultRecord>[]) {
+    for (final record
+        in result.translationResultRecordList ??
+            const <TranslationResultRecord>[]) {
       final texts = record.translateResponse?.translations ?? [];
       if (texts.isEmpty || texts.first.text.isEmpty) continue;
       translations.add((
@@ -77,8 +78,9 @@ bool allServicesFailed(
   var pending = 0;
   var failed = 0;
   for (final result in results) {
-    for (final record in result.translationResultRecordList ??
-        const <TranslationResultRecord>[]) {
+    for (final record
+        in result.translationResultRecordList ??
+            const <TranslationResultRecord>[]) {
       if (!translationServiceIds.contains(record.translationServiceId)) {
         continue;
       }
@@ -168,8 +170,9 @@ class MiniTranslatorTranslation extends StatelessWidget {
     var pendingCount = 0;
     final failures = <_ServiceFailure>[];
     for (final result in results) {
-      for (final record in result.translationResultRecordList ??
-          const <TranslationResultRecord>[]) {
+      for (final record
+          in result.translationResultRecordList ??
+              const <TranslationResultRecord>[]) {
         if (!translationServiceIds.contains(record.translationServiceId)) {
           continue;
         }
@@ -290,8 +293,9 @@ class MiniTranslatorTranslation extends StatelessWidget {
                       color: noResult ? colors.danger : colors.accentText,
                       shape: BoxShape.circle,
                       // No glow: the glow marks the one that answered.
-                      boxShadow:
-                          noResult ? null : context.product.highlightGlow,
+                      boxShadow: noResult
+                          ? null
+                          : context.product.highlightGlow,
                     ),
                   ),
                   const SizedBox(width: 7),
@@ -301,11 +305,11 @@ class MiniTranslatorTranslation extends StatelessWidget {
                       child: Text(
                         noResult
                             ? '${_serviceName(preferredServiceId)} · $targetName'
-                                ' · ${t.mini_translator.result.no_result_tag}'
+                                  ' · ${t.mini_translator.result.no_result_tag}'
                             : translating
-                                ? targetName
-                                : '${_serviceName(preferred!.record.translationServiceId)}'
-                                    ' · $targetName',
+                            ? targetName
+                            : '${_serviceName(preferred!.record.translationServiceId)}'
+                                  ' · $targetName',
                       ),
                     ),
                   ),
@@ -392,8 +396,8 @@ class MiniTranslatorTranslation extends StatelessWidget {
                     onPrefer: candidates[i].record.translationServiceId == null
                         ? null
                         : () => onPreferService(
-                              candidates[i].record.translationServiceId!,
-                            ),
+                            candidates[i].record.translationServiceId!,
+                          ),
                   ),
                 ],
               ],
@@ -468,10 +472,7 @@ class _FailureCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: Label(
-                  tone: LabelTone.subtle,
-                  child: Text(failure.name),
-                ),
+                child: Label(tone: LabelTone.subtle, child: Text(failure.name)),
               ),
               if (failure.shortcut != null)
                 Kbd(failure.shortcut!, size: KbdSize.sm),

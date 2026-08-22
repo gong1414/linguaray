@@ -16,27 +16,27 @@ void main() {
   });
 
   Widget specimen(Widget child) => DesignThemeProvider(
-        child: TranslationProvider(
-          child: Directionality(
-            textDirection: TextDirection.ltr,
-            child: MediaQuery(
-              data: const MediaQueryData(size: Size(900, 700)),
-              child: Overlay(
-                initialEntries: [OverlayEntry(builder: (_) => child)],
-              ),
-            ),
-          ),
+    child: TranslationProvider(
+      child: Directionality(
+        textDirection: TextDirection.ltr,
+        child: MediaQuery(
+          data: const MediaQueryData(size: Size(900, 700)),
+          child: Overlay(initialEntries: [OverlayEntry(builder: (_) => child)]),
         ),
-      );
+      ),
+    ),
+  );
 
   testWidgets('the 新建术语库 sheet lays out inside a scrolling body', (
     tester,
   ) async {
     await tester.pumpWidget(
-      specimen(const NewGlossaryDialog(
-        takenNames: ['机器学习'],
-        languages: ['en', 'zh-Hans', 'ja'],
-      )),
+      specimen(
+        const NewGlossaryDialog(
+          takenNames: ['机器学习'],
+          languages: ['en', 'zh-Hans', 'ja'],
+        ),
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -44,9 +44,10 @@ void main() {
     // All three 初始内容 cards, squared up to the tallest.
     final cards = tester.widgetList<OptionCard>(find.byType(OptionCard));
     expect(cards.length, 3);
-    final heights = find.byType(OptionCard).evaluate().map(
-          (element) => (element.renderObject! as RenderBox).size.height,
-        );
+    final heights = find
+        .byType(OptionCard)
+        .evaluate()
+        .map((element) => (element.renderObject! as RenderBox).size.height);
     expect(heights.toSet().length, 1, reason: 'cards should be equal height');
   });
 

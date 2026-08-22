@@ -8,19 +8,16 @@ import 'package:linguaray_ui/linguaray_ui.dart';
 /// requested sizes.
 void main() {
   Widget specimen(Widget child) => DesignThemeProvider(
-        child: Directionality(
-          textDirection: TextDirection.ltr,
-          child: Center(child: child),
-        ),
-      );
+    child: Directionality(
+      textDirection: TextDirection.ltr,
+      child: Center(child: child),
+    ),
+  );
 
   testWidgets('the Windows cluster carries three 46px strips', (tester) async {
     await tester.pumpWidget(
       specimen(
-        SizedBox(
-          height: 52,
-          child: WindowsCaptionControls(onPressed: (_) {}),
-        ),
+        SizedBox(height: 52, child: WindowsCaptionControls(onPressed: (_) {})),
       ),
     );
 

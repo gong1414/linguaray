@@ -268,7 +268,13 @@
       "quality_hint": "번역이 완료되면 계산됩니다.",
       "shortcuts": "단축키",
       "other_services_disabled": "다른 서비스이 비활성화됨",
-      "input_hint_translate_to": "번역할 텍스트를 입력하거나 붙여넣어 $language(으)로 번역"
+      "input_hint_translate_to": "번역할 텍스트를 입력하거나 붙여넣어 $language(으)로 번역",
+      "clear": "지우기",
+      "swap_languages": "언어 전환",
+      "services": "번역 서비스",
+      "configure_services": "서비스 설정",
+      "retry": "다시 시도",
+      "character_count": "$count자"
     },
     "status": {
       "runtime_ready": "번역 런타임 준비 완료",

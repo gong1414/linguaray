@@ -2194,6 +2194,18 @@ public protocol RuntimeSettingsProtocol: AnyObject, Sendable {
    */
   func subscribe() -> SettingsSubscription
 
+  /**
+   * Validates and probes a provider without changing persisted settings or
+   * the process-wide runtime engine. The caller supplies credentials read
+   * from secure storage; they live only in this temporary provider object.
+   *
+   * LLM providers are probed by listing models. Traditional translation
+   * providers translate a small fixed phrase. The returned number is the
+   * model count for LLM providers and zero for traditional providers.
+   */
+  func testProvider(providerId: String, providerType: String, fields: [String: String]) async throws
+    -> UInt32
+
   func updateAdvanced(patch: AdvancedSettingsPatch) async throws -> AdvancedSettings
 
   func updateAppearance(patch: AppearanceSettingsPatch) async throws -> AppearanceSettings
@@ -2563,6 +2575,35 @@ open class RuntimeSettings: RuntimeSettingsProtocol, @unchecked Sendable {
           self.uniffiCloneHandle(), $0
         )
       })
+  }
+
+  /**
+   * Validates and probes a provider without changing persisted settings or
+   * the process-wide runtime engine. The caller supplies credentials read
+   * from secure storage; they live only in this temporary provider object.
+   *
+   * LLM providers are probed by listing models. Traditional translation
+   * providers translate a small fixed phrase. The returned number is the
+   * model count for LLM providers and zero for traditional providers.
+   */
+  open func testProvider(providerId: String, providerType: String, fields: [String: String])
+    async throws -> UInt32
+  {
+    return
+      try await uniffiRustCallAsync(
+        rustFutureFunc: {
+          uniffi_linguaray_runtime_fn_method_runtimesettings_test_provider(
+            self.uniffiCloneHandle(),
+            FfiConverterString.lower(providerId), FfiConverterString.lower(providerType),
+            FfiConverterDictionaryStringString.lower(fields)
+          )
+        },
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_u32,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_u32,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_u32,
+        liftFunc: FfiConverterUInt32.lift,
+        errorHandler: FfiConverterTypeRuntimeError_lift
+      )
   }
 
   open func updateAdvanced(patch: AdvancedSettingsPatch) async throws -> AdvancedSettings {
@@ -8991,6 +9032,9 @@ private let initializationResult: InitializationResult = {
     return InitializationResult.apiChecksumMismatch
   }
   if uniffi_linguaray_runtime_checksum_method_runtimesettings_subscribe() != 61804 {
+    return InitializationResult.apiChecksumMismatch
+  }
+  if uniffi_linguaray_runtime_checksum_method_runtimesettings_test_provider() != 54690 {
     return InitializationResult.apiChecksumMismatch
   }
   if uniffi_linguaray_runtime_checksum_method_runtimesettings_update_advanced() != 40958 {

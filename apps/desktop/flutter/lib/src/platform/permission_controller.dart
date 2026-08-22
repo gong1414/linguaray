@@ -12,8 +12,8 @@ class PermissionSnapshot {
   });
 
   const PermissionSnapshot.unknown()
-      : accessibility = PermissionState.unknown,
-        screenRecording = PermissionState.unknown;
+    : accessibility = PermissionState.unknown,
+      screenRecording = PermissionState.unknown;
 
   final PermissionState accessibility;
   final PermissionState screenRecording;
@@ -45,10 +45,12 @@ class PermissionController extends ChangeNotifier {
           permission.isScreenRecordingPermissionGranted(),
         ]);
         _snapshot = PermissionSnapshot(
-          accessibility:
-              results[0] ? PermissionState.granted : PermissionState.denied,
-          screenRecording:
-              results[1] ? PermissionState.granted : PermissionState.denied,
+          accessibility: results[0]
+              ? PermissionState.granted
+              : PermissionState.denied,
+          screenRecording: results[1]
+              ? PermissionState.granted
+              : PermissionState.denied,
         );
       }
       notifyListeners();
@@ -65,8 +67,8 @@ class PermissionController extends ChangeNotifier {
   Future<PermissionSnapshot> requestAccessibility() async {
     if (Platform.isMacOS) {
       await runtime.permission().requestAccessibilityPermission(
-            onlyOpenSystemSettings: false,
-          );
+        onlyOpenSystemSettings: false,
+      );
     }
     return refresh();
   }
@@ -74,8 +76,8 @@ class PermissionController extends ChangeNotifier {
   Future<PermissionSnapshot> requestScreenRecording() async {
     if (Platform.isMacOS) {
       await runtime.permission().requestScreenRecordingPermission(
-            onlyOpenSystemSettings: false,
-          );
+        onlyOpenSystemSettings: false,
+      );
     }
     return refresh();
   }

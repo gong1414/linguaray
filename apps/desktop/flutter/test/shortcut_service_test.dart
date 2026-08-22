@@ -9,8 +9,10 @@ void main() {
 
     expect(shortcut, isNotNull);
     expect(shortcut!.key, PhysicalKeyboardKey.keyA);
-    expect(shortcut.modifiers,
-        containsAll([HotKeyModifier.meta, HotKeyModifier.shift]));
+    expect(
+      shortcut.modifiers,
+      containsAll([HotKeyModifier.meta, HotKeyModifier.shift]),
+    );
     expect(shortcut.scope, HotKeyScope.system);
   });
 

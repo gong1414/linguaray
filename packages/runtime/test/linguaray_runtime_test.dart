@@ -32,7 +32,7 @@ void main() {
         rp.WordDefinition(type: 'n', name: 'noun', values: ['hello']),
       ],
       etymology: [
-        rp.WordEtymology(origin: 'Middle English', root: ['hal'])
+        rp.WordEtymology(origin: 'Middle English', root: ['hal']),
       ],
     );
     final echoedResponse = rp.echoLookUpResponse(response: response);

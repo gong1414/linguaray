@@ -1,7 +1,7 @@
 /// Stable-channel window coordination for LinguaRay.
 ///
-/// Beyond's audited commit used Flutter's experimental multi-window API from
-/// the main channel. LinguaRay intentionally stays on Flutter stable, so the
+/// LinguaRay intentionally stays on Flutter stable rather than relying on the
+/// experimental multi-window API from the main channel, so the
 /// workbench and quick translator are mutually-exclusive Flutter surfaces in
 /// one native host window. `nativeapi` owns all native sizing, positioning,
 /// focus, tray and display behavior.
@@ -85,11 +85,9 @@ void detachWorkbenchRouter(GoRouter router) {
 
 String get pendingWorkbenchLocation => _pendingWorkbenchLocation;
 
-void showWorkbenchWindow({
-  WorkbenchDestination? destination,
-  String? text,
-}) {
-  final target = destination ??
+void showWorkbenchWindow({WorkbenchDestination? destination, String? text}) {
+  final target =
+      destination ??
       (onboardingController.isComplete
           ? WorkbenchDestination.translate
           : WorkbenchDestination.welcome);
@@ -106,17 +104,14 @@ void focusWorkbenchWindow() {
 
   window.title = kWorkbenchWindowTitle;
   window.titleBarStyle = TitleBarStyle.hidden;
-  window.windowControlButtonsVisible = false;
+  window.windowControlButtonsVisible = kIsMacOS;
   window.isResizable = true;
   window.setMinimumSize(
     _kWorkbenchWindowMinimumSize.width,
     _kWorkbenchWindowMinimumSize.height,
   );
   if (switchedSurface || window.size != _kWorkbenchWindowSize) {
-    window.setSize(
-      _kWorkbenchWindowSize.width,
-      _kWorkbenchWindowSize.height,
-    );
+    window.setSize(_kWorkbenchWindowSize.width, _kWorkbenchWindowSize.height);
   }
   if (!_workbenchWindowConfigured) {
     _workbenchWindowConfigured = true;
@@ -193,7 +188,8 @@ Future<void> showMiniTranslatorWindow({
     );
   }
 
-  final newPosition = position ??
+  final newPosition =
+      position ??
       (trayBounds != null
           ? _miniTranslatorPositionBelowTray(trayBounds)
           : null);

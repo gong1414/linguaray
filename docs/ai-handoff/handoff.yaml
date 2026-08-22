@@ -1,0 +1,91 @@
+version: 1
+date: 2026-08-22
+workspace: /Users/daoyu/Code/projects/islandpot
+product: LinguaRay
+targets:
+  - macos
+  - windows
+toolchain:
+  flutter: 3.47.1
+  dart: 3.13.1
+  ui_foundation: Material 3
+  state: flutter_riverpod 3.4.2
+  routing: go_router 17.5.0
+  core: Rust + UniFFI
+
+source_of_truth:
+  architecture: docs/ARCHITECTURE.md
+  current_state: docs/ai-handoff/CURRENT_STATE.md
+  ui_spec: docs/ai-handoff/UI_REDESIGN_SPEC.md
+  migration: docs/ai-handoff/ARCHITECTURE_AND_MIGRATION.md
+  acceptance: docs/ai-handoff/ACCEPTANCE.md
+  brand: assets/brand/linguaray/README.md
+  localization: apps/desktop/flutter/lib/src/i18n
+
+preserve:
+  - packages/application/lib/src/translation
+  - apps/desktop/flutter/lib/src/data/runtime_translation_repository.dart
+  - apps/desktop/flutter/lib/src/ui/translation/view_models/translation_view_model.dart
+  - apps/desktop/flutter/lib/src/platform/permission_controller.dart
+  - apps/desktop/flutter/lib/src/platform/selection_controller.dart
+  - apps/desktop/flutter/lib/src/platform/capture_controller.dart
+  - apps/desktop/flutter/lib/src/platform/secret_store.dart
+  - apps/desktop/flutter/lib/src/services/shortcut_service/shortcut_service.dart
+  - apps/desktop/flutter/lib/src/services/app_windows.dart
+  - packages/ui_flutter/lib/src/theme/material_theme.dart
+
+redesign_visuals:
+  - apps/desktop/flutter/lib/src/ui/translation/widgets/translation_workspace_view.dart
+  - apps/desktop/flutter/lib/src/ui/translation/translation_screen.dart
+  - apps/desktop/flutter/lib/src/routes/workbench/index.dart
+  - apps/desktop/flutter/lib/src/routes/workbench/welcome.dart
+  - apps/desktop/flutter/lib/src/routes/mini_translator
+  - apps/desktop/flutter/lib/src/routes/settings
+  - apps/desktop/flutter/lib/widgetbook.dart
+
+remove_only_after_no_references:
+  - apps/desktop/flutter/lib/src/widgets
+  - packages/ui_flutter/lib/src/widgets
+  - apps/desktop/flutter/lib/src/theme/app_theme.dart
+  - packages/ui_flutter/lib/src/theme/tokens.dart
+  - packages/ui_flutter/lib/src/theme/themes.dart
+
+required_first_release:
+  - tray
+  - live_permission_state
+  - global_shortcuts
+  - selection_translation_with_clipboard_restore
+  - clipboard_and_input_translation
+  - region_capture_ocr
+  - quick_translator
+  - translation_workbench
+  - provider_and_service_settings
+  - secure_provider_secrets
+  - macos_build_and_smoke
+  - windows_build_and_smoke
+
+deferred_hidden:
+  - history_ui
+  - dictionary
+  - glossary
+  - vocabulary
+  - tts
+  - auto_update
+  - external_protocol
+  - selection_replacement
+  - legacy_data_migration
+  - advanced_api_server_ui
+  - chat_home
+
+forbidden:
+  - direct_runtime_or_plugin_import_from_view
+  - second_ui_framework
+  - chat_information_architecture
+  - extra_onboarding_native_window
+  - duplicate_window_chrome
+  - plaintext_secret_in_settings_logs_errors_or_ui_state
+  - manual_generated_code_edits
+  - react_tauri_leftover_edits
+  - destructive_git_cleanup
+  - commit_or_push_without_explicit_authorization
+

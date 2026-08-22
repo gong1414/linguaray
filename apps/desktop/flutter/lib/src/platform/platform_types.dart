@@ -11,12 +11,7 @@ enum TriggerAction {
   captureAndTranslate,
 }
 
-enum ShortcutRegistrationState {
-  unregistered,
-  registered,
-  conflict,
-  invalid,
-}
+enum ShortcutRegistrationState { unregistered, registered, conflict, invalid }
 
 class ShortcutBinding {
   const ShortcutBinding({

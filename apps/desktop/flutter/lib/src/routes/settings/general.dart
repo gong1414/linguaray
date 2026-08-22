@@ -100,7 +100,9 @@ class _GeneralSettingsPageState extends State<GeneralSettingsPage> {
                   items: [
                     for (final code in appLanguages)
                       NativeSelectItem(
-                          value: code, label: getLanguageName(code)),
+                        value: code,
+                        label: getLanguageName(code),
+                      ),
                   ],
                   onChanged: (v) => settingsStore.updateAppearance(
                     AppearanceSettingsPatch(language: v),
@@ -119,7 +121,9 @@ class _GeneralSettingsPageState extends State<GeneralSettingsPage> {
                       label: t.common.theme_mode.light,
                     ),
                     NativeSelectItem(
-                        value: 'dark', label: t.common.theme_mode.dark),
+                      value: 'dark',
+                      label: t.common.theme_mode.dark,
+                    ),
                     NativeSelectItem(
                       value: 'system',
                       label: t.common.theme_mode.system,
@@ -209,7 +213,8 @@ class _PermissionAccessRowState extends State<_PermissionAccessRow> {
     final state = widget.accessibility
         ? permissionController.snapshot.accessibility
         : permissionController.snapshot.screenRecording;
-    final granted = state == PermissionState.granted ||
+    final granted =
+        state == PermissionState.granted ||
         state == PermissionState.notRequired;
     return PreferenceRow(
       title: Text(widget.title),

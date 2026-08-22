@@ -108,8 +108,8 @@ class _ProvidersSettingsPageState extends State<ProvidersSettingsPage> {
     final detail = _detailProviderId == null
         ? null
         : providers
-            .where((provider) => provider.id == _detailProviderId)
-            .firstOrNull;
+              .where((provider) => provider.id == _detailProviderId)
+              .firstOrNull;
     // The provider can vanish under us — deleted here, or from the macOS
     // settings window sharing the same runtime. Fall back to the list.
     if (_detailProviderId != null && detail == null) {

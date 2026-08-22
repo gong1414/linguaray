@@ -16,6 +16,7 @@ class ShortcutService extends ChangeNotifier {
 
   TriggerActionHandler? _handler;
   bool _started = false;
+  bool _registrationSuspended = false;
   int _registrationGeneration = 0;
   List<ShortcutBinding> _bindings = const [];
 
@@ -34,6 +35,7 @@ class ShortcutService extends ChangeNotifier {
     if (!_started) return;
     _started = false;
     _handler = null;
+    _registrationSuspended = false;
     _registrationGeneration++;
     settingsStore.removeListener(_settingsChanged);
     await hotKeyManager.unregisterAll();
@@ -42,13 +44,35 @@ class ShortcutService extends ChangeNotifier {
   }
 
   void _settingsChanged() {
-    if (_started) unawaited(_registerCurrentSettings());
+    if (_started && !_registrationSuspended) {
+      unawaited(_registerCurrentSettings());
+    }
+  }
+
+  /// Releases global bindings while the settings UI records a replacement.
+  /// Otherwise the operating system consumes an existing shortcut before the
+  /// focused Flutter recorder can observe it.
+  Future<void> suspendRegistration() async {
+    if (!_started || _registrationSuspended) return;
+    _registrationSuspended = true;
+    _registrationGeneration++;
+    await hotKeyManager.unregisterAll();
+  }
+
+  Future<void> resumeRegistration() async {
+    if (!_registrationSuspended) return;
+    _registrationSuspended = false;
+    if (_started) await _registerCurrentSettings();
   }
 
   Future<void> _registerCurrentSettings() async {
     final generation = ++_registrationGeneration;
     await hotKeyManager.unregisterAll();
-    if (!_started || generation != _registrationGeneration) return;
+    if (!_started ||
+        _registrationSuspended ||
+        generation != _registrationGeneration) {
+      return;
+    }
 
     final shortcuts = settingsStore.shortcuts;
     final requested = <TriggerAction, String>{
@@ -70,7 +94,11 @@ class ShortcutService extends ChangeNotifier {
 
     final results = <ShortcutBinding>[];
     for (final entry in requested.entries) {
-      if (!_started || generation != _registrationGeneration) return;
+      if (!_started ||
+          _registrationSuspended ||
+          generation != _registrationGeneration) {
+        return;
+      }
       final accelerator = entry.value.trim();
       if (accelerator.isEmpty) {
         results.add(
@@ -134,7 +162,11 @@ class ShortcutService extends ChangeNotifier {
       }
     }
 
-    if (!_started || generation != _registrationGeneration) return;
+    if (!_started ||
+        _registrationSuspended ||
+        generation != _registrationGeneration) {
+      return;
+    }
     _bindings = results;
     notifyListeners();
   }

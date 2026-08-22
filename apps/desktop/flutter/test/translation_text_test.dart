@@ -31,10 +31,7 @@ void main() {
     });
   }
 
-  Future<void> pump(
-    WidgetTester tester,
-    Widget child,
-  ) async {
+  Future<void> pump(WidgetTester tester, Widget child) async {
     await tester.pumpWidget(
       Directionality(
         textDirection: TextDirection.ltr,
@@ -43,12 +40,10 @@ void main() {
     );
   }
 
-  testOn(TargetPlatform.linux, 'off macOS the text stays a Flutter widget',
-      (tester) async {
-    await pump(
-      tester,
-      const TranslationText('注意力就是你所需要的一切。'),
-    );
+  testOn(TargetPlatform.linux, 'off macOS the text stays a Flutter widget', (
+    tester,
+  ) async {
+    await pump(tester, const TranslationText('注意力就是你所需要的一切。'));
 
     expect(find.byType(NativeText), findsNothing);
     expect(
@@ -57,8 +52,9 @@ void main() {
     );
   });
 
-  testOn(TargetPlatform.linux, '双击复制 reaches the callback off macOS',
-      (tester) async {
+  testOn(TargetPlatform.linux, '双击复制 reaches the callback off macOS', (
+    tester,
+  ) async {
     var doubleTaps = 0;
     await pump(
       tester,
@@ -79,14 +75,12 @@ void main() {
     expect(doubleTaps, 1);
   });
 
-  testOn(TargetPlatform.macOS, 'on macOS the text is handed to AppKit',
-      (tester) async {
+  testOn(TargetPlatform.macOS, 'on macOS the text is handed to AppKit', (
+    tester,
+  ) async {
     await pump(
       tester,
-      const SizedBox(
-        width: 300,
-        child: TranslationText('注意力就是你所需要的一切。'),
-      ),
+      const SizedBox(width: 300, child: TranslationText('注意力就是你所需要的一切。')),
     );
 
     expect(find.byType(SelectableText), findsNothing);
@@ -99,8 +93,9 @@ void main() {
   // The workbench stacks 原文 / 译文 / 释义 inside an `IntrinsicHeight`, which
   // asks the box how tall it wants to be before laying it out. A `LayoutBuilder`
   // cannot answer that, so the platform view is sized by a layout delegate.
-  testOn(TargetPlatform.macOS, 'the box answers an intrinsic height query',
-      (tester) async {
+  testOn(TargetPlatform.macOS, 'the box answers an intrinsic height query', (
+    tester,
+  ) async {
     await pump(
       tester,
       const SizedBox(
@@ -117,8 +112,9 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testOn(TargetPlatform.macOS, 'the box is the text plus its padding',
-      (tester) async {
+  testOn(TargetPlatform.macOS, 'the box is the text plus its padding', (
+    tester,
+  ) async {
     await pump(
       tester,
       const SizedBox(
@@ -135,8 +131,9 @@ void main() {
     expect(tester.getSize(find.byType(NativeText)), const Size(300, 30));
   });
 
-  testOn(TargetPlatform.linux, 'the platform view draws nothing off macOS',
-      (tester) async {
+  testOn(TargetPlatform.linux, 'the platform view draws nothing off macOS', (
+    tester,
+  ) async {
     await pump(
       tester,
       const SizedBox(width: 300, child: NativeText(text: 'hello')),

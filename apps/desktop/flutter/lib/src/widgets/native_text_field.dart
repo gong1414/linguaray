@@ -149,7 +149,8 @@ class _NativeTextFieldState extends State<NativeTextField> {
   void _updatePlaceholder() {
     if (_channel == null) return;
     final textStyle = widget.style ?? DefaultTextStyle.of(context).style;
-    final placeholderStyle = widget.placeholderStyle ??
+    final placeholderStyle =
+        widget.placeholderStyle ??
         textStyle.copyWith(
           color: (textStyle.color ?? const Color(0xFF000000)).withValues(
             alpha: 0.5,
@@ -255,7 +256,8 @@ class _NativeTextFieldState extends State<NativeTextField> {
   @override
   Widget build(BuildContext context) {
     final textStyle = widget.style ?? DefaultTextStyle.of(context).style;
-    final placeholderStyle = widget.placeholderStyle ??
+    final placeholderStyle =
+        widget.placeholderStyle ??
         textStyle.copyWith(
           color: (textStyle.color ?? const Color(0xFF000000)).withValues(
             alpha: 0.5,
@@ -326,10 +328,10 @@ class _NativeTextFieldState extends State<NativeTextField> {
   }
 
   String? _encodeBrightness() => switch (widget.brightness) {
-        Brightness.dark => 'dark',
-        Brightness.light => 'light',
-        null => null,
-      };
+    Brightness.dark => 'dark',
+    Brightness.light => 'light',
+    null => null,
+  };
 
   Map<String, double> _encodePadding(EdgeInsets padding) {
     return <String, double>{

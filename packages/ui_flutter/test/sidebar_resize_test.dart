@@ -8,14 +8,14 @@ import 'package:linguaray_ui/linguaray_ui.dart';
 /// goes home on a double-click.
 void main() {
   Widget specimen(Widget child) => DesignThemeProvider(
-        child: Directionality(
-          textDirection: TextDirection.ltr,
-          child: Align(
-            alignment: Alignment.topLeft,
-            child: SizedBox(height: 400, child: child),
-          ),
-        ),
-      );
+    child: Directionality(
+      textDirection: TextDirection.ltr,
+      child: Align(
+        alignment: Alignment.topLeft,
+        child: SizedBox(height: 400, child: child),
+      ),
+    ),
+  );
 
   Future<void> dragBy(WidgetTester tester, double dx) async {
     // Grab the handle at its own centre — it sits inside the sidebar's right

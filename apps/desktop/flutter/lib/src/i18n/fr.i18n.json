@@ -268,7 +268,13 @@
       "quality_hint": "Calculés une fois la traduction reçue.",
       "shortcuts": "Raccourcis",
       "other_services_disabled": "Les autres services sont désactivés",
-      "input_hint_translate_to": "Saisissez ou collez le texte à traduire en $language"
+      "input_hint_translate_to": "Saisissez ou collez le texte à traduire en $language",
+      "clear": "Effacer",
+      "swap_languages": "Inverser les langues",
+      "services": "Services de traduction",
+      "configure_services": "Configurer les services",
+      "retry": "Réessayer",
+      "character_count": "$count caractères"
     },
     "status": {
       "runtime_ready": "Moteur de traduction prêt",

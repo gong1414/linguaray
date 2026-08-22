@@ -161,7 +161,7 @@ Future<void> _showTargetDialog(
                       variant: ButtonVariant.warning,
                       onPressed: () async {
                         final next = [
-                          ...settingsStore.general.translationTargets
+                          ...settingsStore.general.translationTargets,
                         ]..removeAt(index);
                         await settingsStore.updateGeneral(
                           GeneralSettingsPatch(translationTargets: next),
@@ -221,8 +221,7 @@ Future<void> showAddTargetDialog(BuildContext context) =>
 Future<void> showEditTargetDialog(
   BuildContext context,
   TranslationTarget target,
-) =>
-    _showTargetDialog(context, target: target);
+) => _showTargetDialog(context, target: target);
 
 Future<void> showCommonLanguagesDialog(BuildContext context) async {
   final selected = Set<String>.from(settingsStore.general.commonLanguages);

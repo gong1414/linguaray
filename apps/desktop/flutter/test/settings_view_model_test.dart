@@ -1,0 +1,327 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:linguaray_application/linguaray_application.dart';
+import 'package:linguaray_desktop/src/config/dependencies.dart';
+import 'package:linguaray_desktop/src/ui/settings/settings_labels.dart';
+import 'package:linguaray_desktop/src/ui/settings/view_models/settings_view_model.dart';
+import 'package:linguaray_desktop/src/ui/settings/view_models/shortcuts_view_model.dart';
+import 'package:linguaray_desktop/src/ui/settings/views/shortcuts_settings_view.dart';
+
+void main() {
+  test(
+    'provider validation prevents repository writes and reports the error',
+    () async {
+      final repository = _FakeWorkspaceSettingsRepository();
+      final container = ProviderContainer(
+        overrides: [
+          workspaceSettingsRepositoryProvider.overrideWithValue(repository),
+        ],
+      );
+      addTearDown(container.dispose);
+      final subscription = container.listen(
+        providersSettingsViewModelProvider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+      await _waitFor(
+        () => !container.read(providersSettingsViewModelProvider).loading,
+      );
+
+      const invalid = ProviderDraft(id: '', typeId: 'openai', fields: {});
+      final notifier = container.read(
+        providersSettingsViewModelProvider.notifier,
+      );
+
+      expect(await notifier.save(invalid), isFalse);
+      expect(repository.saveCalls, 0);
+      expect(
+        container.read(providersSettingsViewModelProvider).operationErrorCode,
+        'validation_missing',
+      );
+
+      await notifier.test(invalid);
+      expect(repository.testCalls, 0);
+      expect(
+        container
+            .read(providersSettingsViewModelProvider)
+            .testResult
+            ?.errorCode,
+        'validation_missing',
+      );
+    },
+  );
+
+  test(
+    'provider save failure is contained and always clears saving state',
+    () async {
+      final repository = _FakeWorkspaceSettingsRepository(throwOnSave: true);
+      final container = ProviderContainer(
+        overrides: [
+          workspaceSettingsRepositoryProvider.overrideWithValue(repository),
+        ],
+      );
+      addTearDown(container.dispose);
+      final subscription = container.listen(
+        providersSettingsViewModelProvider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+      await _waitFor(
+        () => !container.read(providersSettingsViewModelProvider).loading,
+      );
+
+      final saved = await container
+          .read(providersSettingsViewModelProvider.notifier)
+          .save(
+            const ProviderDraft(
+              id: 'openai',
+              typeId: 'openai',
+              fields: {'apiKey': 'secret', 'defaultModel': 'gpt-test'},
+            ),
+          );
+
+      final state = container.read(providersSettingsViewModelProvider);
+      expect(saved, isFalse);
+      expect(repository.saveCalls, 1);
+      expect(state.saving, isFalse);
+      expect(state.operationErrorCode, 'save_failed');
+    },
+  );
+
+  test(
+    'shortcut recording can be cancelled and clears after submit failure',
+    () async {
+      final repository = _FakeShortcutRepository();
+      final container = ProviderContainer(
+        overrides: [shortcutRepositoryProvider.overrideWithValue(repository)],
+      );
+      addTearDown(container.dispose);
+      final subscription = container.listen(
+        shortcutsViewModelProvider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+      await _waitFor(() => !container.read(shortcutsViewModelProvider).loading);
+      final notifier = container.read(shortcutsViewModelProvider.notifier);
+
+      await notifier.startRecording('toggleQuickWindow');
+      expect(repository.beginRecordingCalls, 1);
+      expect(
+        container.read(shortcutsViewModelProvider).recordingActionId,
+        'toggleQuickWindow',
+      );
+      await notifier.cancelRecording();
+      expect(repository.endRecordingCalls, 1);
+      expect(
+        container.read(shortcutsViewModelProvider).recordingActionId,
+        isNull,
+      );
+
+      repository.throwOnSet = true;
+      await notifier.startRecording('toggleQuickWindow');
+      await notifier.submitRecording('Control+X');
+      expect(repository.endRecordingCalls, 2);
+      expect(
+        container.read(shortcutsViewModelProvider).recordingActionId,
+        isNull,
+      );
+    },
+  );
+
+  testWidgets('clicking outside the active shortcut recorder cancels it', (
+    tester,
+  ) async {
+    var cancelled = false;
+    final labels = ShortcutsSettingsLabels(
+      title: 'Shortcuts',
+      record: 'Record',
+      recording: 'Press keys',
+      clear: 'Clear',
+      reset: 'Reset',
+      resetConfirmTitle: 'Reset?',
+      resetConfirmBody: 'Reset shortcuts?',
+      registered: 'Registered',
+      unregistered: 'Unregistered',
+      invalid: 'Invalid',
+      conflict: (label) => 'Conflict: $label',
+      cancel: 'Cancel',
+      confirm: 'Confirm',
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ShortcutsSettingsView(
+            labels: labels,
+            shortcuts: const [
+              ShortcutRecord(
+                actionId: 'toggleQuickWindow',
+                labelKey: 'Toggle quick window',
+                accelerator: 'Option+1',
+                status: ShortcutStatus.registered,
+              ),
+            ],
+            recordingActionId: 'toggleQuickWindow',
+            onStartRecording: (_) {},
+            onCancelRecording: () => cancelled = true,
+            onClear: (_) {},
+            onReset: () {},
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Shortcuts'));
+    await tester.pump();
+
+    expect(cancelled, isTrue);
+  });
+}
+
+Future<void> _waitFor(bool Function() condition) async {
+  for (var attempt = 0; attempt < 50; attempt++) {
+    if (condition()) return;
+    await Future<void>.delayed(const Duration(milliseconds: 1));
+  }
+  fail('Timed out waiting for view-model state.');
+}
+
+final class _FakeWorkspaceSettingsRepository
+    implements WorkspaceSettingsRepository {
+  _FakeWorkspaceSettingsRepository({this.throwOnSave = false});
+
+  final bool throwOnSave;
+  int saveCalls = 0;
+  int testCalls = 0;
+
+  @override
+  Future<List<ProviderTypeOption>> listProviderTypes() async => const [
+    ProviderTypeOption(
+      id: 'openai',
+      label: 'OpenAI',
+      isLlm: true,
+      fields: [
+        ProviderFieldSpec(
+          key: 'apiKey',
+          label: 'API key',
+          secret: true,
+          requiredField: true,
+        ),
+        ProviderFieldSpec(
+          key: 'defaultModel',
+          label: 'Default model',
+          secret: false,
+          requiredField: true,
+        ),
+      ],
+    ),
+  ];
+
+  @override
+  Future<List<ProviderRecord>> listProviders() async => const [];
+
+  @override
+  Future<void> saveProvider(ProviderDraft draft) async {
+    saveCalls++;
+    if (throwOnSave) throw StateError('save failed');
+  }
+
+  @override
+  Future<ProviderTestResult> testProvider(ProviderDraft draft) async {
+    testCalls++;
+    return const ProviderTestResult(status: ProviderTestStatus.passed);
+  }
+
+  @override
+  Future<AboutInfo> loadAbout() async => const AboutInfo(
+    appName: 'LinguaRay',
+    version: '0',
+    buildNumber: '0',
+    platformLabel: 'test',
+    license: 'MIT',
+  );
+
+  @override
+  Future<void> deleteProvider(String providerId) async {}
+  @override
+  Future<List<LanguageChoice>> listAppLanguages() async => const [];
+  @override
+  Future<List<ServiceRecord>> listServices() async => const [];
+  @override
+  Future<List<LanguageChoice>> listTranslationLanguages() async => const [];
+  @override
+  Future<GeneralPreferences> loadGeneral() async => const GeneralPreferences(
+    launchAtLogin: false,
+    showInMenuBar: true,
+    language: 'en',
+    themeMode: ThemePreference.system,
+  );
+  @override
+  Future<List<String>> loadCommonLanguages() async => const [];
+  @override
+  Future<String?> loadDefaultOcrService() async => null;
+  @override
+  Future<String?> loadDefaultTranslationService() async => null;
+  @override
+  Future<void> setCommonLanguages(List<String> codes) async {}
+  @override
+  Future<void> setDefaultOcrService(String? serviceId) async {}
+  @override
+  Future<void> setDefaultTranslationService(String? serviceId) async {}
+  @override
+  Future<void> setLanguage(String language) async {}
+  @override
+  Future<void> setLaunchAtLogin(bool value) async {}
+  @override
+  Future<void> setServiceEnabled({
+    required String serviceId,
+    required bool enabled,
+  }) async {}
+  @override
+  Future<void> setShowInMenuBar(bool value) async {}
+  @override
+  Future<void> setThemeMode(ThemePreference mode) async {}
+}
+
+final class _FakeShortcutRepository implements ShortcutRepository {
+  bool throwOnSet = false;
+  int beginRecordingCalls = 0;
+  int endRecordingCalls = 0;
+
+  @override
+  Future<void> beginRecording() async {
+    beginRecordingCalls++;
+  }
+
+  @override
+  Future<void> endRecording() async {
+    endRecordingCalls++;
+  }
+
+  @override
+  Future<List<ShortcutRecord>> load() async => const [
+    ShortcutRecord(
+      actionId: 'toggleQuickWindow',
+      labelKey: 'toggleQuickWindow',
+      accelerator: 'Option+1',
+      status: ShortcutStatus.registered,
+    ),
+  ];
+
+  @override
+  Future<void> setAccelerator({
+    required String actionId,
+    required String accelerator,
+  }) async {
+    if (throwOnSet) throw StateError('shortcut failed');
+  }
+
+  @override
+  Future<void> clear(String actionId) async {}
+  @override
+  Future<void> resetDefaults() async {}
+}

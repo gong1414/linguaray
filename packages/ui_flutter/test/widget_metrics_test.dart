@@ -7,11 +7,11 @@ import 'package:linguaray_ui/linguaray_ui.dart';
 /// asserted rather than left to look right.
 void main() {
   Widget specimen(Widget child) => DesignThemeProvider(
-        child: Directionality(
-          textDirection: TextDirection.ltr,
-          child: Align(alignment: Alignment.topLeft, child: child),
-        ),
-      );
+    child: Directionality(
+      textDirection: TextDirection.ltr,
+      child: Align(alignment: Alignment.topLeft, child: child),
+    ),
+  );
 
   Future<Size> sizeOf(WidgetTester tester, Widget child, Type type) async {
     await tester.pumpWidget(specimen(child));

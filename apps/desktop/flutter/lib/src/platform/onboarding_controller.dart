@@ -6,7 +6,7 @@ const _kCompletedKey = 'onboarding.completed';
 
 class OnboardingController extends ChangeNotifier {
   OnboardingController({Preferences? preferences})
-      : _preferences = preferences ?? Preferences.withScope(_kOnboardingScope) {
+    : _preferences = preferences ?? Preferences.withScope(_kOnboardingScope) {
     _isComplete = _preferences.get(_kCompletedKey, 'false') == 'true';
   }
 

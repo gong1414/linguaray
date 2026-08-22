@@ -16,3 +16,6 @@ targets:
           flutter_integration: true
           string_interpolation: dart
           flat_map: true
+          format:
+            enabled: true
+            width: 80

@@ -52,11 +52,7 @@ const _linuxTypography = DesignTypography(
   ),
   mono: DesignFont(
     family: 'Noto Sans Mono',
-    fallback: [
-      'Noto Sans Mono CJK SC',
-      'DejaVu Sans Mono',
-      'monospace',
-    ],
+    fallback: ['Noto Sans Mono CJK SC', 'DejaVu Sans Mono', 'monospace'],
   ),
 );
 
@@ -80,13 +76,15 @@ enum DesignThemeFamily {
       .firstWhere((family) => family.id == id, orElse: () => bright);
 
   DesignThemeName themeFor(Brightness brightness) => switch (this) {
-        DesignThemeFamily.studio => brightness == Brightness.dark
-            ? DesignThemeName.studioDark
-            : DesignThemeName.studioLight,
-        DesignThemeFamily.bright => brightness == Brightness.dark
-            ? DesignThemeName.brightDark
-            : DesignThemeName.brightLight,
-      };
+    DesignThemeFamily.studio =>
+      brightness == Brightness.dark
+          ? DesignThemeName.studioDark
+          : DesignThemeName.studioLight,
+    DesignThemeFamily.bright =>
+      brightness == Brightness.dark
+          ? DesignThemeName.brightDark
+          : DesignThemeName.brightLight,
+  };
 }
 
 /// The design tokens behind a family / brightness pair.
@@ -179,8 +177,9 @@ ThemeData appThemeData(DesignTokens tokens) {
       labelSmall: text(10, null, colors.fgSubtle),
     ),
     appBarTheme: AppBarTheme(
-      systemOverlayStyle:
-          isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
+      systemOverlayStyle: isDark
+          ? SystemUiOverlayStyle.light
+          : SystemUiOverlayStyle.dark,
       backgroundColor: colors.chrome,
       foregroundColor: colors.fg,
       elevation: 0,

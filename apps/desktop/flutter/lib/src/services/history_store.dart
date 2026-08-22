@@ -30,10 +30,7 @@ class RuntimeHistoryGateway implements HistoryGateway {
       _history.deleteEntries(entryIds: entryIds);
 
   @override
-  Future<List<HistoryEntry>> listEntries(
-    HistoryFilter filter,
-    String? query,
-  ) =>
+  Future<List<HistoryEntry>> listEntries(HistoryFilter filter, String? query) =>
       _history.listEntries(filter: filter, query: query);
 
   @override
@@ -52,7 +49,7 @@ class RuntimeHistoryGateway implements HistoryGateway {
 /// Flutter-facing snapshot of the Rust history store.
 class HistoryStore extends ChangeNotifier {
   HistoryStore({HistoryGateway? gateway})
-      : _gateway = gateway ?? RuntimeHistoryGateway();
+    : _gateway = gateway ?? RuntimeHistoryGateway();
 
   static final HistoryStore instance = HistoryStore();
 
@@ -201,7 +198,7 @@ final historyStore = HistoryStore.instance;
 /// current entry and preserve its favorite state.
 class TranslationHistorySession {
   TranslationHistorySession({HistoryStore? store})
-      : _store = store ?? historyStore;
+    : _store = store ?? historyStore;
 
   final HistoryStore _store;
   String? _source;

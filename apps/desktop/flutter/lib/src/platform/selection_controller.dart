@@ -6,7 +6,7 @@ import 'platform_types.dart';
 
 class SelectionController {
   SelectionController({PermissionController? permissions})
-      : _permissions = permissions ?? permissionController;
+    : _permissions = permissions ?? permissionController;
 
   final PermissionController _permissions;
 
@@ -21,8 +21,9 @@ class SelectionController {
       );
     }
 
-    final result =
-        await runtime.textExtractor().extractFromScreenSelectionDetailed();
+    final result = await runtime
+        .textExtractor()
+        .extractFromScreenSelectionDetailed();
     return SelectionResult(
       text: result.text,
       triggerPosition: triggerPosition,

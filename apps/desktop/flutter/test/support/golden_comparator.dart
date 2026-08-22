@@ -21,8 +21,8 @@ class _TolerantGoldenFileComparator extends LocalFileComparator {
   _TolerantGoldenFileComparator(
     super.testFile, {
     required double precisionTolerance,
-  })  : assert(precisionTolerance >= 0 && precisionTolerance <= 1),
-        _precisionTolerance = precisionTolerance;
+  }) : assert(precisionTolerance >= 0 && precisionTolerance <= 1),
+       _precisionTolerance = precisionTolerance;
 
   final double _precisionTolerance;
 

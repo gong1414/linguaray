@@ -181,8 +181,8 @@ String _rustTriple(CodeConfig code, OS os, Architecture arch) {
       'x86_64' => 'x86_64-unknown-linux-gnu',
       'aarch64' => 'aarch64-unknown-linux-gnu',
       _ => throw Exception(
-          '[linguaray_runtime] unsupported Linux host architecture: $hostArch',
-        ),
+        '[linguaray_runtime] unsupported Linux host architecture: $hostArch',
+      ),
     };
   }
   if (os == OS.windows) {
@@ -220,8 +220,9 @@ Uri _resolveCdylib(Uri rustDir, String triple, OS os) {
   };
   // The Rust workspace lives at the repo root (../../../target relative to
   // packages/runtime/rust/Cargo.toml), so build artifacts land there.
-  final relativeUri =
-      rustDir.resolve('../../../target/$triple/release/$fileName');
+  final relativeUri = rustDir.resolve(
+    '../../../target/$triple/release/$fileName',
+  );
   // Ensure the URI is absolute, as CodeAsset requires an absolute file path.
   // If the resolved URI is already absolute (has a scheme), use it as-is.
   // Otherwise, resolve it against the current directory.

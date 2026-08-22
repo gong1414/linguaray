@@ -189,10 +189,10 @@ class _NativeTextState extends State<NativeText> {
   }
 
   String? _encodeBrightness(Brightness? brightness) => switch (brightness) {
-        Brightness.dark => 'dark',
-        Brightness.light => 'light',
-        null => null,
-      };
+    Brightness.dark => 'dark',
+    Brightness.light => 'light',
+    null => null,
+  };
 
   Map<String, double> _encodePadding(EdgeInsets padding) {
     return <String, double>{

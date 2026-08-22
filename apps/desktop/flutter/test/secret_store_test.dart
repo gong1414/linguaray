@@ -65,16 +65,51 @@ void main() {
     expect(fields['apiKey'], reference);
   });
 
+  test('untouched edit preserves a secret omitted from the draft', () {
+    final controller = ProviderCredentialsController(
+      store: _MemorySecretStore(),
+    );
+    const reference = 'linguaray-secret://openai/apiKey';
+
+    final fields = controller.protectFields(
+      providerId: 'openai',
+      fields: const {'baseUrl': 'https://example.test'},
+      existingFields: const {'apiKey': reference},
+    );
+
+    expect(fields['apiKey'], reference);
+    expect(fields['baseUrl'], 'https://example.test');
+  });
+
   test('provider deletion removes only its own secrets', () {
     final store = _MemorySecretStore()
-      ..values.addAll({
-        'openai::apiKey': 'one',
-        'deepl::apiKey': 'two',
-      });
+      ..values.addAll({'openai::apiKey': 'one', 'deepl::apiKey': 'two'});
     final controller = ProviderCredentialsController(store: store);
 
     controller.deleteProvider('openai');
 
     expect(store.values, {'deepl::apiKey': 'two'});
+  });
+
+  test('materializes a draft for testing without writing secure storage', () {
+    final store = _MemorySecretStore()
+      ..values['openai::apiKey'] = 'stored-secret';
+    final controller = ProviderCredentialsController(store: store);
+    final before = Map<String, String>.of(store.values);
+
+    final existing = controller.materializeFields(
+      providerId: 'openai',
+      fields: const {'baseUrl': 'https://example.test'},
+      existingFields: const {'apiKey': 'linguaray-secret://openai/apiKey'},
+    );
+    final unsaved = controller.materializeFields(
+      providerId: 'draft',
+      fields: const {'apiKey': 'temporary-secret'},
+    );
+
+    expect(existing['apiKey'], 'stored-secret');
+    expect(existing['baseUrl'], 'https://example.test');
+    expect(unsaved['apiKey'], 'temporary-secret');
+    expect(store.values, before);
   });
 }

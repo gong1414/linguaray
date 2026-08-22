@@ -15,8 +15,7 @@ const bool kGlossaryFeatureEnabled = false;
 /// Whether 翻译 shows its right-hand aside (命中术语 / 质量信号 / 快捷键).
 const bool kTranslationAsideEnabled = false;
 
-/// First-release scope gates. The underlying Beyond modules remain available
-/// for later milestones, but incomplete entry points are not exposed.
+/// First-release scope gates. Incomplete entry points are not exposed.
 const bool kHistoryFeatureEnabled = false;
 const bool kAdvancedSettingsFeatureEnabled = false;
 

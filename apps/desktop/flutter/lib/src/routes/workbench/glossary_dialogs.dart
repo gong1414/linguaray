@@ -256,16 +256,16 @@ class _NewGlossaryDialogState extends State<NewGlossaryDialog> {
   }
 
   String _seedTitle(GlossarySeed seed) => switch (seed) {
-        GlossarySeed.blank => t.workbench.glossary_page.seed_blank,
-        GlossarySeed.csv => 'CSV',
-        GlossarySeed.tbx => 'TBX',
-      };
+    GlossarySeed.blank => t.workbench.glossary_page.seed_blank,
+    GlossarySeed.csv => 'CSV',
+    GlossarySeed.tbx => 'TBX',
+  };
 
   String _seedHint(GlossarySeed seed) => switch (seed) {
-        GlossarySeed.blank => t.workbench.glossary_page.seed_blank_hint,
-        GlossarySeed.csv => t.workbench.glossary_page.seed_csv_hint,
-        GlossarySeed.tbx => t.workbench.glossary_page.seed_tbx_hint,
-      };
+    GlossarySeed.blank => t.workbench.glossary_page.seed_blank_hint,
+    GlossarySeed.csv => t.workbench.glossary_page.seed_csv_hint,
+    GlossarySeed.tbx => t.workbench.glossary_page.seed_tbx_hint,
+  };
 }
 
 /// What [AddTermDialog] hands back for one entry.
@@ -311,7 +311,8 @@ class AddTermDialog extends StatefulWidget {
 }
 
 class _AddTermDialogState extends State<AddTermDialog> {
-  late String _bookId = widget.defaultBookId ??
+  late String _bookId =
+      widget.defaultBookId ??
       (widget.books.isEmpty ? '' : widget.books.first.id);
   final TextEditingController _term = TextEditingController();
   final TextEditingController _translation = TextEditingController();

@@ -310,7 +310,19 @@
       "other_services_disabled": "其他服务已停用",
       "input_hint_translate_to": "输入或粘贴要翻译的文本，翻译为$language",
       "newline_hint": "$key 换行",
-      "failed_body": "这一段没有拿到译文。检查网络连接后重试，或展开看每个服务的原因逐个处理。"
+      "failed_body": "这一段没有拿到译文。检查网络连接后重试，或展开看每个服务的原因逐个处理。",
+      "clear": "清空",
+      "swap_languages": "交换语言",
+      "services": "翻译服务",
+      "configure_services": "配置服务",
+      "retry": "重试",
+      "character_count": "$count 个字符",
+      "language_pair_not_installed": "请先在 macOS“语言与地区”中安装这个语言组合，然后重试。",
+      "unsupported_language_pair": "当前翻译服务不支持这个语言组合。",
+      "source_language_detection_failed": "无法识别原文语言，请手动选择源语言后重试。",
+      "network_error": "无法连接翻译服务，请检查网络后重试。",
+      "partial_failure": "$count 个服务失败，可切换查看原因",
+      "streaming": "正在生成译文…"
     },
     "status": {
       "runtime_ready": "翻译运行时已就绪",
@@ -606,6 +618,61 @@
       "license": "许可证",
       "open_changelog": "查看更新日志",
       "update": "更新"
+    },
+    "permissions": {
+      "title": "权限",
+      "windows_note": "Windows 上无需额外授权即可使用划词和截图。",
+      "recheck": "重新检查"
+    }
+  },
+  "ui": {
+    "shell": {
+      "app_name": "LinguaRay",
+      "translate": "翻译",
+      "settings": "设置",
+      "minimize": "最小化",
+      "maximize": "最大化",
+      "close": "关闭"
+    },
+    "first_run": {
+      "title": "开始使用 LinguaRay",
+      "subtitle": "完成这几步后，就可以从任何应用唤起翻译。",
+      "permissions_title": "系统权限",
+      "permissions_body": "划词和截图 OCR 需要辅助功能与屏幕录制权限。",
+      "accessibility": "辅助功能",
+      "screen_recording": "屏幕录制",
+      "shortcuts_title": "全局快捷键",
+      "shortcuts_body": "四个首版动作已准备好。若有冲突，可稍后在设置中修改。",
+      "services_title": "翻译服务",
+      "services_body": "至少启用一个翻译服务。",
+      "granted": "已授权",
+      "denied": "未授权",
+      "not_required": "当前系统无需授权",
+      "unknown": "状态未知",
+      "checking": "正在检查…",
+      "conflict": "有快捷键冲突。可先跳过，之后在设置中修复。",
+      "no_provider": "还没有可用的翻译服务。",
+      "ready": "已有可用服务。",
+      "grant": "授权",
+      "recheck": "重新检查",
+      "configure_services": "配置服务",
+      "start": "开始使用",
+      "skip": "稍后再说"
+    },
+    "quick": {
+      "title": "快捷翻译",
+      "input_hint": "输入、粘贴，或由划词和截图填入",
+      "pin": "置顶",
+      "unpin": "取消置顶",
+      "permission_denied": "没有所需的系统权限",
+      "permission_next": "打开系统设置授予辅助功能或屏幕录制权限，然后返回重新检查。",
+      "capture_cancelled": "已取消截图。原文未改动。"
+    },
+    "providers": {
+      "secret_stored": "密钥已保存在系统钥匙串",
+      "secret_placeholder": "留空则保留已保存的密钥",
+      "validation_missing": "请填写必填项。",
+      "save_failed": "无法保存服务商，请检查配置后重试。"
     }
   }
 }

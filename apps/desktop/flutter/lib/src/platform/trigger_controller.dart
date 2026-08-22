@@ -12,17 +12,18 @@ class TriggerController {
     SelectionController? selection,
     CaptureController? capture,
     PermissionController? permissions,
-  })  : _selection = selection ?? selectionController,
-        _capture = capture ?? captureController,
-        _permissions = permissions ?? permissionController;
+  }) : _selection = selection ?? selectionController,
+       _capture = capture ?? captureController,
+       _permissions = permissions ?? permissionController;
 
   final SelectionController _selection;
   final CaptureController _capture;
   final PermissionController _permissions;
 
   final ValueNotifier<String?> quickWindowText = ValueNotifier(null);
-  final ValueNotifier<PlatformOperationException?> lastError =
-      ValueNotifier(null);
+  final ValueNotifier<PlatformOperationException?> lastError = ValueNotifier(
+    null,
+  );
 
   Future<void> trigger(TriggerAction action) async {
     lastError.value = null;

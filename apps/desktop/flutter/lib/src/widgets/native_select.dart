@@ -163,13 +163,11 @@ class _NativeSelectState<T> extends State<NativeSelect<T>> {
     final colors = tokens.colors;
     final error = widget.state == FieldState.error;
 
-    final style = (widget.mono
-            ? tokens.typography.monoStyle(fontSize: 12)
-            : tokens.typography.sansStyle(fontSize: 12))
-        .copyWith(
-      height: 1,
-      color: error ? colors.dangerDeep : colors.fg,
-    );
+    final style =
+        (widget.mono
+                ? tokens.typography.monoStyle(fontSize: 12)
+                : tokens.typography.sansStyle(fontSize: 12))
+            .copyWith(height: 1, color: error ? colors.dangerDeep : colors.fg);
 
     return Pressable(
       enabled: !_disabled,

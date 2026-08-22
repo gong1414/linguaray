@@ -216,7 +216,8 @@ class _TextFieldState extends State<TextField> {
         widget.style ?? DefaultTextStyle.of(context).style;
     final Color textColor = textStyle.color ?? const Color(0xFF000000);
     final bool enabled = widget.enabled ?? true;
-    final bool showPlaceholder = widget.placeholder != null &&
+    final bool showPlaceholder =
+        widget.placeholder != null &&
         !widget.obscureText &&
         _effectiveController.text.isEmpty;
 
@@ -232,7 +233,8 @@ class _TextFieldState extends State<TextField> {
               IgnorePointer(
                 child: Text(
                   widget.placeholder!,
-                  style: widget.placeholderStyle ??
+                  style:
+                      widget.placeholderStyle ??
                       textStyle.copyWith(
                         color: textColor.withValues(alpha: 0.5),
                       ),
@@ -264,8 +266,9 @@ class _TextFieldState extends State<TextField> {
         ),
       ),
     );
-    final Widget field =
-        widget.expands ? SizedBox.expand(child: editableText) : editableText;
+    final Widget field = widget.expands
+        ? SizedBox.expand(child: editableText)
+        : editableText;
     if (!_hasSubmitMode) return field;
     return Focus(
       canRequestFocus: false,
