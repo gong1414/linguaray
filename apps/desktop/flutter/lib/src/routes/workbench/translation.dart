@@ -19,6 +19,7 @@ import '../../utils/shortcut_util.dart';
 import '../../widgets/avatar.dart' show Avatar, AvatarSize;
 import '../../widgets/blocks.dart'
     show HighlightBlock, HighlightRule, HighlightTone;
+import '../../widgets/compare_toggle.dart' show CompareToggle;
 import '../../widgets/data_display.dart' show DetailBlock;
 import '../../widgets/language_selector.dart' show LanguageSelector;
 import '../../widgets/text_field.dart' show TextField;
@@ -491,7 +492,7 @@ class _WorkbenchTranslationPageState extends State<WorkbenchTranslationPage> {
               ),
             ),
             const SizedBox(width: 10),
-            _CompareToggle(
+            CompareToggle(
               label: _expanded
                   ? t.mini_translator.result.collapse_reasons
                   : t.mini_translator.result.show_reasons(count: count),
@@ -517,7 +518,7 @@ class _WorkbenchTranslationPageState extends State<WorkbenchTranslationPage> {
     // 对比开关 — lives in the preferred block's action row, the mini's
     // placement. With every other service disabled it degrades to a note.
     final compareToggle = others.isNotEmpty
-        ? _CompareToggle(
+        ? CompareToggle(
             expanded: _expanded,
             label: _expanded
                 ? t.mini_translator.result.collapse_compare
@@ -902,67 +903,6 @@ class _WorkbenchTranslationPageState extends State<WorkbenchTranslationPage> {
     final pronunciations = _controller.dictionaryResult?.pronunciations;
     if (pronunciations == null || pronunciations.isEmpty) return null;
     return pronunciations.first.phoneticSymbol;
-  }
-}
-
-/// The 对比 N 个服务 / 收起对比 pill — same control as the mini translator's.
-class _CompareToggle extends StatelessWidget {
-  const _CompareToggle({
-    required this.expanded,
-    required this.label,
-    required this.onPressed,
-  });
-
-  final bool expanded;
-
-  /// 对比 N 个服务 when the services answered, 查看 N 个服务的原因 when none did.
-  final String label;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = context.tokens;
-    final colors = tokens.colors;
-    final radius = BorderRadius.circular(tokens.radii.pill);
-
-    return Pressable(
-      onPressed: onPressed,
-      borderRadius: radius,
-      semanticsLabel: label,
-      builder: (context, state) => AnimatedContainer(
-        duration: kTransitionDuration,
-        height: 18,
-        padding: const EdgeInsets.symmetric(horizontal: 9),
-        decoration: BoxDecoration(
-          color: colors.accent.withValues(alpha: state.hovered ? 0.20 : 0.12),
-          borderRadius: radius,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              label,
-              style: tokens.typography.sansStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                height: 1,
-                color: colors.accentText,
-              ),
-            ),
-            const SizedBox(width: 4),
-            AnimatedRotation(
-              turns: expanded ? 0.5 : 0,
-              duration: kTransitionDuration,
-              child: Icon(
-                FluentIcons.chevron_down_20_regular,
-                size: 10,
-                color: colors.accentText,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }
 

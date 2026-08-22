@@ -1,4 +1,3 @@
-import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:linguaray_runtime/linguaray_runtime.dart' show InputSubmitMode;
 
@@ -10,6 +9,7 @@ import '../../theme/product_tokens.dart'
     show ProductTokens, ProductTokensContext;
 import '../../utils/language_util.dart';
 import '../../utils/shortcut_util.dart';
+import '../../widgets/compare_toggle.dart' show CompareToggle;
 import '../../widgets/data_display.dart' show DetailBlock;
 import '../../widgets/translation_text.dart';
 import '../../widgets/ui.dart'
@@ -22,10 +22,8 @@ import '../../widgets/ui.dart'
         KbdSize,
         Label,
         LabelTone,
-        Pressable,
         Spinner,
-        SpinnerSize,
-        kTransitionDuration;
+        SpinnerSize;
 
 /// One service's translated text, paired with the target it belongs to.
 typedef ServiceTranslation = ({
@@ -313,7 +311,9 @@ class MiniTranslatorTranslation extends StatelessWidget {
                   ),
                   const Spacer(),
                   if (noResult)
-                    _CompareToggle(
+                    CompareToggle(
+                      height: null,
+                      padding: const EdgeInsets.fromLTRB(9, 4, 7, 4),
                       expanded: showCompare,
                       label: showCompare
                           ? t.mini_translator.result.collapse_reasons
@@ -323,7 +323,9 @@ class MiniTranslatorTranslation extends StatelessWidget {
                       onPressed: onToggleCompare,
                     )
                   else if (translations.length > 1)
-                    _CompareToggle(
+                    CompareToggle(
+                      height: null,
+                      padding: const EdgeInsets.fromLTRB(9, 4, 7, 4),
                       expanded: showCompare,
                       label: showCompare
                           ? t.mini_translator.result.collapse_compare
@@ -423,66 +425,6 @@ class MiniTranslatorTranslation extends StatelessWidget {
     final index = translations.indexOf(candidate);
     if (index < 0 || index > 8) return null;
     return '⌥${index + 1}';
-  }
-}
-
-/// The 对比 N 个服务 / 收起对比 pill — accent-tinted with a rotating chevron.
-class _CompareToggle extends StatelessWidget {
-  const _CompareToggle({
-    required this.expanded,
-    required this.label,
-    required this.onPressed,
-  });
-
-  final bool expanded;
-
-  /// 对比 N 个服务 when the services answered, 查看 N 个服务的原因 when none did.
-  final String label;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = context.tokens;
-    final colors = tokens.colors;
-    final radius = BorderRadius.circular(tokens.radii.pill);
-
-    return Pressable(
-      onPressed: onPressed,
-      borderRadius: radius,
-      semanticsLabel: label,
-      builder: (context, state) => AnimatedContainer(
-        duration: kTransitionDuration,
-        padding: const EdgeInsets.fromLTRB(9, 4, 7, 4),
-        decoration: BoxDecoration(
-          color: colors.accent.withValues(alpha: state.hovered ? 0.20 : 0.12),
-          borderRadius: radius,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              label,
-              style: tokens.typography.sansStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                height: 1,
-                color: colors.accentText,
-              ),
-            ),
-            const SizedBox(width: 4),
-            AnimatedRotation(
-              turns: expanded ? 0.5 : 0,
-              duration: kTransitionDuration,
-              child: Icon(
-                FluentIcons.chevron_down_20_regular,
-                size: 10,
-                color: colors.accentText,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }
 

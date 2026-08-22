@@ -16,92 +16,22 @@
 // That makes these a macOS-local guard; `widget_metrics_test.dart` is the part
 // that holds everywhere.
 
-import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
-import 'package:flutter/services.dart' show FontLoader;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:linguaray_ui/linguaray_ui.dart';
-
-/// Where pub put a dependency, read off the package config rather than the
-/// asset bundle: the bundle's root depends on which directory `flutter test`
-/// was invoked from, and these goldens have to render the same either way.
-Directory _packageRoot(String package) {
-  for (var dir = Directory.current;; dir = dir.parent) {
-    final config = File('${dir.path}/.dart_tool/package_config.json');
-    if (config.existsSync()) {
-      final packages =
-          (jsonDecode(config.readAsStringSync()) as Map)['packages'] as List;
-      for (final entry in packages.cast<Map<String, dynamic>>()) {
-        if (entry['name'] != package) continue;
-        return Directory.fromUri(
-          config.uri.resolve(entry['rootUri'] as String),
-        );
-      }
-    }
-    if (dir.parent.path == dir.path) {
-      fail(
-        '$package is not in any package_config.json above ${Directory.current.path}',
-      );
-    }
-  }
-}
-
-/// The host faces the tokens resolve to. `-apple-system` is SF; the CJK
-/// fallback is PingFang SC; ⌕ ⇄ ✕ ✓ sit outside SF's own coverage and macOS
-/// resolves them through Apple Symbols, which the test environment has to be
-/// told about — it goes in as its own family and is reached through the
-/// fallback lists, so it never outranks the CJK face.
-const _hostFaces = {
-  'SF': '/System/Library/Fonts/SFNS.ttf',
-  'PingFang SC': '/System/Library/Fonts/STHeiti Medium.ttc',
-  'SF Mono': '/System/Library/Fonts/Menlo.ttc',
-  'Symbols': '/System/Library/Fonts/Apple Symbols.ttf',
-};
-
-/// The type roles bound to those faces. `flutter test` does not resolve
-/// `family: null` to the platform UI font the way the running app does, so the
-/// roles have to name the families that were just registered.
-const _typography = DesignTypography(
-  display: DesignFont(family: 'SF', fallback: ['PingFang SC', 'Symbols']),
-  sans: DesignFont(family: 'SF', fallback: ['PingFang SC', 'Symbols']),
-  label: DesignFont(family: 'SF', fallback: ['PingFang SC', 'Symbols']),
-  cjk: DesignFont(family: 'PingFang SC', fallback: ['SF', 'Symbols']),
-  mono: DesignFont(family: 'SF Mono', fallback: ['PingFang SC', 'Symbols']),
-);
-
-Future<void> _load(String family, Uint8List bytes) async {
-  final loader = FontLoader(family)
-    ..addFont(Future.value(bytes.buffer.asByteData()));
-  await loader.load();
-}
+import 'package:linguaray_ui/testing.dart';
 
 void main() {
   final missing = [
-    for (final entry in _hostFaces.entries)
+    for (final entry in goldenHostFaces.entries)
       if (!File(entry.value).existsSync()) entry.key,
   ];
 
   group('goldens', () {
-    setUpAll(() async {
-      for (final entry in _hostFaces.entries) {
-        await _load(entry.key, File(entry.value).readAsBytesSync());
-      }
-      final icons = _packageRoot('fluentui_system_icons');
-      for (final font in const ['Regular', 'Filled']) {
-        final file = File(
-          '${icons.path}/lib/fonts/FluentSystemIcons-$font.ttf',
-        );
-        if (!file.existsSync()) fail('missing icon font: ${file.path}');
-        await _load(
-          'packages/fluentui_system_icons/FluentSystemIcons-$font',
-          file.readAsBytesSync(),
-        );
-      }
-    });
+    setUpAll(loadGoldenFonts);
 
     /// Renders [child] at [width] on the theme's window surface and compares it
     /// with `goldens/<name>.png`.
@@ -119,7 +49,7 @@ void main() {
       await tester.pumpWidget(
         DesignThemeProvider(
           theme: theme,
-          tokens: theme.tokens.copyWith(typography: _typography),
+          tokens: theme.tokens.copyWith(typography: goldenTypography),
           child: Directionality(
             textDirection: TextDirection.ltr,
             child: Align(
