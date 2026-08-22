@@ -6908,29 +6908,6 @@ class FfiConverterDouble64 {
   }
 }
 
-class FfiConverterInt32 {
-  static int lift(int value) => value;
-  static LiftRetVal<int> read(Uint8List buf) {
-    return LiftRetVal(buf.buffer.asByteData(buf.offsetInBytes).getInt32(0), 4);
-  }
-
-  static int lower(int value) {
-    if (value < -2147483648 || value > 2147483647) {
-      throw ArgumentError("Value out of range for i32: " + value.toString());
-    }
-    return value;
-  }
-
-  static int allocationSize([int value = 0]) {
-    return 4;
-  }
-
-  static int write(int value, Uint8List buf) {
-    buf.buffer.asByteData(buf.offsetInBytes).setInt32(0, lower(value));
-    return 4;
-  }
-}
-
 class FfiConverterMapStringToString {
   static Map<String, String> lift(RustBuffer buf) {
     return FfiConverterMapStringToString.read(buf.asUint8List()).value;
@@ -9460,17 +9437,6 @@ class UniffiHandleMap<T> {
 
 const _uniffiAssetId =
     "package:beyondtranslate_runtime/uniffi:beyondtranslate_runtime";
-int add({
-  required int a,
-  required int b,
-}) {
-  return rustCallWithLifter(
-      (status) => uniffi_beyondtranslate_runtime_fn_func_add(
-          FfiConverterInt32.lower(a), FfiConverterInt32.lower(b), status),
-      FfiConverterInt32.lift,
-      null);
-}
-
 DetectLanguageRequest echoDetectLanguageRequest({
   required DetectLanguageRequest request,
 }) {
@@ -9694,23 +9660,6 @@ WordTense echoWordTense({
       (status) => uniffi_beyondtranslate_runtime_fn_func_echo_word_tense(
           FfiConverterWordTense.lower(wordTense), status),
       FfiConverterWordTense.lift,
-      null);
-}
-
-String greet({
-  required String name,
-}) {
-  return rustCallWithLifter(
-      (status) => uniffi_beyondtranslate_runtime_fn_func_greet(
-          FfiConverterString.lower(name), status),
-      FfiConverterString.lift,
-      null);
-}
-
-String version() {
-  return rustCallWithLifter(
-      (status) => uniffi_beyondtranslate_runtime_fn_func_version(status),
-      FfiConverterString.lift,
       null);
 }
 
@@ -10304,11 +10253,6 @@ external void
     uniffi_beyondtranslate_runtime_fn_init_callback_vtable_streamcallback(
         Pointer<UniffiVTableCallbackInterfaceStreamCallback> vtable);
 
-@Native<Int32 Function(Int32, Int32, Pointer<RustCallStatus>)>(
-    assetId: _uniffiAssetId)
-external int uniffi_beyondtranslate_runtime_fn_func_add(
-    int a, int b, Pointer<RustCallStatus> uniffiStatus);
-
 @Native<RustBuffer Function(RustBuffer, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
 external RustBuffer
@@ -10428,15 +10372,6 @@ external RustBuffer uniffi_beyondtranslate_runtime_fn_func_echo_word_tag(
     assetId: _uniffiAssetId)
 external RustBuffer uniffi_beyondtranslate_runtime_fn_func_echo_word_tense(
     RustBuffer word_tense, Pointer<RustCallStatus> uniffiStatus);
-
-@Native<RustBuffer Function(RustBuffer, Pointer<RustCallStatus>)>(
-    assetId: _uniffiAssetId)
-external RustBuffer uniffi_beyondtranslate_runtime_fn_func_greet(
-    RustBuffer name, Pointer<RustCallStatus> uniffiStatus);
-
-@Native<RustBuffer Function(Pointer<RustCallStatus>)>(assetId: _uniffiAssetId)
-external RustBuffer uniffi_beyondtranslate_runtime_fn_func_version(
-    Pointer<RustCallStatus> uniffiStatus);
 
 @Native<RustBuffer Function(Uint64, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
@@ -10736,9 +10671,6 @@ external void ffi_beyondtranslate_runtime_rust_future_complete_void(
     Pointer<Void> handle, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
-external int uniffi_beyondtranslate_runtime_checksum_func_add();
-
-@Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
     uniffi_beyondtranslate_runtime_checksum_func_echo_detect_language_request();
 
@@ -10816,12 +10748,6 @@ external int uniffi_beyondtranslate_runtime_checksum_func_echo_word_tag();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int uniffi_beyondtranslate_runtime_checksum_func_echo_word_tense();
-
-@Native<Uint16 Function()>(assetId: _uniffiAssetId)
-external int uniffi_beyondtranslate_runtime_checksum_func_greet();
-
-@Native<Uint16 Function()>(assetId: _uniffiAssetId)
-external int uniffi_beyondtranslate_runtime_checksum_func_version();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
@@ -11129,9 +11055,6 @@ void _checkApiVersion() {
 }
 
 void _checkApiChecksums() {
-  if (uniffi_beyondtranslate_runtime_checksum_func_add() != 17790) {
-    throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
-  }
   if (uniffi_beyondtranslate_runtime_checksum_func_echo_detect_language_request() !=
       60740) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
@@ -11215,12 +11138,6 @@ void _checkApiChecksums() {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
   if (uniffi_beyondtranslate_runtime_checksum_func_echo_word_tense() != 28625) {
-    throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
-  }
-  if (uniffi_beyondtranslate_runtime_checksum_func_greet() != 35598) {
-    throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
-  }
-  if (uniffi_beyondtranslate_runtime_checksum_func_version() != 42317) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
   if (uniffi_beyondtranslate_runtime_checksum_method_runtimeapiserver_info() !=

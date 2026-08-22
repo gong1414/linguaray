@@ -11,19 +11,39 @@ void main() {
   // The first invocation triggers `hook/build.dart`, which runs
   // `cargo build --release --target <triple>` for the host.
 
-  test('add returns the sum', () {
-    expect(rp.add(a: 2, b: 3), 5);
-    expect(rp.add(a: -10, b: 7), -3);
+  test('core model bindings round trip through the native library', () {
+    final request = rp.TranslateRequest(
+      sourceLanguage: 'zh',
+      targetLanguage: 'en',
+      text: '你好',
+    );
+    final echoedRequest = rp.echoTranslateRequest(request: request);
+    expect(echoedRequest.sourceLanguage, 'zh');
+    expect(echoedRequest.targetLanguage, 'en');
+    expect(echoedRequest.text, '你好');
+
+    final response = rp.LookUpResponse(
+      translations: [
+        rp.TextTranslation(detectedSourceLanguage: 'zh', text: 'hello'),
+      ],
+      word: 'hello',
+      tags: [rp.WordTag(name: 'noun')],
+      definitions: [
+        rp.WordDefinition(type: 'n', name: 'noun', values: ['hello']),
+      ],
+      etymology: [
+        rp.WordEtymology(origin: 'Middle English', root: ['hal'])
+      ],
+    );
+    final echoedResponse = rp.echoLookUpResponse(response: response);
+    expect(echoedResponse.translations.single.text, 'hello');
+    expect(echoedResponse.tags!.single.name, 'noun');
+    expect(echoedResponse.definitions!.single.type, 'n');
+    expect(echoedResponse.etymology!.single.origin, 'Middle English');
   });
 
-  test('greet wraps the input in a hello message', () {
-    expect(rp.greet(name: 'World'), 'Hello, World!');
-    expect(rp.greet(name: 'LinguaRay'), 'Hello, LinguaRay!');
-  });
-
-  test('version returns a non-empty semver string', () {
-    final v = rp.version();
-    expect(v, isNotEmpty);
-    expect(RegExp(r'^\d+\.\d+\.\d+').hasMatch(v), isTrue);
+  test('committed bindings match the native library checksums', () {
+    // Fails fast when the generated Dart bindings drift from the cdylib.
+    rp.ensureInitialized();
   });
 }

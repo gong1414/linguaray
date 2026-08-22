@@ -14,7 +14,7 @@ packages/runtime/
 │   ├── uniffi.toml               Configures the Dart binding (package_name, cdylib_name)
 │   └── src/
 │       ├── api.udl               UniFFI namespace declaration
-│       ├── lib.rs                #[uniffi::export] add / greet / version
+│       ├── lib.rs                #[uniffi::export] surface (runtime objects + echo round-trips)
 │       └── bin/
 │           ├── uniffi-bindgen.rs       Wraps uniffi_bindgen_main() (Swift / Kotlin / ...)
 │           └── uniffi-bindgen-dart.rs  Calls uniffi_dart::gen::generate_dart_bindings(...)
@@ -34,13 +34,15 @@ packages/runtime/
 
 ## Exposed API
 
-The Rust source ([`rust/src/lib.rs`](rust/src/lib.rs)) exports three functions:
+The Rust source ([`rust/src/lib.rs`](rust/src/lib.rs)) and
+[`rust/src/runtime.rs`](rust/src/runtime.rs) export:
 
-| Rust                                      | Dart                            | Swift                                   |
-| ----------------------------------------- | ------------------------------- | --------------------------------------- |
-| `fn add(a: i32, b: i32) -> i32`           | `add(a: 1, b: 2)`               | `add(a: 1, b: 2)`                       |
-| `fn greet(name: String) -> String`        | `greet(name: "World")`          | `greet(name: "World")`                  |
-| `fn version() -> String`                  | `version()`                     | `version()`                             |
+- `Runtime` and its handle objects (settings, translation, dictionary, LLM,
+  OCR, glossary, history, permission, text extractor, API server) — the real
+  product surface.
+- One `echo_*` function per `beyondtranslate-core` model type. These exist
+  only to force UniFFI metadata for the remote (hand-mirrored) core types;
+  they are exercised by the round-trip tests in `rust/test/`.
 
 ## Regenerating the bindings
 
@@ -87,19 +89,10 @@ class AppDelegate: FlutterAppDelegate {
     super.applicationDidFinishLaunching(notification)
     RegisterGeneratedPlugins(registry: self)
 
-    NSLog("version() = %@", beyondtranslate_runtime.version())
-    NSLog("add(2,3)  = %d", beyondtranslate_runtime.add(a: 2, b: 3))
-    NSLog("greet     = %@", beyondtranslate_runtime.greet(name: "AppDelegate"))
+    // The plugin has dlopen'd the bundled runtime; the Swift binding is
+    // ready to use after RegisterGeneratedPlugins.
   }
 }
-```
-
-Run the app and grep for `[beyondtranslate_runtime]` lines in stderr / Console.app:
-
-```text
-[beyondtranslate_runtime] version() = 0.1.0
-[beyondtranslate_runtime] add(a: 2, b: 3) = 5
-[beyondtranslate_runtime] greet(name: "AppDelegate") = Hello, AppDelegate!
 ```
 
 ### How the SPM package works
@@ -143,5 +136,5 @@ Run the app and grep for `[beyondtranslate_runtime]` lines in stderr / Console.a
    those `.swift` and `.h` files alongside the same `libbeyondtranslate_runtime.dylib`
    that native_assets bundles.
 4. **uniffi-dart 0.2.x limitations.** `HashMap`, `BigInt`, trait methods
-   and proc-macro-only crates are not yet supported. The demo functions
-   stay inside the supported subset.
+   and proc-macro-only crates are not yet supported. Core model types cross
+   the boundary as uniffi *remote* types (see `rust/src/remote.rs`).
