@@ -13,7 +13,9 @@ import 'src/utils/language_util.dart';
 
 Future<void> _ensureInitialized() async {
   WidgetsFlutterBinding.ensureInitialized();
-  _smokeTestBeyondtranslateRuntime();
+  // Fail fast if the committed Dart bindings do not match the bundled
+  // native library (API version / checksum mismatch).
+  beyondtranslate_runtime.ensureInitialized();
   await initRuntime();
   debugPrint('[LinguaRay] Rust runtime initialized.');
 
@@ -32,22 +34,6 @@ Future<void> _ensureInitialized() async {
   debugPrint('[LinguaRay] Provider credentials hydrated.');
   await settingsStore.init();
   debugPrint('[LinguaRay] Settings initialized.');
-}
-
-void _smokeTestBeyondtranslateRuntime() {
-  beyondtranslate_runtime.ensureInitialized();
-  debugPrint(
-    '[beyondtranslate_runtime] Dart version() = '
-    '${beyondtranslate_runtime.version()}',
-  );
-  debugPrint(
-    '[beyondtranslate_runtime] Dart add(a: 2, b: 3) = '
-    '${beyondtranslate_runtime.add(a: 2, b: 3)}',
-  );
-  debugPrint(
-    '[beyondtranslate_runtime] Dart greet(name: "main.dart") = '
-    '${beyondtranslate_runtime.greet(name: 'main.dart')}',
-  );
 }
 
 Future<void> main() async {

@@ -461,22 +461,6 @@ private struct FfiConverterUInt32: FfiConverterPrimitive {
 #if swift(>=5.8)
   @_documentation(visibility: private)
 #endif
-private struct FfiConverterInt32: FfiConverterPrimitive {
-  typealias FfiType = Int32
-  typealias SwiftType = Int32
-
-  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Int32 {
-    return try lift(readInt(&buf))
-  }
-
-  public static func write(_ value: Int32, into buf: inout [UInt8]) {
-    writeInt(&buf, lower(value))
-  }
-}
-
-#if swift(>=5.8)
-  @_documentation(visibility: private)
-#endif
 private struct FfiConverterUInt64: FfiConverterPrimitive {
   typealias FfiType = UInt64
   typealias SwiftType = UInt64
@@ -8583,15 +8567,6 @@ private func uniffiFutureContinuationCallback(handle: UInt64, pollResult: Int8) 
     print("uniffiFutureContinuationCallback invalid handle")
   }
 }
-public func add(a: Int32, b: Int32) -> Int32 {
-  return try! FfiConverterInt32.lift(
-    try! rustCall {
-      uniffi_beyondtranslate_runtime_fn_func_add(
-        FfiConverterInt32.lower(a),
-        FfiConverterInt32.lower(b), $0
-      )
-    })
-}
 public func echoDetectLanguageRequest(request: DetectLanguageRequest) -> DetectLanguageRequest {
   return try! FfiConverterTypeDetectLanguageRequest_lift(
     try! rustCall {
@@ -8768,22 +8743,6 @@ public func echoWordTense(wordTense: WordTense) -> WordTense {
       )
     })
 }
-public func greet(name: String) -> String {
-  return try! FfiConverterString.lift(
-    try! rustCall {
-      uniffi_beyondtranslate_runtime_fn_func_greet(
-        FfiConverterString.lower(name), $0
-      )
-    })
-}
-public func version() -> String {
-  return try! FfiConverterString.lift(
-    try! rustCall {
-      uniffi_beyondtranslate_runtime_fn_func_version(
-        $0
-      )
-    })
-}
 
 private enum InitializationResult {
   case ok
@@ -8799,9 +8758,6 @@ private let initializationResult: InitializationResult = {
   let scaffolding_contract_version = ffi_beyondtranslate_runtime_uniffi_contract_version()
   if bindings_contract_version != scaffolding_contract_version {
     return InitializationResult.contractVersionMismatch
-  }
-  if uniffi_beyondtranslate_runtime_checksum_func_add() != 17790 {
-    return InitializationResult.apiChecksumMismatch
   }
   if uniffi_beyondtranslate_runtime_checksum_func_echo_detect_language_request() != 60740 {
     return InitializationResult.apiChecksumMismatch
@@ -8867,12 +8823,6 @@ private let initializationResult: InitializationResult = {
     return InitializationResult.apiChecksumMismatch
   }
   if uniffi_beyondtranslate_runtime_checksum_func_echo_word_tense() != 28625 {
-    return InitializationResult.apiChecksumMismatch
-  }
-  if uniffi_beyondtranslate_runtime_checksum_func_greet() != 35598 {
-    return InitializationResult.apiChecksumMismatch
-  }
-  if uniffi_beyondtranslate_runtime_checksum_func_version() != 42317 {
     return InitializationResult.apiChecksumMismatch
   }
   if uniffi_beyondtranslate_runtime_checksum_method_runtimeapiserver_info() != 36460 {
