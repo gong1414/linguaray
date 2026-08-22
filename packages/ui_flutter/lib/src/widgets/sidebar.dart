@@ -88,22 +88,45 @@ class Sidebar extends StatefulWidget {
   State<Sidebar> createState() => _SidebarState();
 }
 
-class _SidebarState extends State<Sidebar> {
+/// Width bookkeeping the sidebar column and the rail share: an uncontrolled
+/// pane (width == null) remembers its last committed width and reports every
+/// commit outward; a controlled one always shows the width it was given.
+mixin _PaneWidth<W extends StatefulWidget> on State<W> {
   double? _ownWidth;
 
-  /// What the sidebar measured before anyone dragged it — double-click home.
+  /// What the pane measured before anyone dragged it — double-click home.
   double? _natural;
 
-  double _resolved(BuildContext context) =>
-      widget.width ?? _ownWidth ?? _naturalOf(context);
+  /// The controlled width; null when the pane sizes itself.
+  double? get paneWidth;
 
-  double _naturalOf(BuildContext context) =>
-      widget.defaultWidth ?? context.metrics.sidebarWidth;
+  /// Where commits are reported; null when nobody listens.
+  ValueChanged<double>? get onPaneWidthChange;
+
+  /// The width the pane falls back to before the first commit.
+  double naturalPaneWidth(BuildContext context);
+
+  double _resolved(BuildContext context) =>
+      paneWidth ?? _ownWidth ?? naturalPaneWidth(context);
+
+  double _naturalOf(BuildContext context) => naturalPaneWidth(context);
 
   void _commit(double next) {
-    if (widget.width == null) setState(() => _ownWidth = next);
-    widget.onWidthChange?.call(next);
+    if (paneWidth == null) setState(() => _ownWidth = next);
+    onPaneWidthChange?.call(next);
   }
+}
+
+class _SidebarState extends State<Sidebar> with _PaneWidth<Sidebar> {
+  @override
+  double? get paneWidth => widget.width;
+
+  @override
+  ValueChanged<double>? get onPaneWidthChange => widget.onWidthChange;
+
+  @override
+  double naturalPaneWidth(BuildContext context) =>
+      widget.defaultWidth ?? context.metrics.sidebarWidth;
 
   @override
   Widget build(BuildContext context) {
@@ -555,20 +578,16 @@ class Rail extends StatefulWidget {
   State<Rail> createState() => _RailState();
 }
 
-class _RailState extends State<Rail> {
-  double? _ownWidth;
-  double? _natural;
+class _RailState extends State<Rail> with _PaneWidth<Rail> {
+  @override
+  double? get paneWidth => widget.width;
 
-  double _resolved(BuildContext context) =>
-      widget.width ?? _ownWidth ?? _naturalOf(context);
+  @override
+  ValueChanged<double>? get onPaneWidthChange => widget.onWidthChange;
 
-  double _naturalOf(BuildContext context) =>
+  @override
+  double naturalPaneWidth(BuildContext context) =>
       widget.defaultWidth ?? context.metrics.railWidth;
-
-  void _commit(double next) {
-    if (widget.width == null) setState(() => _ownWidth = next);
-    widget.onWidthChange?.call(next);
-  }
 
   @override
   Widget build(BuildContext context) {
