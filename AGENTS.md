@@ -19,6 +19,13 @@ docs/                   Maintainer-facing architecture documentation
 Internal package and FFI identifiers are implementation details. User-facing
 names, identifiers, documentation, and assets use `LinguaRay`.
 
+The workspace root also holds untracked leftovers from a retired React/Tauri
+prototype (`src-tauri/`, `storybook-static/`, `node_modules/`, `dist/`,
+`test-results/`, `s1b-shots/`, `.pnpm-store/`), kept out via `.gitignore` and
+the local `.git/info/exclude`. They are not part of the product: skip them when
+searching, never edit them, and do not treat them as a reference for current
+behavior.
+
 ## Toolchain
 
 - Flutter 3.47.1 / Dart 3.13.1
@@ -27,8 +34,11 @@ names, identifiers, documentation, and assets use `LinguaRay`.
 - Xcode, Swift Format, and CocoaPods for macOS
 - Visual Studio Desktop development with C++ for Windows
 
-The root is a Dart Pub Workspace managed with Melos. Resolve dependencies from
-the repository root:
+The root is a Dart Pub Workspace managed with Melos. The script catalog
+(`analyze`, `test`, `codegen`, `format`, `format-check`, `fix`,
+`dependency_validator`) lives under the `melos:` key in the root
+`pubspec.yaml`, not in a `melos.yaml`. Resolve dependencies from the
+repository root:
 
 ```bash
 dart pub get
