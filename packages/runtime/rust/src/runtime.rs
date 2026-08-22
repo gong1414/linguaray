@@ -1,0 +1,3061 @@
+use std::collections::HashMap;
+use std::future::Future;
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex, OnceLock};
+use std::thread;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use beyondtranslate_core::{
+    ChatMessage, DetectLanguageRequest, DetectLanguageResponse, LanguageInfo, LanguagePair,
+    LookUpRequest, LookUpResponse, RecognizeTextRequest, RecognizeTextResponse, TranslateRequest,
+    TranslateResponse,
+};
+use struct_patch::Patch as ApplyPatch;
+use tokio::sync::{broadcast, Mutex as AsyncMutex, RwLock};
+
+use crate::domain::engine;
+use crate::domain::glossary::{
+    check_compliance, GlossaryBook, GlossaryBookInput, GlossaryComplianceIssue, GlossaryEntry,
+    GlossaryEntryInput, GlossaryMatch, GlossaryStore,
+};
+use crate::domain::history::{
+    HistoryCounts, HistoryEntry, HistoryEntryInput, HistoryFilter, HistoryStore,
+};
+use crate::domain::permission;
+use crate::domain::settings::{
+    provider_entry_from_config, AdvancedSettings, AdvancedSettingsPatch, AppearanceSettings,
+    AppearanceSettingsPatch, GeneralSettings, GeneralSettingsPatch, ProviderConfigEntry,
+    ServiceConfigEntry, ServiceType, Settings, ShortcutSettings, ShortcutSettingsPatch,
+};
+use crate::domain::text_extractor;
+use crate::RuntimeApiServer;
+use beyondtranslate_core::TranslationTarget;
+use beyondtranslate_engine::prompt::GlossaryTerm;
+
+/// Error type returned by all uniffi-exported Runtime methods.
+#[derive(Debug, thiserror::Error, uniffi::Error)]
+pub enum RuntimeError {
+    #[error("{msg}")]
+    Error { msg: String },
+}
+
+impl From<String> for RuntimeError {
+    fn from(s: String) -> Self {
+        RuntimeError::Error { msg: s }
+    }
+}
+
+/// Identifies which top-level settings section was just modified.
+///
+/// Emitted by [`SettingsSubscription::next`] every time settings are
+/// successfully written through any [`RuntimeSettings`] handle. Consumers
+/// (Dart `SettingsStore`, Swift `SettingsViewModel`, etc.) receive these
+/// events regardless of which language binding initiated the change, and
+/// typically respond by re-fetching the affected section.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, uniffi::Enum)]
+pub enum SettingsChange {
+    General,
+    Appearance,
+    Shortcuts,
+    Advanced,
+    Providers,
+    /// A glossary book or term was created, edited or deleted. Glossary data
+    /// lives outside `settings.json` but rides the same event channel so
+    /// consumers keep a single subscription loop.
+    Glossary,
+    /// Translation history was created, edited, favorited or deleted.
+    History,
+}
+
+/// Callback invoked by the Rust runtime as LLM streaming chunks arrive.
+///
+/// Dart/Swift implement this trait and pass it to
+/// [`RuntimeLlm::translate_stream`]. The Rust side calls:
+///
+/// 1. `on_chunk(content)` — for each token delta (may be called many times)
+/// 2. `on_finish(reason)` — when the stream completes (`"stop"`, `"length"`, etc.)
+/// 3. `on_error(error)` — if the stream encounters an error
+#[uniffi::export(callback_interface)]
+pub trait StreamCallback: Send + Sync {
+    fn on_chunk(&self, content: String);
+    fn on_finish(&self, finish_reason: String);
+    fn on_error(&self, error: String);
+}
+
+/// Broadcast channel buffer size; settings updates are infrequent so 64
+/// is generous. If a subscriber falls more than this many events behind,
+/// they receive [`broadcast::error::RecvError::Lagged`] and we transparently
+/// resume from the next event.
+const EVENT_CHANNEL_CAPACITY: usize = 64;
+
+struct RuntimeState {
+    settings: Settings,
+    engine: beyondtranslate_engine::Engine,
+    /// Credentials hydrated from the OS secure store for this process only.
+    /// Persisted settings contain opaque references instead of these values.
+    provider_secrets: HashMap<String, HashMap<String, String>>,
+}
+
+impl RuntimeState {
+    fn new(mut settings: Settings) -> Result<Self, String> {
+        // Auto-create the system provider on first launch so it appears in
+        // the provider list like any other provider. Users can modify or
+        // delete it freely; it will persist to settings.json.
+        if !settings.providers.contains_key("system") {
+            settings.providers.insert(
+                "system".to_owned(),
+                ProviderConfigEntry {
+                    id: "system".to_owned(),
+                    r#type: beyondtranslate_engine::ProviderType::System,
+                    fields: HashMap::new(),
+                    created_at: None,
+                },
+            );
+        }
+        let provider_secrets = HashMap::new();
+        let engine = engine::build_from_settings_with_secrets(&settings, &provider_secrets)?;
+        Ok(Self {
+            settings,
+            engine,
+            provider_secrets,
+        })
+    }
+}
+
+/// Shared, process-wide state behind a [`Runtime`] handle. All [`Runtime`]
+/// instances built for the same `data_dir` reference the **same**
+/// `RuntimeInner`, so Dart and Swift bindings observe the same in-memory
+/// settings/engine state and the same `settings.json` on disk.
+struct RuntimeInner {
+    settings_file_path: Arc<str>,
+    state: RwLock<RuntimeState>,
+    /// Terms live in their own files under `data_dir/glossary`, behind their
+    /// own lock so editing a book never blocks a translation waiting on
+    /// settings (or vice versa).
+    glossary: RwLock<GlossaryStore>,
+    /// Translation history has its own file and lock, so listing it never
+    /// blocks settings or glossary operations.
+    history: RwLock<HistoryStore>,
+    /// Broadcasts a [`SettingsChange`] event after every successful
+    /// settings write. The sender is kept alive for the lifetime of
+    /// `RuntimeInner`, so receivers obtained via `subscribe()` will only
+    /// see [`broadcast::error::RecvError::Closed`] once the runtime itself
+    /// is dropped (i.e. process shutdown).
+    events: broadcast::Sender<SettingsChange>,
+}
+
+/// Process-wide registry mapping a canonical `data_dir` path to the
+/// [`RuntimeInner`] currently backing it. The first call to
+/// [`Runtime::new`] for a given `data_dir` populates the entry; subsequent
+/// calls (regardless of which language binding they originate from) return
+/// a cheap [`Runtime`] handle that shares the same `Arc<RuntimeInner>`.
+static RUNTIME_REGISTRY: OnceLock<Mutex<HashMap<PathBuf, Arc<RuntimeInner>>>> = OnceLock::new();
+
+fn runtime_registry() -> &'static Mutex<HashMap<PathBuf, Arc<RuntimeInner>>> {
+    RUNTIME_REGISTRY.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// Resolves `data_dir` to a stable canonical path used as the registry key.
+/// The directory is created if missing so that paths from different
+/// language bindings (`/Users/...` vs `/private/Users/...` symlinks on
+/// macOS, trailing slashes, etc.) collapse to the same key.
+fn canonical_data_dir(data_dir: &str) -> PathBuf {
+    let raw = PathBuf::from(data_dir);
+    let _ = std::fs::create_dir_all(&raw);
+    std::fs::canonicalize(&raw).unwrap_or(raw)
+}
+
+#[derive(Clone, uniffi::Object)]
+pub struct Runtime {
+    inner: Arc<RuntimeInner>,
+}
+
+#[derive(uniffi::Object)]
+pub struct RuntimeSettings {
+    runtime: Runtime,
+}
+
+#[derive(uniffi::Object)]
+pub struct RuntimeTranslation {
+    runtime: Runtime,
+    service_id: String,
+}
+
+#[derive(uniffi::Object)]
+pub struct RuntimeDictionary {
+    runtime: Runtime,
+    service_id: String,
+}
+
+#[derive(Clone, uniffi::Object)]
+pub struct RuntimeLlm {
+    runtime: Runtime,
+    service_id: String,
+}
+
+#[derive(uniffi::Object)]
+pub struct RuntimeOcr {
+    runtime: Runtime,
+    service_id: String,
+}
+
+#[derive(uniffi::Object)]
+pub struct RuntimeGlossary {
+    runtime: Runtime,
+}
+
+#[derive(uniffi::Object)]
+pub struct RuntimeHistory {
+    runtime: Runtime,
+}
+
+#[derive(uniffi::Object)]
+pub struct RuntimePermission;
+
+/// Rust-native screen text extractor.
+///
+/// Provides clipboard reading, screen selection text extraction,
+/// and screen capture with OCR across all supported platforms.
+#[derive(uniffi::Object)]
+pub struct RuntimeTextExtractor {
+    runtime: Runtime,
+}
+
+/// Foreign-language handle for observing [`SettingsChange`] events.
+///
+/// Obtain one via [`RuntimeSettings::subscribe`] and call
+/// [`SettingsSubscription::next`] in a loop:
+///
+/// * `Some(change)` — a section was modified; reload it if you care.
+/// * `None` — the runtime has been torn down and no further events
+///   will arrive (terminate the loop).
+///
+/// Each subscription has its own independent cursor in the broadcast
+/// channel; multiple subscribers can coexist and all see the same events.
+#[derive(uniffi::Object)]
+pub struct SettingsSubscription {
+    receiver: AsyncMutex<broadcast::Receiver<SettingsChange>>,
+}
+
+impl Runtime {
+    fn new_impl(data_dir: String) -> Result<Self, String> {
+        let key = canonical_data_dir(&data_dir);
+
+        let mut registry = runtime_registry()
+            .lock()
+            .map_err(|error| format!("runtime registry mutex poisoned: {error}"))?;
+
+        if let Some(existing) = registry.get(&key) {
+            return Ok(Self {
+                inner: existing.clone(),
+            });
+        }
+
+        let settings_file_path = key.join("settings.json");
+        let settings = Settings::load(&settings_file_path)?;
+        let state = RuntimeState::new(settings)?;
+        let glossary = GlossaryStore::load(&key)?;
+        let history = HistoryStore::load(&key);
+        let (events, _) = broadcast::channel(EVENT_CHANNEL_CAPACITY);
+        let inner = Arc::new(RuntimeInner {
+            settings_file_path: Arc::from(settings_file_path.to_string_lossy().into_owned()),
+            state: RwLock::new(state),
+            glossary: RwLock::new(glossary),
+            history: RwLock::new(history),
+            events,
+        });
+        registry.insert(key, inner.clone());
+        Ok(Self { inner })
+    }
+}
+
+#[uniffi::export]
+impl Runtime {
+    #[uniffi::constructor]
+    pub fn new(data_dir: String) -> Result<Arc<Self>, RuntimeError> {
+        Self::new_impl(data_dir).map(Arc::new).map_err(Into::into)
+    }
+
+    pub fn settings(self: Arc<Self>) -> Arc<RuntimeSettings> {
+        Arc::new(RuntimeSettings {
+            runtime: (*self).clone(),
+        })
+    }
+
+    pub fn translation(
+        self: Arc<Self>,
+        provider_id: String,
+    ) -> Result<Arc<RuntimeTranslation>, RuntimeError> {
+        let service_id = validate_service_provider_id(provider_id, "+translation")
+            .map_err(RuntimeError::from)?;
+        Ok(Arc::new(RuntimeTranslation {
+            runtime: (*self).clone(),
+            service_id,
+        }))
+    }
+
+    pub fn dictionary(
+        self: Arc<Self>,
+        provider_id: String,
+    ) -> Result<Arc<RuntimeDictionary>, RuntimeError> {
+        let service_id =
+            validate_service_provider_id(provider_id, "+dictionary").map_err(RuntimeError::from)?;
+        Ok(Arc::new(RuntimeDictionary {
+            runtime: (*self).clone(),
+            service_id,
+        }))
+    }
+
+    pub fn ocr(self: Arc<Self>, provider_id: String) -> Result<Arc<RuntimeOcr>, RuntimeError> {
+        let service_id =
+            validate_service_provider_id(provider_id, "+ocr").map_err(RuntimeError::from)?;
+        Ok(Arc::new(RuntimeOcr {
+            runtime: (*self).clone(),
+            service_id,
+        }))
+    }
+
+    pub fn llm(self: Arc<Self>, provider_id: String) -> Result<Arc<RuntimeLlm>, RuntimeError> {
+        let service_id =
+            validate_service_provider_id(provider_id, "+llm").map_err(RuntimeError::from)?;
+        Ok(Arc::new(RuntimeLlm {
+            runtime: (*self).clone(),
+            service_id,
+        }))
+    }
+
+    pub fn text_extractor(self: Arc<Self>) -> Arc<RuntimeTextExtractor> {
+        Arc::new(RuntimeTextExtractor {
+            runtime: (*self).clone(),
+        })
+    }
+
+    pub fn glossary(self: Arc<Self>) -> Arc<RuntimeGlossary> {
+        Arc::new(RuntimeGlossary {
+            runtime: (*self).clone(),
+        })
+    }
+
+    pub fn history(self: Arc<Self>) -> Arc<RuntimeHistory> {
+        Arc::new(RuntimeHistory {
+            runtime: (*self).clone(),
+        })
+    }
+
+    pub fn permission(self: Arc<Self>) -> Arc<RuntimePermission> {
+        Arc::new(RuntimePermission)
+    }
+
+    pub fn start_api_server(
+        self: Arc<Self>,
+        host: String,
+        port: u16,
+    ) -> Result<Arc<RuntimeApiServer>, RuntimeError> {
+        RuntimeApiServer::start((*self).clone(), host, port)
+    }
+
+    /// Returns the curated language list supported by the app.
+    pub fn list_languages(&self) -> Vec<LanguageInfo> {
+        beyondtranslate_engine::all_languages()
+    }
+
+    /// Returns languages supported by the app UI.
+    pub fn list_app_languages(&self) -> Vec<LanguageInfo> {
+        beyondtranslate_engine::app_languages()
+    }
+}
+
+impl Runtime {
+    pub(crate) async fn api_translate(
+        &self,
+        provider_id: String,
+        request: TranslateRequest,
+    ) -> Result<TranslateResponse, beyondtranslate_api_core::ApiError> {
+        let request = beyondtranslate_api_core::translate_request(request)?;
+        let provider = {
+            let state = self.inner.state.read().await;
+            state
+                .engine
+                .require(&provider_id)
+                .map_err(beyondtranslate_api_core::ApiError::from_engine_error)?
+                .clone()
+        };
+        let service = provider.translation().ok_or_else(|| {
+            beyondtranslate_api_core::ApiError::from_engine_error(
+                beyondtranslate_engine::EngineError::TranslationNotSupported(provider_id.clone()),
+            )
+        })?;
+
+        service.translate(request).await.map_err(Into::into)
+    }
+
+    pub(crate) async fn api_detect_language(
+        &self,
+        provider_id: String,
+        request: DetectLanguageRequest,
+    ) -> Result<DetectLanguageResponse, beyondtranslate_api_core::ApiError> {
+        let request = beyondtranslate_api_core::detect_language_request(request)?;
+        let provider = {
+            let state = self.inner.state.read().await;
+            state
+                .engine
+                .require(&provider_id)
+                .map_err(beyondtranslate_api_core::ApiError::from_engine_error)?
+                .clone()
+        };
+        let service = provider.translation().ok_or_else(|| {
+            beyondtranslate_api_core::ApiError::from_engine_error(
+                beyondtranslate_engine::EngineError::TranslationNotSupported(provider_id.clone()),
+            )
+        })?;
+
+        service.detect_language(request).await.map_err(Into::into)
+    }
+
+    pub(crate) async fn api_supported_language_pairs(
+        &self,
+        provider_id: String,
+    ) -> Result<Vec<LanguagePair>, beyondtranslate_api_core::ApiError> {
+        let provider = {
+            let state = self.inner.state.read().await;
+            state
+                .engine
+                .require(&provider_id)
+                .map_err(beyondtranslate_api_core::ApiError::from_engine_error)?
+                .clone()
+        };
+        let service = provider.translation().ok_or_else(|| {
+            beyondtranslate_api_core::ApiError::from_engine_error(
+                beyondtranslate_engine::EngineError::TranslationNotSupported(provider_id.clone()),
+            )
+        })?;
+
+        service
+            .get_supported_language_pairs()
+            .await
+            .map_err(Into::into)
+    }
+
+    pub(crate) async fn api_lookup(
+        &self,
+        provider_id: String,
+        request: LookUpRequest,
+    ) -> Result<LookUpResponse, beyondtranslate_api_core::ApiError> {
+        let request = beyondtranslate_api_core::lookup_request(request)?;
+        let provider = {
+            let state = self.inner.state.read().await;
+            state
+                .engine
+                .require(&provider_id)
+                .map_err(beyondtranslate_api_core::ApiError::from_engine_error)?
+                .clone()
+        };
+        let service = provider.dictionary().ok_or_else(|| {
+            beyondtranslate_api_core::ApiError::from_engine_error(
+                beyondtranslate_engine::EngineError::DictionaryNotSupported(provider_id.clone()),
+            )
+        })?;
+
+        service.look_up(request).await.map_err(Into::into)
+    }
+
+    async fn resolve_service(
+        &self,
+        service_id: &str,
+        expected_type: ServiceType,
+    ) -> Result<ResolvedService, String> {
+        let state = self.inner.state.read().await;
+        if let Some(service) = state.settings.services.get(service_id) {
+            if service.r#type != expected_type {
+                return Err(format!(
+                    "service `{service_id}` is not a {expected_type:?} service"
+                ));
+            }
+            if !state.settings.providers.contains_key(&service.provider_id) {
+                return Err(format!(
+                    "service `{service_id}` references unknown provider `{}`",
+                    service.provider_id
+                ));
+            }
+            let mut entry = service.clone();
+            entry.id = service_id.to_owned();
+            return Ok(ResolvedService {
+                provider_id: entry.provider_id.clone(),
+                entry,
+            });
+        }
+
+        let provider = state
+            .settings
+            .providers
+            .get(service_id)
+            .ok_or_else(|| format!("service or provider `{service_id}` does not exist"))?;
+        let engine_provider = state
+            .engine
+            .require(service_id)
+            .map_err(|error| error.to_string())?;
+        let supported = match expected_type {
+            ServiceType::Dictionary => engine_provider.dictionary().is_some(),
+            ServiceType::Ocr => engine_provider.ocr().is_some(),
+            ServiceType::Translation => {
+                engine_provider.translation().is_some() || engine_provider.llm().is_some()
+            }
+            ServiceType::Llm => engine_provider.llm().is_some(),
+        };
+        if !supported {
+            return Err(format!(
+                "provider `{service_id}` does not support {expected_type:?}"
+            ));
+        }
+        Ok(ResolvedService {
+            provider_id: service_id.to_owned(),
+            entry: service_entry_for_provider_type(
+                service_id,
+                &normalized_provider_entry(service_id, provider),
+                expected_type,
+            ),
+        })
+    }
+
+    async fn resolve_llm_service(&self, service_id: &str) -> Result<ResolvedService, String> {
+        match self.resolve_service(service_id, ServiceType::Llm).await {
+            Ok(service) => Ok(service),
+            Err(_) => {
+                let state = self.inner.state.read().await;
+                let Some(service) = state.settings.services.get(service_id) else {
+                    return Err(format!("service or provider `{service_id}` does not exist"));
+                };
+                if service.r#type != ServiceType::Translation
+                    && service.r#type != ServiceType::Dictionary
+                {
+                    return Err(format!("service `{service_id}` is not an llm service"));
+                }
+                if !state.settings.providers.contains_key(&service.provider_id) {
+                    return Err(format!(
+                        "service `{service_id}` references unknown provider `{}`",
+                        service.provider_id
+                    ));
+                }
+                let provider = state
+                    .engine
+                    .require(&service.provider_id)
+                    .map_err(|error| error.to_string())?;
+                if provider.llm().is_none() {
+                    return Err(format!(
+                        "provider `{}` does not support llm",
+                        service.provider_id
+                    ));
+                }
+                let mut entry = service.clone();
+                entry.id = service_id.to_owned();
+                Ok(ResolvedService {
+                    provider_id: entry.provider_id.clone(),
+                    entry,
+                })
+            }
+        }
+    }
+}
+
+impl RuntimeSettings {
+    async fn get_json_impl(&self) -> Result<String, String> {
+        let state = self.runtime.inner.state.read().await;
+        state.settings.to_pretty_json()
+    }
+
+    async fn get_section<T: Clone>(&self, select: impl FnOnce(&Settings) -> &T) -> T {
+        select(&self.runtime.inner.state.read().await.settings).clone()
+    }
+
+    async fn update_section<T, P>(
+        &self,
+        change: SettingsChange,
+        patch: P,
+        select: impl FnOnce(&mut Settings) -> &mut T + Send + 'static,
+    ) -> Result<T, String>
+    where
+        T: Clone + ApplyPatch<P>,
+        P: Send + 'static,
+    {
+        self.commit_settings(change, move |settings| {
+            let section = select(settings);
+            section.apply(patch);
+            Ok(section.clone())
+        })
+        .await
+    }
+
+    async fn commit_settings<F, T>(&self, change: SettingsChange, update: F) -> Result<T, String>
+    where
+        F: FnOnce(&mut Settings) -> Result<T, String>,
+    {
+        let mut state = self.runtime.inner.state.write().await;
+        let mut next_settings = state.settings.clone();
+        let result = update(&mut next_settings)?;
+        next_settings.touch_last_updated()?;
+
+        let engine_changed = next_settings.providers != state.settings.providers;
+
+        let settings_file_path = self.runtime.inner.settings_file_path.as_ref();
+        if engine_changed {
+            state
+                .provider_secrets
+                .retain(|provider_id, _| next_settings.providers.contains_key(provider_id));
+            let next_engine =
+                engine::build_from_settings_with_secrets(&next_settings, &state.provider_secrets)?;
+            next_settings.save(settings_file_path)?;
+            *state = RuntimeState {
+                settings: next_settings,
+                engine: next_engine,
+                provider_secrets: state.provider_secrets.clone(),
+            };
+        } else {
+            next_settings.save(settings_file_path)?;
+            state.settings = next_settings;
+        }
+
+        // Release the write lock before broadcasting so a subscriber that
+        // immediately re-reads doesn't block on the same lock.
+        drop(state);
+
+        // `send` only fails when there are zero active receivers, which is
+        // a benign condition (no one is listening yet); ignore it.
+        let _ = self.runtime.inner.events.send(change);
+
+        Ok(result)
+    }
+}
+
+#[derive(Clone)]
+struct ResolvedService {
+    provider_id: String,
+    entry: ServiceConfigEntry,
+}
+
+impl ResolvedService {
+    fn field(&self, key: &str) -> Option<&str> {
+        self.entry
+            .fields
+            .get(key)
+            .map(|value| value.trim())
+            .filter(|value| !value.is_empty())
+    }
+}
+
+fn service_entry_for_provider_type(
+    service_id: &str,
+    provider: &ProviderConfigEntry,
+    service_type: ServiceType,
+) -> ServiceConfigEntry {
+    let name = provider.id.clone();
+    ServiceConfigEntry {
+        id: service_id.to_owned(),
+        provider_id: provider.id.clone(),
+        r#type: service_type,
+        name,
+        fields: HashMap::new(),
+        created_at: provider.created_at,
+    }
+}
+
+fn render_prompt_template(
+    template: &str,
+    source_language: &str,
+    target_language: &str,
+    text: &str,
+    glossary: &[GlossaryTerm],
+) -> String {
+    const GLOSSARY_PLACEHOLDER: &str = "{{glossary}}";
+
+    let rendered = template
+        .replace("{{sourceLanguage}}", source_language)
+        .replace("{{targetLanguage}}", target_language)
+        .replace("{{text}}", text);
+    let block = beyondtranslate_engine::prompt::glossary_constraints(glossary);
+
+    if rendered.contains(GLOSSARY_PLACEHOLDER) {
+        return rendered.replace(GLOSSARY_PLACEHOLDER, block.as_deref().unwrap_or_default());
+    }
+    // A custom template written before glossaries existed has nowhere to put
+    // the terms, and dropping them silently would break the promise that
+    // glossary entries outrank engine output. Append instead.
+    match block {
+        Some(block) => format!("{rendered}\n\n{block}"),
+        None => rendered,
+    }
+}
+
+/// Flattens matches into the shape the prompt builder wants.
+fn glossary_terms(matches: &[GlossaryMatch]) -> Vec<GlossaryTerm> {
+    matches
+        .iter()
+        .map(|hit| GlossaryTerm {
+            term: hit.term.clone(),
+            translation: hit.translation.clone(),
+            forbidden: hit.forbidden.clone(),
+        })
+        .collect()
+}
+
+#[uniffi::export(async_runtime = "tokio")]
+impl RuntimeSettings {
+    /// Returns the active subset of translation targets based on the
+    /// detected source language.
+    ///
+    /// * `Always` targets are always included.
+    /// * `AutoDetect` targets are included only when their source matches
+    ///   the detected language (or when no detected language is available).
+    pub async fn get_active_translation_targets(
+        &self,
+        targets: Vec<TranslationTarget>,
+        detected_language: Option<String>,
+    ) -> Vec<TranslationTarget> {
+        TranslationTarget::filter_active(&targets, detected_language.as_deref())
+    }
+
+    pub async fn get_json(&self) -> Result<String, RuntimeError> {
+        self.get_json_impl().await.map_err(Into::into)
+    }
+
+    pub async fn get_general(&self) -> Result<GeneralSettings, RuntimeError> {
+        Ok(self.get_section(|s| &s.general).await)
+    }
+
+    pub async fn update_general(
+        &self,
+        patch: GeneralSettingsPatch,
+    ) -> Result<GeneralSettings, RuntimeError> {
+        self.update_section(SettingsChange::General, patch, |s| &mut s.general)
+            .await
+            .map_err(Into::into)
+    }
+
+    pub async fn get_appearance(&self) -> Result<AppearanceSettings, RuntimeError> {
+        Ok(self.get_section(|s| &s.appearance).await)
+    }
+
+    pub async fn update_appearance(
+        &self,
+        patch: AppearanceSettingsPatch,
+    ) -> Result<AppearanceSettings, RuntimeError> {
+        self.update_section(SettingsChange::Appearance, patch, |s| &mut s.appearance)
+            .await
+            .map_err(Into::into)
+    }
+
+    pub async fn get_shortcuts(&self) -> Result<ShortcutSettings, RuntimeError> {
+        Ok(self.get_section(|s| &s.shortcuts).await)
+    }
+
+    pub async fn update_shortcuts(
+        &self,
+        patch: ShortcutSettingsPatch,
+    ) -> Result<ShortcutSettings, RuntimeError> {
+        self.update_section(SettingsChange::Shortcuts, patch, |s| &mut s.shortcuts)
+            .await
+            .map_err(Into::into)
+    }
+
+    pub async fn reset_shortcuts(&self) -> Result<ShortcutSettings, RuntimeError> {
+        self.commit_settings(SettingsChange::Shortcuts, |settings| {
+            settings.shortcuts = ShortcutSettings::default();
+            Ok(settings.shortcuts.clone())
+        })
+        .await
+        .map_err(Into::into)
+    }
+
+    pub async fn get_advanced(&self) -> Result<AdvancedSettings, RuntimeError> {
+        Ok(self.get_section(|s| &s.advanced).await)
+    }
+
+    pub async fn update_advanced(
+        &self,
+        patch: AdvancedSettingsPatch,
+    ) -> Result<AdvancedSettings, RuntimeError> {
+        self.update_section(SettingsChange::Advanced, patch, |s| &mut s.advanced)
+            .await
+            .map_err(Into::into)
+    }
+
+    pub async fn generate_provider_id(
+        &self,
+        provider_type: String,
+    ) -> Result<String, RuntimeError> {
+        let base_id = provider_type.trim().to_lowercase();
+        if base_id.is_empty() {
+            return Err(RuntimeError::from("provider_type is required".to_owned()));
+        }
+
+        let state = self.runtime.inner.state.read().await;
+        let existing_ids: Vec<&String> = state.settings.providers.keys().collect();
+
+        // If the base ID is free, use it as-is
+        if !existing_ids.contains(&&base_id) {
+            return Ok(base_id);
+        }
+
+        // Find the first available numeric suffix starting from 1
+        for suffix in 1.. {
+            let candidate = format!("{base_id}{suffix}");
+            if !existing_ids.contains(&&candidate) {
+                return Ok(candidate);
+            }
+        }
+
+        unreachable!()
+    }
+
+    pub async fn list_providers(&self) -> Result<Vec<ProviderConfigEntry>, RuntimeError> {
+        let state = self.runtime.inner.state.read().await;
+        Ok(state
+            .settings
+            .providers
+            .iter()
+            .map(|(provider_id, provider)| normalized_provider_entry(provider_id, provider))
+            .collect())
+    }
+
+    /// Hydrates one provider with credentials read by Flutter from the OS
+    /// secure store. Values live only in process memory and are never written
+    /// to settings or returned by `list_providers` / `get_json`.
+    pub async fn set_provider_secrets(
+        &self,
+        provider_id: String,
+        secrets: HashMap<String, String>,
+    ) -> Result<(), RuntimeError> {
+        let provider_id = validate_provider_id(provider_id).map_err(RuntimeError::from)?;
+        let mut state = self.runtime.inner.state.write().await;
+        if !state.settings.providers.contains_key(&provider_id) {
+            return Err(RuntimeError::from(format!(
+                "provider `{provider_id}` does not exist"
+            )));
+        }
+
+        let secrets = secrets
+            .into_iter()
+            .filter(|(key, value)| !key.trim().is_empty() && !value.is_empty())
+            .collect::<HashMap<_, _>>();
+        if secrets.is_empty() {
+            state.provider_secrets.remove(&provider_id);
+        } else {
+            state.provider_secrets.insert(provider_id, secrets);
+        }
+        state.engine =
+            engine::build_from_settings_with_secrets(&state.settings, &state.provider_secrets)?;
+        Ok(())
+    }
+
+    pub async fn list_services(&self) -> Result<Vec<ServiceConfigEntry>, RuntimeError> {
+        let state = self.runtime.inner.state.read().await;
+        let mut services = Vec::new();
+
+        for (provider_id, provider) in &state.settings.providers {
+            let entry = normalized_provider_entry(provider_id, provider);
+            if let Ok(engine_provider) = state.engine.require(provider_id) {
+                if engine_provider.dictionary().is_some() {
+                    services.push(service_entry_for_provider_type(
+                        &format!("{provider_id}+dictionary"),
+                        &entry,
+                        ServiceType::Dictionary,
+                    ));
+                }
+                if engine_provider.translation().is_some() || engine_provider.llm().is_some() {
+                    services.push(service_entry_for_provider_type(
+                        &format!("{provider_id}+translation"),
+                        &entry,
+                        ServiceType::Translation,
+                    ));
+                }
+                if engine_provider.ocr().is_some() {
+                    services.push(service_entry_for_provider_type(
+                        &format!("{provider_id}+ocr"),
+                        &entry,
+                        ServiceType::Ocr,
+                    ));
+                }
+            }
+        }
+
+        for (service_id, service) in &state.settings.services {
+            if !state.settings.providers.contains_key(&service.provider_id) {
+                continue;
+            }
+            let mut entry = service.clone();
+            entry.id = service_id.clone();
+            services.push(entry);
+        }
+
+        services.sort_by(|a, b| a.id.cmp(&b.id));
+        Ok(services)
+    }
+
+    pub async fn list_models(&self, provider_id: String) -> Result<Vec<String>, RuntimeError> {
+        let provider_id = validate_provider_id(provider_id).map_err(RuntimeError::from)?;
+        let runtime = self.runtime.clone();
+        run_on_worker_thread(move || async move {
+            let provider = {
+                let state = runtime.inner.state.read().await;
+                state
+                    .engine
+                    .require(&provider_id)
+                    .map_err(|e| e.to_string())?
+                    .clone()
+            };
+            provider.list_models().await.map_err(|e| e.to_string())
+        })
+        .await
+        .map_err(|e: String| RuntimeError::from(e))
+    }
+
+    pub async fn get_service(
+        &self,
+        service_id: String,
+    ) -> Result<Option<ServiceConfigEntry>, RuntimeError> {
+        let service_id = validate_provider_id(service_id).map_err(RuntimeError::from)?;
+        let state = self.runtime.inner.state.read().await;
+        if let Some(service) = state.settings.services.get(&service_id) {
+            let mut entry = service.clone();
+            entry.id = service_id;
+            return Ok(Some(entry));
+        }
+
+        let Some(provider) = state.settings.providers.get(&service_id) else {
+            return Ok(None);
+        };
+        let entry = normalized_provider_entry(&service_id, provider);
+        let service_type = state.engine.require(&service_id).ok().and_then(|provider| {
+            if provider.translation().is_some() || provider.llm().is_some() {
+                Some(ServiceType::Translation)
+            } else if provider.dictionary().is_some() {
+                Some(ServiceType::Dictionary)
+            } else if provider.ocr().is_some() {
+                Some(ServiceType::Ocr)
+            } else {
+                None
+            }
+        });
+
+        Ok(service_type
+            .map(|service_type| service_entry_for_provider_type(&service_id, &entry, service_type)))
+    }
+
+    pub async fn get_provider(
+        &self,
+        provider_id: String,
+    ) -> Result<Option<ProviderConfigEntry>, RuntimeError> {
+        let provider_id = validate_provider_id(provider_id).map_err(RuntimeError::from)?;
+        let state = self.runtime.inner.state.read().await;
+        Ok(state
+            .settings
+            .providers
+            .get(&provider_id)
+            .map(|provider| normalized_provider_entry(&provider_id, provider)))
+    }
+
+    pub async fn update_provider(
+        &self,
+        provider_id: String,
+        provider_type: String,
+        fields: HashMap<String, String>,
+    ) -> Result<ProviderConfigEntry, RuntimeError> {
+        let provider_id = validate_provider_id(provider_id).map_err(RuntimeError::from)?;
+        let provider_type =
+            validate_required("provider_type", provider_type).map_err(RuntimeError::from)?;
+        let provider_type = crate::domain::settings::parse_provider_type(&provider_type)
+            .map_err(RuntimeError::from)?;
+        let entry = ProviderConfigEntry {
+            id: provider_id.clone(),
+            r#type: provider_type,
+            fields,
+            created_at: None,
+        };
+        let config = crate::domain::settings::provider_config_from_settings(&entry)
+            .map_err(RuntimeError::from)?;
+
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .ok();
+
+        self.commit_settings(SettingsChange::Providers, move |settings| {
+            let entry = provider_entry_from_config(&provider_id, &config)?;
+            if let Some(existing) = settings.providers.get_mut(&provider_id) {
+                existing.id = provider_id;
+                existing.r#type = entry.r#type;
+                existing.fields = entry.fields.clone();
+            } else {
+                let mut new_entry = entry.clone();
+                new_entry.created_at = now;
+                settings.providers.insert(provider_id, new_entry);
+            }
+            Ok(entry)
+        })
+        .await
+        .map_err(Into::into)
+    }
+
+    pub async fn update_service(
+        &self,
+        service_id: String,
+        provider_id: String,
+        service_type: ServiceType,
+        name: String,
+        fields: HashMap<String, String>,
+    ) -> Result<ServiceConfigEntry, RuntimeError> {
+        let service_id = validate_provider_id(service_id).map_err(RuntimeError::from)?;
+        let provider_id = validate_provider_id(provider_id).map_err(RuntimeError::from)?;
+        let name = name.trim().to_owned();
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .ok();
+
+        self.commit_settings(SettingsChange::Providers, move |settings| {
+            if !settings.providers.contains_key(&provider_id) {
+                return Err(format!("provider `{provider_id}` does not exist"));
+            }
+            if service_id == provider_id {
+                return Err("custom service id must be different from provider id".to_owned());
+            }
+
+            let mut entry = ServiceConfigEntry {
+                id: service_id.clone(),
+                provider_id,
+                r#type: service_type,
+                name,
+                fields,
+                created_at: None,
+            };
+            if let Some(existing) = settings.services.get(&service_id) {
+                entry.created_at = existing.created_at.or(now);
+            } else {
+                entry.created_at = now;
+            }
+            settings.services.insert(service_id, entry.clone());
+            Ok(entry)
+        })
+        .await
+        .map_err(Into::into)
+    }
+
+    pub async fn delete_provider(
+        &self,
+        provider_id: String,
+    ) -> Result<Option<ProviderConfigEntry>, RuntimeError> {
+        let provider_id = validate_provider_id(provider_id).map_err(RuntimeError::from)?;
+        self.commit_settings(SettingsChange::Providers, move |settings| {
+            let removed = settings
+                .providers
+                .remove(&provider_id)
+                .map(|provider| normalized_provider_entry(&provider_id, &provider));
+            settings
+                .services
+                .retain(|_, service| service.provider_id != provider_id);
+            Ok(removed)
+        })
+        .await
+        .map_err(Into::into)
+    }
+
+    pub async fn delete_service(
+        &self,
+        service_id: String,
+    ) -> Result<Option<ServiceConfigEntry>, RuntimeError> {
+        let service_id = validate_provider_id(service_id).map_err(RuntimeError::from)?;
+        self.commit_settings(SettingsChange::Providers, move |settings| {
+            Ok(settings.services.remove(&service_id).map(|mut service| {
+                service.id = service_id;
+                service
+            }))
+        })
+        .await
+        .map_err(Into::into)
+    }
+
+    /// Returns a fresh subscription that starts receiving
+    /// [`SettingsChange`] events emitted **after** this call. Existing
+    /// state should be loaded eagerly via the corresponding `get_*`
+    /// methods; subscriptions are intentionally not replayed.
+    pub fn subscribe(&self) -> Arc<SettingsSubscription> {
+        Arc::new(SettingsSubscription {
+            receiver: AsyncMutex::new(self.runtime.inner.events.subscribe()),
+        })
+    }
+}
+
+#[uniffi::export(async_runtime = "tokio")]
+impl SettingsSubscription {
+    /// Awaits the next [`SettingsChange`] event. Returns `None` when the
+    /// owning [`Runtime`] has been dropped (no further events will arrive).
+    /// If this subscription falls behind, missed events are silently
+    /// skipped and the next available event is returned.
+    pub async fn next(&self) -> Result<Option<SettingsChange>, RuntimeError> {
+        let mut rx = self.receiver.lock().await;
+        loop {
+            match rx.recv().await {
+                Ok(change) => return Ok(Some(change)),
+                Err(broadcast::error::RecvError::Closed) => return Ok(None),
+                Err(broadcast::error::RecvError::Lagged(_)) => continue,
+            }
+        }
+    }
+}
+
+impl Runtime {
+    /// Terms from the enabled books that occur in `text`. Used by the
+    /// translation path to constrain the model and by the UI to highlight.
+    pub(crate) async fn glossary_matches(
+        &self,
+        text: &str,
+        source_language: Option<&str>,
+        target_language: Option<&str>,
+    ) -> Vec<GlossaryMatch> {
+        self.inner
+            .glossary
+            .read()
+            .await
+            .match_text(text, source_language, target_language)
+    }
+
+    /// Counts one use of each matched term. Failures here are never worth
+    /// failing a translation over, so they stay inside the store.
+    pub(crate) async fn record_glossary_hits(&self, matches: &[GlossaryMatch]) {
+        if matches.is_empty() {
+            return;
+        }
+        self.inner.glossary.write().await.record_hits(matches);
+    }
+}
+
+impl RuntimeGlossary {
+    /// Applies a change, persists it and tells subscribers the glossary moved.
+    async fn commit<T>(
+        &self,
+        update: impl FnOnce(&mut GlossaryStore) -> Result<T, String>,
+    ) -> Result<T, String> {
+        let result = {
+            let mut store = self.runtime.inner.glossary.write().await;
+            update(&mut store)?
+        };
+        // `send` only fails when nobody is subscribed yet, which is benign.
+        let _ = self.runtime.inner.events.send(SettingsChange::Glossary);
+        Ok(result)
+    }
+}
+
+impl RuntimeHistory {
+    async fn commit<T>(
+        &self,
+        update: impl FnOnce(&mut HistoryStore) -> Result<T, String>,
+    ) -> Result<T, String> {
+        let result = {
+            let mut store = self.runtime.inner.history.write().await;
+            update(&mut store)?
+        };
+        let _ = self.runtime.inner.events.send(SettingsChange::History);
+        Ok(result)
+    }
+}
+
+#[uniffi::export(async_runtime = "tokio")]
+impl RuntimeHistory {
+    pub async fn list_entries(
+        &self,
+        filter: HistoryFilter,
+        query: Option<String>,
+    ) -> Result<Vec<HistoryEntry>, RuntimeError> {
+        self.runtime
+            .inner
+            .history
+            .write()
+            .await
+            .list_entries(filter, query.as_deref())
+            .map_err(Into::into)
+    }
+
+    pub async fn counts(&self) -> Result<HistoryCounts, RuntimeError> {
+        self.runtime
+            .inner
+            .history
+            .write()
+            .await
+            .counts()
+            .map_err(Into::into)
+    }
+
+    pub async fn upsert_entry(
+        &self,
+        input: HistoryEntryInput,
+    ) -> Result<HistoryEntry, RuntimeError> {
+        self.commit(|store| store.upsert_entry(input))
+            .await
+            .map_err(Into::into)
+    }
+
+    pub async fn set_favorite(
+        &self,
+        entry_id: String,
+        favorite: bool,
+    ) -> Result<Option<HistoryEntry>, RuntimeError> {
+        self.commit(|store| store.set_favorite(&entry_id, favorite))
+            .await
+            .map_err(Into::into)
+    }
+
+    pub async fn delete_entries(&self, entry_ids: Vec<String>) -> Result<u32, RuntimeError> {
+        self.commit(|store| store.delete_entries(&entry_ids))
+            .await
+            .map_err(Into::into)
+    }
+}
+
+#[uniffi::export(async_runtime = "tokio")]
+impl RuntimeGlossary {
+    pub async fn list_books(&self) -> Result<Vec<GlossaryBook>, RuntimeError> {
+        Ok(self.runtime.inner.glossary.read().await.list_books())
+    }
+
+    pub async fn get_book(&self, book_id: String) -> Result<Option<GlossaryBook>, RuntimeError> {
+        Ok(self.runtime.inner.glossary.read().await.get_book(&book_id))
+    }
+
+    /// Creates a book when `input.id` is empty, otherwise replaces the named
+    /// book's metadata.
+    pub async fn upsert_book(
+        &self,
+        input: GlossaryBookInput,
+    ) -> Result<GlossaryBook, RuntimeError> {
+        self.commit(|store| store.upsert_book(input))
+            .await
+            .map_err(Into::into)
+    }
+
+    /// Returns `false` when the book was already gone.
+    pub async fn delete_book(&self, book_id: String) -> Result<bool, RuntimeError> {
+        self.commit(|store| store.delete_book(&book_id))
+            .await
+            .map_err(Into::into)
+    }
+
+    /// Terms in a book, newest first. `query` filters on term, translation,
+    /// forbidden list and note; `limit` of 0 means no limit.
+    pub async fn list_entries(
+        &self,
+        book_id: String,
+        query: Option<String>,
+        offset: u32,
+        limit: u32,
+    ) -> Result<Vec<GlossaryEntry>, RuntimeError> {
+        self.runtime
+            .inner
+            .glossary
+            .read()
+            .await
+            .list_entries(&book_id, query.as_deref(), offset, limit)
+            .map_err(Into::into)
+    }
+
+    /// How many terms `list_entries` would return with the same `query`.
+    pub async fn count_entries(
+        &self,
+        book_id: String,
+        query: Option<String>,
+    ) -> Result<u32, RuntimeError> {
+        self.runtime
+            .inner
+            .glossary
+            .read()
+            .await
+            .count_entries(&book_id, query.as_deref())
+            .map_err(Into::into)
+    }
+
+    /// Creates a term when `input.id` is empty, otherwise replaces it. An
+    /// empty id whose term already exists updates that term in place.
+    pub async fn upsert_entry(
+        &self,
+        book_id: String,
+        input: GlossaryEntryInput,
+    ) -> Result<GlossaryEntry, RuntimeError> {
+        self.commit(|store| store.upsert_entry(&book_id, input))
+            .await
+            .map_err(Into::into)
+    }
+
+    /// Returns `false` when the term was already gone.
+    pub async fn delete_entry(
+        &self,
+        book_id: String,
+        entry_id: String,
+    ) -> Result<bool, RuntimeError> {
+        self.commit(|store| store.delete_entry(&book_id, &entry_id))
+            .await
+            .map_err(Into::into)
+    }
+
+    /// Terms present in `text`, for highlighting the source before or during
+    /// a translation.
+    pub async fn match_text(
+        &self,
+        text: String,
+        source_language: Option<String>,
+        target_language: Option<String>,
+    ) -> Result<Vec<GlossaryMatch>, RuntimeError> {
+        Ok(self
+            .runtime
+            .glossary_matches(
+                &text,
+                source_language.as_deref(),
+                target_language.as_deref(),
+            )
+            .await)
+    }
+
+    /// Which glossary rules `translated` breaks. Engines that cannot be
+    /// constrained up front are checked here instead, so the result can be
+    /// flagged rather than silently rewritten.
+    pub async fn check(
+        &self,
+        source: String,
+        translated: String,
+        source_language: Option<String>,
+        target_language: Option<String>,
+    ) -> Result<Vec<GlossaryComplianceIssue>, RuntimeError> {
+        let matches = self
+            .runtime
+            .glossary_matches(
+                &source,
+                source_language.as_deref(),
+                target_language.as_deref(),
+            )
+            .await;
+        Ok(check_compliance(&matches, &translated))
+    }
+
+    /// Writes any hit counts still held in memory. Worth calling before the
+    /// app quits; everything else flushes on its own schedule.
+    pub async fn flush_hits(&self) -> Result<(), RuntimeError> {
+        self.runtime
+            .inner
+            .glossary
+            .write()
+            .await
+            .flush_hits()
+            .map_err(Into::into)
+    }
+}
+
+impl RuntimeTranslation {
+    async fn translate_impl(&self, request: TranslateRequest) -> Result<TranslateResponse, String> {
+        let service_id = self.service_id.clone();
+        let runtime = self.runtime.clone();
+        run_on_worker_thread(move || async move {
+            let target_language =
+                validate_optional_required("target_language", request.target_language)?;
+            let text = validate_required("text", request.text)?;
+            let source_language = optional_trimmed(request.source_language);
+            let resolved = runtime
+                .resolve_service(&service_id, ServiceType::Translation)
+                .await?;
+            let provider_id = resolved.provider_id.clone();
+            let provider = {
+                let state = runtime.inner.state.read().await;
+                state
+                    .engine
+                    .require(&provider_id)
+                    .map_err(|error| error.to_string())?
+                    .clone()
+            };
+
+            // Terms are looked up once for both branches: an LLM gets them as
+            // constraints, and either way their use is counted.
+            let matches = runtime
+                .glossary_matches(&text, source_language.as_deref(), Some(&target_language))
+                .await;
+            runtime.record_glossary_hits(&matches).await;
+
+            if let Some(translation_service) = provider.translation() {
+                // Use the dedicated translation service.
+                translation_service
+                    .translate(TranslateRequest {
+                        source_language,
+                        target_language: Some(target_language),
+                        text,
+                    })
+                    .await
+                    .map_err(|error| error.to_string())
+            } else if let Some(llm_service) = provider.llm() {
+                // LLM-based translation via prompts.
+                let model = resolved
+                    .field("model")
+                    .map(str::to_owned)
+                    .or_else(|| llm_service.available_models().into_iter().next())
+                    .ok_or_else(|| "llm default model must be configured".to_owned())?;
+                let terms = glossary_terms(&matches);
+                let system_prompt = if let Some(system_prompt) = resolved.field("systemPrompt") {
+                    render_prompt_template(
+                        system_prompt,
+                        source_language.as_deref().unwrap_or("auto"),
+                        &target_language,
+                        &text,
+                        &terms,
+                    )
+                } else {
+                    beyondtranslate_engine::prompt::translate_text_system_prompt(
+                        source_language.as_deref().unwrap_or("auto"),
+                        &target_language,
+                        None,
+                        &terms,
+                    )
+                };
+                let user_prompt = beyondtranslate_engine::prompt::translate_text_user_prompt(&text);
+                let response = llm_service
+                    .chat(beyondtranslate_core::ChatRequest {
+                        model,
+                        messages: vec![
+                            ChatMessage::system(system_prompt),
+                            ChatMessage::user(user_prompt),
+                        ],
+                        temperature: Some(0.3),
+                        max_tokens: Some(4096),
+                        stream: None,
+                        response_format: None,
+                    })
+                    .await
+                    .map_err(|error| error.to_string())?;
+                let content = response
+                    .choices
+                    .first()
+                    .map(|choice| choice.message.content.clone())
+                    .ok_or_else(|| "no response from llm".to_owned())?;
+                Ok(TranslateResponse {
+                    translations: vec![beyondtranslate_core::TextTranslation {
+                        text: content,
+                        detected_source_language: None,
+                        audio_url: None,
+                    }],
+                })
+            } else {
+                Err(format!(
+                    "provider `{provider_id}` does not support translation"
+                ))
+            }
+        })
+        .await
+    }
+}
+
+impl RuntimeTranslation {
+    async fn detect_language_impl(
+        &self,
+        request: DetectLanguageRequest,
+    ) -> Result<DetectLanguageResponse, String> {
+        let service_id = self.service_id.clone();
+        let runtime = self.runtime.clone();
+        run_on_worker_thread(move || async move {
+            let texts = request
+                .texts
+                .into_iter()
+                .map(|text| text.trim().to_string())
+                .filter(|text| !text.is_empty())
+                .collect::<Vec<_>>();
+            if texts.is_empty() {
+                return Err("texts must not be empty".to_owned());
+            }
+            let resolved = runtime
+                .resolve_service(&service_id, ServiceType::Translation)
+                .await?;
+            let provider_id = resolved.provider_id.clone();
+            let provider = {
+                let state = runtime.inner.state.read().await;
+                state
+                    .engine
+                    .require(&provider_id)
+                    .map_err(|error| error.to_string())?
+                    .clone()
+            };
+            if let Some(translation_service) = provider.translation() {
+                translation_service
+                    .detect_language(DetectLanguageRequest { texts })
+                    .await
+                    .map_err(|error| error.to_string())
+            } else if let Some(llm_service) = provider.llm() {
+                // LLM-based language detection.
+                let model = resolved
+                    .field("model")
+                    .map(str::to_owned)
+                    .or_else(|| llm_service.available_models().into_iter().next())
+                    .ok_or_else(|| "llm default model must be configured".to_owned())?;
+
+                let text = texts.join(" ");
+                let system_prompt = concat!(
+                        "You are a language detection expert. ",
+                        "Identify the language of the following text. ",
+                        "Return ONLY the ISO 639-1 language code (e.g. \"en\", \"zh\", \"ja\", \"fr\", \"de\", \"es\"). ",
+                        "If unsure, return \"auto\"."
+                    )
+                    .to_string();
+                let user_prompt = format!("Detect the language of this text:\n\n{text}");
+
+                let response = llm_service
+                    .chat(beyondtranslate_core::ChatRequest {
+                        model,
+                        messages: vec![
+                            beyondtranslate_core::ChatMessage::system(system_prompt),
+                            beyondtranslate_core::ChatMessage::user(user_prompt),
+                        ],
+                        temperature: Some(0.0),
+                        max_tokens: Some(16),
+                        stream: None,
+                        response_format: None,
+                    })
+                    .await
+                    .map_err(|error| error.to_string())?;
+
+                let detected = response
+                    .choices
+                    .first()
+                    .map(|choice| choice.message.content.trim().to_lowercase())
+                    .filter(|code| !code.is_empty())
+                    .unwrap_or_else(|| "auto".to_string());
+
+                // Validate the detected code is a reasonable ISO 639-1 code
+                let code = if detected.len() == 2 && detected.chars().all(|c| c.is_ascii_alphabetic()) {
+                    detected
+                } else {
+                    "auto".to_string()
+                };
+
+                let detections: Vec<beyondtranslate_core::TextDetection> = texts
+                    .iter()
+                    .map(|t| beyondtranslate_core::TextDetection {
+                        detected_language: code.clone(),
+                        text: t.clone(),
+                    })
+                    .collect();
+
+                Ok(DetectLanguageResponse {
+                    detections: Some(detections),
+                })
+            } else {
+                Err(format!(
+                    "provider `{provider_id}` does not support translation"
+                ))
+            }
+        })
+        .await
+    }
+}
+
+impl RuntimeDictionary {
+    async fn lookup_impl(&self, request: LookUpRequest) -> Result<LookUpResponse, String> {
+        let service_id = self.service_id.clone();
+        let runtime = self.runtime.clone();
+        run_on_worker_thread(move || async move {
+            let source_language = validate_required("source_language", request.source_language)?;
+            let target_language = validate_required("target_language", request.target_language)?;
+            let word = validate_required("word", request.word)?;
+            let resolved = runtime
+                .resolve_service(&service_id, ServiceType::Dictionary)
+                .await?;
+            let provider_id = resolved.provider_id.clone();
+            let provider = {
+                let state = runtime.inner.state.read().await;
+                state
+                    .engine
+                    .require(&provider_id)
+                    .map_err(|error| error.to_string())?
+                    .clone()
+            };
+            let dictionary_service = provider
+                .dictionary()
+                .ok_or_else(|| format!("provider `{provider_id}` does not support dictionary"))?;
+
+            dictionary_service
+                .look_up(LookUpRequest {
+                    source_language,
+                    target_language,
+                    word,
+                })
+                .await
+                .map_err(|error| error.to_string())
+        })
+        .await
+    }
+}
+
+#[uniffi::export(async_runtime = "tokio")]
+impl RuntimeTranslation {
+    pub async fn translate(
+        &self,
+        request: TranslateRequest,
+    ) -> Result<TranslateResponse, RuntimeError> {
+        self.translate_impl(request).await.map_err(Into::into)
+    }
+
+    pub async fn detect_language(
+        &self,
+        request: DetectLanguageRequest,
+    ) -> Result<DetectLanguageResponse, RuntimeError> {
+        self.detect_language_impl(request).await.map_err(Into::into)
+    }
+}
+
+#[uniffi::export(async_runtime = "tokio")]
+impl RuntimeDictionary {
+    pub async fn lookup(&self, request: LookUpRequest) -> Result<LookUpResponse, RuntimeError> {
+        self.lookup_impl(request).await.map_err(Into::into)
+    }
+}
+
+impl RuntimeLlm {
+    async fn chat_impl(
+        &self,
+        model: String,
+        messages: Vec<beyondtranslate_core::ChatMessage>,
+    ) -> Result<beyondtranslate_core::ChatResponse, String> {
+        let service_id = self.service_id.clone();
+        let runtime = self.runtime.clone();
+        run_on_worker_thread(move || async move {
+            let model = validate_required("model", model)?;
+            if messages.is_empty() {
+                return Err("messages must not be empty".to_owned());
+            }
+            let resolved = runtime.resolve_llm_service(&service_id).await?;
+            let provider_id = resolved.provider_id;
+            let provider = {
+                let state = runtime.inner.state.read().await;
+                state
+                    .engine
+                    .require(&provider_id)
+                    .map_err(|error| error.to_string())?
+                    .clone()
+            };
+            let llm_service = provider
+                .llm()
+                .ok_or_else(|| format!("provider `{provider_id}` does not support llm"))?;
+
+            llm_service
+                .chat(beyondtranslate_core::ChatRequest {
+                    model,
+                    messages,
+                    temperature: None,
+                    max_tokens: None,
+                    stream: None,
+                    response_format: None,
+                })
+                .await
+                .map_err(|error| error.to_string())
+        })
+        .await
+    }
+
+    async fn polish_impl(&self, text: String, style: String) -> Result<String, String> {
+        let service_id = self.service_id.clone();
+        let runtime = self.runtime.clone();
+        run_on_worker_thread(move || async move {
+            let text = validate_required("text", text)?;
+            let style = validate_required("style", style)?;
+            let resolved = runtime.resolve_llm_service(&service_id).await?;
+            let provider_id = resolved.provider_id.clone();
+            let provider = {
+                let state = runtime.inner.state.read().await;
+                state
+                    .engine
+                    .require(&provider_id)
+                    .map_err(|error| error.to_string())?
+                    .clone()
+            };
+            let llm_service = provider
+                .llm()
+                .ok_or_else(|| format!("provider `{provider_id}` does not support llm"))?;
+
+            let model = resolved
+                .field("model")
+                .map(str::to_owned)
+                .or_else(|| llm_service.available_models().into_iter().next())
+                .ok_or_else(|| "llm default model must be configured".to_owned())?;
+            let system_prompt =
+                beyondtranslate_engine::prompt::polish_translation_system_prompt(&style);
+
+            let response = llm_service
+                .chat(beyondtranslate_core::ChatRequest {
+                    model,
+                    messages: vec![
+                        beyondtranslate_core::ChatMessage::system(system_prompt),
+                        beyondtranslate_core::ChatMessage::user(text),
+                    ],
+                    temperature: None,
+                    max_tokens: None,
+                    stream: None,
+                    response_format: None,
+                })
+                .await
+                .map_err(|error| error.to_string())?;
+
+            response
+                .choices
+                .first()
+                .map(|c| c.message.content.clone())
+                .ok_or_else(|| "no response from llm".to_owned())
+        })
+        .await
+    }
+
+    async fn explain_impl(&self, source: String, translation: String) -> Result<String, String> {
+        let service_id = self.service_id.clone();
+        let runtime = self.runtime.clone();
+        run_on_worker_thread(move || async move {
+            let source = validate_required("source", source)?;
+            let translation = validate_required("translation", translation)?;
+            let resolved = runtime.resolve_llm_service(&service_id).await?;
+            let provider_id = resolved.provider_id.clone();
+            let provider = {
+                let state = runtime.inner.state.read().await;
+                state
+                    .engine
+                    .require(&provider_id)
+                    .map_err(|error| error.to_string())?
+                    .clone()
+            };
+            let llm_service = provider
+                .llm()
+                .ok_or_else(|| format!("provider `{provider_id}` does not support llm"))?;
+
+            let model = resolved
+                .field("model")
+                .map(str::to_owned)
+                .or_else(|| llm_service.available_models().into_iter().next())
+                .ok_or_else(|| "llm default model must be configured".to_owned())?;
+            let system_prompt = beyondtranslate_engine::prompt::explain_translation_system_prompt();
+            let user_prompt = format!("Source text: {source}\n\nTranslation: {translation}");
+
+            let response = llm_service
+                .chat(beyondtranslate_core::ChatRequest {
+                    model,
+                    messages: vec![
+                        beyondtranslate_core::ChatMessage::system(system_prompt),
+                        beyondtranslate_core::ChatMessage::user(user_prompt),
+                    ],
+                    temperature: None,
+                    max_tokens: None,
+                    stream: None,
+                    response_format: None,
+                })
+                .await
+                .map_err(|error| error.to_string())?;
+
+            response
+                .choices
+                .first()
+                .map(|c| c.message.content.clone())
+                .ok_or_else(|| "no response from llm".to_owned())
+        })
+        .await
+    }
+
+    async fn alternatives_impl(
+        &self,
+        text: String,
+        source_lang: String,
+        target_lang: String,
+        count: u32,
+        style: Option<String>,
+    ) -> Result<Vec<String>, String> {
+        let service_id = self.service_id.clone();
+        let runtime = self.runtime.clone();
+        run_on_worker_thread(move || async move {
+            let text = validate_required("text", text)?;
+            let source_lang = validate_required("source_lang", source_lang)?;
+            let target_lang = validate_required("target_lang", target_lang)?;
+            if count == 0 {
+                return Err("count must be greater than 0".to_owned());
+            }
+            let resolved = runtime.resolve_llm_service(&service_id).await?;
+            let provider_id = resolved.provider_id.clone();
+            let provider = {
+                let state = runtime.inner.state.read().await;
+                state
+                    .engine
+                    .require(&provider_id)
+                    .map_err(|error| error.to_string())?
+                    .clone()
+            };
+            let llm_service = provider
+                .llm()
+                .ok_or_else(|| format!("provider `{provider_id}` does not support llm"))?;
+
+            let model = resolved
+                .field("model")
+                .map(str::to_owned)
+                .or_else(|| llm_service.available_models().into_iter().next())
+                .ok_or_else(|| "llm default model must be configured".to_owned())?;
+            let system_prompt =
+                beyondtranslate_engine::prompt::alternative_translations_system_prompt(
+                    count,
+                    style.as_deref(),
+                );
+            let user_prompt = format!(
+                "Source language: {source_lang}\nTarget language: {target_lang}\nText: {text}"
+            );
+
+            let response = llm_service
+                .chat(beyondtranslate_core::ChatRequest {
+                    model,
+                    messages: vec![
+                        beyondtranslate_core::ChatMessage::system(system_prompt),
+                        beyondtranslate_core::ChatMessage::user(user_prompt),
+                    ],
+                    temperature: None,
+                    max_tokens: None,
+                    stream: None,
+                    response_format: None,
+                })
+                .await
+                .map_err(|error| error.to_string())?;
+
+            let content = response
+                .choices
+                .first()
+                .map(|c| c.message.content.clone())
+                .ok_or_else(|| "no response from llm".to_owned())?;
+
+            parse_alternatives_json(&content)
+        })
+        .await
+    }
+
+    async fn translate_stream_impl(
+        &self,
+        source_lang: String,
+        target_lang: String,
+        text: String,
+        callback: Arc<dyn StreamCallback>,
+    ) -> Result<(), String> {
+        let service_id = self.service_id.clone();
+        let runtime = self.runtime.clone();
+        run_on_worker_thread(move || async move {
+            let text = validate_required("text", text)?;
+            let resolved = match runtime
+                .resolve_service(&service_id, ServiceType::Translation)
+                .await
+            {
+                Ok(service) => service,
+                Err(_) => runtime.resolve_llm_service(&service_id).await?,
+            };
+            let provider_id = resolved.provider_id.clone();
+            let provider = {
+                let state = runtime.inner.state.read().await;
+                state
+                    .engine
+                    .require(&provider_id)
+                    .map_err(|error| error.to_string())?
+                    .clone()
+            };
+            let matches = runtime
+                .glossary_matches(&text, Some(&source_lang), Some(&target_lang))
+                .await;
+            runtime.record_glossary_hits(&matches).await;
+
+            if let Some(llm_service) = provider.llm() {
+                // LLM-based streaming translation
+                let model = resolved
+                    .field("model")
+                    .map(str::to_owned)
+                    .or_else(|| llm_service.available_models().into_iter().next())
+                    .ok_or_else(|| "llm default model must be configured".to_owned())?;
+                let terms = glossary_terms(&matches);
+                let system_prompt = if let Some(system_prompt) = resolved.field("systemPrompt") {
+                    render_prompt_template(system_prompt, &source_lang, &target_lang, &text, &terms)
+                } else {
+                    beyondtranslate_engine::prompt::translate_text_system_prompt(
+                        &source_lang,
+                        &target_lang,
+                        None,
+                        &terms,
+                    )
+                };
+                let user_prompt = beyondtranslate_engine::prompt::translate_text_user_prompt(&text);
+
+                let receiver = llm_service
+                    .chat_stream(beyondtranslate_core::ChatRequest {
+                        model,
+                        messages: vec![
+                            beyondtranslate_core::ChatMessage::system(system_prompt),
+                            beyondtranslate_core::ChatMessage::user(user_prompt),
+                        ],
+                        temperature: Some(0.3),
+                        max_tokens: Some(4096),
+                        stream: Some(true),
+                        response_format: None,
+                    })
+                    .await
+                    .map_err(|error| error.to_string())?;
+
+                loop {
+                    match receiver.rx.recv() {
+                        Ok(chunk) => {
+                            if let Some(reason) = chunk.finish_reason {
+                                if reason == "error" {
+                                    callback.on_error(chunk.content);
+                                } else {
+                                    callback.on_finish(reason);
+                                }
+                                break;
+                            }
+                            callback.on_chunk(chunk.content);
+                        }
+                        Err(_) => {
+                            callback.on_finish("stop".to_string());
+                            break;
+                        }
+                    }
+                }
+            } else {
+                // Fallback to non-streaming translation via the translation service
+                let translation_service = provider.translation().ok_or_else(|| {
+                    format!("provider `{provider_id}` does not support translation")
+                })?;
+                let response = translation_service
+                    .translate(beyondtranslate_core::TranslateRequest {
+                        source_language: Some(source_lang.clone()),
+                        target_language: Some(target_lang),
+                        text: text.clone(),
+                    })
+                    .await
+                    .map_err(|error| error.to_string())?;
+                for translation in response.translations {
+                    callback.on_chunk(translation.text);
+                }
+                callback.on_finish("stop".to_string());
+            }
+
+            Ok(())
+        })
+        .await
+    }
+}
+
+#[uniffi::export(async_runtime = "tokio")]
+impl RuntimeLlm {
+    pub async fn chat(
+        &self,
+        model: String,
+        messages: Vec<beyondtranslate_core::ChatMessage>,
+    ) -> Result<beyondtranslate_core::ChatResponse, RuntimeError> {
+        self.chat_impl(model, messages).await.map_err(Into::into)
+    }
+
+    pub async fn polish(&self, text: String, style: String) -> Result<String, RuntimeError> {
+        self.polish_impl(text, style).await.map_err(Into::into)
+    }
+
+    pub async fn explain(
+        &self,
+        source: String,
+        translation: String,
+    ) -> Result<String, RuntimeError> {
+        self.explain_impl(source, translation)
+            .await
+            .map_err(Into::into)
+    }
+
+    pub async fn alternatives(
+        &self,
+        text: String,
+        source_lang: String,
+        target_lang: String,
+        count: u32,
+        style: Option<String>,
+    ) -> Result<Vec<String>, RuntimeError> {
+        self.alternatives_impl(text, source_lang, target_lang, count, style)
+            .await
+            .map_err(Into::into)
+    }
+}
+
+#[uniffi::export]
+impl RuntimeLlm {
+    pub fn translate_stream(
+        &self,
+        source_lang: String,
+        target_lang: String,
+        text: String,
+        callback: Box<dyn StreamCallback>,
+    ) {
+        let this = self.clone();
+        let callback: Arc<dyn StreamCallback> = callback.into();
+        let callback_for_worker = callback.clone();
+
+        if let Err(error) = thread::Builder::new()
+            .name("beyondtranslate-engine-bridge".to_owned())
+            .spawn(move || {
+                let result = tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .map_err(|error| format!("failed to build tokio runtime: {error}"))
+                    .and_then(|runtime| {
+                        runtime.block_on(this.translate_stream_impl(
+                            source_lang,
+                            target_lang,
+                            text,
+                            callback_for_worker.clone(),
+                        ))
+                    });
+
+                if let Err(error) = result {
+                    callback_for_worker.on_error(error);
+                }
+            })
+        {
+            callback.on_error(format!("failed to spawn runtime worker thread: {error}"));
+        }
+    }
+}
+
+fn parse_alternatives_json(content: &str) -> Result<Vec<String>, String> {
+    #[derive(serde::Deserialize)]
+    struct AlternativesContainer {
+        alternatives: Vec<AlternativeEntry>,
+    }
+
+    #[derive(serde::Deserialize)]
+    struct AlternativeEntry {
+        text: String,
+    }
+
+    let parsed: AlternativesContainer = serde_json::from_str(content)
+        .map_err(|error| format!("failed to parse alternatives response: {error}"))?;
+
+    Ok(parsed.alternatives.into_iter().map(|a| a.text).collect())
+}
+
+impl RuntimeOcr {
+    async fn recognize_text_impl(
+        &self,
+        request: RecognizeTextRequest,
+    ) -> Result<RecognizeTextResponse, String> {
+        let service_id = self.service_id.clone();
+        let runtime = self.runtime.clone();
+        run_on_worker_thread(move || async move {
+            let resolved = runtime
+                .resolve_service(&service_id, ServiceType::Ocr)
+                .await?;
+            let provider_id = resolved.provider_id;
+            let provider = {
+                let state = runtime.inner.state.read().await;
+                state
+                    .engine
+                    .require(&provider_id)
+                    .map_err(|error| error.to_string())?
+                    .clone()
+            };
+            let ocr_service = provider
+                .ocr()
+                .ok_or_else(|| format!("provider `{provider_id}` does not support ocr"))?;
+
+            ocr_service
+                .recognize_text(request)
+                .await
+                .map_err(|error| error.to_string())
+        })
+        .await
+    }
+}
+
+#[uniffi::export(async_runtime = "tokio")]
+impl RuntimeOcr {
+    pub async fn recognize_text(
+        &self,
+        request: RecognizeTextRequest,
+    ) -> Result<RecognizeTextResponse, RuntimeError> {
+        self.recognize_text_impl(request).await.map_err(Into::into)
+    }
+}
+
+#[uniffi::export(async_runtime = "tokio")]
+impl RuntimePermission {
+    /// macOS only: check if Screen Recording permission is granted.
+    /// Returns `true` on other platforms.
+    pub async fn is_screen_recording_permission_granted(&self) -> bool {
+        permission::is_screen_recording_permission_granted()
+    }
+
+    /// macOS only: request Screen Recording permission.
+    /// If `only_open_system_settings` is true, just opens System Settings.
+    /// No-op on other platforms.
+    pub async fn request_screen_recording_permission(&self, only_open_system_settings: bool) {
+        permission::request_screen_recording_permission(only_open_system_settings);
+    }
+
+    /// macOS only: check if Accessibility permission is granted.
+    /// Returns `true` on other platforms.
+    pub async fn is_accessibility_permission_granted(&self) -> bool {
+        permission::is_accessibility_permission_granted()
+    }
+
+    /// macOS only: request Accessibility permission.
+    /// If `only_open_system_settings` is true, just opens System Settings.
+    /// No-op on other platforms.
+    pub async fn request_accessibility_permission(&self, only_open_system_settings: bool) {
+        permission::request_accessibility_permission(only_open_system_settings);
+    }
+}
+
+#[uniffi::export(async_runtime = "tokio")]
+impl RuntimeTextExtractor {
+    /// Read the current clipboard text.
+    pub async fn extract_from_clipboard(&self) -> Result<String, RuntimeError> {
+        text_extractor::extract_from_clipboard()
+            .map_err(|e| RuntimeError::Error { msg: e.to_string() })
+    }
+
+    /// Extract text from the current screen selection.
+    ///
+    /// **macOS / Windows:** Simulates Cmd+C / Ctrl+C, polls the clipboard
+    /// until content changes (or 3s timeout), then returns the text.
+    ///
+    /// **Linux:** Reads the PRIMARY selection directly via `xclip`.
+    pub async fn extract_from_screen_selection(&self) -> Result<String, RuntimeError> {
+        text_extractor::extract_from_screen_selection()
+            .map_err(|e| RuntimeError::Error { msg: e.to_string() })
+    }
+
+    /// Detailed selection extraction with method and non-fatal recovery
+    /// warnings. The clipboard is restored before this future completes.
+    pub async fn extract_from_screen_selection_detailed(
+        &self,
+    ) -> Result<text_extractor::SelectionExtraction, RuntimeError> {
+        text_extractor::extract_from_screen_selection_detailed()
+            .map_err(|e| RuntimeError::Error { msg: e.to_string() })
+    }
+
+    /// Capture a screenshot and recognize text using the default OCR service.
+    ///
+    /// 1. Interactively captures a screen region (via `screencapture` on macOS
+    ///    or `import` on Linux; unsupported on Windows).
+    /// 2. Sends the captured image to the configured default OCR service.
+    /// 3. Returns the recognized text.
+    ///
+    /// The user must have a default OCR service configured in settings.
+    pub async fn extract_from_screen_capture(&self) -> Result<String, RuntimeError> {
+        let runtime = self.runtime.clone();
+
+        // 1. Take a screenshot to a temporary file.
+        let image_path =
+            capture_screenshot().map_err(|e| RuntimeError::Error { msg: e.to_string() })?;
+
+        // 2. Read settings to get the default OCR service ID.
+        let service_id = {
+            let state = runtime.inner.state.read().await;
+            let ocr_service_id = state.settings.general.default_ocr_service.clone();
+            if ocr_service_id.is_empty() {
+                return Err(RuntimeError::Error {
+                    msg: "no default OCR service configured".into(),
+                });
+            }
+            ocr_service_id
+        };
+
+        // 3. Run OCR on the worker thread.
+        let result = run_on_worker_thread(move || async move {
+            let resolved = runtime
+                .resolve_service(&service_id, ServiceType::Ocr)
+                .await?;
+            let provider_id = resolved.provider_id;
+            let provider = {
+                let state = runtime.inner.state.read().await;
+                state
+                    .engine
+                    .require(&provider_id)
+                    .map_err(|error| error.to_string())?
+                    .clone()
+            };
+            let ocr_service = provider
+                .ocr()
+                .ok_or_else(|| format!("provider `{provider_id}` does not support ocr"))?;
+
+            let request = RecognizeTextRequest {
+                image_path: Some(image_path),
+                base64_image: None,
+            };
+
+            let response = ocr_service
+                .recognize_text(request)
+                .await
+                .map_err(|error| error.to_string())?;
+
+            Ok(response.text)
+        })
+        .await;
+
+        result.map_err(|e| RuntimeError::Error { msg: e })
+    }
+}
+
+/// Capture a screenshot of a selected screen region and return the path.
+///
+/// Creates a temporary PNG file, invokes the platform-specific screen
+/// capture command, and returns the path to the saved image.
+fn capture_screenshot() -> Result<String, String> {
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
+    let file_name = format!("beyondtranslate-screenshot-{timestamp}.png");
+    let path = std::env::temp_dir().join(&file_name);
+    let path_str = path
+        .to_str()
+        .ok_or_else(|| "failed to convert screenshot path to string".to_owned())?;
+
+    text_extractor::capture_screen(path_str).map_err(|e| format!("screen capture failed: {e}"))
+}
+
+fn normalized_provider_entry(
+    provider_id: &str,
+    provider: &ProviderConfigEntry,
+) -> ProviderConfigEntry {
+    let mut provider = provider.clone();
+    if provider.id.trim().is_empty() {
+        provider.id = provider_id.to_owned();
+    }
+    provider
+}
+
+fn validate_provider_id(provider_id: String) -> Result<String, String> {
+    validate_required("provider_id", provider_id)
+}
+
+fn validate_service_provider_id(provider_id: String, suffix: &str) -> Result<String, String> {
+    let provider_id = validate_provider_id(provider_id)?;
+    // Try to strip the expected suffix first. If that doesn't match, also try
+    // common alternative suffixes for backward compatibility (e.g. a stored
+    // default service ID like "openai+llm" passed to translation()).
+    Ok(provider_id
+        .strip_suffix(suffix)
+        .or_else(|| {
+            let alternatives: &[&str] = match suffix {
+                "+translation" => &["+llm"],
+                "+llm" => &["+translation"],
+                _ => &[],
+            };
+            alternatives
+                .iter()
+                .find_map(|alt| provider_id.strip_suffix(alt))
+        })
+        .unwrap_or(&provider_id)
+        .to_owned())
+}
+
+fn validate_optional_required(name: &str, value: Option<String>) -> Result<String, String> {
+    validate_required(name, value.unwrap_or_default())
+}
+
+fn validate_required(name: &str, value: String) -> Result<String, String> {
+    let value = value.trim().to_owned();
+    if value.is_empty() {
+        return Err(format!("{name} is required"));
+    }
+    Ok(value)
+}
+
+fn optional_trimmed(value: Option<String>) -> Option<String> {
+    value
+        .map(|value| value.trim().to_owned())
+        .filter(|value| !value.is_empty())
+}
+
+async fn run_on_worker_thread<F, Fut, T>(task: F) -> Result<T, String>
+where
+    F: FnOnce() -> Fut + Send + 'static,
+    Fut: Future<Output = Result<T, String>> + 'static,
+    T: Send + 'static,
+{
+    let (sender, receiver) = tokio::sync::oneshot::channel();
+
+    thread::Builder::new()
+        .name("beyondtranslate-engine-bridge".to_owned())
+        .spawn(move || {
+            let result = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|error| format!("failed to build tokio runtime: {error}"))
+                .and_then(|runtime| runtime.block_on(task()));
+
+            let _ = sender.send(result);
+        })
+        .map_err(|error| format!("failed to spawn runtime worker thread: {error}"))?;
+
+    receiver
+        .await
+        .map_err(|error| format!("runtime worker thread ended unexpectedly: {error}"))?
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn unique_data_dir() -> PathBuf {
+        std::env::temp_dir().join(format!(
+            "beyondtranslate-runtime-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("time went backwards")
+                .as_nanos()
+        ))
+    }
+
+    fn create_runtime() -> Arc<Runtime> {
+        let data_dir = unique_data_dir();
+        Runtime::new(data_dir.display().to_string()).expect("failed to create runtime")
+    }
+
+    fn current_timestamp_millis() -> u64 {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("time went backwards")
+            .as_millis()
+            .try_into()
+            .expect("timestamp does not fit in u64")
+    }
+
+    #[test]
+    fn commit_settings_updates_last_updated() {
+        let runtime = create_runtime();
+
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async {
+                let before = current_timestamp_millis();
+                runtime
+                    .clone()
+                    .settings()
+                    .update_appearance(AppearanceSettingsPatch {
+                        language: Some("en".to_owned()),
+                        theme_mode: None,
+                        theme: None,
+                    })
+                    .await
+                    .expect("failed to update appearance");
+                let after = current_timestamp_millis();
+
+                let json = runtime
+                    .clone()
+                    .settings()
+                    .get_json()
+                    .await
+                    .expect("failed to get settings json");
+                let value = serde_json::from_str::<serde_json::Value>(&json)
+                    .expect("settings json should parse");
+                let last_updated = value
+                    .get("lastUpdated")
+                    .and_then(serde_json::Value::as_u64)
+                    .expect("lastUpdated should be a number");
+
+                assert!(last_updated >= before);
+                assert!(last_updated <= after);
+            });
+    }
+
+    #[test]
+    fn update_shortcuts_persists_all_fields_to_settings_file() {
+        let data_dir = unique_data_dir();
+        let settings_file = data_dir.join("settings.json");
+        let runtime =
+            Runtime::new(data_dir.display().to_string()).expect("failed to create runtime");
+
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async {
+                runtime
+                    .clone()
+                    .settings()
+                    .update_shortcuts(ShortcutSettingsPatch {
+                        toggle_mini_translator: Some("Command+Shift+Space".to_owned()),
+                        extract_text_from_screen_selection: Some("Command+Shift+1".to_owned()),
+                        extract_text_from_screen_capture: Some("Command+Shift+2".to_owned()),
+                        extract_text_from_clipboard: Some("Command+Shift+3".to_owned()),
+                        translate_input_content: Some("Option+Z".to_owned()),
+                    })
+                    .await
+                    .expect("failed to update shortcuts");
+            });
+
+        let saved = std::fs::read_to_string(settings_file).expect("failed to read settings file");
+        let json =
+            serde_json::from_str::<serde_json::Value>(&saved).expect("invalid settings json");
+        assert_eq!(
+            json.pointer("/shortcuts/toggleMiniTranslator").cloned(),
+            Some(serde_json::Value::String("Command+Shift+Space".to_owned()))
+        );
+        assert_eq!(
+            json.pointer("/shortcuts/extractTextFromScreenSelection")
+                .cloned(),
+            Some(serde_json::Value::String("Command+Shift+1".to_owned()))
+        );
+        assert_eq!(
+            json.pointer("/shortcuts/extractTextFromScreenCapture")
+                .cloned(),
+            Some(serde_json::Value::String("Command+Shift+2".to_owned()))
+        );
+        assert_eq!(
+            json.pointer("/shortcuts/extractTextFromClipboard").cloned(),
+            Some(serde_json::Value::String("Command+Shift+3".to_owned()))
+        );
+        assert_eq!(
+            json.pointer("/shortcuts/translateInputContent").cloned(),
+            Some(serde_json::Value::String("Option+Z".to_owned()))
+        );
+    }
+
+    #[test]
+    fn hydrated_provider_secrets_never_enter_settings_json() {
+        let data_dir = unique_data_dir();
+        let settings_file = data_dir.join("settings.json");
+        let runtime =
+            Runtime::new(data_dir.display().to_string()).expect("failed to create runtime");
+        let secret = "sk-runtime-only-never-persist";
+        let reference = "linguaray-secret://openai/apiKey";
+
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async {
+                let settings = runtime.clone().settings();
+                settings
+                    .update_provider(
+                        "openai".to_owned(),
+                        "openai".to_owned(),
+                        HashMap::from([
+                            ("apiKey".to_owned(), reference.to_owned()),
+                            ("defaultModel".to_owned(), "gpt-4o-mini".to_owned()),
+                        ]),
+                    )
+                    .await
+                    .expect("failed to add provider");
+                settings
+                    .set_provider_secrets(
+                        "openai".to_owned(),
+                        HashMap::from([("apiKey".to_owned(), secret.to_owned())]),
+                    )
+                    .await
+                    .expect("failed to hydrate provider secret");
+
+                let json = settings
+                    .get_json()
+                    .await
+                    .expect("failed to get settings json");
+                assert!(!json.contains(secret));
+                assert!(json.contains(reference));
+            });
+
+        let saved = std::fs::read_to_string(settings_file).expect("failed to read settings file");
+        assert!(!saved.contains(secret));
+        assert!(saved.contains(reference));
+    }
+
+    #[test]
+    fn reset_shortcuts_persists_rust_defaults_to_settings_file() {
+        let data_dir = unique_data_dir();
+        let settings_file = data_dir.join("settings.json");
+        let runtime =
+            Runtime::new(data_dir.display().to_string()).expect("failed to create runtime");
+
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async {
+                runtime
+                    .clone()
+                    .settings()
+                    .update_shortcuts(ShortcutSettingsPatch {
+                        toggle_mini_translator: Some("Command+Shift+Space".to_owned()),
+                        extract_text_from_screen_selection: Some("Command+Shift+1".to_owned()),
+                        extract_text_from_screen_capture: Some("Command+Shift+2".to_owned()),
+                        extract_text_from_clipboard: Some("Command+Shift+3".to_owned()),
+                        translate_input_content: Some("Command+Shift+4".to_owned()),
+                    })
+                    .await
+                    .expect("failed to update shortcuts");
+
+                let reset = runtime
+                    .settings()
+                    .reset_shortcuts()
+                    .await
+                    .expect("failed to reset shortcuts");
+                assert_eq!(reset, ShortcutSettings::default());
+            });
+
+        let saved = std::fs::read_to_string(settings_file).expect("failed to read settings file");
+        let settings =
+            serde_json::from_str::<Settings>(&saved).expect("failed to parse settings file");
+        assert_eq!(settings.shortcuts, ShortcutSettings::default());
+    }
+
+    #[test]
+    fn service_provider_id_suffixes_are_accepted_for_compatibility() {
+        assert_eq!(
+            validate_service_provider_id("system+translation".to_owned(), "+translation").unwrap(),
+            "system"
+        );
+        assert_eq!(
+            validate_service_provider_id("system+dictionary".to_owned(), "+dictionary").unwrap(),
+            "system"
+        );
+        assert_eq!(
+            validate_service_provider_id("system+ocr".to_owned(), "+ocr").unwrap(),
+            "system"
+        );
+        assert_eq!(
+            validate_service_provider_id("system".to_owned(), "+translation").unwrap(),
+            "system"
+        );
+    }
+
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[test]
+    fn system_ocr_recognizes_fixed_catalog_image() {
+        let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(
+            "../../../apps/desktop/flutter/test/goldens/catalog/\
+             workbench_success_light_macos.png",
+        );
+        assert!(fixture.is_file(), "OCR fixture is missing: {fixture:?}");
+
+        let runtime = create_runtime();
+        let response = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async {
+                runtime
+                    .ocr("system".to_owned())
+                    .expect("failed to get system OCR")
+                    .recognize_text(RecognizeTextRequest {
+                        base64_image: None,
+                        image_path: Some(fixture.display().to_string()),
+                    })
+                    .await
+                    .expect("system OCR failed")
+            });
+
+        assert!(
+            response.text.to_lowercase().contains("stable"),
+            "system OCR did not recognize the fixed English text: {:?}",
+            response.text
+        );
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn system_dictionary_lookup_returns_structured_definitions() {
+        let runtime = create_runtime();
+
+        // Add the system provider explicitly (it is no longer auto-injected).
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async {
+                runtime
+                    .clone()
+                    .settings()
+                    .update_provider("system".to_owned(), "system".to_owned(), HashMap::new())
+                    .await
+                    .expect("failed to add system provider");
+            });
+
+        let response = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async {
+                runtime
+                    .clone()
+                    .dictionary("system".to_owned())
+                    .expect("failed to get dictionary")
+                    .lookup(LookUpRequest {
+                        source_language: "en".to_owned(),
+                        target_language: "zh".to_owned(),
+                        word: "hello".to_owned(),
+                    })
+                    .await
+                    .expect("failed to look up hello")
+            });
+
+        let pronunciations = response.pronunciations.expect("pronunciations");
+        assert_eq!(pronunciations.len(), 2);
+        assert_eq!(pronunciations[0].r#type.as_deref(), Some("uk"));
+        assert_eq!(pronunciations[1].r#type.as_deref(), Some("us"));
+
+        let definitions = response.definitions.expect("definitions");
+        assert!(
+            definitions.iter().any(|definition| definition
+                .values
+                .as_ref()
+                .map(|values| values.iter().any(|value| value.contains("问候")))
+                .unwrap_or(false)),
+            "expected parsed definitions to include the noun translation: {definitions:#?}"
+        );
+        assert!(
+            definitions
+                .iter()
+                .flat_map(|definition| definition.values.as_deref().unwrap_or_default())
+                .all(|value| !value.trim().is_empty()),
+            "definitions should not contain empty values: {definitions:#?}"
+        );
+    }
+
+    #[test]
+    fn translation_requires_target_language() {
+        let runtime = create_runtime();
+        let error = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async {
+                runtime
+                    .clone()
+                    .translation("deepl".to_owned())
+                    .unwrap()
+                    .translate(TranslateRequest {
+                        source_language: Some("en".to_owned()),
+                        target_language: Some(String::new()),
+                        text: "hello".to_owned(),
+                    })
+                    .await
+            })
+            .unwrap_err();
+
+        assert_eq!(error.to_string(), "target_language is required");
+    }
+
+    #[test]
+    fn runtime_new_returns_same_inner_for_same_data_dir() {
+        let data_dir = unique_data_dir();
+        let path = data_dir.display().to_string();
+
+        let first = Runtime::new(path.clone()).expect("failed to create first runtime");
+        let second = Runtime::new(path).expect("failed to create second runtime");
+
+        assert!(
+            Arc::ptr_eq(&first.inner, &second.inner),
+            "Runtime::new should return a handle backed by the shared singleton inner"
+        );
+    }
+
+    #[test]
+    fn runtime_new_returns_distinct_inner_for_different_data_dirs() {
+        let first =
+            Runtime::new(unique_data_dir().display().to_string()).expect("failed to create first");
+        let second =
+            Runtime::new(unique_data_dir().display().to_string()).expect("failed to create second");
+
+        assert!(
+            !Arc::ptr_eq(&first.inner, &second.inner),
+            "different data dirs should produce independent runtimes"
+        );
+    }
+
+    #[test]
+    fn subscribe_receives_change_for_each_section() {
+        let runtime = create_runtime();
+
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async {
+                let settings = runtime.clone().settings();
+                let subscription = settings.subscribe();
+
+                settings
+                    .update_appearance(AppearanceSettingsPatch {
+                        language: Some("en".to_owned()),
+                        theme_mode: None,
+                        theme: None,
+                    })
+                    .await
+                    .expect("update_appearance failed");
+                assert_eq!(
+                    subscription.next().await.expect("recv failed"),
+                    Some(SettingsChange::Appearance)
+                );
+
+                settings
+                    .update_general(GeneralSettingsPatch {
+                        launch_at_login: Some(true),
+                        show_in_menu_bar: None,
+                        default_ocr_service: None,
+                        auto_copy_detected_text: None,
+                        default_directory_service: None,
+                        default_translation_service: None,
+                        translation_targets: None,
+                        input_submit_mode: None,
+                        double_click_copy_result: None,
+                        common_languages: None,
+                    })
+                    .await
+                    .expect("update_general failed");
+                assert_eq!(
+                    subscription.next().await.expect("recv failed"),
+                    Some(SettingsChange::General)
+                );
+
+                settings
+                    .update_shortcuts(ShortcutSettingsPatch {
+                        toggle_mini_translator: Some("Cmd+Space".to_owned()),
+                        extract_text_from_screen_selection: None,
+                        extract_text_from_screen_capture: None,
+                        extract_text_from_clipboard: None,
+                        translate_input_content: None,
+                    })
+                    .await
+                    .expect("update_shortcuts failed");
+                assert_eq!(
+                    subscription.next().await.expect("recv failed"),
+                    Some(SettingsChange::Shortcuts)
+                );
+            });
+    }
+
+    #[test]
+    fn subscribe_fans_out_to_multiple_subscribers() {
+        let runtime = create_runtime();
+
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async {
+                let settings = runtime.clone().settings();
+                let sub_a = settings.subscribe();
+                let sub_b = settings.subscribe();
+
+                settings
+                    .update_appearance(AppearanceSettingsPatch {
+                        language: Some("zh-Hans".to_owned()),
+                        theme_mode: None,
+                        theme: None,
+                    })
+                    .await
+                    .expect("update_appearance failed");
+
+                assert_eq!(
+                    sub_a.next().await.expect("recv failed"),
+                    Some(SettingsChange::Appearance)
+                );
+                assert_eq!(
+                    sub_b.next().await.expect("recv failed"),
+                    Some(SettingsChange::Appearance)
+                );
+            });
+    }
+
+    #[test]
+    fn subscribe_observes_writes_from_other_handles() {
+        // Mirrors the cross-binding scenario: writer and reader both
+        // come from the same singleton; subscribing on one observes
+        // writes performed on the other.
+        let data_dir = unique_data_dir();
+        let path = data_dir.display().to_string();
+        let writer = Runtime::new(path.clone()).expect("failed to create writer runtime");
+        let reader = Runtime::new(path).expect("failed to create reader runtime");
+
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async {
+                let subscription = reader.clone().settings().subscribe();
+
+                writer
+                    .clone()
+                    .settings()
+                    .update_appearance(AppearanceSettingsPatch {
+                        language: Some("zh-Hans".to_owned()),
+                        theme_mode: None,
+                        theme: None,
+                    })
+                    .await
+                    .expect("writer update_appearance failed");
+
+                assert_eq!(
+                    subscription.next().await.expect("recv failed"),
+                    Some(SettingsChange::Appearance)
+                );
+            });
+    }
+
+    #[test]
+    fn shared_runtime_observes_each_other_writes() {
+        let data_dir = unique_data_dir();
+        let path = data_dir.display().to_string();
+        let writer = Runtime::new(path.clone()).expect("failed to create writer runtime");
+        let reader = Runtime::new(path).expect("failed to create reader runtime");
+
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async {
+                writer
+                    .clone()
+                    .settings()
+                    .update_appearance(AppearanceSettingsPatch {
+                        language: Some("zh-Hans".to_owned()),
+                        theme_mode: None,
+                        theme: None,
+                    })
+                    .await
+                    .expect("failed to update appearance via writer");
+
+                let read_back = reader
+                    .clone()
+                    .settings()
+                    .get_appearance()
+                    .await
+                    .expect("failed to read appearance via reader");
+
+                assert_eq!(read_back.language, "zh-Hans");
+            });
+    }
+
+    #[test]
+    fn lookup_requires_word() {
+        let runtime = create_runtime();
+
+        // Add the system provider explicitly.
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async {
+                runtime
+                    .clone()
+                    .settings()
+                    .update_provider("system".to_owned(), "system".to_owned(), HashMap::new())
+                    .await
+                    .expect("failed to add system provider");
+            });
+
+        let error = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async {
+                runtime
+                    .clone()
+                    .dictionary("system".to_owned())
+                    .unwrap()
+                    .lookup(LookUpRequest {
+                        source_language: "en".to_owned(),
+                        target_language: "zh".to_owned(),
+                        word: String::new(),
+                    })
+                    .await
+            })
+            .unwrap_err();
+
+        assert_eq!(error.to_string(), "word is required");
+    }
+
+    fn block_on<F: Future>(future: F) -> F::Output {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(future)
+    }
+
+    fn sample_book() -> GlossaryBookInput {
+        GlossaryBookInput {
+            id: None,
+            name: "机器学习".to_owned(),
+            enabled: true,
+            source_language: None,
+            target_language: None,
+        }
+    }
+
+    fn sample_entry(term: &str, translation: &str, forbidden: &[&str]) -> GlossaryEntryInput {
+        GlossaryEntryInput {
+            id: None,
+            term: term.to_owned(),
+            translation: translation.to_owned(),
+            forbidden: forbidden.iter().map(|value| (*value).to_owned()).collect(),
+            note: None,
+            case_sensitive: false,
+            whole_word: true,
+        }
+    }
+
+    #[test]
+    fn glossary_survives_a_runtime_rebuilt_from_the_same_data_dir() {
+        let data_dir = unique_data_dir();
+        let book_id = block_on(async {
+            let runtime =
+                Runtime::new(data_dir.display().to_string()).expect("failed to create runtime");
+            let glossary = runtime.glossary();
+            let book = glossary
+                .upsert_book(sample_book())
+                .await
+                .expect("failed to create book");
+            glossary
+                .upsert_entry(book.id.clone(), sample_entry("token", "词元", &["标记"]))
+                .await
+                .expect("failed to create entry");
+            book.id
+        });
+
+        // A fresh handle for the same data dir shares the registry entry, so
+        // reload through a second runtime process would look the same.
+        let store = crate::domain::glossary::GlossaryStore::load(&data_dir)
+            .expect("failed to reload glossary");
+        let entries = store
+            .list_entries(&book_id, None, 0, 0)
+            .expect("failed to list entries");
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].translation, "词元");
+    }
+
+    #[test]
+    fn glossary_writes_notify_settings_subscribers() {
+        let runtime = create_runtime();
+
+        block_on(async {
+            let subscription = runtime.clone().settings().subscribe();
+            runtime
+                .clone()
+                .glossary()
+                .upsert_book(sample_book())
+                .await
+                .expect("failed to create book");
+
+            let change = subscription.next().await.expect("subscription ended");
+            assert_eq!(change, Some(SettingsChange::Glossary));
+        });
+    }
+
+    #[test]
+    fn glossary_check_flags_a_translation_that_ignores_its_terms() {
+        let runtime = create_runtime();
+
+        block_on(async {
+            let glossary = runtime.clone().glossary();
+            let book = glossary
+                .upsert_book(sample_book())
+                .await
+                .expect("failed to create book");
+            glossary
+                .upsert_entry(book.id, sample_entry("token", "词元", &["标记"]))
+                .await
+                .expect("failed to create entry");
+
+            let clean = glossary
+                .check(
+                    "one token".to_owned(),
+                    "一个词元".to_owned(),
+                    Some("en".to_owned()),
+                    Some("zh".to_owned()),
+                )
+                .await
+                .expect("failed to check translation");
+            assert!(clean.is_empty());
+
+            let issues = glossary
+                .check(
+                    "one token".to_owned(),
+                    "一个标记".to_owned(),
+                    Some("en".to_owned()),
+                    Some("zh".to_owned()),
+                )
+                .await
+                .expect("failed to check translation");
+            let kinds: Vec<_> = issues.iter().map(|issue| issue.kind).collect();
+            assert!(kinds.contains(&crate::domain::glossary::GlossaryIssueKind::MissingTranslation));
+            assert!(kinds.contains(&crate::domain::glossary::GlossaryIssueKind::ForbiddenUsed));
+        });
+    }
+
+    #[test]
+    fn prompt_template_substitutes_the_glossary_placeholder() {
+        let terms = [GlossaryTerm {
+            term: "token".to_owned(),
+            translation: "词元".to_owned(),
+            forbidden: Vec::new(),
+        }];
+        let rendered = render_prompt_template(
+            "Translate to {{targetLanguage}}.\n{{glossary}}\nEnd.",
+            "en",
+            "zh",
+            "token",
+            &terms,
+        );
+
+        assert!(rendered.contains("Translate to zh."));
+        assert!(rendered.contains("\"token\" MUST be translated as \"词元\""));
+        assert!(rendered.trim_end().ends_with("End."));
+    }
+
+    #[test]
+    fn history_writes_notify_subscribers_and_round_trip() {
+        let runtime = create_runtime();
+        block_on(async {
+            let subscription = runtime.clone().settings().subscribe();
+            let entry = runtime
+                .clone()
+                .history()
+                .upsert_entry(crate::domain::history::HistoryEntryInput {
+                    id: None,
+                    source: "hello".to_owned(),
+                    translation: "你好".to_owned(),
+                    source_language: "en".to_owned(),
+                    target_language: "zh-Hans".to_owned(),
+                    service_id: "system+translation".to_owned(),
+                    service_name: "System".to_owned(),
+                    edited: false,
+                })
+                .await
+                .expect("failed to save history");
+            assert_eq!(
+                subscription.next().await.expect("history event"),
+                Some(SettingsChange::History)
+            );
+            let entries = runtime
+                .clone()
+                .history()
+                .list_entries(crate::domain::history::HistoryFilter::All, None)
+                .await
+                .expect("failed to list history");
+            assert_eq!(entries, vec![entry]);
+        });
+    }
+
+    #[test]
+    fn prompt_template_without_a_placeholder_still_gets_the_terms() {
+        let terms = [GlossaryTerm {
+            term: "token".to_owned(),
+            translation: "词元".to_owned(),
+            forbidden: Vec::new(),
+        }];
+        let rendered = render_prompt_template("Translate {{text}}.", "en", "zh", "token", &terms);
+
+        assert!(rendered.starts_with("Translate token."));
+        assert!(rendered.contains("Terminology constraints"));
+    }
+
+    #[test]
+    fn prompt_template_is_untouched_when_nothing_matched() {
+        assert_eq!(
+            render_prompt_template("Translate {{text}}.", "en", "zh", "hello", &[]),
+            "Translate hello."
+        );
+    }
+}

@@ -1,0 +1,16 @@
+{
+  "brand": "LinguaRay",
+  "canonicalSpelling": "LinguaRay",
+  "concept": "LR monogram separated by one diagonal ray",
+  "colors": {
+    "blue": "#2859D9",
+    "teal": "#18A6A6",
+    "tealOnDark": "#34C0BE",
+    "navy": "#13233F",
+    "graphite": "#172033",
+    "paper": "#F7F9FC"
+  },
+  "minimumSymbolSizePx": 18,
+  "wordmarkSource": "LinguaRay",
+  "wordmarkOutlined": true
+}

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions and support
+    url: https://github.com/gong1414/linguaray/discussions
+    about: Ask for installation help, provider setup, or general guidance.
+  - name: Security vulnerability
+    url: https://github.com/gong1414/linguaray/security/advisories/new
+    about: Report security problems privately. Do not create a public issue.

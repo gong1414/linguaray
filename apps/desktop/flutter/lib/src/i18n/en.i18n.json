@@ -1,0 +1,611 @@
+{
+  "common": {
+    "ui": {
+      "button": {
+        "ok": "OK",
+        "cancel": "Cancel",
+        "add": "Add",
+        "delete": "Delete",
+        "edit": "Edit",
+        "save": "Save",
+        "manage": "Manage",
+        "continue": "Continue"
+      },
+      "feedback": {
+        "copied": "Copied"
+      }
+    },
+    "language": {
+      "ar": "Arabic",
+      "bn": "Bengali",
+      "de": "German",
+      "en": "English",
+      "es": "Spanish",
+      "fa": "Persian",
+      "fr": "French",
+      "gu": "Gujarati",
+      "ha": "Hausa",
+      "hi": "Hindi",
+      "id": "Indonesian",
+      "it": "Italian",
+      "ja": "Japanese",
+      "jv": "Javanese",
+      "ko": "Korean",
+      "ml": "Malayalam",
+      "mr": "Marathi",
+      "ms": "Malay",
+      "nl": "Dutch",
+      "pa": "Punjabi",
+      "pl": "Polish",
+      "pt": "Portuguese",
+      "ro": "Romanian",
+      "ru": "Russian",
+      "sw": "Swahili",
+      "ta": "Tamil",
+      "te": "Telugu",
+      "th": "Thai",
+      "tr": "Turkish",
+      "uk": "Ukrainian",
+      "ur": "Urdu",
+      "vi": "Vietnamese",
+      "yo": "Yoruba",
+      "zh_hans": "Chinese (Simplified)",
+      "zh_hant": "Chinese (Traditional)"
+    },
+    "theme_mode": {
+      "light": "Light",
+      "dark": "Dark",
+      "system": "System"
+    },
+    "theme_style": {
+      "studio": "Studio",
+      "bright": "Bright"
+    },
+    "provider": {
+      "anthropic": "Anthropic",
+      "baidu": "Baidu",
+      "caiyun": "Caiyun",
+      "deepl": "DeepL",
+      "google": "Google",
+      "ollama": "Ollama",
+      "openai": "OpenAI",
+      "sogou": "Sogou",
+      "xai": "xAI",
+      "system": "System",
+      "tencent": "Tencent",
+      "youdao": "Youda"
+    }
+  },
+  "app": {
+    "tray": {
+      "context_menu": {
+        "show_window": "Show Window",
+        "dev_tools": {
+          "title": "Dev Tools",
+          "open_data_directory": "Open Data Directory"
+        },
+        "check_for_updates": "Check for Updates",
+        "settings": "Settings",
+        "quit": "Quit"
+      }
+    }
+  },
+  "mini_translator": {
+    "limited_banner": {
+      "permission": {
+        "missing_both": "Grant Screen Recording and Accessibility permissions to enable all features.",
+        "missing_screen_capture": "Grant Screen Recording permission to enable all features.",
+        "missing_accessibility": "Grant Accessibility permission to enable all features."
+      },
+      "instruction": {
+        "app_settings_prefix": "Go to ",
+        "follow_guide_prefix": ", follow the guide, then click ",
+        "suffix": "."
+      },
+      "action": {
+        "app_settings": "App Settings",
+        "recheck": "Recheck"
+      },
+      "feedback": {
+        "enabled": "Screen text extraction is enabled.",
+        "still_missing": "Required permissions are still missing.\nPlease check your settings and try again."
+      },
+      "tooltip": {
+        "help": "View help"
+      }
+    },
+    "input": {
+      "hint": "Enter the word or text here",
+      "extracting_text": "Extracting text...",
+      "hint_translate_to": "Type a word or text to translate into $language"
+    },
+    "toolbar": {
+      "tooltip": {
+        "extract_text_from_screen_capture": "Capture screen area and recognize text",
+        "extract_text_from_clipboard": "Read clipboard content",
+        "pin": "Pin window",
+        "more_actions": "More actions"
+      },
+      "menu": {
+        "extract_from_screen_capture": "Capture from screen",
+        "extract_from_clipboard": "From clipboard",
+        "open_main_window": "Open main window",
+        "open_settings": "Settings…"
+      }
+    },
+    "button": {
+      "clear": "Clear",
+      "translate": "Translate",
+      "copy": "Copy",
+      "copied": "Copied",
+      "bookmark": "Save",
+      "bookmarked": "Saved"
+    },
+    "language": {
+      "auto_detect": "Auto Detect",
+      "auto_match": "Auto Match",
+      "switch_config": "Switch Target",
+      "more_languages": "More languages...",
+      "manage_common_languages": "Manage Common Languages...",
+      "manage_targets": "Manage Translation Targets...",
+      "add_target": "Add Translation Target..."
+    },
+    "message": {
+      "please_enter_word_or_text": "No text entered or text not extracted",
+      "capture_screen_area_canceled": "Capture screen area has been canceled",
+      "ocr_service_not_configured": "No default text recognition service configured. Please set one in Settings.",
+      "ocr_recognition_failed": "Text recognition failed"
+    },
+    "result": {
+      "translating": "Translating…",
+      "stale_requery": "Source changed · $key retranslate",
+      "compare_services": "Compare $count services",
+      "collapse_compare": "Collapse",
+      "set_preferred": "Set as preferred",
+      "retry": "Retry",
+      "no_result": "No service returned a result — check your network or try another service.",
+      "no_result_note": "Your text is kept; retrying will not duplicate history.",
+      "no_result_meta": "$count services returned nothing",
+      "no_result_body": "No translation came back. Check your network and press ⏎ to retry, or expand to see each service's reason.",
+      "check_services": "Check services",
+      "show_reasons": "Why $count services failed",
+      "collapse_reasons": "Hide reasons",
+      "unknown_error": "The service gave no reason.",
+      "no_result_tag": "no result"
+    }
+  },
+  "workbench": {
+    "workspace": "Workspace",
+    "translate": "Translate",
+    "history": "History",
+    "history_page": {
+      "all": "All",
+      "favorites": "Favorites",
+      "edited": "Edited by me",
+      "search": "Search",
+      "search_placeholder": "Search source, translation, or service",
+      "search_label": "Search history",
+      "entry_count": "$label · $count entries",
+      "by_time": "By time",
+      "loading": "Loading history…",
+      "load_failed": "Failed to load history",
+      "retry": "Retry",
+      "empty_title": "No translation history yet",
+      "empty_description": "Your preferred result is saved here after a successful translation.",
+      "no_results": "No history matches “$query”",
+      "clear_search": "Clear search",
+      "select": "Select",
+      "selected_count": "$count selected",
+      "exit_select": "Exit selection",
+      "add_to_glossary": "Add to glossary",
+      "favorite": "Favorite",
+      "unfavorite": "Unfavorite",
+      "delete_confirm": "Delete the selected $count history entries? This cannot be undone.",
+      "no_glossary": "Create a glossary first",
+      "added_to_glossary": "Added $count entries to the glossary",
+      "favorite_flag": "Favorite",
+      "edited_flag": "Edited",
+      "edit_history_hint": "The edited translation will be saved to history",
+      "copy_translation": "Copy translation",
+      "more_actions": "More",
+      "delete_title_one": "Delete this record",
+      "delete_title_many": "Delete $count records",
+      "delete_message": "This cannot be undone. Favourites and your own wording go with it; the glossary is untouched."
+    },
+    "glossary": "Glossary",
+    "recent_languages": "Recent Languages",
+    "not_configured": "Not configured",
+    "subtitle": {
+      "translate": "Workbench · Service comparison",
+      "settings": "Settings"
+    },
+    "placeholder": {
+      "history": "Favorites and history will be available in a future release",
+      "glossary": "Glossary management is being built"
+    },
+    "glossary_page": {
+      "add_entry": "New entry",
+      "term": "Source",
+      "translation": "Required translation",
+      "forbidden": "Forbidden",
+      "hits": "Hits",
+      "term_placeholder": "teacher forcing",
+      "translation_placeholder": "forced teaching",
+      "forbidden_placeholder": "coerced teaching",
+      "search": "Search",
+      "search_placeholder": "Search terms or required translations",
+      "search_label": "Search the glossary",
+      "entry_count": "$name · $count terms",
+      "priority_note": "Glossary terms outrank any service output",
+      "new_book": "New glossary",
+      "new_book_placeholder": "Glossary name",
+      "rename_book": "Rename",
+      "delete_book_confirm": "Delete “$name” and all $count of its terms?",
+      "disabled": "Off",
+      "enable": "Enable",
+      "disable": "Disable",
+      "empty_title": "This glossary is empty",
+      "empty_description": "Glossary terms outrank any service output. Add them one at a time, or drop in a CSV to merge.",
+      "no_results_title": "No terms match “$query”",
+      "no_results_description": "Try another keyword, or add the term.",
+      "no_books_title": "No glossaries yet",
+      "no_books_description": "A glossary keeps your chosen wording consistent across every service. Create one, then start adding terms.",
+      "loading": "Loading…",
+      "new_book_subtitle": "One book per domain; all of them apply while translating",
+      "name": "Name",
+      "name_taken": "Name · already exists",
+      "name_taken_hint": "There is already a glossary called “$name”.",
+      "name_placeholder": "Machine learning",
+      "source_language": "Source language",
+      "target_language": "Target language",
+      "same_language": "The source and target have to be two different languages.",
+      "seed": "Initial content",
+      "seed_blank": "Blank",
+      "seed_blank_hint": "Add entries one at a time later",
+      "seed_csv_hint": "Two columns: term / translation",
+      "seed_tbx_hint": "Industry term exchange format",
+      "seed_blank_note": "Once it exists you can add entries one by one, or drop a CSV / TBX onto the list to merge.",
+      "seed_file_note": "Imports the $format file right after creating · duplicates take the file’s translation",
+      "choose_file": "Choose file…",
+      "create": "Create",
+      "add_entry_subtitle": "A term outranks anything a service returns",
+      "book": "Glossary",
+      "forbidden_label": "Forbidden translations",
+      "forbidden_hint": "A service offering these is flagged as a conflict; separate several with /, leave empty to forbid none.",
+      "forbidden_placeholder_full": "forced teaching / forcing teacher",
+      "duplicate": "“$term” is already in $book; saving overwrites the existing translation.",
+      "duplicate_book_fallback": "this glossary",
+      "keep_adding": "Keep adding after saving",
+      "added_count": "Added $count so far",
+      "overwrite": "Overwrite",
+      "done": "Done"
+    },
+    "translation": {
+      "source": "Source",
+      "target": "Translation",
+      "input_hint": "Enter or paste text to translate",
+      "button": "Translate",
+      "auto_detected": "Auto detected",
+      "loading_services": "Loading translation services…",
+      "no_services": "Configure a translation service in Settings first",
+      "translating": "Translating…",
+      "failed": "Translation failed. Check the service configuration and try again.",
+      "empty": "The translation will appear here",
+      "service_compare": "Service comparison",
+      "main_translation": "Primary",
+      "service_unavailable": "Service unavailable",
+      "waiting": "Waiting to translate",
+      "copy": "Copy",
+      "favorite_unavailable": "Favorites will be available in a future release",
+      "preferred": "Preferred translation",
+      "other_services": "Other services",
+      "copy_result": "Copy translation",
+      "copied": "Copied",
+      "favorite": "Save",
+      "terms": "Glossary hits",
+      "terms_hint": "Terms are matched once you type.",
+      "quality": "Quality signals",
+      "quality_hint": "Computed once a translation lands.",
+      "shortcuts": "Shortcuts",
+      "other_services_disabled": "Other services are disabled",
+      "input_hint_translate_to": "Type or paste text to translate into $language",
+      "newline_hint": "$key for a new line",
+      "failed_body": "This passage did not get a translation. Check your connection and retry, or expand to work through each service's reason."
+    },
+    "status": {
+      "runtime_ready": "Translation runtime ready",
+      "settings_synced": "Settings synced",
+      "shortcuts": "⌥Space Quick window · ⌥⇧2 Capture"
+    },
+    "version_latest": "Up to date",
+    "version_checking": "Checking…",
+    "check_updates": "Check for updates"
+  },
+  "settings": {
+    "version": "v{} (Build {})",
+    "general": {
+      "title": "General",
+      "section": {
+        "permissions": "System Permissions",
+        "ocr": "Text Recognition",
+        "directory": "Directory",
+        "translation": "Translation",
+        "translation_target": "Translation Target",
+        "languages": "Languages",
+        "input": "Input Settings",
+        "startup": "Startup & Integration",
+        "ocr_behaviour": "Capture Behaviour",
+        "translation_behaviour": "Translation Behaviour"
+      },
+      "row": {
+        "launch_at_login": "Launch when you log in",
+        "show_in_menu_bar": "Show in menu bar",
+        "screen_capture_access": "Grant screen recording access",
+        "screen_selection_access": "Grant accessibility access",
+        "default_ocr_service": "Default text recognition service",
+        "auto_copy_detected_text": "Auto copy detected text",
+        "default_directory_service": "Default directory service",
+        "default_translation_service": "Default translation service",
+        "translation_target_hint": "Configure language pairs used by the translator.",
+        "common_languages": "Common Languages",
+        "common_languages_description": "Shown at the top of language pickers.",
+        "common_languages_hint": "Select your common languages:",
+        "common_languages_sort": "Sort by Code",
+        "double_click_copy_result": "Double click to copy translation result",
+        "common_languages_reset": "Reset to Defaults",
+        "common_languages_reset_help": "Reset to the default set of common languages",
+        "common_languages_search": "Search languages...",
+        "common_languages_all": "All Languages",
+        "submit_with_enter": "Submit with Enter",
+        "submit_with_meta_enter_mac": "Submit with ⌘ + Enter",
+        "screen_capture_access_hint": "Capturing text from the screen needs to read screen contents.",
+        "screen_selection_access_hint": "Capturing selected text needs to read selections in other apps.",
+        "no_translation_targets": "No translation targets yet — add one to set the default language to translate into."
+      },
+      "button": {
+        "add_provider": "Add...",
+        "add_target": "Add Target...",
+        "manage_targets": "Manage Translation Targets...",
+        "manage_languages": "Manage Common Languages...",
+        "grant": "Grant"
+      },
+      "option": {
+        "none": "None",
+        "no_services_available": "No services available",
+        "granted": "Granted",
+        "built_in_ocr": "Built-in OCR",
+        "tesseract": "Tesseract",
+        "youdao_ocr": "Youdao OCR"
+      },
+      "editor": {
+        "add_target_title": "Add Translation Target",
+        "edit_target_title": "Edit Translation Target",
+        "row": {
+          "source_language": "Source Language",
+          "target_language": "Target Language"
+        },
+        "title_edit": "Edit Translation Target",
+        "subtitle": "Decide which language a source language translates into by default",
+        "same_language": "Source and target are the same language — pick another target.",
+        "duplicate": "There is already a target with this pair.",
+        "hint_auto": "Translate into {} when no other rule matches.",
+        "hint_source": "Translate into {} when {} is detected."
+      }
+    },
+    "appearance": {
+      "title": "Appearance",
+      "section": {
+        "app_language": "Display Language",
+        "theme_mode": "Theme Mode",
+        "theme_style": "Theme style"
+      },
+      "footer": "Changes apply to the whole window immediately."
+    },
+    "shortcuts": {
+      "title": "Shortcuts",
+      "section": {
+        "text_extraction": "Text Extraction",
+        "input_assist": "Input Assist Function",
+        "submit_mode": "Submit With"
+      },
+      "row": {
+        "toggle_mini_translator": "Show/Hide Window",
+        "extract_text_from_screen_selection": "Extract text from screen selection",
+        "extract_text_from_screen_capture": "Extract text from screen capture",
+        "extract_text_from_clipboard": "Extract text from clipboard",
+        "translate_input": "Translate input content"
+      },
+      "reset_dialog": {
+        "title": "Reset Shortcuts",
+        "message": "Are you sure you want to reset all shortcuts to their default values?",
+        "confirm": "Reset",
+        "cancel": "Cancel"
+      },
+      "group": {
+        "global": {
+          "title": "Global Shortcuts",
+          "description": "Work in any app."
+        },
+        "in_app": {
+          "title": "In-App Keys",
+          "description": "Only apply inside this app’s own text fields."
+        }
+      },
+      "reset": "Restore Defaults...",
+      "record_placeholder": "Record shortcut",
+      "recording": "Press keys…",
+      "clear": "Clear",
+      "conflict": "Conflicts with “$label”"
+    },
+    "advanced": {
+      "title": "Advanced",
+      "api_server": "Local API server",
+      "api_server_description": "Expose the translation API on 127.0.0.1 for local integrations.",
+      "enable": "Enable",
+      "port": "Port",
+      "running_at": "Running at {url}",
+      "disabled": "Disabled"
+    },
+    "services": {
+      "title": "Services",
+      "button": {
+        "add_service": "Add Service..."
+      },
+      "section": {
+        "available_services": "Available Services"
+      },
+      "editor": {
+        "title": "Add Service",
+        "subtitle": "Add one more service to a configured provider",
+        "row": {
+          "model": "Model",
+          "system_prompt": "System Prompt"
+        },
+        "prompt_placeholder": "Leave blank to use the default prompt for this kind",
+        "variant_hint": "{} already has a {} service; this one is added alongside it as a second configuration.",
+        "traditional_note": "{} is a traditional endpoint — no model or prompt to tune. Its parameters live on the provider's detail page."
+      },
+      "detail": {
+        "row": {
+          "id": "Service ID",
+          "name": "Name",
+          "provider": "Provider",
+          "type": "Type"
+        },
+        "delete_dialog": {
+          "title": "Delete \"{}\"?",
+          "message": "This service will be removed from the provider."
+        },
+        "prompt_variables": "Available variables: {{sourceLanguage}}, {{targetLanguage}}, {{text}}"
+      },
+      "make_default": "Make Default",
+      "item": {
+        "none_of_kind": "No {} service available yet."
+      }
+    },
+    "providers": {
+      "title": "Providers",
+      "section": {
+        "services": "Available Services",
+        "services_description": "View available services from configured providers and switch between service types."
+      },
+      "item": {
+        "empty": "No providers configured. Add one to enable translation services.",
+        "loading": "Loading providers...",
+        "no_services": "No services available."
+      },
+      "button": {
+        "add": "Add a Provider..."
+      },
+      "alert": {
+        "error": "Error"
+      },
+      "intro": {
+        "body": "Manage the service providers used by the app.",
+        "warning": "Connected providers may process the text or images you send. Only enable services you trust."
+      },
+      "editor": {
+        "row": {
+          "id": "Provider ID",
+          "type": "Provider Type",
+          "default_model": "Default Model"
+        },
+        "placeholder": {
+          "id": "e.g. deepl-main"
+        },
+        "type_picker": {
+          "prompt": "Select the type of provider you would like to add:",
+          "section_llm": "LLM",
+          "section_traditional": "Traditional"
+        },
+        "tooltip": {
+          "help": "Help"
+        },
+        "step": {
+          "next": "Continue",
+          "back": "Back"
+        },
+        "add_title": "Add {}",
+        "capability_note": {
+          "translation": "Joins the translation candidates",
+          "dictionary": "Provides dictionary definitions",
+          "ocr": "Recognises text in images"
+        },
+        "test": {
+          "run": "Test Connection",
+          "running": "Testing connection · {}s elapsed",
+          "passed_models": "Connection OK · {} models available",
+          "passed_service": "Connection OK · service available",
+          "passed_footer": "Connection test passed",
+          "retest": "Test Again",
+          "tips_title": "Things to try",
+          "tips_llm": "· Check the key matches the provider type you picked\n· Check whether the Base URL needs /v1\n· Confirm the model is enabled in the provider console",
+          "tips_traditional": "· Check the credentials match the provider type you picked\n· Confirm the service is enabled in the provider console",
+          "failed_suffix": "verification failed",
+          "passed_suffix": "verified"
+        }
+      },
+      "detail": {
+        "tooltip": {
+          "edit": "Edit provider"
+        },
+        "row": {
+          "id_hint": "Cannot be changed after creation"
+        },
+        "section": {
+          "configuration": "Configuration",
+          "models": "Models"
+        },
+        "models": {
+          "loading": "Loading models...",
+          "empty": "No models found.",
+          "retry": "Retry",
+          "refresh": "Refresh List",
+          "default_badge": "Default",
+          "set_default": "Set as Default",
+          "fetch_error": "Could not fetch models from provider API."
+        }
+      },
+      "capability": {
+        "translation": "Translation",
+        "dictionary": "Dictionary",
+        "ocr": "OCR",
+        "llm": "AI"
+      },
+      "description": {
+        "all": "Provides dictionary lookup and text translation",
+        "dictionary": "Provides dictionary lookup and word definitions",
+        "translation": "Provides text translation between languages",
+        "fallback": "Provides translation services"
+      },
+      "delete_dialog": {
+        "title": "Delete \"{}\"?",
+        "message": "This action cannot be undone."
+      }
+    },
+    "layout": {
+      "title": "Settings",
+      "empty": {
+        "title": "Select a Category",
+        "message": "Choose a settings section from the sidebar."
+      },
+      "groups": "Groups",
+      "effect_hint": "Changes apply immediately",
+      "footer_note": "Translations and keys stay on this Mac",
+      "support": "Support"
+    },
+    "about": {
+      "title": "About",
+      "copy_version_info": "Copy Version Info",
+      "up_to_date": "You're up to date.",
+      "check_again": "Check Again",
+      "links": "Links",
+      "website": "Website",
+      "github": "GitHub",
+      "report_issue": "Report an Issue",
+      "license": "License",
+      "open_changelog": "Open Changelog",
+      "update": "Update"
+    }
+  }
+}

@@ -1,0 +1,565 @@
+{
+  "common": {
+    "ui": {
+      "button": {
+        "ok": "確定",
+        "cancel": "取消",
+        "add": "新增",
+        "delete": "刪除",
+        "edit": "編輯",
+        "save": "儲存",
+        "manage": "管理",
+        "continue": "繼續"
+      },
+      "feedback": {
+        "copied": "已複製"
+      }
+    },
+    "language": {
+      "ar": "阿拉伯語",
+      "bn": "孟加拉語",
+      "de": "德語",
+      "en": "英語",
+      "es": "西班牙語",
+      "fa": "波斯語",
+      "fr": "法語",
+      "gu": "古吉拉特語",
+      "ha": "豪薩語",
+      "hi": "印地語",
+      "id": "印尼語",
+      "it": "義大利語",
+      "ja": "日語",
+      "jv": "爪哇語",
+      "ko": "韓語",
+      "ml": "馬拉雅拉姆語",
+      "mr": "馬拉地語",
+      "ms": "馬來語",
+      "nl": "荷蘭語",
+      "pa": "旁遮普語",
+      "pl": "波蘭語",
+      "pt": "葡萄牙語",
+      "ro": "羅馬尼亞語",
+      "ru": "俄語",
+      "sw": "斯瓦希里語",
+      "ta": "泰米爾語",
+      "te": "泰盧固語",
+      "th": "泰語",
+      "tr": "土耳其語",
+      "uk": "烏克蘭語",
+      "ur": "烏爾都語",
+      "vi": "越南語",
+      "yo": "約魯巴語",
+      "zh_hans": "中文（簡體）",
+      "zh_hant": "中文（繁體）"
+    },
+    "theme_mode": {
+      "light": "淺色",
+      "dark": "深色",
+      "system": "跟隨系統"
+    },
+    "theme_style": {
+      "studio": "Studio",
+      "bright": "Bright"
+    },
+    "provider": {
+      "anthropic": "Anthropic",
+      "baidu": "百度",
+      "caiyun": "彩雲小譯",
+      "deepl": "DeepL",
+      "google": "谷歌",
+      "ollama": "Ollama",
+      "openai": "OpenAI",
+      "sogou": "搜狗",
+      "xai": "xAI",
+      "system": "系統",
+      "tencent": "騰訊",
+      "youdao": "有道"
+    }
+  },
+  "app": {
+    "tray": {
+      "context_menu": {
+        "show_window": "顯示視窗",
+        "dev_tools": {
+          "title": "開發工具",
+          "open_data_directory": "開啟資料目錄"
+        },
+        "check_for_updates": "檢查更新",
+        "settings": "設定",
+        "quit": "結束"
+      }
+    }
+  },
+  "mini_translator": {
+    "limited_banner": {
+      "permission": {
+        "missing_both": "請授予螢幕錄製和輔助功能權限以啟用完整功能。",
+        "missing_screen_capture": "請授予螢幕錄製權限以啟用完整功能。",
+        "missing_accessibility": "請授予輔助功能權限以啟用完整功能。"
+      },
+      "instruction": {
+        "app_settings_prefix": "請前往",
+        "follow_guide_prefix": "，依指引授權後點選",
+        "suffix": "。"
+      },
+      "action": {
+        "app_settings": "應用程式設定",
+        "recheck": "重新檢查"
+      },
+      "feedback": {
+        "enabled": "螢幕取詞功能已啟用。",
+        "still_missing": "仍缺少所需權限。\n請檢查您的設定後再試。"
+      },
+      "tooltip": {
+        "help": "檢視說明"
+      }
+    },
+    "input": {
+      "hint": "在此輸入單字或文字",
+      "extracting_text": "正在辨識文字…",
+      "hint_translate_to": "輸入單詞或文字，翻譯為$language"
+    },
+    "toolbar": {
+      "tooltip": {
+        "extract_text_from_screen_capture": "擷取螢幕區域並辨識文字",
+        "extract_text_from_clipboard": "讀取剪貼簿內容",
+        "pin": "固定視窗",
+        "more_actions": "更多操作"
+      },
+      "menu": {
+        "extract_from_screen_capture": "螢幕取詞",
+        "extract_from_clipboard": "剪貼簿取詞",
+        "open_main_window": "開啟主視窗",
+        "open_settings": "設定…"
+      }
+    },
+    "button": {
+      "clear": "清除",
+      "translate": "翻譯",
+      "copy": "複製",
+      "copied": "已複製",
+      "bookmark": "收藏",
+      "bookmarked": "已收藏"
+    },
+    "language": {
+      "auto_detect": "自動偵測",
+      "auto_match": "自動匹配",
+      "switch_config": "切換目標",
+      "more_languages": "更多語言...",
+      "manage_common_languages": "管理常用語言...",
+      "manage_targets": "管理翻譯目標...",
+      "add_target": "添加翻譯目標..."
+    },
+    "message": {
+      "please_enter_word_or_text": "未輸入或未擷取到文字",
+      "capture_screen_area_canceled": "螢幕區域擷取已取消",
+      "ocr_service_not_configured": "未配置預設文字辨識服務，請在設定中配置。",
+      "ocr_recognition_failed": "文字辨識失敗"
+    },
+    "result": {
+      "translating": "正在翻譯…",
+      "stale_requery": "原文已修改 · $key 重新翻譯",
+      "compare_services": "對比 $count 個服務",
+      "collapse_compare": "收起對比",
+      "set_preferred": "設為首選",
+      "retry": "重試",
+      "no_result": "所有服務都沒有回傳結果 —— 檢查網路，或換一個服務再試。",
+      "no_result_note": "原文已保留，重試不會重複計入歷史。"
+    }
+  },
+  "workbench": {
+    "workspace": "工作區",
+    "translate": "翻譯",
+    "history": "歷史",
+    "history_page": {
+      "all": "全部",
+      "favorites": "收藏",
+      "edited": "我改過的",
+      "search": "搜尋",
+      "search_placeholder": "搜尋原文、譯文或服務",
+      "search_label": "搜尋歷史",
+      "entry_count": "$label · $count 筆",
+      "by_time": "按時間",
+      "loading": "正在載入歷史…",
+      "load_failed": "歷史載入失敗",
+      "retry": "重試",
+      "empty_title": "尚無翻譯歷史",
+      "empty_description": "完成翻譯後，首選譯文會自動儲存在這裡。",
+      "no_results": "找不到符合「$query」的記錄",
+      "clear_search": "清除搜尋",
+      "select": "多選",
+      "selected_count": "已選 $count 筆",
+      "exit_select": "退出多選",
+      "add_to_glossary": "加入術語庫",
+      "favorite": "收藏",
+      "unfavorite": "取消收藏",
+      "delete_confirm": "確定刪除選取的 $count 筆歷史？此操作無法復原。",
+      "no_glossary": "請先建立一個術語庫",
+      "added_to_glossary": "已將 $count 筆記錄加入術語庫",
+      "favorite_flag": "已收藏",
+      "edited_flag": "我改過",
+      "edit_history_hint": "修改後的譯文會儲存到歷史"
+    },
+    "glossary": "術語庫",
+    "recent_languages": "最近語言",
+    "not_configured": "尚未設定",
+    "subtitle": {
+      "translate": "工作台 · 多服務對照",
+      "settings": "設定"
+    },
+    "placeholder": {
+      "history": "收藏與歷史將在後續版本提供",
+      "glossary": "術語庫管理正在建置中"
+    },
+    "glossary_page": {
+      "add_entry": "新增條目",
+      "term": "原文",
+      "translation": "指定譯法",
+      "forbidden": "禁用",
+      "hits": "命中",
+      "term_placeholder": "teacher forcing",
+      "translation_placeholder": "教師強制",
+      "forbidden_placeholder": "強制教學",
+      "search": "搜尋",
+      "search_placeholder": "搜尋術語或指定譯法",
+      "search_label": "搜尋術語庫",
+      "entry_count": "$name · $count 條",
+      "priority_note": "術語優先級高於任何服務輸出",
+      "new_book": "新增術語庫",
+      "new_book_placeholder": "術語庫名稱",
+      "rename_book": "重新命名",
+      "delete_book_confirm": "刪除「$name」及其中的 $count 條術語？",
+      "disabled": "已停用",
+      "enable": "啟用",
+      "disable": "停用",
+      "empty_title": "這個術語庫還是空的",
+      "empty_description": "術語優先級高於任何服務輸出。可以逐條新增，也可以把 CSV 拖進來合併。",
+      "no_results_title": "沒有符合「$query」的術語",
+      "no_results_description": "換個關鍵字，或直接新增一條。",
+      "no_books_title": "還沒有術語庫",
+      "no_books_description": "術語庫讓指定譯法在所有服務裡保持一致。先建一個，再往裡加詞。",
+      "loading": "正在載入…"
+    },
+    "translation": {
+      "source": "原文",
+      "target": "譯文",
+      "input_hint": "輸入或貼上需要翻譯的文字",
+      "button": "翻譯",
+      "auto_detected": "已自動偵測",
+      "loading_services": "正在載入翻譯服務…",
+      "no_services": "請先在設定中配置翻譯服務",
+      "translating": "正在翻譯…",
+      "failed": "翻譯失敗，請檢查服務設定後重試",
+      "empty": "譯文將顯示於此",
+      "service_compare": "服務比較",
+      "main_translation": "主譯文",
+      "service_unavailable": "服務暫不可用",
+      "waiting": "等待翻譯",
+      "copy": "複製",
+      "favorite_unavailable": "收藏功能將在後續版本提供",
+      "preferred": "首選譯文",
+      "other_services": "其他服務",
+      "copy_result": "複製譯文",
+      "copied": "已複製",
+      "favorite": "收藏",
+      "terms": "命中術語",
+      "terms_hint": "輸入後自動比對術語庫。",
+      "quality": "品質信號",
+      "quality_hint": "譯文產生後計算。",
+      "shortcuts": "快捷鍵",
+      "other_services_disabled": "其他服務已停用",
+      "input_hint_translate_to": "輸入或貼上要翻譯的文字，翻譯為$language"
+    },
+    "status": {
+      "runtime_ready": "翻譯執行環境已就緒",
+      "settings_synced": "設定已同步",
+      "shortcuts": "⌥Space 小窗 · ⌥⇧2 截圖"
+    },
+    "version_latest": "已是最新",
+    "version_checking": "正在檢查…",
+    "check_updates": "檢查更新"
+  },
+  "settings": {
+    "version": "v{} (Build {})",
+    "general": {
+      "title": "一般",
+      "section": {
+        "permissions": "系統權限",
+        "ocr": "文字辨識",
+        "directory": "辭典",
+        "translation": "翻譯",
+        "translation_target": "翻譯目標",
+        "languages": "語言",
+        "input": "輸入設定",
+        "startup": "啟動與整合",
+        "ocr_behaviour": "取詞行為",
+        "translation_behaviour": "翻譯行為"
+      },
+      "row": {
+        "launch_at_login": "登入時啟動",
+        "show_in_menu_bar": "在選單列中顯示",
+        "screen_capture_access": "授予螢幕錄製權限",
+        "screen_selection_access": "授予輔助功能權限",
+        "default_ocr_service": "預設文字辨識服務",
+        "auto_copy_detected_text": "自動複製偵測到的文字",
+        "default_directory_service": "預設辭典服務",
+        "default_translation_service": "預設翻譯服務",
+        "translation_target_hint": "設定翻譯器使用的語言目標。",
+        "common_languages": "常用語言",
+        "common_languages_description": "顯示在語言選擇列表頂部。",
+        "common_languages_hint": "選擇你常用的語言：",
+        "common_languages_sort": "按代碼排序",
+        "common_languages_reset": "恢復預設",
+        "common_languages_reset_help": "恢復為預設的常用語言集合",
+        "common_languages_search": "搜索語言...",
+        "common_languages_all": "所有語言",
+        "double_click_copy_result": "雙擊複製翻譯結果",
+        "submit_with_enter": "按 Enter 提交",
+        "submit_with_meta_enter_mac": "按 ⌘ + Enter 提交",
+        "screen_capture_access_hint": "截圖取詞需要讀取螢幕內容。",
+        "screen_selection_access_hint": "劃詞取詞需要讀取其他應用程式中選取的文字。",
+        "no_translation_targets": "還沒有翻譯目標，新增一條來決定預設譯入哪種語言。"
+      },
+      "button": {
+        "add_provider": "新增…",
+        "add_target": "新增目標...",
+        "manage_targets": "管理翻譯目標...",
+        "manage_languages": "管理常用語言...",
+        "grant": "授權"
+      },
+      "option": {
+        "none": "無",
+        "no_services_available": "暫無可用服務",
+        "granted": "已授權",
+        "built_in_ocr": "內建 OCR",
+        "tesseract": "Tesseract",
+        "youdao_ocr": "有道 OCR"
+      },
+      "editor": {
+        "add_target_title": "添加翻譯目標：",
+        "edit_target_title": "修改翻譯目標：",
+        "row": {
+          "source_language": "源語言",
+          "target_language": "目標語言"
+        },
+        "title_edit": "編輯翻譯目標",
+        "subtitle": "決定某種來源語言預設翻譯成哪種語言",
+        "same_language": "來源語言與目標語言相同，換一個目標語言。",
+        "duplicate": "已經有一條同樣的翻譯目標了。",
+        "hint_auto": "未符合其他規則時，一律譯成{}。",
+        "hint_source": "偵測到{}時，譯成{}。"
+      }
+    },
+    "appearance": {
+      "title": "外觀",
+      "section": {
+        "app_language": "顯示語言",
+        "theme_mode": "主題模式",
+        "theme_style": "主題風格"
+      },
+      "footer": "變更立即套用到整個視窗。"
+    },
+    "shortcuts": {
+      "title": "快捷鍵",
+      "section": {
+        "text_extraction": "文字擷取",
+        "input_assist": "輸入輔助功能",
+        "submit_mode": "提交方式"
+      },
+      "row": {
+        "toggle_mini_translator": "顯示/隱藏視窗",
+        "extract_text_from_screen_selection": "從螢幕選取範圍擷取文字",
+        "extract_text_from_screen_capture": "從螢幕截圖擷取文字",
+        "extract_text_from_clipboard": "從剪貼簿擷取文字",
+        "translate_input": "翻譯輸入內容"
+      },
+      "reset_dialog": {
+        "title": "重設快捷鍵",
+        "message": "確定要重設所有快捷鍵為預設值嗎？",
+        "confirm": "重設",
+        "cancel": "取消"
+      },
+      "group": {
+        "global": {
+          "title": "全域快速鍵",
+          "description": "在任何應用程式裡都能觸發。"
+        },
+        "in_app": {
+          "title": "應用程式內按鍵",
+          "description": "僅在應用程式自己的輸入框內生效。"
+        }
+      },
+      "reset": "恢復預設..."
+    },
+    "advanced": {
+      "title": "進階",
+      "api_server": "本機 API 服務",
+      "api_server_description": "在 127.0.0.1 上開放翻譯 API，供本機整合使用。",
+      "enable": "啟用",
+      "port": "埠號",
+      "running_at": "執行於 {url}",
+      "disabled": "已關閉"
+    },
+    "services": {
+      "title": "服務",
+      "button": {
+        "add_service": "新增服務..."
+      },
+      "section": {
+        "available_services": "可用服務"
+      },
+      "editor": {
+        "title": "新增服務",
+        "subtitle": "為已設定的提供者新增一項服務",
+        "row": {
+          "model": "模型",
+          "system_prompt": "系統提示詞"
+        },
+        "prompt_placeholder": "留空則使用該類型的預設提示詞",
+        "variant_hint": "{} 已有一項{}服務，這條會作為並列的另一份設定。",
+        "traditional_note": "{} 是傳統介面，沒有模型與提示詞可調；服務參數在提供者詳情頁設定。"
+      },
+      "detail": {
+        "row": {
+          "id": "服務 ID",
+          "name": "名稱",
+          "provider": "提供者",
+          "type": "類型"
+        },
+        "delete_dialog": {
+          "title": "刪除「{}」？",
+          "message": "此服務將從提供者中移除。"
+        },
+        "prompt_variables": "可用變數：{{sourceLanguage}}、{{targetLanguage}}、{{text}}"
+      },
+      "make_default": "設為預設",
+      "item": {
+        "none_of_kind": "還沒有可用的{}服務。"
+      }
+    },
+    "providers": {
+      "title": "提供者",
+      "section": {
+        "services": "可用服務",
+        "services_description": "查看已設定提供商的可用服務，並依服務類型切換。"
+      },
+      "item": {
+        "empty": "尚未設定任何提供者。新增一個提供者以啟用翻譯服務。",
+        "loading": "正在載入提供者…",
+        "no_services": "暫無可用服務。"
+      },
+      "button": {
+        "add": "新增提供者…"
+      },
+      "alert": {
+        "error": "錯誤"
+      },
+      "intro": {
+        "body": "管理應用程式使用的服務提供商。",
+        "warning": "已連線的提供商可能會處理您傳送的文字或圖片，請僅啟用您信任的服務。"
+      },
+      "editor": {
+        "row": {
+          "id": "提供者 ID",
+          "type": "提供者類型",
+          "default_model": "預設模型"
+        },
+        "placeholder": {
+          "id": "例如 deepl-main"
+        },
+        "type_picker": {
+          "prompt": "請選擇要新增的提供者類型：",
+          "section_llm": "LLM",
+          "section_traditional": "傳統"
+        },
+        "tooltip": {
+          "help": "說明"
+        },
+        "step": {
+          "next": "繼續",
+          "back": "上一步"
+        },
+        "add_title": "新增 {}",
+        "capability_note": {
+          "translation": "加入翻譯候選",
+          "dictionary": "提供辭典釋義",
+          "ocr": "辨識圖片中的文字"
+        },
+        "test": {
+          "run": "測試連線",
+          "running": "正在測試連線 · 已用 {}s",
+          "passed_models": "連線正常 · {} 個模型可用",
+          "passed_service": "連線正常 · 服務可用",
+          "passed_footer": "已通過連線測試",
+          "retest": "重新測試",
+          "tips_title": "可以試試",
+          "tips_llm": "· 確認金鑰與所選提供者類型一致\n· 檢查 Base URL 是否需要包含 /v1\n· 在提供者主控台確認該模型已開通",
+          "tips_traditional": "· 確認金鑰與所選提供者類型一致\n· 在提供者主控台確認服務已開通",
+          "failed_suffix": "驗證失敗",
+          "passed_suffix": "已驗證"
+        }
+      },
+      "detail": {
+        "tooltip": {
+          "edit": "編輯提供者"
+        },
+        "row": {
+          "id_hint": "建立後不可變更"
+        },
+        "section": {
+          "configuration": "配置",
+          "models": "模型"
+        },
+        "models": {
+          "loading": "正在載入模型...",
+          "empty": "找不到模型。",
+          "retry": "重試",
+          "refresh": "重新整理清單",
+          "default_badge": "預設",
+          "set_default": "設為預設",
+          "fetch_error": "無法從提供者 API 取得模型。"
+        }
+      },
+      "capability": {
+        "translation": "翻譯",
+        "dictionary": "辭典",
+        "ocr": "OCR",
+        "llm": "AI"
+      },
+      "description": {
+        "all": "提供辭典查詢和文字翻譯",
+        "translation": "提供語言間文字翻譯",
+        "dictionary": "提供辭典查詢和單字釋義",
+        "fallback": "提供翻譯服務"
+      },
+      "delete_dialog": {
+        "title": "刪除「{}」？",
+        "message": "此操作無法復原。"
+      }
+    },
+    "layout": {
+      "title": "設定",
+      "empty": {
+        "title": "選擇一個分類",
+        "message": "從側邊欄選擇一個設定分類。"
+      },
+      "groups": "設定分組",
+      "effect_hint": "更改即時生效",
+      "footer_note": "譯文與金鑰僅保存在本機",
+      "support": "支援"
+    },
+    "about": {
+      "title": "關於",
+      "copy_version_info": "複製版本資訊",
+      "up_to_date": "已是最新版本。",
+      "check_again": "重新檢查",
+      "links": "連結",
+      "website": "網站",
+      "github": "GitHub",
+      "report_issue": "回報問題",
+      "license": "授權條款",
+      "open_changelog": "查看更新日誌",
+      "update": "更新"
+    }
+  }
+}

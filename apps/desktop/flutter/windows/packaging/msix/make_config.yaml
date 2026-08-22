@@ -1,0 +1,6 @@
+display_name: LinguaRay
+identity_name: io.github.gong1414.linguaray
+publisher: CN=LinguaRay
+publisher_display_name: LinguaRay contributors
+logo_path: windows\runner\resources\app_icon.ico
+store: 'true'

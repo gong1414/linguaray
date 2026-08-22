@@ -1,0 +1,118 @@
+use crate::common::http_client::HttpClient;
+use async_trait::async_trait;
+use beyondtranslate_core::{
+    Provider, TextTranslation, TranslateRequest, TranslateResponse, TranslationError,
+    TranslationService,
+};
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Serialize)]
+pub struct DeepLProviderConfig {
+    #[serde(rename = "appKey", alias = "apiKey", alias = "api_key")]
+    pub api_key: String,
+    #[serde(rename = "baseUrl", alias = "base_url")]
+    pub base_url: Option<String>,
+}
+
+pub struct DeepLProvider {
+    #[allow(dead_code)]
+    config: DeepLProviderConfig,
+    translation_service: DeepLTranslationService,
+}
+
+struct DeepLTranslationService {
+    api_key: String,
+    http: HttpClient,
+}
+
+impl DeepLProvider {
+    pub fn new(config: DeepLProviderConfig) -> Result<Self, String> {
+        if config.api_key.trim().is_empty() {
+            return Err("api_key must not be empty".to_owned());
+        }
+        Ok(Self {
+            config: config.clone(),
+            translation_service: DeepLTranslationService {
+                api_key: config.api_key,
+                http: HttpClient::new(
+                    config
+                        .base_url
+                        .unwrap_or_else(|| "https://api.deepl.com".to_owned()),
+                    Default::default(),
+                ),
+            },
+        })
+    }
+}
+
+#[async_trait(?Send)]
+impl TranslationService for DeepLTranslationService {
+    async fn translate(
+        &self,
+        request: TranslateRequest,
+    ) -> Result<TranslateResponse, TranslationError> {
+        let mut form_fields = vec![
+            ("text".to_owned(), request.text),
+            (
+                "target_lang".to_owned(),
+                request.target_language.ok_or_else(|| {
+                    TranslationError::InvalidRequest("target_language is required".to_owned())
+                })?,
+            ),
+        ];
+
+        if let Some(source_language) = request.source_language {
+            form_fields.push(("source_lang".to_owned(), source_language.to_uppercase()));
+        }
+
+        let response = self
+            .http
+            .post("/v2/translate")
+            .header("Authorization", format!("DeepL-Auth-Key {}", self.api_key))
+            .form(&form_fields);
+
+        let response = self
+            .http
+            .execute(response)
+            .await
+            .map_err(TranslationError::from_network_error)?;
+        let response = TranslationError::from_response("deepl", response).await?;
+        let payload: DeepLTranslateResponse = response
+            .json()
+            .await
+            .map_err(|error| TranslationError::SerializationError(error.to_string()))?;
+
+        let translations = payload
+            .translations
+            .into_iter()
+            .map(|item| TextTranslation {
+                detected_source_language: item.detected_source_language,
+                text: item.text,
+                audio_url: None,
+            })
+            .collect();
+
+        Ok(TranslateResponse { translations })
+    }
+}
+
+impl Provider for DeepLProvider {
+    fn name(&self) -> &'static str {
+        "deepl"
+    }
+
+    fn translation(&self) -> Option<&dyn TranslationService> {
+        Some(&self.translation_service)
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct DeepLTranslateResponse {
+    translations: Vec<DeepLTranslation>,
+}
+
+#[derive(Debug, Deserialize)]
+struct DeepLTranslation {
+    detected_source_language: Option<String>,
+    text: String,
+}

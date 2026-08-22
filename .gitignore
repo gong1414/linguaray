@@ -1,0 +1,28 @@
+# IntelliJ related
+*.iml
+.idea/
+
+# Flutter/Dart/Pub related
+.dart_tool/
+node_modules/
+
+**/pubspec_overrides.yaml
+
+# Rust related
+/target/
+**/target/
+
+# macOS related
+.DS_Store
+**/macos/Pods/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Build artifacts
+**/dist/
+!assets/brand/linguaray/dist/
+!assets/brand/linguaray/dist/**
