@@ -4,7 +4,8 @@ mod languages;
 mod provider;
 
 pub use engine::{
-    from_yaml_str, load_from_file, Engine, EngineConfig, EngineError, ProviderConfig, ProviderType,
+    from_config, from_yaml_str, load_from_file, Engine, EngineConfig, EngineError, ProviderConfig,
+    ProviderType,
 };
 pub use languages::{all_languages, app_languages};
 pub use linguaray_core::{
