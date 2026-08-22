@@ -1,5 +1,3 @@
-// ignore_for_file: deprecated_member_use
-
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -41,7 +39,7 @@ import 'translation_target_select_view.dart';
 const double _kTrayInset = 8;
 
 class MiniTranslatorPage extends StatefulWidget {
-  const MiniTranslatorPage({Key? key}) : super(key: key);
+  const MiniTranslatorPage({super.key});
 
   @override
   State<StatefulWidget> createState() => _MiniTranslatorPageState();
@@ -140,7 +138,7 @@ class _MiniTranslatorPageState extends State<MiniTranslatorPage>
   @override
   void didChangePlatformBrightness() {
     Brightness newBrightness =
-        WidgetsBinding.instance.window.platformBrightness;
+        WidgetsBinding.instance.platformDispatcher.platformBrightness;
 
     if (newBrightness != _brightness) {
       _setStateAndScheduleWindowResize(() {

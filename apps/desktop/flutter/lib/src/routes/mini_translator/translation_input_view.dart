@@ -18,7 +18,7 @@ import '../../widgets/ui.dart'
 
 class MiniTranslatorInput extends StatelessWidget {
   const MiniTranslatorInput({
-    Key? key,
+    super.key,
     required this.focusNode,
     required this.controller,
     required this.text,
@@ -28,7 +28,7 @@ class MiniTranslatorInput extends StatelessWidget {
     required this.onChanged,
     required this.onSubmitted,
     required this.onClear,
-  }) : super(key: key);
+  });
 
   final FocusNode focusNode;
   final TextEditingController controller;
@@ -113,7 +113,7 @@ class MiniTranslatorInput extends StatelessWidget {
 
 class MiniTranslatorActionButtons extends StatelessWidget {
   const MiniTranslatorActionButtons({
-    Key? key,
+    super.key,
     required this.inputSubmitMode,
     required this.hasContent,
     required this.copied,
@@ -123,7 +123,7 @@ class MiniTranslatorActionButtons extends StatelessWidget {
     required this.onCopy,
     required this.onBookmark,
     required this.onTranslate,
-  }) : super(key: key);
+  });
 
   /// Only so the 翻译 chip names the key that submits — the button is a way
   /// to the same place the key goes.

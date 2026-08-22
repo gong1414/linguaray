@@ -8,17 +8,16 @@ const kDialogActionTypeSecondary = 'secondary';
 const kDialogActionTypeSuccess = 'success';
 const kDialogActionTypeDanger = 'danger';
 
-// ignore: must_be_immutable
 class CustomDialogAction extends StatelessWidget {
-  CustomDialogAction({
-    Key? key,
+  const CustomDialogAction({
+    super.key,
     this.type,
     this.processing = false,
     required this.child,
     this.onPressed,
-  }) : super(key: key);
+  });
 
-  String? type;
+  final String? type;
   final bool processing;
   final Widget child;
   final VoidCallback? onPressed;
@@ -44,8 +43,7 @@ class CustomDialogAction extends StatelessWidget {
 }
 
 class CustomAlertDialog extends StatelessWidget {
-  const CustomAlertDialog({Key? key, this.title, this.content, this.actions})
-      : super(key: key);
+  const CustomAlertDialog({super.key, this.title, this.content, this.actions});
   final Widget? title;
   final Widget? content;
   final List<Widget>? actions;
@@ -97,13 +95,22 @@ class CustomAlertDialog extends StatelessWidget {
                         builder: (_) {
                           CustomDialogAction action =
                               actions![i] as CustomDialogAction;
-                          if (action.type == null && i == actions!.length - 1) {
-                            action.type = kDialogActionTypePrimary;
-                          }
+                          // The trailing action defaults to primary; resolve
+                          // it through a copy instead of mutating the child.
+                          final isLast = i == actions!.length - 1;
+                          final resolved = action.type == null && isLast
+                              ? CustomDialogAction(
+                                  key: action.key,
+                                  type: kDialogActionTypePrimary,
+                                  processing: action.processing,
+                                  onPressed: action.onPressed,
+                                  child: action.child,
+                                )
+                              : action;
                           return Expanded(
                             child: Container(
                               padding: const EdgeInsets.only(left: 5, right: 5),
-                              child: action,
+                              child: resolved,
                             ),
                           );
                         },
