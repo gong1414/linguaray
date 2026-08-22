@@ -1,0 +1,45 @@
+name: linguaray_workspace
+publish_to: "none"
+repository: https://github.com/gong1414/linguaray
+
+environment:
+  sdk: ">=3.6.0 <4.0.0"
+
+workspace:
+  - apps/desktop/flutter
+  - packages/runtime
+  - packages/ui_flutter
+
+dev_dependencies:
+  flutter_lints: ^2.0.0
+  melos: ^7.0.0
+
+melos:
+  scripts:
+    analyze:
+      run: dart run melos exec -c 1 -- flutter analyze --fatal-infos
+      description: Run `flutter analyze` for all packages.
+
+    codegen:
+      run: python3 scripts/codegen.py
+      description: Regenerate Dart/Swift FFI bindings and macOS localization files.
+
+    format:
+      run: python3 scripts/format.py
+      description: Format Dart, Rust, and Swift source files.
+
+    format-check:
+      run: python3 scripts/format.py --check
+      description: Check formatting of Dart, Rust, and Swift source files.
+
+    fix:
+      exec: dart fix . --apply
+      description: Run `dart fix` for all packages.
+
+    test:
+      exec: flutter test
+      description: Run `flutter test` for all packages.
+
+    dependency_validator:
+      run: dart run dependency_validator -C apps/desktop/flutter
+      description: Validate dependencies for workspace packages.

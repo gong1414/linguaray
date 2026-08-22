@@ -1,0 +1,565 @@
+{
+  "common": {
+    "ui": {
+      "button": {
+        "ok": "확인",
+        "cancel": "취소",
+        "add": "추가",
+        "delete": "삭제",
+        "edit": "편집",
+        "save": "저장",
+        "manage": "관리",
+        "continue": "계속"
+      },
+      "feedback": {
+        "copied": "복사됨"
+      }
+    },
+    "language": {
+      "ar": "아랍어",
+      "bn": "벵골어",
+      "de": "독일어",
+      "en": "영어",
+      "es": "스페인어",
+      "fa": "페르시아어",
+      "fr": "프랑스어",
+      "gu": "구자라트어",
+      "ha": "하우사어",
+      "hi": "힌디어",
+      "id": "인도네시아어",
+      "it": "이탈리아어",
+      "ja": "일본어",
+      "jv": "자바어",
+      "ko": "한국어",
+      "ml": "말라얄람어",
+      "mr": "마라티어",
+      "ms": "말레이어",
+      "nl": "네덜란드어",
+      "pa": "펀자브어",
+      "pl": "폴란드어",
+      "pt": "포르투갈어",
+      "ro": "루마니아어",
+      "ru": "러시아어",
+      "sw": "스와힐리어",
+      "ta": "타밀어",
+      "te": "텔루구어",
+      "th": "태국어",
+      "tr": "터키어",
+      "uk": "우크라이나어",
+      "ur": "우르두어",
+      "vi": "베트남어",
+      "yo": "요루바어",
+      "zh_hans": "중국어(간체)",
+      "zh_hant": "중국어(번체)"
+    },
+    "theme_mode": {
+      "light": "라이트",
+      "dark": "다크",
+      "system": "시스템"
+    },
+    "theme_style": {
+      "studio": "Studio",
+      "bright": "Bright"
+    },
+    "provider": {
+      "anthropic": "Anthropic",
+      "baidu": "Baidu",
+      "caiyun": "Caiyun",
+      "deepl": "DeepL",
+      "google": "Google",
+      "ollama": "Ollama",
+      "openai": "OpenAI",
+      "sogou": "Sogou",
+      "xai": "xAI",
+      "system": "시스템",
+      "tencent": "Tencent",
+      "youdao": "Youdao"
+    }
+  },
+  "app": {
+    "tray": {
+      "context_menu": {
+        "show_window": "창 보기",
+        "dev_tools": {
+          "title": "개발자 도구",
+          "open_data_directory": "데이터 디렉터리 열기"
+        },
+        "check_for_updates": "업데이트 확인",
+        "settings": "설정",
+        "quit": "종료"
+      }
+    }
+  },
+  "mini_translator": {
+    "limited_banner": {
+      "permission": {
+        "missing_both": "모든 기능을 사용하려면 화면 녹화 및 손쉬운 사용 권한을 부여하세요.",
+        "missing_screen_capture": "모든 기능을 사용하려면 화면 녹화 권한을 부여하세요.",
+        "missing_accessibility": "모든 기능을 사용하려면 손쉬운 사용 권한을 부여하세요."
+      },
+      "instruction": {
+        "app_settings_prefix": "",
+        "follow_guide_prefix": "로 이동하여 안내를 따라 ",
+        "suffix": "을(를) 클릭하세요."
+      },
+      "action": {
+        "app_settings": "앱 설정",
+        "recheck": "재확인"
+      },
+      "feedback": {
+        "enabled": "화면 텍스트 추출이 활성화되었습니다.",
+        "still_missing": "필요한 권한이 아직 부여되지 않았습니다.\n설정을 확인한 후 다시 시도해 주세요."
+      },
+      "tooltip": {
+        "help": "도움말 보기"
+      }
+    },
+    "input": {
+      "hint": "단어나 텍스트를 입력하세요",
+      "extracting_text": "텍스트 추출 중...",
+      "hint_translate_to": "단어나 텍스트를 입력해 $language(으)로 번역"
+    },
+    "toolbar": {
+      "tooltip": {
+        "extract_text_from_screen_capture": "화면 영역을 캡처하여 텍스트 인식",
+        "extract_text_from_clipboard": "클립보드 내용 읽기",
+        "pin": "창 고정",
+        "more_actions": "더 보기"
+      },
+      "menu": {
+        "extract_from_screen_capture": "화면에서 추출",
+        "extract_from_clipboard": "클립보드에서 추출",
+        "open_main_window": "메인 창 열기",
+        "open_settings": "설정…"
+      }
+    },
+    "button": {
+      "clear": "지우기",
+      "translate": "번역",
+      "copy": "복사",
+      "copied": "복사됨",
+      "bookmark": "저장",
+      "bookmarked": "저장됨"
+    },
+    "language": {
+      "auto_detect": "자동 감지",
+      "auto_match": "자동 일치",
+      "switch_config": "대상 전환",
+      "more_languages": "더 많은 언어...",
+      "manage_common_languages": "자주 사용하는 언어 관리...",
+      "manage_targets": "번역 대상 관리...",
+      "add_target": "번역 대상 추가..."
+    },
+    "message": {
+      "please_enter_word_or_text": "입력된 텍스트가 없거나 텍스트를 추출하지 못했습니다",
+      "capture_screen_area_canceled": "화면 영역 캡처가 취소되었습니다",
+      "ocr_service_not_configured": "기본 텍스트 인식 서비스가 설정되지 않았습니다. 설정에서 설정해주세요.",
+      "ocr_recognition_failed": "텍스트 인식 실패"
+    },
+    "result": {
+      "translating": "번역 중…",
+      "stale_requery": "원문이 수정됨 · $key 다시 번역",
+      "compare_services": "서비스 $count개 비교",
+      "collapse_compare": "비교 접기",
+      "set_preferred": "기본으로 설정",
+      "retry": "다시 시도",
+      "no_result": "어떤 서비스도 결과를 반환하지 않았습니다. 네트워크를 확인하거나 다른 서비스을 사용해 보세요.",
+      "no_result_note": "원문은 유지되며, 다시 시도해도 기록이 중복되지 않습니다."
+    }
+  },
+  "workbench": {
+    "workspace": "작업 공간",
+    "translate": "번역",
+    "history": "기록",
+    "history_page": {
+      "all": "전체",
+      "favorites": "즐겨찾기",
+      "edited": "내가 수정함",
+      "search": "검색",
+      "search_placeholder": "원문, 번역문 또는 서비스 검색",
+      "search_label": "기록 검색",
+      "entry_count": "$label · $count개",
+      "by_time": "시간순",
+      "loading": "기록 불러오는 중…",
+      "load_failed": "기록을 불러오지 못했습니다",
+      "retry": "다시 시도",
+      "empty_title": "번역 기록이 없습니다",
+      "empty_description": "번역이 완료되면 선호 번역이 여기에 저장됩니다.",
+      "no_results": "“$query”와 일치하는 기록이 없습니다",
+      "clear_search": "검색 지우기",
+      "select": "다중 선택",
+      "selected_count": "$count개 선택됨",
+      "exit_select": "선택 종료",
+      "add_to_glossary": "용어집에 추가",
+      "favorite": "즐겨찾기",
+      "unfavorite": "즐겨찾기 해제",
+      "delete_confirm": "선택한 기록 $count개를 삭제할까요? 되돌릴 수 없습니다.",
+      "no_glossary": "먼저 용어집을 만드세요",
+      "added_to_glossary": "기록 $count개를 용어집에 추가했습니다",
+      "favorite_flag": "즐겨찾기",
+      "edited_flag": "수정됨",
+      "edit_history_hint": "수정한 번역은 기록에 저장됩니다"
+    },
+    "glossary": "용어집",
+    "recent_languages": "최근 언어",
+    "not_configured": "설정되지 않음",
+    "subtitle": {
+      "translate": "워크벤치 · 서비스 비교",
+      "settings": "설정"
+    },
+    "placeholder": {
+      "history": "즐겨찾기와 기록은 향후 버전에서 제공됩니다",
+      "glossary": "용어집 관리를 개발 중입니다"
+    },
+    "glossary_page": {
+      "add_entry": "용어 추가",
+      "term": "원문",
+      "translation": "지정 번역",
+      "forbidden": "금지",
+      "hits": "적중",
+      "term_placeholder": "teacher forcing",
+      "translation_placeholder": "교사 강요",
+      "forbidden_placeholder": "강제 교육",
+      "search": "검색",
+      "search_placeholder": "용어 또는 지정 번역 검색",
+      "search_label": "용어집 검색",
+      "entry_count": "$name · $count개",
+      "priority_note": "용어집은 어떤 서비스 출력보다 우선합니다",
+      "new_book": "용어집 만들기",
+      "new_book_placeholder": "용어집 이름",
+      "rename_book": "이름 바꾸기",
+      "delete_book_confirm": "“$name”과(와) 그 안의 용어 $count개를 삭제할까요?",
+      "disabled": "사용 안 함",
+      "enable": "사용",
+      "disable": "사용 안 함",
+      "empty_title": "이 용어집은 비어 있습니다",
+      "empty_description": "용어집은 어떤 서비스 출력보다 우선합니다. 하나씩 추가하거나 CSV를 끌어다 놓아 병합하세요.",
+      "no_results_title": "“$query”와(과) 일치하는 용어가 없습니다",
+      "no_results_description": "다른 키워드를 쓰거나 새로 추가해 보세요.",
+      "no_books_title": "아직 용어집이 없습니다",
+      "no_books_description": "용어집은 선택한 번역어를 모든 서비스에서 일관되게 유지합니다. 먼저 하나 만들고 용어를 추가하세요.",
+      "loading": "불러오는 중…"
+    },
+    "translation": {
+      "source": "원문",
+      "target": "번역문",
+      "input_hint": "번역할 텍스트를 입력하거나 붙여넣으세요",
+      "button": "번역",
+      "auto_detected": "자동 감지됨",
+      "loading_services": "번역 서비스를 불러오는 중…",
+      "no_services": "먼저 설정에서 번역 서비스를 구성하세요",
+      "translating": "번역 중…",
+      "failed": "번역에 실패했습니다. 서비스 설정을 확인하세요.",
+      "empty": "번역문이 여기에 표시됩니다",
+      "service_compare": "서비스 비교",
+      "main_translation": "기본 번역",
+      "service_unavailable": "서비스를 사용할 수 없음",
+      "waiting": "번역 대기",
+      "copy": "복사",
+      "favorite_unavailable": "즐겨찾기는 향후 버전에서 제공됩니다",
+      "preferred": "기본 번역",
+      "other_services": "다른 서비스",
+      "copy_result": "번역 복사",
+      "copied": "복사됨",
+      "favorite": "저장",
+      "terms": "용어 일치",
+      "terms_hint": "입력하면 용어집과 대조합니다.",
+      "quality": "품질 신호",
+      "quality_hint": "번역이 완료되면 계산됩니다.",
+      "shortcuts": "단축키",
+      "other_services_disabled": "다른 서비스이 비활성화됨",
+      "input_hint_translate_to": "번역할 텍스트를 입력하거나 붙여넣어 $language(으)로 번역"
+    },
+    "status": {
+      "runtime_ready": "번역 런타임 준비 완료",
+      "settings_synced": "설정 동기화됨",
+      "shortcuts": "⌥Space 빠른 창 · ⌥⇧2 캡처"
+    },
+    "version_latest": "최신 버전입니다",
+    "version_checking": "확인 중…",
+    "check_updates": "업데이트 확인"
+  },
+  "settings": {
+    "version": "v{} (Build {})",
+    "general": {
+      "title": "일반",
+      "section": {
+        "permissions": "시스템 권한",
+        "ocr": "텍스트 인식",
+        "directory": "사전",
+        "translation": "번역",
+        "translation_target": "번역 대상",
+        "languages": "언어",
+        "input": "입력 설정",
+        "startup": "시작 및 통합",
+        "ocr_behaviour": "가져오기 동작",
+        "translation_behaviour": "번역 동작"
+      },
+      "row": {
+        "launch_at_login": "로그인할 때 시작",
+        "show_in_menu_bar": "메뉴 막대에 표시",
+        "screen_capture_access": "화면 기록 접근 권한 부여",
+        "screen_selection_access": "손쉬운 사용 접근 권한 부여",
+        "default_ocr_service": "기본 텍스트 인식 서비스",
+        "auto_copy_detected_text": "감지된 텍스트 자동 복사",
+        "default_directory_service": "기본 사전 서비스",
+        "default_translation_service": "기본 번역 서비스",
+        "translation_target_hint": "번역기에 사용할 언어 쌍을 설정합니다.",
+        "common_languages": "자주 사용하는 언어",
+        "common_languages_description": "자주 사용하는 언어는 언어 선택기 상단에 표시됩니다.",
+        "common_languages_hint": "자주 사용하는 언어를 선택하세요:",
+        "common_languages_sort": "코드로 정렬",
+        "common_languages_reset": "기본값으로 재설정",
+        "common_languages_reset_help": "기본 공용 언어 세트로 재설정",
+        "common_languages_search": "언어 검색...",
+        "common_languages_all": "모든 언어",
+        "double_click_copy_result": "더블 클릭으로 번역 결과 복사",
+        "submit_with_enter": "Enter로 제출",
+        "submit_with_meta_enter_mac": "⌘ + Enter로 제출",
+        "screen_capture_access_hint": "화면에서 텍스트를 가져오려면 화면 내용을 읽어야 합니다.",
+        "screen_selection_access_hint": "선택한 텍스트를 가져오려면 다른 앱의 선택 항목을 읽어야 합니다.",
+        "no_translation_targets": "번역 대상이 없습니다. 기본 번역 언어를 정하려면 하나 추가하세요."
+      },
+      "button": {
+        "add_provider": "추가...",
+        "add_target": "대상 추가...",
+        "manage_targets": "번역 대상 관리...",
+        "manage_languages": "자주 사용하는 언어 관리...",
+        "grant": "허용"
+      },
+      "option": {
+        "none": "없음",
+        "no_services_available": "사용 가능한 서비스가 없습니다",
+        "granted": "허용됨",
+        "built_in_ocr": "내장 OCR",
+        "tesseract": "Tesseract",
+        "youdao_ocr": "Youdao OCR"
+      },
+      "editor": {
+        "add_target_title": "번역 대상 추가",
+        "edit_target_title": "번역 대상 수정",
+        "row": {
+          "source_language": "소스 언어",
+          "target_language": "대상 언어"
+        },
+        "title_edit": "번역 대상 편집",
+        "subtitle": "특정 원본 언어를 기본으로 어떤 언어로 번역할지 정합니다",
+        "same_language": "원본 언어와 대상 언어가 같습니다. 다른 대상을 선택하세요.",
+        "duplicate": "같은 조합의 대상이 이미 있습니다.",
+        "hint_auto": "다른 규칙과 일치하지 않으면 {}(으)로 번역합니다.",
+        "hint_source": "{}이(가) 감지되면 {}(으)로 번역합니다."
+      }
+    },
+    "appearance": {
+      "title": "외관",
+      "section": {
+        "app_language": "표시 언어",
+        "theme_mode": "테마 모드",
+        "theme_style": "테마 스타일"
+      },
+      "footer": "변경 사항은 창 전체에 즉시 적용됩니다."
+    },
+    "shortcuts": {
+      "title": "단축키",
+      "section": {
+        "text_extraction": "텍스트 추출",
+        "input_assist": "입력 보조 기능",
+        "submit_mode": "전송 방식"
+      },
+      "row": {
+        "toggle_mini_translator": "창 보이기/숨기기",
+        "extract_text_from_screen_selection": "화면 선택 영역에서 텍스트 추출",
+        "extract_text_from_screen_capture": "화면 캡처에서 텍스트 추출",
+        "extract_text_from_clipboard": "클립보드에서 텍스트 추출",
+        "translate_input": "입력 내용 번역"
+      },
+      "reset_dialog": {
+        "title": "단축키 초기화",
+        "message": "모든 단축키를 기본값으로 초기화하시겠습니까?",
+        "confirm": "초기화",
+        "cancel": "취소"
+      },
+      "group": {
+        "global": {
+          "title": "전역 단축키",
+          "description": "모든 앱에서 작동합니다."
+        },
+        "in_app": {
+          "title": "앱 내 키",
+          "description": "이 앱의 입력란에서만 적용됩니다."
+        }
+      },
+      "reset": "기본값 복원..."
+    },
+    "advanced": {
+      "title": "고급",
+      "api_server": "로컬 API 서버",
+      "api_server_description": "로컬 통합을 위해 127.0.0.1에서 번역 API를 노출합니다.",
+      "enable": "활성화",
+      "port": "포트",
+      "running_at": "{url}에서 실행 중",
+      "disabled": "비활성화됨"
+    },
+    "services": {
+      "title": "서비스",
+      "button": {
+        "add_service": "서비스 추가..."
+      },
+      "section": {
+        "available_services": "사용 가능한 서비스"
+      },
+      "editor": {
+        "title": "서비스 추가",
+        "subtitle": "구성된 제공자에 서비스를 하나 더 추가합니다",
+        "row": {
+          "model": "모델",
+          "system_prompt": "시스템 프롬프트"
+        },
+        "prompt_placeholder": "비워 두면 이 유형의 기본 프롬프트를 사용합니다",
+        "variant_hint": "{}에 이미 {} 서비스가 있습니다. 이 서비스는 별도의 구성으로 나란히 추가됩니다.",
+        "traditional_note": "{}은(는) 전통적인 인터페이스라 조정할 모델이나 프롬프트가 없습니다. 매개변수는 제공자 상세 페이지에서 설정합니다."
+      },
+      "detail": {
+        "row": {
+          "id": "서비스 ID",
+          "name": "이름",
+          "provider": "제공자",
+          "type": "유형"
+        },
+        "delete_dialog": {
+          "title": "\"{}\"을(를) 삭제할까요?",
+          "message": "이 서비스가 제공자에서 제거됩니다."
+        },
+        "prompt_variables": "사용 가능한 변수: {{sourceLanguage}}, {{targetLanguage}}, {{text}}"
+      },
+      "make_default": "기본으로 설정",
+      "item": {
+        "none_of_kind": "사용할 수 있는 {} 서비스가 아직 없습니다."
+      }
+    },
+    "providers": {
+      "title": "제공자",
+      "section": {
+        "services": "사용 가능한 서비스",
+        "services_description": "구성된 제공업체의 사용 가능한 서비스를 확인하고 서비스 유형별로 전환합니다."
+      },
+      "item": {
+        "empty": "구성된 제공자가 없습니다. 추가하여 번역 서비스를 활성화하세요.",
+        "loading": "제공자 로딩 중...",
+        "no_services": "사용 가능한 서비스가 없습니다."
+      },
+      "button": {
+        "add": "제공자 추가..."
+      },
+      "alert": {
+        "error": "오류"
+      },
+      "intro": {
+        "body": "앱에서 사용하는 서비스 제공업체를 관리합니다.",
+        "warning": "연결된 제공업체는 사용자가 보낸 텍스트나 이미지를 처리할 수 있습니다. 신뢰할 수 있는 서비스만 활성화하세요."
+      },
+      "editor": {
+        "row": {
+          "id": "제공자 ID",
+          "type": "제공자 유형",
+          "default_model": "기본 모델"
+        },
+        "placeholder": {
+          "id": "예: deepl-main"
+        },
+        "type_picker": {
+          "prompt": "추가할 제공자 유형을 선택하세요:",
+          "section_llm": "LLM",
+          "section_traditional": "전통"
+        },
+        "tooltip": {
+          "help": "도움말"
+        },
+        "step": {
+          "next": "계속",
+          "back": "이전"
+        },
+        "add_title": "{} 추가",
+        "capability_note": {
+          "translation": "번역 후보에 참여합니다",
+          "dictionary": "사전 뜻풀이를 제공합니다",
+          "ocr": "이미지 속 문자를 인식합니다"
+        },
+        "test": {
+          "run": "연결 테스트",
+          "running": "연결 테스트 중 · {}s 경과",
+          "passed_models": "연결 정상 · 모델 {}개 사용 가능",
+          "passed_service": "연결 정상 · 서비스 사용 가능",
+          "passed_footer": "연결 테스트를 통과했습니다",
+          "retest": "다시 테스트",
+          "tips_title": "이렇게 해보세요",
+          "tips_llm": "· 키가 선택한 제공자 유형과 맞는지 확인하세요\n· Base URL에 /v1이 필요한지 확인하세요\n· 제공자 콘솔에서 해당 모델이 활성화되어 있는지 확인하세요",
+          "tips_traditional": "· 자격 증명이 선택한 제공자 유형과 맞는지 확인하세요\n· 제공자 콘솔에서 서비스가 활성화되어 있는지 확인하세요",
+          "failed_suffix": "검증 실패",
+          "passed_suffix": "검증됨"
+        }
+      },
+      "detail": {
+        "tooltip": {
+          "edit": "제공자 편집"
+        },
+        "row": {
+          "id_hint": "생성 후에는 변경할 수 없습니다"
+        },
+        "section": {
+          "configuration": "구성",
+          "models": "모델"
+        },
+        "models": {
+          "loading": "모델 로딩 중...",
+          "empty": "모델을 찾을 수 없습니다.",
+          "retry": "재시도",
+          "refresh": "목록 새로 고침",
+          "default_badge": "기본값",
+          "set_default": "기본값으로 설정",
+          "fetch_error": "제공자 API에서 모델을 가져올 수 없습니다."
+        }
+      },
+      "capability": {
+        "translation": "번역",
+        "dictionary": "사전",
+        "ocr": "OCR",
+        "llm": "AI"
+      },
+      "description": {
+        "all": "사전 검색 및 텍스트 번역을 제공합니다",
+        "dictionary": "사전 검색 및 단어 정의를 제공합니다",
+        "translation": "언어 간 텍스트 번역을 제공합니다",
+        "fallback": "번역 서비스를 제공합니다"
+      },
+      "delete_dialog": {
+        "title": "\"{}\"을(를) 삭제하시겠습니까?",
+        "message": "이 작업은 되돌릴 수 없습니다."
+      }
+    },
+    "layout": {
+      "title": "설정",
+      "empty": {
+        "title": "카테고리 선택",
+        "message": "사이드바에서 설정 섹션을 선택하세요."
+      },
+      "groups": "설정 그룹",
+      "effect_hint": "변경 사항 즉시 적용",
+      "footer_note": "번역과 키는 이 기기에만 저장됩니다",
+      "support": "지원"
+    },
+    "about": {
+      "title": "정보",
+      "copy_version_info": "버전 정보 복사",
+      "up_to_date": "최신 버전입니다.",
+      "check_again": "다시 확인",
+      "links": "링크",
+      "website": "웹사이트",
+      "github": "GitHub",
+      "report_issue": "문제 보고",
+      "license": "라이선스",
+      "open_changelog": "변경 내역 열기",
+      "update": "업데이트"
+    }
+  }
+}

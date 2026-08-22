@@ -1,0 +1,12 @@
+{
+  "name": "@linguaray/brand-assets",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Reproducible LinguaRay brand asset generation",
+  "scripts": {
+    "generate": "node tools/generate_brand_assets.js"
+  },
+  "devDependencies": {
+    "sharp": "0.35.3"
+  }
+}

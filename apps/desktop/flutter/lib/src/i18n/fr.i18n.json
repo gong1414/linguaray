@@ -1,0 +1,565 @@
+{
+  "common": {
+    "ui": {
+      "button": {
+        "ok": "OK",
+        "cancel": "Annuler",
+        "add": "Ajouter",
+        "delete": "Supprimer",
+        "edit": "Modifier",
+        "save": "Enregistrer",
+        "manage": "Gérer",
+        "continue": "Continuer"
+      },
+      "feedback": {
+        "copied": "Copié"
+      }
+    },
+    "language": {
+      "ar": "Arabe",
+      "bn": "Bengali",
+      "de": "Allemand",
+      "en": "Anglais",
+      "es": "Espagnol",
+      "fa": "Persan",
+      "fr": "Français",
+      "gu": "Gujarati",
+      "ha": "Haoussa",
+      "hi": "Hindi",
+      "id": "Indonésien",
+      "it": "Italien",
+      "ja": "Japonais",
+      "jv": "Javanais",
+      "ko": "Coréen",
+      "ml": "Malayalam",
+      "mr": "Marathi",
+      "ms": "Malais",
+      "nl": "Néerlandais",
+      "pa": "Pendjabi",
+      "pl": "Polonais",
+      "pt": "Portugais",
+      "ro": "Roumain",
+      "ru": "Russe",
+      "sw": "Swahili",
+      "ta": "Tamoul",
+      "te": "Télougou",
+      "th": "Thaï",
+      "tr": "Turc",
+      "uk": "Ukrainien",
+      "ur": "Ourdou",
+      "vi": "Vietnamien",
+      "yo": "Yoruba",
+      "zh_hans": "Chinois simplifié",
+      "zh_hant": "Chinois traditionnel"
+    },
+    "theme_mode": {
+      "light": "Clair",
+      "dark": "Sombre",
+      "system": "Système"
+    },
+    "theme_style": {
+      "studio": "Studio",
+      "bright": "Bright"
+    },
+    "provider": {
+      "anthropic": "Anthropic",
+      "baidu": "Baidu",
+      "caiyun": "Caiyun",
+      "deepl": "DeepL",
+      "google": "Google",
+      "ollama": "Ollama",
+      "openai": "OpenAI",
+      "sogou": "Sogou",
+      "xai": "xAI",
+      "system": "Système",
+      "tencent": "Tencent",
+      "youdao": "Youdao"
+    }
+  },
+  "app": {
+    "tray": {
+      "context_menu": {
+        "show_window": "Afficher la fenêtre",
+        "dev_tools": {
+          "title": "Outils de développement",
+          "open_data_directory": "Ouvrir le répertoire de données"
+        },
+        "check_for_updates": "Vérifier les mises à jour",
+        "settings": "Paramètres",
+        "quit": "Quitter"
+      }
+    }
+  },
+  "mini_translator": {
+    "limited_banner": {
+      "permission": {
+        "missing_both": "Accordez les autorisations d'enregistrement d'écran et d'accessibilité pour activer toutes les fonctionnalités.",
+        "missing_screen_capture": "Accordez l'autorisation d'enregistrement d'écran pour activer toutes les fonctionnalités.",
+        "missing_accessibility": "Accordez l'autorisation d'accessibilité pour activer toutes les fonctionnalités."
+      },
+      "instruction": {
+        "app_settings_prefix": "Accédez aux ",
+        "follow_guide_prefix": ", suivez le guide, puis cliquez sur ",
+        "suffix": "."
+      },
+      "action": {
+        "app_settings": "Paramètres de l'application",
+        "recheck": "Re-vérifier"
+      },
+      "feedback": {
+        "enabled": "L'extraction de texte d'écran est activée.",
+        "still_missing": "Les autorisations requises sont toujours manquantes.\nVeuillez vérifier vos paramètres et réessayer."
+      },
+      "tooltip": {
+        "help": "Voir l'aide"
+      }
+    },
+    "input": {
+      "hint": "Saisissez le mot ou le texte ici",
+      "extracting_text": "Extraction du texte...",
+      "hint_translate_to": "Saisissez un mot ou un texte à traduire en $language"
+    },
+    "toolbar": {
+      "tooltip": {
+        "extract_text_from_screen_capture": "Capturer une zone de l'écran et reconnaître le texte",
+        "extract_text_from_clipboard": "Lire le contenu du presse-papiers",
+        "pin": "Épingler la fenêtre",
+        "more_actions": "Plus d’actions"
+      },
+      "menu": {
+        "extract_from_screen_capture": "Capturer depuis l’écran",
+        "extract_from_clipboard": "Depuis le presse-papiers",
+        "open_main_window": "Ouvrir la fenêtre principale",
+        "open_settings": "Réglages…"
+      }
+    },
+    "button": {
+      "clear": "Effacer",
+      "translate": "Traduire",
+      "copy": "Copier",
+      "copied": "Copié",
+      "bookmark": "Enregistrer",
+      "bookmarked": "Enregistré"
+    },
+    "language": {
+      "auto_detect": "Détection automatique",
+      "auto_match": "Correspondance auto",
+      "switch_config": "Changer de cible",
+      "more_languages": "Plus de langues...",
+      "manage_common_languages": "Gérer les langues courantes...",
+      "manage_targets": "Gérer les cibles de traduction...",
+      "add_target": "Ajouter une cible de traduction..."
+    },
+    "message": {
+      "please_enter_word_or_text": "Aucun texte saisi ou texte non extrait",
+      "capture_screen_area_canceled": "La capture de la zone d'écran a été annulée",
+      "ocr_service_not_configured": "Aucun service de reconnaissance de texte par défaut configuré. Veuillez en définir un dans les Paramètres.",
+      "ocr_recognition_failed": "La reconnaissance de texte a échoué"
+    },
+    "result": {
+      "translating": "Traduction…",
+      "stale_requery": "Texte modifié · $key retraduire",
+      "compare_services": "Comparer $count services",
+      "collapse_compare": "Réduire",
+      "set_preferred": "Définir comme préféré",
+      "retry": "Réessayer",
+      "no_result": "Aucun service n’a renvoyé de résultat : vérifiez le réseau ou essayez un autre service.",
+      "no_result_note": "Le texte est conservé ; réessayer ne dupliquera pas l’historique."
+    }
+  },
+  "workbench": {
+    "workspace": "Espace de travail",
+    "translate": "Traduire",
+    "history": "Historique",
+    "history_page": {
+      "all": "Tout",
+      "favorites": "Favoris",
+      "edited": "Modifiés par moi",
+      "search": "Rechercher",
+      "search_placeholder": "Rechercher le texte, la traduction ou le service",
+      "search_label": "Rechercher dans l’historique",
+      "entry_count": "$label · $count entrées",
+      "by_time": "Par date",
+      "loading": "Chargement de l’historique…",
+      "load_failed": "Échec du chargement de l’historique",
+      "retry": "Réessayer",
+      "empty_title": "Aucun historique de traduction",
+      "empty_description": "La traduction préférée est enregistrée ici après chaque réussite.",
+      "no_results": "Aucun résultat pour « $query »",
+      "clear_search": "Effacer la recherche",
+      "select": "Sélection multiple",
+      "selected_count": "$count sélectionnées",
+      "exit_select": "Quitter la sélection",
+      "add_to_glossary": "Ajouter au glossaire",
+      "favorite": "Ajouter aux favoris",
+      "unfavorite": "Retirer des favoris",
+      "delete_confirm": "Supprimer les $count entrées sélectionnées ? Cette action est irréversible.",
+      "no_glossary": "Créez d’abord un glossaire",
+      "added_to_glossary": "$count entrées ajoutées au glossaire",
+      "favorite_flag": "Favori",
+      "edited_flag": "Modifié",
+      "edit_history_hint": "La traduction modifiée sera enregistrée dans l’historique"
+    },
+    "glossary": "Glossaire",
+    "recent_languages": "Langues récentes",
+    "not_configured": "Non configuré",
+    "subtitle": {
+      "translate": "Atelier · Comparaison des services",
+      "settings": "Réglages"
+    },
+    "placeholder": {
+      "history": "Les favoris et l’historique seront disponibles ultérieurement",
+      "glossary": "La gestion du glossaire est en cours de développement"
+    },
+    "glossary_page": {
+      "add_entry": "Nouvelle entrée",
+      "term": "Source",
+      "translation": "Traduction imposée",
+      "forbidden": "Interdit",
+      "hits": "Occur.",
+      "term_placeholder": "teacher forcing",
+      "translation_placeholder": "forçage enseignant",
+      "forbidden_placeholder": "enseignement forcé",
+      "search": "Rechercher",
+      "search_placeholder": "Rechercher un terme ou une traduction imposée",
+      "search_label": "Rechercher dans le glossaire",
+      "entry_count": "$name · $count termes",
+      "priority_note": "Le glossaire prime sur toute sortie de service",
+      "new_book": "Nouveau glossaire",
+      "new_book_placeholder": "Nom du glossaire",
+      "rename_book": "Renommer",
+      "delete_book_confirm": "Supprimer « $name » et ses $count termes ?",
+      "disabled": "Désactivé",
+      "enable": "Activer",
+      "disable": "Désactiver",
+      "empty_title": "Ce glossaire est vide",
+      "empty_description": "Le glossaire prime sur toute sortie de service. Ajoutez les termes un à un, ou déposez un CSV pour les fusionner.",
+      "no_results_title": "Aucun terme ne correspond à « $query »",
+      "no_results_description": "Essayez un autre mot-clé, ou ajoutez le terme.",
+      "no_books_title": "Aucun glossaire pour l’instant",
+      "no_books_description": "Un glossaire garde vos choix de traduction cohérents sur tous les services. Créez-en un, puis ajoutez des termes.",
+      "loading": "Chargement…"
+    },
+    "translation": {
+      "source": "Source",
+      "target": "Traduction",
+      "input_hint": "Saisissez ou collez le texte à traduire",
+      "button": "Traduire",
+      "auto_detected": "Détecté automatiquement",
+      "loading_services": "Chargement des services de traduction…",
+      "no_services": "Configurez d’abord un service de traduction",
+      "translating": "Traduction…",
+      "failed": "Échec de la traduction. Vérifiez la configuration du service.",
+      "empty": "La traduction apparaîtra ici",
+      "service_compare": "Comparaison des services",
+      "main_translation": "Principale",
+      "service_unavailable": "Service indisponible",
+      "waiting": "En attente",
+      "copy": "Copier",
+      "favorite_unavailable": "Les favoris seront disponibles ultérieurement",
+      "preferred": "Traduction préférée",
+      "other_services": "Autres services",
+      "copy_result": "Copier la traduction",
+      "copied": "Copié",
+      "favorite": "Enregistrer",
+      "terms": "Correspondances du glossaire",
+      "terms_hint": "Les termes sont comparés à la saisie.",
+      "quality": "Signaux de qualité",
+      "quality_hint": "Calculés une fois la traduction reçue.",
+      "shortcuts": "Raccourcis",
+      "other_services_disabled": "Les autres services sont désactivés",
+      "input_hint_translate_to": "Saisissez ou collez le texte à traduire en $language"
+    },
+    "status": {
+      "runtime_ready": "Moteur de traduction prêt",
+      "settings_synced": "Réglages synchronisés",
+      "shortcuts": "⌥Space Fenêtre rapide · ⌥⇧2 Capture"
+    },
+    "version_latest": "À jour",
+    "version_checking": "Vérification…",
+    "check_updates": "Rechercher des mises à jour"
+  },
+  "settings": {
+    "version": "v{} (Build {})",
+    "general": {
+      "title": "Général",
+      "section": {
+        "permissions": "Autorisations système",
+        "ocr": "Reconnaissance de texte",
+        "directory": "Répertoire",
+        "translation": "Traduction",
+        "translation_target": "Cible de traduction",
+        "languages": "Langues",
+        "input": "Paramètres de saisie",
+        "startup": "Démarrage et intégration",
+        "ocr_behaviour": "Comportement de capture",
+        "translation_behaviour": "Comportement de traduction"
+      },
+      "row": {
+        "launch_at_login": "Lancer à l'ouverture de session",
+        "show_in_menu_bar": "Afficher dans la barre de menus",
+        "screen_capture_access": "Accorder l'accès à l'enregistrement d'écran",
+        "screen_selection_access": "Accorder l'accès à l'accessibilité",
+        "default_ocr_service": "Service de reconnaissance de texte par défaut",
+        "auto_copy_detected_text": "Copier automatiquement le texte détecté",
+        "default_directory_service": "Service de répertoire par défaut",
+        "default_translation_service": "Service de traduction par défaut",
+        "translation_target_hint": "Configurez les paires de langues utilisées par le traducteur.",
+        "common_languages": "Langues courantes",
+        "common_languages_description": "Les langues courantes apparaissent en haut des sélecteurs de langue.",
+        "common_languages_hint": "Sélectionnez vos langues courantes:",
+        "common_languages_sort": "Trier par code",
+        "common_languages_reset": "Réinitialiser",
+        "common_languages_reset_help": "Rétablir l'ensemble par défaut des langues courantes",
+        "common_languages_search": "Rechercher des langues...",
+        "common_languages_all": "Toutes les langues",
+        "double_click_copy_result": "Double-cliquer pour copier le résultat de la traduction",
+        "submit_with_enter": "Valider avec Entrée",
+        "submit_with_meta_enter_mac": "Valider avec ⌘ + Entrée",
+        "screen_capture_access_hint": "La capture de texte à l’écran nécessite de lire son contenu.",
+        "screen_selection_access_hint": "La capture du texte sélectionné nécessite de lire les sélections des autres applications.",
+        "no_translation_targets": "Aucune cible de traduction — ajoutez-en une pour définir la langue par défaut."
+      },
+      "button": {
+        "add_provider": "Ajouter...",
+        "add_target": "Ajouter une cible...",
+        "manage_targets": "Gérer les cibles de traduction...",
+        "manage_languages": "Gérer les langues courantes...",
+        "grant": "Accorder"
+      },
+      "option": {
+        "none": "Aucun",
+        "no_services_available": "Aucun service disponible",
+        "granted": "Accordée",
+        "built_in_ocr": "OCR intégré",
+        "tesseract": "Tesseract",
+        "youdao_ocr": "OCR Youdao"
+      },
+      "editor": {
+        "add_target_title": "Ajouter une cible de traduction",
+        "edit_target_title": "Modifier la cible de traduction",
+        "row": {
+          "source_language": "Langue source",
+          "target_language": "Langue cible"
+        },
+        "title_edit": "Modifier la cible de traduction",
+        "subtitle": "Définit vers quelle langue une langue source est traduite par défaut",
+        "same_language": "La langue source et la cible sont identiques — choisissez une autre cible.",
+        "duplicate": "Une cible avec cette paire existe déjà.",
+        "hint_auto": "Traduire vers {} lorsque aucune autre règle ne correspond.",
+        "hint_source": "Traduire vers {} lorsque {} est détecté."
+      }
+    },
+    "appearance": {
+      "title": "Apparence",
+      "section": {
+        "app_language": "Langue d'affichage",
+        "theme_mode": "Mode du thème",
+        "theme_style": "Style de thème"
+      },
+      "footer": "Les modifications s’appliquent immédiatement à toute la fenêtre."
+    },
+    "shortcuts": {
+      "title": "Raccourcis",
+      "section": {
+        "text_extraction": "Extraction de texte",
+        "input_assist": "Fonction d'aide à la saisie",
+        "submit_mode": "Envoyer avec"
+      },
+      "row": {
+        "toggle_mini_translator": "Afficher/Masquer la fenêtre",
+        "extract_text_from_screen_selection": "Extraire le texte d'une sélection d'écran",
+        "extract_text_from_screen_capture": "Extraire le texte d'une capture d'écran",
+        "extract_text_from_clipboard": "Extraire le texte du presse-papiers",
+        "translate_input": "Traduire le contenu saisi"
+      },
+      "reset_dialog": {
+        "title": "Réinitialiser les raccourcis",
+        "message": "Êtes-vous sûr de vouloir réinitialiser tous les raccourcis à leurs valeurs par défaut ?",
+        "confirm": "Réinitialiser",
+        "cancel": "Annuler"
+      },
+      "group": {
+        "global": {
+          "title": "Raccourcis globaux",
+          "description": "Fonctionnent dans toutes les applications."
+        },
+        "in_app": {
+          "title": "Touches de l’application",
+          "description": "S’appliquent uniquement aux champs de saisie de cette application."
+        }
+      },
+      "reset": "Rétablir les valeurs par défaut..."
+    },
+    "advanced": {
+      "title": "Avancé",
+      "api_server": "Serveur API local",
+      "api_server_description": "Expose l'API de traduction sur 127.0.0.1 pour les intégrations locales.",
+      "enable": "Activer",
+      "port": "Port",
+      "running_at": "En cours d'exécution à {url}",
+      "disabled": "Désactivé"
+    },
+    "services": {
+      "title": "Services",
+      "button": {
+        "add_service": "Ajouter un service..."
+      },
+      "section": {
+        "available_services": "Services disponibles"
+      },
+      "editor": {
+        "title": "Ajouter un service",
+        "subtitle": "Ajoutez un service à un fournisseur déjà configuré",
+        "row": {
+          "model": "Modèle",
+          "system_prompt": "Prompt système"
+        },
+        "prompt_placeholder": "Laissez vide pour utiliser le prompt par défaut de ce type",
+        "variant_hint": "{} a déjà un service de {} ; celui-ci vient s’y ajouter comme seconde configuration.",
+        "traditional_note": "{} est une interface traditionnelle : ni modèle ni prompt à régler. Ses paramètres se trouvent sur la page de détail du fournisseur."
+      },
+      "detail": {
+        "row": {
+          "id": "ID du service",
+          "name": "Nom",
+          "provider": "Fournisseur",
+          "type": "Type"
+        },
+        "delete_dialog": {
+          "title": "Supprimer \"{}\" ?",
+          "message": "Ce service sera supprimé du fournisseur."
+        },
+        "prompt_variables": "Variables disponibles : {{sourceLanguage}}, {{targetLanguage}}, {{text}}"
+      },
+      "make_default": "Définir par défaut",
+      "item": {
+        "none_of_kind": "Aucun service de {} disponible pour l’instant."
+      }
+    },
+    "providers": {
+      "title": "Fournisseurs",
+      "section": {
+        "services": "Services disponibles",
+        "services_description": "Consultez les services disponibles des fournisseurs configurés et changez de type de service."
+      },
+      "item": {
+        "empty": "Aucun fournisseur configuré. Ajoutez-en un pour activer les services de traduction.",
+        "loading": "Chargement des fournisseurs...",
+        "no_services": "Aucun service disponible."
+      },
+      "button": {
+        "add": "Ajouter un fournisseur..."
+      },
+      "alert": {
+        "error": "Erreur"
+      },
+      "intro": {
+        "body": "Gérez les fournisseurs de services utilisés par l’application.",
+        "warning": "Les fournisseurs connectés peuvent traiter le texte ou les images que vous envoyez. Activez uniquement les services de confiance."
+      },
+      "editor": {
+        "row": {
+          "id": "Identifiant du fournisseur",
+          "type": "Type de fournisseur",
+          "default_model": "Modèle par défaut"
+        },
+        "placeholder": {
+          "id": "p. ex. deepl-main"
+        },
+        "type_picker": {
+          "prompt": "Sélectionnez le type de fournisseur que vous souhaitez ajouter :",
+          "section_llm": "LLM",
+          "section_traditional": "Traditionnel"
+        },
+        "tooltip": {
+          "help": "Aide"
+        },
+        "step": {
+          "next": "Continuer",
+          "back": "Précédent"
+        },
+        "add_title": "Ajouter {}",
+        "capability_note": {
+          "translation": "Rejoint les traductions candidates",
+          "dictionary": "Fournit des définitions de dictionnaire",
+          "ocr": "Reconnaît le texte des images"
+        },
+        "test": {
+          "run": "Tester la connexion",
+          "running": "Test de la connexion · {}s écoulées",
+          "passed_models": "Connexion OK · {} modèles disponibles",
+          "passed_service": "Connexion OK · service disponible",
+          "passed_footer": "Test de connexion réussi",
+          "retest": "Retester",
+          "tips_title": "À essayer",
+          "tips_llm": "· Vérifiez que la clé correspond au type de fournisseur choisi\n· Vérifiez si la Base URL doit contenir /v1\n· Confirmez que le modèle est activé dans la console du fournisseur",
+          "tips_traditional": "· Vérifiez que les identifiants correspondent au type de fournisseur choisi\n· Confirmez que le service est activé dans la console du fournisseur",
+          "failed_suffix": "échec de la vérification",
+          "passed_suffix": "vérifié"
+        }
+      },
+      "detail": {
+        "tooltip": {
+          "edit": "Modifier le fournisseur"
+        },
+        "row": {
+          "id_hint": "Non modifiable après la création"
+        },
+        "section": {
+          "configuration": "Configuration",
+          "models": "Modèles"
+        },
+        "models": {
+          "loading": "Chargement des modèles...",
+          "empty": "Aucun modèle trouvé.",
+          "retry": "Réessayer",
+          "refresh": "Actualiser la liste",
+          "default_badge": "Par défaut",
+          "set_default": "Définir par défaut",
+          "fetch_error": "Impossible de récupérer les modèles depuis l'API du fournisseur."
+        }
+      },
+      "capability": {
+        "translation": "Traduction",
+        "dictionary": "Dictionnaire",
+        "ocr": "OCR",
+        "llm": "IA"
+      },
+      "description": {
+        "all": "Fournit la recherche dans le dictionnaire et la traduction de texte",
+        "dictionary": "Fournit la recherche dans le dictionnaire et les définitions de mots",
+        "translation": "Fournit la traduction de texte entre les langues",
+        "fallback": "Fournit des services de traduction"
+      },
+      "delete_dialog": {
+        "title": "Supprimer « {} » ?",
+        "message": "Cette action est irréversible."
+      }
+    },
+    "layout": {
+      "title": "Paramètres",
+      "empty": {
+        "title": "Sélectionnez une catégorie",
+        "message": "Choisissez une section de paramètres dans la barre latérale."
+      },
+      "groups": "Groupes",
+      "effect_hint": "Les changements prennent effet immédiatement",
+      "footer_note": "Traductions et clés restent sur cet appareil",
+      "support": "Assistance"
+    },
+    "about": {
+      "title": "À propos",
+      "copy_version_info": "Copier les informations de version",
+      "up_to_date": "Vous êtes à jour.",
+      "check_again": "Vérifier à nouveau",
+      "links": "Liens",
+      "website": "Site web",
+      "github": "GitHub",
+      "report_issue": "Signaler un problème",
+      "license": "Licence",
+      "open_changelog": "Ouvrir le journal des modifications",
+      "update": "Mise à jour"
+    }
+  }
+}

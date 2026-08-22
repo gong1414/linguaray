@@ -1,0 +1,284 @@
+use std::{
+    collections::BTreeMap,
+    env, fs,
+    time::{SystemTime, UNIX_EPOCH},
+};
+
+use crate::{from_yaml_str, load_from_file, EngineConfig, EngineError, ProviderConfig};
+
+#[test]
+fn loads_configured_provider() {
+    let registry = from_yaml_str(
+        r#"
+providers:
+  deepl:
+    type: deepl
+    api_key: test-key
+"#,
+    )
+    .expect("valid config");
+
+    assert_eq!(registry.names(), vec!["deepl"]);
+    let provider = registry.require("deepl").expect("deepl provider");
+    assert_eq!(provider.name(), "deepl");
+    assert!(registry.require("missing").is_err());
+}
+
+#[test]
+fn loads_camel_case_provider_config() {
+    let registry = from_yaml_str(
+        r#"
+providers:
+  deepl:
+    type: deepl
+    appKey: test-key
+"#,
+    )
+    .expect("valid config");
+
+    assert_eq!(registry.names(), vec!["deepl"]);
+}
+
+#[cfg(feature = "baidu")]
+#[test]
+fn loads_baidu_provider() {
+    let registry = from_yaml_str(
+        r#"
+providers:
+  baidu-main:
+    type: baidu
+    appId: test-id
+    appKey: test-key
+"#,
+    )
+    .expect("valid config");
+
+    assert_eq!(registry.names(), vec!["baidu-main"]);
+    let provider = registry.require("baidu-main").expect("baidu provider");
+    assert_eq!(provider.name(), "baidu");
+}
+
+#[cfg(feature = "openai")]
+#[test]
+fn loads_openai_provider() {
+    let registry = from_yaml_str(
+        r#"
+providers:
+  openai-main:
+    type: openai
+    apiKey: sk-test-key
+    defaultModel: configured-model
+"#,
+    )
+    .expect("valid config");
+
+    assert_eq!(registry.names(), vec!["openai-main"]);
+    let provider = registry.require("openai-main").expect("openai provider");
+    assert_eq!(provider.name(), "openai");
+}
+
+#[cfg(feature = "openai")]
+#[test]
+fn loads_openai_provider_snake_case() {
+    let registry = from_yaml_str(
+        r#"
+providers:
+  openai-main:
+    type: openai
+    api_key: sk-test-key
+    default_model: configured-model
+"#,
+    )
+    .expect("valid config");
+
+    assert_eq!(registry.names(), vec!["openai-main"]);
+}
+
+#[cfg(feature = "openai")]
+#[test]
+fn openai_provider_settings_roundtrip() {
+    // Simulate what settings.json stores after user configures via UI
+    let settings_json = r#"{"type":"openai","apiKey":"sk-test","baseUrl":"https://api.openai.com","defaultModel":"configured-model"}"#;
+    let config: ProviderConfig = serde_json::from_str(settings_json).expect("parse settings JSON");
+
+    // Build engine config (same flow as engine::build_from_settings)
+    let mut providers = BTreeMap::new();
+    providers.insert("openai-main".to_string(), config);
+    let engine_config = EngineConfig { providers };
+    let yaml = serde_yaml::to_string(&engine_config).expect("serialize to yaml");
+
+    // Parse back (same as from_yaml_str)
+    let registry = from_yaml_str(&yaml).expect("parse yaml");
+    assert_eq!(registry.names(), vec!["openai-main"]);
+}
+
+#[cfg(feature = "deepseek")]
+#[test]
+fn loads_deepseek_provider() {
+    let registry = from_yaml_str(
+        r#"
+providers:
+  deepseek-main:
+    type: deepseek
+    apiKey: sk-test-key
+    defaultModel: deepseek-chat
+"#,
+    )
+    .expect("valid config");
+
+    assert_eq!(registry.names(), vec!["deepseek-main"]);
+    let provider = registry
+        .require("deepseek-main")
+        .expect("deepseek provider");
+    assert_eq!(provider.name(), "deepseek");
+}
+
+#[cfg(feature = "openai-compatible")]
+#[test]
+fn openai_compatible_provider_requires_base_url() {
+    let error = from_yaml_str(
+        r#"
+providers:
+  local-llm:
+    type: openai_compatible
+    defaultModel: qwen3:8b
+"#,
+    )
+    .expect_err("missing base url should fail");
+
+    assert!(matches!(error, EngineError::ConfigValidationFailed { .. }));
+
+    let registry = from_yaml_str(
+        r#"
+providers:
+  local-llm:
+    type: openai_compatible
+    baseUrl: http://localhost:1234
+    defaultModel: qwen3:8b
+"#,
+    )
+    .expect("valid config");
+    let provider = registry.require("local-llm").expect("compat provider");
+    assert_eq!(provider.name(), "openai_compatible");
+}
+
+#[test]
+fn rejects_unknown_provider() {
+    let error = from_yaml_str(
+        r#"
+providers:
+  unknown:
+    type: unknown
+    api_key: test-key
+"#,
+    )
+    .expect_err("unknown provider should fail");
+
+    assert!(matches!(error, EngineError::ParseConfig(_)));
+}
+
+#[test]
+fn rejects_invalid_provider_config() {
+    let error = from_yaml_str(
+        r#"
+providers:
+  deepl:
+    type: deepl
+    base_url: https://api.deepl.com
+"#,
+    )
+    .expect_err("missing api_key should fail");
+
+    assert!(matches!(
+        error,
+        EngineError::InvalidProviderConfig { provider, .. } if provider == "deepl"
+    ));
+}
+
+#[test]
+fn rejects_empty_api_key() {
+    let error = from_yaml_str(
+        r#"
+providers:
+  deepl:
+    type: deepl
+    api_key: ""
+"#,
+    )
+    .expect_err("empty api_key should fail");
+
+    assert!(matches!(
+        error,
+        EngineError::ConfigValidationFailed { ref provider, ref reason }
+            if provider == "deepl" && reason == "api_key must not be empty"
+    ));
+}
+
+#[test]
+fn rejects_invalid_yaml() {
+    let error = from_yaml_str("providers: [").expect_err("invalid yaml should fail");
+
+    assert!(matches!(error, EngineError::ParseConfig(_)));
+}
+
+#[test]
+fn reads_yaml_from_file() {
+    let suffix = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("valid time")
+        .as_nanos();
+    let path = env::temp_dir().join(format!("beyondtranslate-engine-{suffix}.yaml"));
+    fs::write(
+        &path,
+        r#"
+providers:
+  deepl:
+    type: deepl
+    api_key: file-key
+"#,
+    )
+    .expect("write temp config");
+
+    let registry = load_from_file(&path).expect("load config from file");
+    fs::remove_file(&path).expect("remove temp config");
+
+    assert_eq!(registry.names(), vec!["deepl"]);
+}
+
+#[test]
+fn system_provider_advertises_dictionary() {
+    let registry = from_yaml_str(
+        r#"
+providers:
+  system:
+    type: system
+"#,
+    )
+    .expect("valid config");
+
+    let provider = registry.require("system").expect("system provider");
+
+    assert!(provider.translation().is_some());
+    assert!(provider.ocr().is_some());
+    assert!(provider.dictionary().is_some());
+}
+
+#[cfg(not(feature = "baidu"))]
+#[test]
+fn errors_when_feature_is_disabled() {
+    let error = from_yaml_str(
+        r#"
+providers:
+  baidu-main:
+    type: baidu
+    app_id: test-id
+    app_key: test-key
+"#,
+    )
+    .expect_err("disabled provider should fail");
+
+    assert!(matches!(
+        error,
+        EngineError::ProviderNotEnabled(name) if name == "baidu-main"
+    ));
+}
