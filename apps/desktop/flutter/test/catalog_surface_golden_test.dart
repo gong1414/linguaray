@@ -22,7 +22,14 @@ void main() {
     );
   });
 
-  final targets = Platform.isWindows
+  // The override lets maintainers refresh both deterministic platform themes
+  // from either desktop host. CI still validates the native host by default.
+  final requestedPlatform = Platform.environment['LINGUARAY_GOLDEN_PLATFORM'];
+  final targets = requestedPlatform == 'windows'
+      ? const [TargetPlatform.windows]
+      : requestedPlatform == 'macos'
+      ? const [TargetPlatform.macOS]
+      : Platform.isWindows
       ? const [TargetPlatform.windows]
       : const [TargetPlatform.macOS];
   for (final target in targets) {

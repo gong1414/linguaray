@@ -14,6 +14,7 @@ dependencies:
   linguaray_ui: ^0.1.0
 
   collection: ^1.18.0
+  crypto: ^3.0.6
   fluentui_system_icons: ^1.1.255
   flutter:
     sdk: flutter

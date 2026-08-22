@@ -20,21 +20,27 @@ final class TranslationServiceOption {
     required this.id,
     required this.name,
     required this.isStreaming,
+    this.omitsSourceLanguage = false,
   });
 
   final String id;
   final String name;
   final bool isStreaming;
 
+  /// When true the provider accepts an omitted source language. Auto-detect
+  /// may still supply a concrete language for providers that need one.
+  final bool omitsSourceLanguage;
+
   @override
   bool operator ==(Object other) =>
       other is TranslationServiceOption &&
       other.id == id &&
       other.name == name &&
-      other.isStreaming == isStreaming;
+      other.isStreaming == isStreaming &&
+      other.omitsSourceLanguage == omitsSourceLanguage;
 
   @override
-  int get hashCode => Object.hash(id, name, isStreaming);
+  int get hashCode => Object.hash(id, name, isStreaming, omitsSourceLanguage);
 }
 
 final class TranslationCatalog {

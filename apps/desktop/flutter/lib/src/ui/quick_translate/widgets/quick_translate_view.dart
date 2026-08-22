@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:linguaray_application/linguaray_application.dart';
+import 'package:linguaray_ui/linguaray_ui.dart' show LinguaRayThemeContext;
 
 import '../../shared/status_message.dart';
 
@@ -31,6 +32,13 @@ final class QuickTranslateLabels {
     required this.serviceError,
     required this.noServices,
     required this.failureMessage,
+    this.captureFailed = '',
+    this.ocrNotConfigured = '',
+    this.ocrEmpty = '',
+    this.emptySelection = '',
+    this.clipboardUnavailable = '',
+    this.clipboardRestoreFailed = '',
+    this.recheck = '',
   });
 
   final String title;
@@ -58,9 +66,26 @@ final class QuickTranslateLabels {
   final String serviceError;
   final String noServices;
   final String Function(String? code) failureMessage;
+  final String captureFailed;
+  final String ocrNotConfigured;
+  final String ocrEmpty;
+  final String emptySelection;
+  final String clipboardUnavailable;
+  final String clipboardRestoreFailed;
+  final String recheck;
 }
 
-enum QuickTranslateNotice { none, permissionDenied, captureCancelled }
+enum QuickTranslateNotice {
+  none,
+  permissionDenied,
+  captureCancelled,
+  captureFailed,
+  ocrNotConfigured,
+  ocrEmpty,
+  emptySelection,
+  clipboardUnavailable,
+  clipboardRestoreFailed,
+}
 
 class QuickTranslateView extends StatefulWidget {
   const QuickTranslateView({
@@ -96,6 +121,7 @@ class QuickTranslateView extends StatefulWidget {
     this.notice = QuickTranslateNotice.none,
     this.toolbarKey,
     this.contentKey,
+    this.onConfigureOcr,
   });
 
   final QuickTranslateLabels labels;
@@ -129,6 +155,7 @@ class QuickTranslateView extends StatefulWidget {
   final VoidCallback onOpenSettings;
   final VoidCallback onConfigureServices;
   final VoidCallback onRecheckPermissions;
+  final VoidCallback? onConfigureOcr;
 
   @override
   State<QuickTranslateView> createState() => _QuickTranslateViewState();
@@ -185,14 +212,20 @@ class _QuickTranslateViewState extends State<QuickTranslateView> {
             children: [
               KeyedSubtree(
                 key: widget.toolbarKey,
-                child: _Toolbar(
+                child: _CommandHeader(
                   labels: widget.labels,
                   pinned: widget.pinned,
+                  languages: widget.languages,
+                  sourceLanguage: widget.sourceLanguage,
+                  targetLanguage: widget.targetLanguage,
                   onTogglePin: widget.onTogglePin,
                   onCapture: widget.onCapture,
                   onClipboard: widget.onClipboard,
                   onOpenWorkbench: widget.onOpenWorkbench,
                   onOpenSettings: widget.onOpenSettings,
+                  onSourceLanguageChanged: widget.onSourceLanguageChanged,
+                  onTargetLanguageChanged: widget.onTargetLanguageChanged,
+                  onSwapLanguages: widget.onSwapLanguages,
                 ),
               ),
               KeyedSubtree(
@@ -202,69 +235,45 @@ class _QuickTranslateViewState extends State<QuickTranslateView> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const SizedBox(height: 8),
-                    _LanguageRow(
-                      labels: widget.labels,
-                      languages: widget.languages,
-                      services: widget.services,
-                      sourceLanguage: widget.sourceLanguage,
-                      targetLanguage: widget.targetLanguage,
-                      selectedServiceId: widget.selectedServiceId,
-                      onSourceLanguageChanged: widget.onSourceLanguageChanged,
-                      onTargetLanguageChanged: widget.onTargetLanguageChanged,
-                      onServiceSelected: widget.onServiceSelected,
-                      onSwapLanguages: widget.onSwapLanguages,
-                    ),
-                    const SizedBox(height: 8),
                     TextField(
                       key: const ValueKey('quick-source-input'),
                       controller: _controller,
                       autofocus: true,
-                      minLines: 2,
-                      maxLines: 6,
+                      minLines: 1,
+                      maxLines: 4,
+                      textInputAction: TextInputAction.go,
+                      onSubmitted: (_) {
+                        if (canTranslate) widget.onTranslate();
+                      },
                       onChanged: widget.onSourceTextChanged,
                       decoration: InputDecoration(
                         hintText: widget.labels.inputHint,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        TextButton(
-                          onPressed: widget.sourceText.isEmpty
-                              ? null
-                              : widget.onClear,
-                          child: Text(widget.labels.clear),
-                        ),
-                        const Spacer(),
-                        FilledButton(
+                        suffixIcon: IconButton(
+                          tooltip: widget.submitting
+                              ? widget.labels.translating
+                              : widget.labels.translate,
                           onPressed: canTranslate ? widget.onTranslate : null,
-                          child: Text(
-                            widget.submitting
-                                ? widget.labels.translating
-                                : widget.labels.translate,
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (widget.notice == QuickTranslateNotice.permissionDenied)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: StatusMessage(
-                          kind: StatusKind.warning,
-                          title: widget.labels.permissionDenied,
-                          body: widget.labels.permissionNext,
-                          action: OutlinedButton(
-                            onPressed: widget.onRecheckPermissions,
-                            child: Text(widget.labels.openSettings),
-                          ),
+                          icon: widget.submitting
+                              ? const SizedBox.square(
+                                  dimension: 14,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.arrow_forward_rounded),
                         ),
                       ),
-                    if (widget.notice == QuickTranslateNotice.captureCancelled)
+                    ),
+                    if (widget.notice != QuickTranslateNotice.none)
                       Padding(
                         padding: const EdgeInsets.only(top: 8),
-                        child: StatusMessage(
-                          kind: StatusKind.info,
-                          title: widget.labels.captureCancelled,
+                        child: _Notice(
+                          labels: widget.labels,
+                          notice: widget.notice,
+                          onRecheck: widget.onRecheckPermissions,
+                          onConfigureOcr: widget.onConfigureOcr,
+                          onConfigureServices: widget.onConfigureServices,
+                          onRetryCapture: widget.onCapture,
                         ),
                       ),
                     if (widget.services.isEmpty)
@@ -285,9 +294,14 @@ class _QuickTranslateViewState extends State<QuickTranslateView> {
                         child: LinearProgressIndicator(minHeight: 2),
                       ),
                     if (resultText.trim().isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      Container(
+                        height: 2,
+                        color: context.brandColors.resultRule,
+                      ),
                       const SizedBox(height: 8),
                       ConstrainedBox(
-                        constraints: const BoxConstraints(maxHeight: 280),
+                        constraints: const BoxConstraints(maxHeight: 240),
                         child: SingleChildScrollView(
                           child: SelectableText(
                             resultText,
@@ -304,6 +318,7 @@ class _QuickTranslateViewState extends State<QuickTranslateView> {
                             widget.copied
                                 ? Icons.check_rounded
                                 : Icons.copy_rounded,
+                            size: 16,
                           ),
                           label: Text(
                             widget.copied
@@ -355,96 +370,35 @@ class _QuickTranslateViewState extends State<QuickTranslateView> {
   }
 }
 
-class _Toolbar extends StatelessWidget {
-  const _Toolbar({
+class _CommandHeader extends StatelessWidget {
+  const _CommandHeader({
     required this.labels,
     required this.pinned,
+    required this.languages,
+    required this.sourceLanguage,
+    required this.targetLanguage,
     required this.onTogglePin,
     required this.onCapture,
     required this.onClipboard,
     required this.onOpenWorkbench,
     required this.onOpenSettings,
+    required this.onSourceLanguageChanged,
+    required this.onTargetLanguageChanged,
+    required this.onSwapLanguages,
   });
 
   final QuickTranslateLabels labels;
   final bool pinned;
+  final List<LanguageOption> languages;
+  final String sourceLanguage;
+  final String targetLanguage;
   final VoidCallback onTogglePin;
   final VoidCallback onCapture;
   final VoidCallback onClipboard;
   final VoidCallback onOpenWorkbench;
   final VoidCallback onOpenSettings;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            labels.title,
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-        ),
-        IconButton(
-          tooltip: labels.capture,
-          onPressed: onCapture,
-          icon: const Icon(Icons.crop_free_rounded),
-        ),
-        IconButton(
-          tooltip: labels.clipboard,
-          onPressed: onClipboard,
-          icon: const Icon(Icons.content_paste_rounded),
-        ),
-        IconButton(
-          tooltip: pinned ? labels.unpin : labels.pin,
-          onPressed: onTogglePin,
-          icon: Icon(pinned ? Icons.push_pin_rounded : Icons.push_pin_outlined),
-        ),
-        PopupMenuButton<String>(
-          tooltip: labels.openSettings,
-          onSelected: (value) {
-            switch (value) {
-              case 'workbench':
-                onOpenWorkbench();
-              case 'settings':
-                onOpenSettings();
-            }
-          },
-          itemBuilder: (context) => [
-            PopupMenuItem(
-              value: 'workbench',
-              child: Text(labels.openWorkbench),
-            ),
-            PopupMenuItem(value: 'settings', child: Text(labels.openSettings)),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _LanguageRow extends StatelessWidget {
-  const _LanguageRow({
-    required this.labels,
-    required this.languages,
-    required this.services,
-    required this.sourceLanguage,
-    required this.targetLanguage,
-    required this.selectedServiceId,
-    required this.onSourceLanguageChanged,
-    required this.onTargetLanguageChanged,
-    required this.onServiceSelected,
-    required this.onSwapLanguages,
-  });
-
-  final QuickTranslateLabels labels;
-  final List<LanguageOption> languages;
-  final List<TranslationServiceOption> services;
-  final String sourceLanguage;
-  final String targetLanguage;
-  final String? selectedServiceId;
   final ValueChanged<String> onSourceLanguageChanged;
   final ValueChanged<String> onTargetLanguageChanged;
-  final ValueChanged<String> onServiceSelected;
   final VoidCallback onSwapLanguages;
 
   @override
@@ -457,68 +411,200 @@ class _LanguageRow extends StatelessWidget {
       LanguageOption(code: automaticTargetCode, name: labels.autoMatch),
       ...languages,
     ];
-
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Expanded(
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: sourceItems.any((item) => item.code == sourceLanguage)
-                  ? sourceLanguage
-                  : autoLanguageCode,
-              isExpanded: true,
-              items: [
-                for (final item in sourceItems)
-                  DropdownMenuItem(value: item.code, child: Text(item.name)),
-              ],
-              onChanged: (value) {
-                if (value != null) onSourceLanguageChanged(value);
-              },
-            ),
-          ),
-        ),
-        IconButton(
-          tooltip: labels.swapLanguages,
-          onPressed: onSwapLanguages,
-          icon: const Icon(Icons.swap_horiz_rounded),
-        ),
-        Expanded(
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: targetItems.any((item) => item.code == targetLanguage)
-                  ? targetLanguage
-                  : automaticTargetCode,
-              isExpanded: true,
-              items: [
-                for (final item in targetItems)
-                  DropdownMenuItem(value: item.code, child: Text(item.name)),
-              ],
-              onChanged: (value) {
-                if (value != null) onTargetLanguageChanged(value);
-              },
-            ),
-          ),
-        ),
-        if (services.isNotEmpty)
-          Flexible(
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: selectedServiceId ?? services.first.id,
-                isExpanded: true,
-                items: [
-                  for (final service in services)
-                    DropdownMenuItem(
-                      value: service.id,
-                      child: Text(service.name),
-                    ),
-                ],
-                onChanged: (value) {
-                  if (value != null) onServiceSelected(value);
-                },
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                labels.title,
+                style: Theme.of(context).textTheme.titleMedium,
               ),
             ),
-          ),
+            IconButton(
+              tooltip: labels.capture,
+              onPressed: onCapture,
+              icon: const Icon(Icons.crop_free_rounded, size: 18),
+            ),
+            IconButton(
+              tooltip: labels.clipboard,
+              onPressed: onClipboard,
+              icon: const Icon(Icons.content_paste_rounded, size: 18),
+            ),
+            IconButton(
+              tooltip: pinned ? labels.unpin : labels.pin,
+              onPressed: onTogglePin,
+              icon: Icon(
+                pinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
+                size: 18,
+              ),
+            ),
+            PopupMenuButton<String>(
+              tooltip: labels.openSettings,
+              onSelected: (value) {
+                switch (value) {
+                  case 'workbench':
+                    onOpenWorkbench();
+                  case 'settings':
+                    onOpenSettings();
+                }
+              },
+              itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: 'workbench',
+                  child: Text(labels.openWorkbench),
+                ),
+                PopupMenuItem(
+                  value: 'settings',
+                  child: Text(labels.openSettings),
+                ),
+              ],
+            ),
+          ],
+        ),
+        Row(
+          children: [
+            Expanded(
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: sourceItems.any((item) => item.code == sourceLanguage)
+                      ? sourceLanguage
+                      : autoLanguageCode,
+                  isExpanded: true,
+                  isDense: true,
+                  items: [
+                    for (final item in sourceItems)
+                      DropdownMenuItem(
+                        value: item.code,
+                        child: Text(item.name, overflow: TextOverflow.ellipsis),
+                      ),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) onSourceLanguageChanged(value);
+                  },
+                ),
+              ),
+            ),
+            IconButton(
+              tooltip: labels.swapLanguages,
+              onPressed: onSwapLanguages,
+              icon: const Icon(Icons.swap_horiz_rounded, size: 18),
+            ),
+            Expanded(
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: targetItems.any((item) => item.code == targetLanguage)
+                      ? targetLanguage
+                      : automaticTargetCode,
+                  isExpanded: true,
+                  isDense: true,
+                  items: [
+                    for (final item in targetItems)
+                      DropdownMenuItem(
+                        value: item.code,
+                        child: Text(item.name, overflow: TextOverflow.ellipsis),
+                      ),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) onTargetLanguageChanged(value);
+                  },
+                ),
+              ),
+            ),
+          ],
+        ),
       ],
     );
+  }
+}
+
+class _Notice extends StatelessWidget {
+  const _Notice({
+    required this.labels,
+    required this.notice,
+    required this.onRecheck,
+    required this.onConfigureOcr,
+    required this.onConfigureServices,
+    required this.onRetryCapture,
+  });
+
+  final QuickTranslateLabels labels;
+  final QuickTranslateNotice notice;
+  final VoidCallback onRecheck;
+  final VoidCallback? onConfigureOcr;
+  final VoidCallback onConfigureServices;
+  final VoidCallback onRetryCapture;
+
+  @override
+  Widget build(BuildContext context) {
+    return switch (notice) {
+      QuickTranslateNotice.none => const SizedBox.shrink(),
+      QuickTranslateNotice.permissionDenied => StatusMessage(
+        kind: StatusKind.warning,
+        title: labels.permissionDenied,
+        body: labels.permissionNext,
+        action: OutlinedButton(
+          onPressed: onRecheck,
+          child: Text(
+            labels.recheck.isEmpty ? labels.openSettings : labels.recheck,
+          ),
+        ),
+      ),
+      QuickTranslateNotice.captureCancelled => StatusMessage(
+        kind: StatusKind.info,
+        title: labels.captureCancelled,
+      ),
+      QuickTranslateNotice.captureFailed => StatusMessage(
+        kind: StatusKind.error,
+        title: labels.captureFailed.isEmpty
+            ? labels.failureMessage(AppErrorCode.captureFailed.wireName)
+            : labels.captureFailed,
+        action: OutlinedButton(
+          onPressed: onRetryCapture,
+          child: Text(labels.retry),
+        ),
+      ),
+      QuickTranslateNotice.ocrNotConfigured => StatusMessage(
+        kind: StatusKind.warning,
+        title: labels.ocrNotConfigured.isEmpty
+            ? labels.failureMessage(AppErrorCode.ocrNotConfigured.wireName)
+            : labels.ocrNotConfigured,
+        action: OutlinedButton(
+          onPressed: onConfigureOcr ?? onConfigureServices,
+          child: Text(labels.configureServices),
+        ),
+      ),
+      QuickTranslateNotice.ocrEmpty => StatusMessage(
+        kind: StatusKind.warning,
+        title: labels.ocrEmpty.isEmpty
+            ? labels.failureMessage(AppErrorCode.ocrEmpty.wireName)
+            : labels.ocrEmpty,
+        action: OutlinedButton(
+          onPressed: onRetryCapture,
+          child: Text(labels.retry),
+        ),
+      ),
+      QuickTranslateNotice.emptySelection => StatusMessage(
+        kind: StatusKind.info,
+        title: labels.emptySelection.isEmpty
+            ? labels.failureMessage(AppErrorCode.emptySelection.wireName)
+            : labels.emptySelection,
+      ),
+      QuickTranslateNotice.clipboardUnavailable => StatusMessage(
+        kind: StatusKind.warning,
+        title: labels.clipboardUnavailable.isEmpty
+            ? labels.failureMessage(AppErrorCode.clipboardUnavailable.wireName)
+            : labels.clipboardUnavailable,
+      ),
+      QuickTranslateNotice.clipboardRestoreFailed => StatusMessage(
+        kind: StatusKind.warning,
+        title: labels.clipboardRestoreFailed.isEmpty
+            ? labels.failureMessage(
+                AppErrorCode.clipboardRestoreFailed.wireName,
+              )
+            : labels.clipboardRestoreFailed,
+      ),
+    };
   }
 }

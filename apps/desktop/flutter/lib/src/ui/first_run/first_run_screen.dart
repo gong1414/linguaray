@@ -28,7 +28,9 @@ class FirstRunScreen extends ConsumerWidget {
       permissions: permissions,
       shortcutsReady: !shortcuts.hasConflict && !shortcuts.loading,
       shortcutConflict: shortcuts.hasConflict,
-      hasServices: services.services.any((item) => item.enabled),
+      hasServices: services.services.any(
+        (item) => item.enabled && item.kind == 'translation' && item.usable,
+      ),
       checkingPermissions: permissions.accessibility.name == 'unknown',
       onGrantAccessibility: () => ref
           .read(permissionsViewModelProvider.notifier)

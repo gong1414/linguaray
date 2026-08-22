@@ -44,20 +44,66 @@ jobs:
         run: dart pub get
       - run: flutter test
       - run: ${{ matrix.build }}
-      - name: Package macOS build
+      - name: Sign and notarize macOS app
         if: runner.os == 'macOS'
+        env:
+          MACOS_SIGNING_CERTIFICATE_BASE64: ${{ secrets.MACOS_SIGNING_CERTIFICATE_BASE64 }}
+          MACOS_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_SIGNING_CERTIFICATE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
         run: |
+          APP="build/macos/Build/Products/Release/LinguaRay.app"
+          if [ -z "${MACOS_SIGNING_CERTIFICATE_BASE64:-}" ]; then
+            echo "macOS signing secrets are not configured; packaging an unsigned development artifact."
+            mkdir -p dist
+            ditto -c -k --sequesterRsrc --keepParent "$APP" dist/LinguaRay-macos-unsigned.zip
+            shasum -a 256 dist/LinguaRay-macos-unsigned.zip > dist/SHA256SUMS-macos.txt
+            exit 0
+          fi
+          CERT_PATH="$(mktemp).p12"
+          KEYCHAIN="linguaray-signing.keychain-db"
+          echo "$MACOS_SIGNING_CERTIFICATE_BASE64" | base64 --decode > "$CERT_PATH"
+          security create-keychain -p temporary "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p temporary "$KEYCHAIN"
+          security import "$CERT_PATH" -k "$KEYCHAIN" -P "$MACOS_SIGNING_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k temporary "$KEYCHAIN"
+          IDENTITY="$(security find-identity -v -p codesigning "$KEYCHAIN" | awk -F'\"' '/Developer ID Application/{print $2; exit}')"
+          codesign --force --deep --options runtime --sign "$IDENTITY" "$APP"
+          if [ -n "${APPLE_ID:-}" ] && [ -n "${APPLE_APP_SPECIFIC_PASSWORD:-}" ] && [ -n "${APPLE_TEAM_ID:-}" ]; then
+            ditto -c -k --keepParent "$APP" /tmp/LinguaRay-notarize.zip
+            xcrun notarytool submit /tmp/LinguaRay-notarize.zip --apple-id "$APPLE_ID" --password "$APPLE_APP_SPECIFIC_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait
+            xcrun stapler staple "$APP"
+          fi
           mkdir -p dist
-          ditto -c -k --sequesterRsrc --keepParent build/macos/Build/Products/Release/LinguaRay.app dist/LinguaRay-macos.zip
+          ditto -c -k --sequesterRsrc --keepParent "$APP" dist/LinguaRay-macos.zip
           shasum -a 256 dist/LinguaRay-macos.zip > dist/SHA256SUMS-macos.txt
+          rm -f "$CERT_PATH"
       - name: Package Windows build
         if: runner.os == 'Windows'
+        env:
+          WINDOWS_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force dist | Out-Null
-          Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath dist/LinguaRay-windows-x64.zip
-          $hash = (Get-FileHash dist/LinguaRay-windows-x64.zip -Algorithm SHA256).Hash.ToLower()
-          "$hash  LinguaRay-windows-x64.zip" | Set-Content dist/SHA256SUMS-windows.txt
+          $payload = "build/windows/x64/runner/Release"
+          if ($env:WINDOWS_CERTIFICATE_BASE64) {
+            $certPath = Join-Path $env:RUNNER_TEMP "linguaray.pfx"
+            [IO.File]::WriteAllBytes($certPath, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE_BASE64))
+            Get-ChildItem $payload -Recurse -Include *.exe,*.dll | ForEach-Object {
+              & signtool sign /fd SHA256 /f $certPath /p $env:WINDOWS_CERTIFICATE_PASSWORD $_.FullName
+            }
+            Compress-Archive -Path "$payload\*" -DestinationPath dist/LinguaRay-windows-x64.zip
+          } else {
+            Write-Host "Windows Authenticode secrets are not configured; packaging an unsigned development artifact."
+            Compress-Archive -Path "$payload\*" -DestinationPath dist/LinguaRay-windows-x64-unsigned.zip
+          }
+          Get-ChildItem dist/*.zip | ForEach-Object {
+            $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
+            "$hash  $($_.Name)" | Add-Content dist/SHA256SUMS-windows.txt
+          }
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: release-${{ matrix.device }}

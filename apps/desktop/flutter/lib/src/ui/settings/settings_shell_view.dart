@@ -29,6 +29,14 @@ class SettingsShellView extends StatelessWidget {
         Icons.verified_user_outlined,
         labels.permissions,
       ),
+      if (labels.advanced.isNotEmpty)
+        (SettingsSection.advanced, Icons.terminal_rounded, labels.advanced),
+      if (labels.updates.isNotEmpty)
+        (
+          SettingsSection.updates,
+          Icons.system_update_alt_rounded,
+          labels.updates,
+        ),
       (SettingsSection.about, Icons.info_outline_rounded, labels.about),
     ];
 

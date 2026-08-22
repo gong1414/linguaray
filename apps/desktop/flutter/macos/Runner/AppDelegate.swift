@@ -33,6 +33,12 @@ class AppDelegate: FlutterAppDelegate {
     connectPreferencesMenuItem()
   }
 
+  override func application(_ application: NSApplication, open urls: [URL]) {
+    for url in urls where url.scheme?.lowercased() == "linguaray" {
+      ProtocolPlugin.shared.open(url)
+    }
+  }
+
   /// The template's Preferences… item ships with no action, so it renders
   /// disabled once the menu bar becomes visible. Point it at the Dart side.
   private func connectPreferencesMenuItem() {

@@ -30,4 +30,6 @@ class FlutterWindow : public Win32Window {
   std::unique_ptr<flutter::FlutterViewController> flutter_controller_;
 };
 
+void SetPendingProtocolUrl(const std::string& url);
+
 #endif  // RUNNER_FLUTTER_WINDOW_H_

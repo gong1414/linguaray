@@ -259,6 +259,16 @@ impl HistoryStore {
         Ok(removed.try_into().unwrap_or(u32::MAX))
     }
 
+    pub fn clear(&mut self) -> Result<u32, String> {
+        let removed = self.entries.len();
+        if removed == 0 {
+            return Ok(0);
+        }
+        self.entries.clear();
+        self.persist()?;
+        Ok(removed.try_into().unwrap_or(u32::MAX))
+    }
+
     fn next_id(&mut self) -> String {
         loop {
             self.id_seq += 1;
@@ -384,6 +394,19 @@ mod tests {
             service_name: "System".to_owned(),
             edited: false,
         }
+    }
+
+    #[test]
+    fn clear_removes_all_entries() {
+        let dir = temp_data_dir();
+        let mut store = HistoryStore::load(&dir);
+        store.upsert_entry(input("one", "一")).unwrap();
+        store.upsert_entry(input("two", "二")).unwrap();
+        assert_eq!(store.clear().unwrap(), 2);
+        assert!(store
+            .list_entries(HistoryFilter::All, None)
+            .unwrap()
+            .is_empty());
     }
 
     #[test]

@@ -38,6 +38,10 @@ export 'package:linguaray_runtime/linguaray_runtime.dart'
         HistoryEntryInput,
         HistoryFilter,
         RuntimeHistory,
+        RuntimeVocabulary,
+        VocabularyEntry,
+        VocabularyEntryInput,
+        VocabularyFilter,
         // Translation / look-up types
         DetectLanguageRequest,
         DetectLanguageResponse,

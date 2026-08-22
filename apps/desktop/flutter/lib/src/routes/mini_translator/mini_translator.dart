@@ -16,6 +16,7 @@ import '../../routes/settings/provider_meta.dart' show isServiceEnabled;
 import '../../routes/settings/services.dart' show ServicesSettingsPage;
 import '../../services/app_windows.dart'
     show
+        canResizeMiniTranslatorWindow,
         hideMiniTranslatorWindow,
         miniTranslatorPositionNearCursor,
         miniTranslatorWindowController,
@@ -297,6 +298,7 @@ class _MiniTranslatorPageState extends State<MiniTranslatorPage>
   }
 
   void _windowResize({bool animate = true}) {
+    if (!canResizeMiniTranslatorWindow) return;
     if (context.canPop()) return;
 
     try {

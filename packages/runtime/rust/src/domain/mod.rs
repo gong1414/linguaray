@@ -4,3 +4,4 @@ pub mod history;
 pub mod permission;
 pub mod settings;
 pub mod text_extractor;
+pub mod vocabulary;

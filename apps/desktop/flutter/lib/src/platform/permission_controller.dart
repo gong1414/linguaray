@@ -25,13 +25,23 @@ class PermissionSnapshot {
 /// selection/capture, and lifecycle owners refresh after focus or app resume.
 class PermissionController extends ChangeNotifier {
   PermissionSnapshot _snapshot = const PermissionSnapshot.unknown();
-  bool _refreshing = false;
+  Future<PermissionSnapshot>? _inFlightRefresh;
 
   PermissionSnapshot get snapshot => _snapshot;
 
-  Future<PermissionSnapshot> refresh() async {
-    if (_refreshing) return _snapshot;
-    _refreshing = true;
+  Future<PermissionSnapshot> refresh() {
+    final inFlight = _inFlightRefresh;
+    if (inFlight != null) return inFlight;
+
+    late final Future<PermissionSnapshot> refresh;
+    refresh = _readSnapshot().whenComplete(() {
+      if (identical(_inFlightRefresh, refresh)) _inFlightRefresh = null;
+    });
+    _inFlightRefresh = refresh;
+    return refresh;
+  }
+
+  Future<PermissionSnapshot> _readSnapshot() async {
     try {
       if (!Platform.isMacOS) {
         _snapshot = const PermissionSnapshot(
@@ -59,8 +69,6 @@ class PermissionController extends ChangeNotifier {
       _snapshot = const PermissionSnapshot.unknown();
       notifyListeners();
       return _snapshot;
-    } finally {
-      _refreshing = false;
     }
   }
 

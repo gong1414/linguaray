@@ -43,7 +43,7 @@ void main() {
     expect(last.results.first.text, '你好');
     expect(last.results.first.status, TranslationResultStatus.completed);
     expect(last.results.last.status, TranslationResultStatus.failed);
-    expect(last.results.last.errorCode, 'offline');
+    expect(last.results.last.errorCode, 'network_failure');
   });
 }
 

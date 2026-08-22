@@ -13,15 +13,29 @@ class GeneralSettingsView extends StatelessWidget {
     required this.onLanguageChanged,
     required this.onThemeModeChanged,
     super.key,
+    this.translationLanguages = const [],
+    this.errorCode,
+    this.onRetry,
+    this.onCommonLanguagesChanged,
+    this.onInputSubmitModeChanged,
+    this.onAutoCopyChanged,
+    this.onDoubleClickCopyChanged,
   });
 
   final GeneralSettingsLabels labels;
   final GeneralPreferences preferences;
   final List<LanguageChoice> languages;
+  final List<LanguageChoice> translationLanguages;
+  final String? errorCode;
+  final VoidCallback? onRetry;
   final ValueChanged<bool> onLaunchAtLoginChanged;
   final ValueChanged<bool> onShowInMenuBarChanged;
   final ValueChanged<String> onLanguageChanged;
   final ValueChanged<ThemePreference> onThemeModeChanged;
+  final ValueChanged<List<String>>? onCommonLanguagesChanged;
+  final ValueChanged<InputSubmitMode>? onInputSubmitModeChanged;
+  final ValueChanged<bool>? onAutoCopyChanged;
+  final ValueChanged<bool>? onDoubleClickCopyChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -63,6 +77,20 @@ class GeneralSettingsView extends StatelessWidget {
             ],
           ),
         ),
+        if (errorCode != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(labels.error),
+              subtitle: Text(
+                labels.errorMessage?.call(errorCode) ?? labels.error,
+              ),
+              trailing: onRetry == null
+                  ? null
+                  : TextButton(onPressed: onRetry, child: Text(labels.retry)),
+            ),
+          ),
         ListTile(
           contentPadding: EdgeInsets.zero,
           title: Text(labels.theme),
@@ -87,6 +115,72 @@ class GeneralSettingsView extends StatelessWidget {
             },
           ),
         ),
+        if (labels.input.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          Text(labels.input, style: Theme.of(context).textTheme.titleMedium),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(labels.submitEnter),
+            value: preferences.inputSubmitMode == InputSubmitMode.enter,
+            onChanged: onInputSubmitModeChanged == null
+                ? null
+                : (value) => onInputSubmitModeChanged!(
+                    value
+                        ? InputSubmitMode.enter
+                        : InputSubmitMode.commandEnter,
+                  ),
+          ),
+        ],
+        if (labels.translationBehaviour.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          Text(
+            labels.translationBehaviour,
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(labels.autoCopyOcr),
+            value: preferences.autoCopyDetectedText,
+            onChanged: onAutoCopyChanged,
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(labels.doubleClickCopy),
+            value: preferences.doubleClickCopyResult,
+            onChanged: onDoubleClickCopyChanged,
+          ),
+        ],
+        if (labels.commonLanguages.isNotEmpty &&
+            translationLanguages.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          Text(
+            labels.commonLanguages,
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final language in translationLanguages)
+                FilterChip(
+                  label: Text(language.name),
+                  selected: preferences.commonLanguages.contains(language.code),
+                  onSelected: onCommonLanguagesChanged == null
+                      ? null
+                      : (selected) {
+                          final next = [...preferences.commonLanguages];
+                          if (selected) {
+                            next.add(language.code);
+                          } else {
+                            next.remove(language.code);
+                          }
+                          onCommonLanguagesChanged!(next);
+                        },
+                ),
+            ],
+          ),
+        ],
       ],
     );
   }

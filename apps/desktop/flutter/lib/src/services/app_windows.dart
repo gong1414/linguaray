@@ -31,11 +31,23 @@ int _surfaceSwitchGeneration = 0;
 
 enum AppSurface { workbench, miniTranslator }
 
+AppSurface _requestedSurface = AppSurface.workbench;
+
 /// Exactly one surface is mounted at a time, which prevents duplicate title
 /// frames and stacked workbench/quick-window layers.
 final ValueNotifier<AppSurface> appSurface = ValueNotifier(
   AppSurface.workbench,
 );
+
+/// Whether the mounted quick translator still owns native window sizing.
+///
+/// A workbench transition deliberately keeps the compact Flutter surface
+/// mounted until the native host has expanded. Its delayed content-measurement
+/// callbacks must not be allowed to shrink that host back to 396 px while the
+/// transition is in flight.
+bool get canResizeMiniTranslatorWindow =>
+    appSurface.value == AppSurface.miniTranslator &&
+    _requestedSurface == AppSurface.miniTranslator;
 
 class AppWindowController {
   const AppWindowController();
@@ -63,11 +75,13 @@ enum WorkbenchDestination {
   translate('/translate'),
   history('/history'),
   glossary('/glossary'),
+  vocabulary('/vocabulary'),
   settingsGeneral('/settings/general'),
   settingsServices('/settings/services'),
   settingsShortcuts('/settings/shortcuts'),
   settingsProviders('/settings/providers'),
   settingsAdvanced('/settings/advanced'),
+  settingsUpdates('/settings/updates'),
   settingsAbout('/settings/about');
 
   const WorkbenchDestination(this.location);
@@ -101,6 +115,14 @@ void focusWorkbenchWindow() {
   final window = workbenchWindowController.window;
   final switchedSurface = appSurface.value != AppSurface.workbench;
   final switchGeneration = ++_surfaceSwitchGeneration;
+  _requestedSurface = AppSurface.workbench;
+
+  // Resizing a top-right compact window expands its native frame before the
+  // Flutter backing surface receives the new metrics. Keeping it visible in
+  // that interval exposes the desktop as a white strip beside the old 396 px
+  // surface. Hide only for the cross-surface transition and reveal it after
+  // the first workbench frame has been laid out.
+  if (switchedSurface) window.hide();
 
   window.title = kWorkbenchWindowTitle;
   window.titleBarStyle = TitleBarStyle.hidden;
@@ -119,8 +141,6 @@ void focusWorkbenchWindow() {
   }
   dockIconController.setWorkbenchWindowVisible(true);
   if (window.isMinimized) window.restore();
-  window.show();
-  window.focus();
 
   if (switchedSurface) {
     // Keep the compact surface mounted while the native host expands. Mounting
@@ -131,9 +151,18 @@ void focusWorkbenchWindow() {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (switchGeneration != _surfaceSwitchGeneration) return;
         appSurface.value = AppSurface.workbench;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (switchGeneration != _surfaceSwitchGeneration) return;
+          window.show();
+          window.focus();
+        });
+        WidgetsBinding.instance.scheduleFrame();
       });
       WidgetsBinding.instance.scheduleFrame();
     });
+  } else {
+    window.show();
+    window.focus();
   }
 }
 
@@ -167,6 +196,7 @@ Future<void> showMiniTranslatorWindow({
 }) async {
   final window = miniTranslatorWindowController.window;
   _surfaceSwitchGeneration++;
+  _requestedSurface = AppSurface.miniTranslator;
   final switchedSurface = appSurface.value != AppSurface.miniTranslator;
   if (switchedSurface) {
     appSurface.value = AppSurface.miniTranslator;

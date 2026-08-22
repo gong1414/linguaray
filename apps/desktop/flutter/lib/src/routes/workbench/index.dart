@@ -5,11 +5,13 @@ import '../../features.dart';
 import '../../services/app_windows.dart'
     show hideWorkbenchWindow, workbenchWindowController;
 import '../../ui/chrome/workbench_shell_view.dart';
+import '../../ui/glossary/glossary_screen.dart';
+import '../../ui/history/history_screen.dart';
 import '../../ui/i18n_labels.dart';
 import '../../ui/settings/settings_screens.dart';
+import '../../ui/updates/updates_screen.dart';
+import '../../ui/vocabulary/vocabulary_screen.dart';
 import '../../utils/platform_util.dart';
-import 'glossary.dart';
-import 'library.dart';
 import 'translation.dart';
 import 'welcome.dart';
 
@@ -45,7 +47,7 @@ List<RouteBase> get $appRoutes => <RouteBase>[
             GoRoute(
               path: '/history',
               pageBuilder: (_, state) =>
-                  _noTransitionPage(state, const WorkbenchLibraryPage()),
+                  _noTransitionPage(state, const HistoryScreen()),
             ),
           ],
         ),
@@ -55,7 +57,17 @@ List<RouteBase> get $appRoutes => <RouteBase>[
             GoRoute(
               path: '/glossary',
               pageBuilder: (_, state) =>
-                  _noTransitionPage(state, const WorkbenchGlossaryPage()),
+                  _noTransitionPage(state, const GlossaryScreen()),
+            ),
+          ],
+        ),
+      if (kDictionaryFeatureEnabled)
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/vocabulary',
+              pageBuilder: (_, state) =>
+                  _noTransitionPage(state, const VocabularyScreen()),
             ),
           ],
         ),
@@ -97,6 +109,17 @@ List<RouteBase> get $appRoutes => <RouteBase>[
                 pageBuilder: (_, state) =>
                     _noTransitionPage(state, const AboutSettingsScreen()),
               ),
+              if (kAdvancedSettingsFeatureEnabled)
+                GoRoute(
+                  path: '/settings/advanced',
+                  pageBuilder: (_, state) =>
+                      _noTransitionPage(state, const AdvancedSettingsScreen()),
+                ),
+              GoRoute(
+                path: '/settings/updates',
+                pageBuilder: (_, state) =>
+                    _noTransitionPage(state, const UpdatesSettingsScreen()),
+              ),
             ],
           ),
         ],
@@ -124,10 +147,20 @@ class WorkbenchShell extends StatefulWidget {
 }
 
 class _WorkbenchShellState extends State<WorkbenchShell> {
-  WorkbenchDestinationId get _destination =>
-      widget.location.startsWith('/settings')
-      ? WorkbenchDestinationId.settings
-      : WorkbenchDestinationId.translate;
+  WorkbenchDestinationId get _destination {
+    final location = widget.location;
+    if (location.startsWith('/settings')) {
+      return WorkbenchDestinationId.settings;
+    }
+    if (location.startsWith('/history')) return WorkbenchDestinationId.history;
+    if (location.startsWith('/glossary')) {
+      return WorkbenchDestinationId.glossary;
+    }
+    if (location.startsWith('/vocabulary')) {
+      return WorkbenchDestinationId.vocabulary;
+    }
+    return WorkbenchDestinationId.translate;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -141,11 +174,13 @@ class _WorkbenchShellState extends State<WorkbenchShell> {
           ? WorkbenchDestinationId.translate
           : _destination,
       onDestinationSelected: (destination) {
-        context.go(
-          destination == WorkbenchDestinationId.settings
-              ? '/settings/general'
-              : '/translate',
-        );
+        context.go(switch (destination) {
+          WorkbenchDestinationId.translate => '/translate',
+          WorkbenchDestinationId.history => '/history',
+          WorkbenchDestinationId.glossary => '/glossary',
+          WorkbenchDestinationId.vocabulary => '/vocabulary',
+          WorkbenchDestinationId.settings => '/settings/general',
+        });
       },
       onMinimize: chrome == WindowChromeKind.windows
           ? () => workbenchWindowController.window.minimize()

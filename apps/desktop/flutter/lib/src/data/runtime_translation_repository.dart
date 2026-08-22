@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:linguaray_application/linguaray_application.dart';
 import 'package:linguaray_runtime/linguaray_runtime.dart'
     show ErrorExceptionRuntimeException;
@@ -29,16 +31,25 @@ final class RuntimeTranslationRepository implements TranslationRepository {
         .toList(growable: false);
 
     final translationServices = services
-        .where(
-          (service) =>
-              service.type == ServiceType.translation &&
-              service.fields[_serviceEnabledField] != 'false',
-        )
+        .where((service) {
+          if (service.type != ServiceType.translation) return false;
+          if (service.fields[_serviceEnabledField] == 'false') return false;
+          final providerType = _providerTypesById[service.providerId];
+          if (providerType == ProviderType.system &&
+              !const PlatformCapabilities.windows().systemTranslation &&
+              _isWindows) {
+            return false;
+          }
+          return true;
+        })
         .map(
           (service) => TranslationServiceOption(
             id: service.id,
             name: service.name.trim().isEmpty ? service.id : service.name,
             isStreaming: _isStreamingProvider(
+              _providerTypesById[service.providerId],
+            ),
+            omitsSourceLanguage: _isStreamingProvider(
               _providerTypesById[service.providerId],
             ),
           ),
@@ -193,10 +204,17 @@ final class RuntimeTranslationRepository implements TranslationRepository {
       return const TranslationFailure('source_language_detection_failed');
     }
     if (message.contains('network') || message.contains('connection')) {
-      return const TranslationFailure('network_error');
+      return const TranslationFailure('network_failure');
     }
-    return const TranslationFailure('translation_failed');
+    if (message.contains('401') ||
+        message.contains('unauthorized') ||
+        message.contains('auth')) {
+      return const TranslationFailure('provider_auth_failed');
+    }
+    return TranslationFailure(mapErrorCode(message).wireName);
   }
 }
+
+bool get _isWindows => Platform.isWindows;
 
 const String _serviceEnabledField = 'enabled';

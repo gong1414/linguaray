@@ -84,7 +84,7 @@ void main() {
     await tester.tap(find.bySemanticsLabel('更多'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
-    expect(offered, ['复制译文', '删除']);
+    expect(offered, ['复制译文', '加入术语库', '删除']);
 
     // The sheet asks; nothing has gone yet.
     expect(find.text('删除这条记录'), findsOneWidget);

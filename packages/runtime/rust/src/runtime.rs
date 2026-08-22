@@ -28,6 +28,9 @@ use crate::domain::settings::{
     ServiceConfigEntry, ServiceType, Settings, ShortcutSettings, ShortcutSettingsPatch,
 };
 use crate::domain::text_extractor;
+use crate::domain::vocabulary::{
+    VocabularyEntry, VocabularyEntryInput, VocabularyFilter, VocabularyStore,
+};
 use crate::RuntimeApiServer;
 use linguaray_core::TranslationTarget;
 use linguaray_engine::prompt::GlossaryTerm;
@@ -65,6 +68,8 @@ pub enum SettingsChange {
     Glossary,
     /// Translation history was created, edited, favorited or deleted.
     History,
+    /// A vocabulary book entry was created, edited, favorited or deleted.
+    Vocabulary,
 }
 
 /// Callback invoked by the Rust runtime as LLM streaming chunks arrive.
@@ -136,6 +141,9 @@ struct RuntimeInner {
     /// Translation history has its own file and lock, so listing it never
     /// blocks settings or glossary operations.
     history: RwLock<HistoryStore>,
+    /// Saved words live beside history, with the same isolation so a corrupt
+    /// vocabulary file cannot block translation.
+    vocabulary: RwLock<VocabularyStore>,
     /// Broadcasts a [`SettingsChange`] event after every successful
     /// settings write. The sender is kept alive for the lifetime of
     /// `RuntimeInner`, so receivers obtained via `subscribe()` will only
@@ -210,6 +218,11 @@ pub struct RuntimeHistory {
 }
 
 #[derive(uniffi::Object)]
+pub struct RuntimeVocabulary {
+    runtime: Runtime,
+}
+
+#[derive(uniffi::Object)]
 pub struct RuntimePermission;
 
 /// Rust-native screen text extractor.
@@ -256,12 +269,14 @@ impl Runtime {
         let state = RuntimeState::new(settings)?;
         let glossary = GlossaryStore::load(&key)?;
         let history = HistoryStore::load(&key);
+        let vocabulary = VocabularyStore::load(&key);
         let (events, _) = broadcast::channel(EVENT_CHANNEL_CAPACITY);
         let inner = Arc::new(RuntimeInner {
             settings_file_path: Arc::from(settings_file_path.to_string_lossy().into_owned()),
             state: RwLock::new(state),
             glossary: RwLock::new(glossary),
             history: RwLock::new(history),
+            vocabulary: RwLock::new(vocabulary),
             events,
         });
         registry.insert(key, inner.clone());
@@ -338,6 +353,12 @@ impl Runtime {
 
     pub fn history(self: Arc<Self>) -> Arc<RuntimeHistory> {
         Arc::new(RuntimeHistory {
+            runtime: (*self).clone(),
+        })
+    }
+
+    pub fn vocabulary(self: Arc<Self>) -> Arc<RuntimeVocabulary> {
+        Arc::new(RuntimeVocabulary {
             runtime: (*self).clone(),
         })
     }
@@ -853,21 +874,27 @@ impl RuntimeSettings {
         for (provider_id, provider) in &state.settings.providers {
             let entry = normalized_provider_entry(provider_id, provider);
             if let Ok(engine_provider) = state.engine.require(provider_id) {
-                if engine_provider.dictionary().is_some() {
+                if engine_provider.dictionary().is_some()
+                    && advertises_system_capability(provider_id, ServiceType::Dictionary)
+                {
                     services.push(service_entry_for_provider_type(
                         &format!("{provider_id}+dictionary"),
                         &entry,
                         ServiceType::Dictionary,
                     ));
                 }
-                if engine_provider.translation().is_some() || engine_provider.llm().is_some() {
+                if (engine_provider.translation().is_some() || engine_provider.llm().is_some())
+                    && advertises_system_capability(provider_id, ServiceType::Translation)
+                {
                     services.push(service_entry_for_provider_type(
                         &format!("{provider_id}+translation"),
                         &entry,
                         ServiceType::Translation,
                     ));
                 }
-                if engine_provider.ocr().is_some() {
+                if engine_provider.ocr().is_some()
+                    && advertises_system_capability(provider_id, ServiceType::Ocr)
+                {
                     services.push(service_entry_for_provider_type(
                         &format!("{provider_id}+ocr"),
                         &entry,
@@ -879,6 +906,9 @@ impl RuntimeSettings {
 
         for (service_id, service) in &state.settings.services {
             if !state.settings.providers.contains_key(&service.provider_id) {
+                continue;
+            }
+            if !advertises_system_capability(&service.provider_id, service.r#type) {
                 continue;
             }
             let mut entry = service.clone();
@@ -1261,6 +1291,76 @@ impl RuntimeHistory {
         favorite: bool,
     ) -> Result<Option<HistoryEntry>, RuntimeError> {
         self.commit(|store| store.set_favorite(&entry_id, favorite))
+            .await
+            .map_err(Into::into)
+    }
+
+    pub async fn delete_entries(&self, entry_ids: Vec<String>) -> Result<u32, RuntimeError> {
+        self.commit(|store| store.delete_entries(&entry_ids))
+            .await
+            .map_err(Into::into)
+    }
+
+    pub async fn clear(&self) -> Result<u32, RuntimeError> {
+        self.commit(|store| store.clear()).await.map_err(Into::into)
+    }
+}
+
+impl RuntimeVocabulary {
+    async fn commit<T>(
+        &self,
+        update: impl FnOnce(&mut VocabularyStore) -> Result<T, String>,
+    ) -> Result<T, String> {
+        let result = {
+            let mut store = self.runtime.inner.vocabulary.write().await;
+            update(&mut store)?
+        };
+        let _ = self.runtime.inner.events.send(SettingsChange::Vocabulary);
+        Ok(result)
+    }
+}
+
+#[uniffi::export(async_runtime = "tokio")]
+impl RuntimeVocabulary {
+    pub async fn list_entries(
+        &self,
+        filter: VocabularyFilter,
+        query: Option<String>,
+    ) -> Result<Vec<VocabularyEntry>, RuntimeError> {
+        Ok(self
+            .runtime
+            .inner
+            .vocabulary
+            .read()
+            .await
+            .list_entries(filter, query.as_deref()))
+    }
+
+    pub async fn upsert_entry(
+        &self,
+        input: VocabularyEntryInput,
+    ) -> Result<VocabularyEntry, RuntimeError> {
+        self.commit(|store| store.upsert_entry(input))
+            .await
+            .map_err(Into::into)
+    }
+
+    pub async fn set_favorite(
+        &self,
+        entry_id: String,
+        favorite: bool,
+    ) -> Result<Option<VocabularyEntry>, RuntimeError> {
+        self.commit(|store| store.set_favorite(&entry_id, favorite))
+            .await
+            .map_err(Into::into)
+    }
+
+    pub async fn set_note(
+        &self,
+        entry_id: String,
+        note: Option<String>,
+    ) -> Result<Option<VocabularyEntry>, RuntimeError> {
+        self.commit(|store| store.set_note(&entry_id, note))
             .await
             .map_err(Into::into)
     }
@@ -2281,6 +2381,18 @@ fn normalized_provider_entry(
         provider.id = provider_id.to_owned();
     }
     provider
+}
+
+fn advertises_system_capability(provider_id: &str, service_type: ServiceType) -> bool {
+    if provider_id != "system" {
+        return true;
+    }
+    match service_type {
+        ServiceType::Ocr => true,
+        ServiceType::Translation | ServiceType::Dictionary | ServiceType::Llm => {
+            cfg!(target_os = "macos")
+        }
+    }
 }
 
 fn validate_provider_id(provider_id: String) -> Result<String, String> {

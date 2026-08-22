@@ -16,7 +16,7 @@ class SelectionController {
     if (permission.accessibility == PermissionState.denied) {
       throw const PlatformOperationException(
         action: TriggerAction.translateSelection,
-        code: 'accessibilityDenied',
+        code: 'accessibility_denied',
         message: 'Accessibility permission is required to read selected text.',
       );
     }

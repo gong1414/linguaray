@@ -7,6 +7,8 @@ final class SettingsShellLabels {
     required this.shortcuts,
     required this.permissions,
     required this.about,
+    this.advanced = '',
+    this.updates = '',
   });
 
   final String title;
@@ -16,6 +18,8 @@ final class SettingsShellLabels {
   final String shortcuts;
   final String permissions;
   final String about;
+  final String advanced;
+  final String updates;
 }
 
 enum SettingsSection {
@@ -24,6 +28,8 @@ enum SettingsSection {
   providers,
   shortcuts,
   permissions,
+  advanced,
+  updates,
   about,
 }
 
@@ -38,6 +44,16 @@ final class GeneralSettingsLabels {
     required this.light,
     required this.dark,
     required this.system,
+    this.commonLanguages = '',
+    this.autoCopyOcr = '',
+    this.doubleClickCopy = '',
+    this.submitEnter = '',
+    this.submitModifierEnter = '',
+    this.input = '',
+    this.translationBehaviour = '',
+    this.error = '',
+    this.errorMessage,
+    this.retry = '',
   });
 
   final String startup;
@@ -49,6 +65,16 @@ final class GeneralSettingsLabels {
   final String light;
   final String dark;
   final String system;
+  final String commonLanguages;
+  final String autoCopyOcr;
+  final String doubleClickCopy;
+  final String submitEnter;
+  final String submitModifierEnter;
+  final String input;
+  final String translationBehaviour;
+  final String error;
+  final String Function(String? code)? errorMessage;
+  final String retry;
 }
 
 final class ServicesSettingsLabels {
@@ -64,6 +90,7 @@ final class ServicesSettingsLabels {
     required this.configureProviders,
     required this.commonLanguages,
     required this.defaultService,
+    this.errorMessage,
   });
 
   final String title;
@@ -77,6 +104,7 @@ final class ServicesSettingsLabels {
   final String configureProviders;
   final String commonLanguages;
   final String defaultService;
+  final String Function(String? code)? errorMessage;
 }
 
 final class ProvidersSettingsLabels {

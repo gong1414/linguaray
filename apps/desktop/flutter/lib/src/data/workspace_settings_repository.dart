@@ -1,10 +1,13 @@
 import 'dart:io';
 
 import 'package:linguaray_application/linguaray_application.dart';
+import 'package:linguaray_runtime/linguaray_runtime.dart'
+    as rt
+    show InputSubmitMode;
 
 import '../platform/secret_store.dart';
 import '../routes/settings/provider_meta.dart';
-import '../services/runtime.dart';
+import '../services/runtime.dart' hide InputSubmitMode;
 import '../services/settings_store.dart';
 import '../utils/env.dart';
 import '../utils/language_util.dart';
@@ -32,6 +35,29 @@ final class RuntimeWorkspaceSettingsRepository
         'dark' => ThemePreference.dark,
         _ => ThemePreference.system,
       },
+      commonLanguages: List<String>.from(_store.general.commonLanguages),
+      translationTargets: [
+        for (final target in _store.general.translationTargets)
+          TranslationTargetRule(
+            source: target.source,
+            target: target.target,
+            enabled: target.enabled,
+          ),
+      ],
+      inputSubmitMode: _store.general.inputSubmitMode.name == 'commandEnter'
+          ? InputSubmitMode.commandEnter
+          : InputSubmitMode.enter,
+      autoCopyDetectedText: _store.general.autoCopyDetectedText,
+      doubleClickCopyResult: _store.general.doubleClickCopyResult,
+      defaultTranslationService: _store.defaultTranslationService.isEmpty
+          ? null
+          : _store.defaultTranslationService,
+      defaultOcrService: _store.defaultOcrService.isEmpty
+          ? null
+          : _store.defaultOcrService,
+      defaultDictionaryService: _store.defaultDirectoryService.isEmpty
+          ? null
+          : _store.defaultDirectoryService,
     );
   }
 
@@ -90,6 +116,87 @@ final class RuntimeWorkspaceSettingsRepository
   }
 
   @override
+  Future<List<TranslationTargetRule>> loadTranslationTargets() async {
+    return [
+      for (final target in _store.general.translationTargets)
+        TranslationTargetRule(
+          source: target.source,
+          target: target.target,
+          enabled: target.enabled,
+        ),
+    ];
+  }
+
+  @override
+  Future<void> setTranslationTargets(List<TranslationTargetRule> targets) {
+    return _store.updateGeneral(
+      GeneralSettingsPatch(
+        translationTargets: [
+          for (final target in targets)
+            TranslationTarget(
+              source: target.source,
+              target: target.target,
+              enabled: target.enabled,
+            ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Future<InputSubmitMode> loadInputSubmitMode() async {
+    return _store.general.inputSubmitMode.name == 'commandEnter'
+        ? InputSubmitMode.commandEnter
+        : InputSubmitMode.enter;
+  }
+
+  @override
+  Future<void> setInputSubmitMode(InputSubmitMode mode) {
+    return _store.updateGeneral(
+      GeneralSettingsPatch(
+        inputSubmitMode: mode == InputSubmitMode.commandEnter
+            ? rt.InputSubmitMode.commandEnter
+            : rt.InputSubmitMode.enter,
+      ),
+    );
+  }
+
+  @override
+  Future<bool> loadAutoCopyDetectedText() async =>
+      _store.general.autoCopyDetectedText;
+
+  @override
+  Future<void> setAutoCopyDetectedText(bool value) {
+    return _store.updateGeneral(
+      GeneralSettingsPatch(autoCopyDetectedText: value),
+    );
+  }
+
+  @override
+  Future<bool> loadDoubleClickCopyResult() async =>
+      _store.general.doubleClickCopyResult;
+
+  @override
+  Future<void> setDoubleClickCopyResult(bool value) {
+    return _store.updateGeneral(
+      GeneralSettingsPatch(doubleClickCopyResult: value),
+    );
+  }
+
+  @override
+  Future<String?> loadDefaultDictionaryService() async {
+    final value = _store.defaultDirectoryService;
+    return value.isEmpty ? null : value;
+  }
+
+  @override
+  Future<void> setDefaultDictionaryService(String? serviceId) {
+    return _store.updateGeneral(
+      GeneralSettingsPatch(defaultDirectoryService: serviceId ?? ''),
+    );
+  }
+
+  @override
   Future<String?> loadDefaultTranslationService() async {
     final value = _store.defaultTranslationService;
     return value.isEmpty ? null : value;
@@ -121,10 +228,10 @@ final class RuntimeWorkspaceSettingsRepository
     final providers = {for (final item in _store.providers) item.id: item};
     final defaultTranslation = _store.defaultTranslationService;
     final defaultOcr = _store.defaultOcrService;
+    final capabilities = await loadCapabilities();
     return [
       for (final service in _store.services)
-        if (service.type == ServiceType.translation ||
-            service.type == ServiceType.ocr)
+        if (_isVisibleService(service, capabilities))
           ServiceRecord(
             id: service.id,
             name: service.name.trim().isEmpty ? service.id : service.name,
@@ -132,12 +239,44 @@ final class RuntimeWorkspaceSettingsRepository
             providerName: providers[service.providerId] == null
                 ? service.providerId
                 : providerTypeDisplayName(providers[service.providerId]!.type),
-            kind: service.type == ServiceType.ocr ? 'ocr' : 'translation',
+            kind: _kindName(service.type),
             enabled: isServiceEnabled(service),
             isDefault:
-                service.id == defaultTranslation || service.id == defaultOcr,
+                service.id == defaultTranslation ||
+                service.id == defaultOcr ||
+                service.id == _store.defaultDirectoryService,
+            synthesized: !service.id.contains('+custom-'),
+            usable: true,
           ),
     ];
+  }
+
+  bool _isVisibleService(
+    ServiceConfigEntry service,
+    PlatformCapabilities capabilities,
+  ) {
+    if (service.providerId == 'system' &&
+        service.type == ServiceType.translation &&
+        !capabilities.systemTranslation) {
+      return false;
+    }
+    if (service.providerId == 'system' &&
+        service.type == ServiceType.dictionary &&
+        !capabilities.systemDictionary) {
+      return false;
+    }
+    return service.type == ServiceType.translation ||
+        service.type == ServiceType.ocr ||
+        service.type == ServiceType.dictionary;
+  }
+
+  String _kindName(ServiceType type) {
+    return switch (type) {
+      ServiceType.ocr => 'ocr',
+      ServiceType.dictionary => 'dictionary',
+      ServiceType.llm => 'translation',
+      ServiceType.translation => 'translation',
+    };
   }
 
   @override
@@ -272,6 +411,80 @@ final class RuntimeWorkspaceSettingsRepository
         errorCode: 'network_error',
       );
     }
+  }
+
+  @override
+  Future<void> saveService(ServiceDraft draft) async {
+    final type = switch (draft.kind) {
+      'ocr' => ServiceType.ocr,
+      'dictionary' => ServiceType.dictionary,
+      _ => ServiceType.translation,
+    };
+    await runtime.settings().updateService(
+      serviceId: draft.id ?? '${draft.providerId}+custom-${draft.kind}',
+      providerId: draft.providerId,
+      serviceType: type,
+      name: draft.name,
+      fields: draft.fields,
+    );
+    await _store.reloadServices();
+  }
+
+  @override
+  Future<void> deleteService(String serviceId) async {
+    await runtime.settings().deleteService(serviceId: serviceId);
+    await _store.reloadServices();
+  }
+
+  @override
+  Future<ApiServerStatus> loadApiServer() async {
+    await _store.reloadAdvanced();
+    final advanced = _store.advanced;
+    try {
+      final info = await applyApiServerSettings(advanced);
+      return ApiServerStatus(
+        enabled: advanced.apiServerEnabled,
+        host: advanced.apiServerHost,
+        port: info?.port ?? advanced.apiServerPort,
+        baseUrl: info?.baseUrl,
+      );
+    } catch (_) {
+      return ApiServerStatus(
+        enabled: advanced.apiServerEnabled,
+        host: advanced.apiServerHost,
+        port: advanced.apiServerPort,
+        bindErrorCode: AppErrorCode.apiServerBindFailed.wireName,
+      );
+    }
+  }
+
+  @override
+  Future<ApiServerStatus> setApiServerEnabled(bool enabled) async {
+    await _store.updateAdvanced(
+      AdvancedSettingsPatch(apiServerEnabled: enabled),
+    );
+    return loadApiServer();
+  }
+
+  @override
+  Future<ApiServerStatus> setApiServerPort(int port) async {
+    if (port < 0 || port > 65535) {
+      return ApiServerStatus(
+        enabled: _store.advanced.apiServerEnabled,
+        host: _store.advanced.apiServerHost,
+        port: port,
+        bindErrorCode: AppErrorCode.invalidPort.wireName,
+      );
+    }
+    await _store.updateAdvanced(AdvancedSettingsPatch(apiServerPort: port));
+    return loadApiServer();
+  }
+
+  @override
+  Future<PlatformCapabilities> loadCapabilities() async {
+    if (Platform.isWindows) return const PlatformCapabilities.windows();
+    if (Platform.isMacOS) return const PlatformCapabilities.macos();
+    return const PlatformCapabilities.windows();
   }
 
   @override

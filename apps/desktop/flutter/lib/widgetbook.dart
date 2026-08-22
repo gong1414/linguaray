@@ -105,6 +105,31 @@ final _catalog = WidgetbookCategory(
       ],
     ),
     WidgetbookComponent(
+      name: 'History / glossary / vocabulary',
+      useCases: [
+        WidgetbookUseCase(
+          name: 'History · empty',
+          builder: (_) => const HistoryCatalogPreview(empty: true),
+        ),
+        WidgetbookUseCase(
+          name: 'History · populated',
+          builder: (_) => const HistoryCatalogPreview(empty: false),
+        ),
+        WidgetbookUseCase(
+          name: 'Glossary · empty',
+          builder: (_) => const GlossaryCatalogPreview(empty: true),
+        ),
+        WidgetbookUseCase(
+          name: 'Vocabulary · empty',
+          builder: (_) => const VocabularyCatalogPreview(empty: true),
+        ),
+        WidgetbookUseCase(
+          name: 'Updates · available',
+          builder: (_) => const UpdatesCatalogPreview(),
+        ),
+      ],
+    ),
+    WidgetbookComponent(
       name: 'Input translation',
       useCases: [
         for (final scenario in CatalogTranslationScenario.values)

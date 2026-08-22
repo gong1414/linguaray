@@ -7,8 +7,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:linguaray_application/linguaray_application.dart';
 
+import '../../config/dependencies.dart';
+import '../../i18n/i18n.dart';
 import '../../routes/settings/about.dart' show openExternalUrl;
 import '../i18n_labels.dart';
+import '../shared/status_message.dart';
 import 'settings_labels.dart';
 import 'settings_shell_view.dart';
 import 'view_models/permissions_view_model.dart';
@@ -47,6 +50,12 @@ class SettingsHostScreen extends StatelessWidget {
     if (location.startsWith('/settings/about')) {
       return SettingsSection.about;
     }
+    if (location.startsWith('/settings/advanced')) {
+      return SettingsSection.advanced;
+    }
+    if (location.startsWith('/settings/updates')) {
+      return SettingsSection.updates;
+    }
     return SettingsSection.general;
   }
 
@@ -61,6 +70,8 @@ class SettingsHostScreen extends StatelessWidget {
         SettingsSection.providers => '/settings/providers',
         SettingsSection.shortcuts => '/settings/shortcuts',
         SettingsSection.permissions => '/settings/permissions',
+        SettingsSection.advanced => '/settings/advanced',
+        SettingsSection.updates => '/settings/updates',
         SettingsSection.about => '/settings/about',
       }),
       child: child,
@@ -82,6 +93,11 @@ class GeneralSettingsScreen extends ConsumerWidget {
       labels: generalSettingsLabels(),
       preferences: preferences,
       languages: state.languages,
+      translationLanguages: state.translationLanguages,
+      errorCode: state.errorCode,
+      onRetry: () => unawaited(
+        ref.read(generalSettingsViewModelProvider.notifier).reload(),
+      ),
       onLaunchAtLoginChanged: (value) => unawaited(
         ref
             .read(generalSettingsViewModelProvider.notifier)
@@ -97,6 +113,26 @@ class GeneralSettingsScreen extends ConsumerWidget {
       ),
       onThemeModeChanged: (value) => unawaited(
         ref.read(generalSettingsViewModelProvider.notifier).setThemeMode(value),
+      ),
+      onCommonLanguagesChanged: (value) => unawaited(
+        ref
+            .read(generalSettingsViewModelProvider.notifier)
+            .setCommonLanguages(value),
+      ),
+      onInputSubmitModeChanged: (value) => unawaited(
+        ref
+            .read(generalSettingsViewModelProvider.notifier)
+            .setInputSubmitMode(value),
+      ),
+      onAutoCopyChanged: (value) => unawaited(
+        ref
+            .read(generalSettingsViewModelProvider.notifier)
+            .setAutoCopyDetectedText(value),
+      ),
+      onDoubleClickCopyChanged: (value) => unawaited(
+        ref
+            .read(generalSettingsViewModelProvider.notifier)
+            .setDoubleClickCopyResult(value),
       ),
     );
   }
@@ -121,8 +157,99 @@ class ServicesSettingsScreen extends ConsumerWidget {
         ref.read(servicesSettingsViewModelProvider.notifier).makeDefault(id),
       ),
       onConfigureProviders: () => context.go('/settings/providers'),
+      onAdd: () => unawaited(_addService(context, ref)),
+      errorCode: state.operationErrorCode,
+      onRetry: () => unawaited(
+        ref.read(servicesSettingsViewModelProvider.notifier).reload(),
+      ),
     );
   }
+}
+
+Future<void> _addService(BuildContext context, WidgetRef ref) async {
+  final providers = await ref
+      .read(workspaceSettingsRepositoryProvider)
+      .listProviders();
+  if (providers.isEmpty || !context.mounted) return;
+  var providerId = providers.first.id;
+  var kind = 'translation';
+  final name = TextEditingController();
+  final saved = await showDialog<bool>(
+    context: context,
+    builder: (context) {
+      return StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: Text(t.settings.services.button.add_service),
+          content: SizedBox(
+            width: 360,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButton<String>(
+                  value: providerId,
+                  isExpanded: true,
+                  items: [
+                    for (final provider in providers)
+                      DropdownMenuItem(
+                        value: provider.id,
+                        child: Text(provider.displayName),
+                      ),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) setState(() => providerId = value);
+                  },
+                ),
+                DropdownButton<String>(
+                  value: kind,
+                  isExpanded: true,
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'translation',
+                      child: Text('translation'),
+                    ),
+                    DropdownMenuItem(value: 'ocr', child: Text('ocr')),
+                    DropdownMenuItem(
+                      value: 'dictionary',
+                      child: Text('dictionary'),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) setState(() => kind = value);
+                  },
+                ),
+                TextField(
+                  controller: name,
+                  decoration: const InputDecoration(),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(t.common.ui.button.cancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(t.common.ui.button.save),
+            ),
+          ],
+        ),
+      );
+    },
+  );
+  if (saved != true) return;
+  await ref
+      .read(servicesSettingsViewModelProvider.notifier)
+      .addService(
+        ServiceDraft(
+          providerId: providerId,
+          kind: kind,
+          name: name.text.trim().isEmpty
+              ? '$providerId $kind'
+              : name.text.trim(),
+        ),
+      );
 }
 
 class ProvidersSettingsScreen extends ConsumerWidget {
@@ -452,6 +579,136 @@ class _AboutSettingsScreenState extends ConsumerState<AboutSettingsScreen> {
           'https://github.com/gong1414/linguaray/blob/main/LICENSE',
         ),
       ),
+    );
+  }
+}
+
+class AdvancedSettingsScreen extends ConsumerStatefulWidget {
+  const AdvancedSettingsScreen({super.key});
+
+  @override
+  ConsumerState<AdvancedSettingsScreen> createState() =>
+      _AdvancedSettingsScreenState();
+}
+
+class _AdvancedSettingsScreenState
+    extends ConsumerState<AdvancedSettingsScreen> {
+  ApiServerStatus? _status;
+  String? _error;
+  final TextEditingController _port = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_reload());
+  }
+
+  @override
+  void dispose() {
+    _port.dispose();
+    super.dispose();
+  }
+
+  Future<void> _reload() async {
+    try {
+      final status = await ref
+          .read(workspaceSettingsRepositoryProvider)
+          .loadApiServer();
+      if (!mounted) return;
+      setState(() {
+        _status = status;
+        _error = status.bindErrorCode;
+        _port.text = '${status.port}';
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _error = AppErrorCode.apiServerBindFailed.wireName);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final status = _status;
+    final advanced = t.settings.advanced;
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+      children: [
+        Text(advanced.title, style: Theme.of(context).textTheme.headlineMedium),
+        const SizedBox(height: 8),
+        Text(advanced.api_server_description),
+        if (status != null)
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(advanced.enable),
+            value: status.enabled,
+            onChanged: (value) async {
+              try {
+                final next = await ref
+                    .read(workspaceSettingsRepositoryProvider)
+                    .setApiServerEnabled(value);
+                if (!mounted) return;
+                setState(() {
+                  _status = next;
+                  _error = next.bindErrorCode;
+                });
+              } catch (_) {
+                if (!mounted) return;
+                setState(
+                  () => _error = AppErrorCode.apiServerBindFailed.wireName,
+                );
+              }
+            },
+          ),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text(advanced.port),
+          trailing: SizedBox(
+            width: 96,
+            child: TextField(
+              controller: _port,
+              keyboardType: TextInputType.number,
+              onSubmitted: (value) async {
+                final port = int.tryParse(value);
+                if (port == null) {
+                  setState(() => _error = AppErrorCode.invalidPort.wireName);
+                  return;
+                }
+                final next = await ref
+                    .read(workspaceSettingsRepositoryProvider)
+                    .setApiServerPort(port);
+                if (!mounted) return;
+                setState(() {
+                  _status = next;
+                  _error = next.bindErrorCode;
+                });
+              },
+            ),
+          ),
+        ),
+        if (status?.baseUrl != null) ...[
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text('${advanced.running_at} ${status!.baseUrl}'),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  tooltip: t.common.ui.feedback.copied,
+                  onPressed: () =>
+                      Clipboard.setData(ClipboardData(text: status.baseUrl!)),
+                  icon: const Icon(Icons.copy_rounded),
+                ),
+                IconButton(
+                  onPressed: () => unawaited(openExternalUrl(status.baseUrl!)),
+                  icon: const Icon(Icons.open_in_new_rounded),
+                ),
+              ],
+            ),
+          ),
+        ],
+        if (_error != null)
+          StatusMessage(kind: StatusKind.error, title: appErrorMessage(_error)),
+      ],
     );
   }
 }

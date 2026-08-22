@@ -13,6 +13,14 @@ PRODUCT_BUNDLE_IDENTIFIER = io.github.gong1414.linguaray
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2026 gong1414. MIT License.
 
+// Open-source builds default to ad-hoc signing. Contributors who need stable
+// macOS privacy grants across hot-reload builds can create the ignored
+// DeveloperSigning.xcconfig from DeveloperSigning.xcconfig.example.
+LINGUARAY_CODE_SIGN_IDENTITY = -
+LINGUARAY_CODE_SIGN_STYLE = Manual
+LINGUARAY_DEVELOPMENT_TEAM =
+#include? "DeveloperSigning.xcconfig"
+
 // Native Swift code imports the uniffi-generated linguaray_runtime
 // bindings, whose C symbols are provided by Flutter's native_assets framework.
 // Link the host app against that bundled framework so dyld resolves those

@@ -5,19 +5,19 @@ import 'services/runtime.dart';
 /// runs beside a translation. The runtime still synthesises `+dictionary`
 /// services for providers that support them; this only decides whether the UI
 /// acknowledges them.
-const bool kDictionaryFeatureEnabled = false;
+const bool kDictionaryFeatureEnabled = true;
 
 /// Whether 术语库 is reachable: its workbench navigation item and route, and
 /// the 加入术语库 actions on 历史. The store still loads so nothing else has
 /// to null-check it.
-const bool kGlossaryFeatureEnabled = false;
+const bool kGlossaryFeatureEnabled = true;
 
 /// Whether 翻译 shows its right-hand aside (命中术语 / 质量信号 / 快捷键).
-const bool kTranslationAsideEnabled = false;
+const bool kTranslationAsideEnabled = true;
 
 /// First-release scope gates. Incomplete entry points are not exposed.
-const bool kHistoryFeatureEnabled = false;
-const bool kAdvancedSettingsFeatureEnabled = false;
+const bool kHistoryFeatureEnabled = true;
+const bool kAdvancedSettingsFeatureEnabled = true;
 
 /// True when the UI should surface a service of this kind at all.
 bool isServiceTypeVisible(ServiceType type) {
