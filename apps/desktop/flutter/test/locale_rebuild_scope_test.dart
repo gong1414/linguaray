@@ -106,11 +106,11 @@ void main() {
 /// engine only ever observes the one real view.
 class _FakeView extends TestFlutterView {
   _FakeView(FlutterView view)
-      : super(
-          view: view,
-          platformDispatcher: view.platformDispatcher as TestPlatformDispatcher,
-          display: view.display as TestDisplay,
-        );
+    : super(
+        view: view,
+        platformDispatcher: view.platformDispatcher as TestPlatformDispatcher,
+        display: view.display as TestDisplay,
+      );
 
   @override
   int get viewId => 100;
@@ -170,7 +170,10 @@ class _Shell extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Column(
-        children: [Text(t.workbench.translate), Expanded(child: child)],
+        children: [
+          Text(t.workbench.translate),
+          Expanded(child: child),
+        ],
       ),
     );
   }

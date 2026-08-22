@@ -83,7 +83,7 @@ class NativeMenu extends StatefulWidget {
   /// Renders the trigger; receives the open state and a toggle callback, so a
   /// call site reads the same as it did against the kit's `Menu`.
   final Widget Function(BuildContext context, bool open, VoidCallback toggle)
-      trigger;
+  trigger;
   final List<NativeMenuItem> items;
 
   /// Which edge of the trigger the menu hangs from.
@@ -97,7 +97,7 @@ class NativeMenu extends StatefulWidget {
   /// returns the one to select, or null for a dismissal.
   @visibleForTesting
   static Future<NativeMenuItem?> Function(List<NativeMenuItem> items)?
-      debugPresenter;
+  debugPresenter;
 
   @override
   State<NativeMenu> createState() => _NativeMenuState();
@@ -224,7 +224,7 @@ class _NativeMenuState extends State<NativeMenu> {
 
   @override
   Widget build(BuildContext context) => KeyedSubtree(
-        key: _anchorKey,
-        child: widget.trigger(context, _open, _toggle),
-      );
+    key: _anchorKey,
+    child: widget.trigger(context, _open, _toggle),
+  );
 }

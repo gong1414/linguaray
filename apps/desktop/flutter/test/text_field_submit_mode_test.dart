@@ -97,8 +97,9 @@ void main() {
     expect(submitted, ['hello', 'hello']);
   });
 
-  testOnLinux('a field with no submit mode keeps Enter to itself',
-      (tester) async {
+  testOnLinux('a field with no submit mode keeps Enter to itself', (
+    tester,
+  ) async {
     final submitted = await pump(
       tester,
       submitOnEnter: false,

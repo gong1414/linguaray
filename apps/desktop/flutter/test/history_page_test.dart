@@ -127,12 +127,10 @@ void main() {
 }
 
 Widget _specimen(Widget child) => DesignThemeProvider(
-      child: MaterialApp(
-        home: Scaffold(
-          body: SizedBox(width: 668, height: 560, child: child),
-        ),
-      ),
-    );
+  child: MaterialApp(
+    home: Scaffold(body: SizedBox(width: 668, height: 560, child: child)),
+  ),
+);
 
 HistoryEntry _entry(
   String id,
@@ -140,20 +138,19 @@ HistoryEntry _entry(
   String translation, {
   bool favorite = false,
   bool edited = false,
-}) =>
-    HistoryEntry(
-      id: id,
-      source: source,
-      translation: translation,
-      sourceLanguage: 'en',
-      targetLanguage: 'zh-Hans',
-      serviceId: 'system+translation',
-      serviceName: 'System',
-      favorite: favorite,
-      edited: edited,
-      createdAt: 1700000000,
-      updatedAt: 1700000000,
-    );
+}) => HistoryEntry(
+  id: id,
+  source: source,
+  translation: translation,
+  sourceLanguage: 'en',
+  targetLanguage: 'zh-Hans',
+  serviceId: 'system+translation',
+  serviceName: 'System',
+  favorite: favorite,
+  edited: edited,
+  createdAt: 1700000000,
+  updatedAt: 1700000000,
+);
 
 class _PageHistoryGateway implements HistoryGateway {
   _PageHistoryGateway(this.entries);
@@ -162,10 +159,10 @@ class _PageHistoryGateway implements HistoryGateway {
 
   @override
   Future<HistoryCounts> counts() async => HistoryCounts(
-        all: entries.length,
-        favorites: entries.where((entry) => entry.favorite).length,
-        edited: entries.where((entry) => entry.edited).length,
-      );
+    all: entries.length,
+    favorites: entries.where((entry) => entry.favorite).length,
+    edited: entries.where((entry) => entry.edited).length,
+  );
 
   @override
   Future<int> deleteEntries(List<String> entryIds) async {
@@ -178,14 +175,13 @@ class _PageHistoryGateway implements HistoryGateway {
   Future<List<HistoryEntry>> listEntries(
     HistoryFilter filter,
     String? query,
-  ) async =>
-      [
-        for (final entry in entries)
-          if (filter == HistoryFilter.all ||
-              (filter == HistoryFilter.favorites && entry.favorite) ||
-              (filter == HistoryFilter.edited && entry.edited))
-            entry,
-      ];
+  ) async => [
+    for (final entry in entries)
+      if (filter == HistoryFilter.all ||
+          (filter == HistoryFilter.favorites && entry.favorite) ||
+          (filter == HistoryFilter.edited && entry.edited))
+        entry,
+  ];
 
   /// Ids the page asked to favourite, in order.
   final List<String> favorited = [];

@@ -3,11 +3,11 @@
 ///
 // coverage:ignore-file
 // ignore_for_file: type=lint, unused_import
-// dart format off
 
 import 'package:flutter/widgets.dart';
 import 'package:intl/intl.dart';
 import 'package:slang/generated.dart';
+
 import 'strings.g.dart';
 
 // Path: <root>
@@ -15,25 +15,30 @@ class TranslationsZhHans extends Translations
     with BaseTranslations<AppLocale, Translations> {
   /// You can call this constructor and build your own translation instance of this locale.
   /// Constructing via the enum [AppLocale.build] is preferred.
-  TranslationsZhHans(
-      {Map<String, Node>? overrides,
-      PluralResolver? cardinalResolver,
-      PluralResolver? ordinalResolver,
-      TranslationMetadata<AppLocale, Translations>? meta})
-      : assert(overrides == null,
-            'Set "translation_overrides: true" in order to enable this feature.'),
-        $meta = meta ??
-            TranslationMetadata(
-              locale: AppLocale.zhHans,
-              overrides: overrides ?? {},
-              cardinalResolver: cardinalResolver,
-              ordinalResolver: ordinalResolver,
-            ),
-        super(
-            cardinalResolver: cardinalResolver,
-            ordinalResolver: ordinalResolver) {
+  TranslationsZhHans({
+    Map<String, Node>? overrides,
+    PluralResolver? cardinalResolver,
+    PluralResolver? ordinalResolver,
+    TranslationMetadata<AppLocale, Translations>? meta,
+  }) : assert(
+         overrides == null,
+         'Set "translation_overrides: true" in order to enable this feature.',
+       ),
+       $meta =
+           meta ??
+           TranslationMetadata(
+             locale: AppLocale.zhHans,
+             overrides: overrides ?? {},
+             cardinalResolver: cardinalResolver,
+             ordinalResolver: ordinalResolver,
+           ),
+       super(
+         cardinalResolver: cardinalResolver,
+         ordinalResolver: ordinalResolver,
+       ) {
     super.$meta.setFlatMapFunction(
-        $meta.getTranslation); // copy base translations to super.$meta
+      $meta.getTranslation,
+    ); // copy base translations to super.$meta
     $meta.setFlatMapFunction(_flatMapFunction);
   }
 
@@ -49,14 +54,15 @@ class TranslationsZhHans extends Translations
   late final TranslationsZhHans _root = this; // ignore: unused_field
 
   @override
-  TranslationsZhHans $copyWith(
-          {TranslationMetadata<AppLocale, Translations>? meta}) =>
-      TranslationsZhHans(meta: meta ?? this.$meta);
+  TranslationsZhHans $copyWith({
+    TranslationMetadata<AppLocale, Translations>? meta,
+  }) => TranslationsZhHans(meta: meta ?? this.$meta);
 
   // Translations
   @override
-  late final _TranslationsCommonZhHans common =
-      _TranslationsCommonZhHans._(_root);
+  late final _TranslationsCommonZhHans common = _TranslationsCommonZhHans._(
+    _root,
+  );
   @override
   late final _TranslationsAppZhHans app = _TranslationsAppZhHans._(_root);
   @override
@@ -68,20 +74,23 @@ class TranslationsZhHans extends Translations
   @override
   late final _TranslationsSettingsZhHans settings =
       _TranslationsSettingsZhHans._(_root);
+  @override
+  late final _TranslationsUiZhHans ui = _TranslationsUiZhHans._(_root);
 }
 
 // Path: common
 class _TranslationsCommonZhHans extends TranslationsCommonEn {
   _TranslationsCommonZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
   // Translations
   @override
-  late final _TranslationsCommonUiZhHans ui =
-      _TranslationsCommonUiZhHans._(_root);
+  late final _TranslationsCommonUiZhHans ui = _TranslationsCommonUiZhHans._(
+    _root,
+  );
   @override
   late final _TranslationsCommonLanguageZhHans language =
       _TranslationsCommonLanguageZhHans._(_root);
@@ -99,22 +108,23 @@ class _TranslationsCommonZhHans extends TranslationsCommonEn {
 // Path: app
 class _TranslationsAppZhHans extends TranslationsAppEn {
   _TranslationsAppZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
   // Translations
   @override
-  late final _TranslationsAppTrayZhHans tray =
-      _TranslationsAppTrayZhHans._(_root);
+  late final _TranslationsAppTrayZhHans tray = _TranslationsAppTrayZhHans._(
+    _root,
+  );
 }
 
 // Path: mini_translator
 class _TranslationsMiniTranslatorZhHans extends TranslationsMiniTranslatorEn {
   _TranslationsMiniTranslatorZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -145,8 +155,8 @@ class _TranslationsMiniTranslatorZhHans extends TranslationsMiniTranslatorEn {
 // Path: workbench
 class _TranslationsWorkbenchZhHans extends TranslationsWorkbenchEn {
   _TranslationsWorkbenchZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -192,8 +202,8 @@ class _TranslationsWorkbenchZhHans extends TranslationsWorkbenchEn {
 // Path: settings
 class _TranslationsSettingsZhHans extends TranslationsSettingsEn {
   _TranslationsSettingsZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -224,13 +234,41 @@ class _TranslationsSettingsZhHans extends TranslationsSettingsEn {
   @override
   late final _TranslationsSettingsAboutZhHans about =
       _TranslationsSettingsAboutZhHans._(_root);
+  @override
+  late final _TranslationsSettingsPermissionsZhHans permissions =
+      _TranslationsSettingsPermissionsZhHans._(_root);
+}
+
+// Path: ui
+class _TranslationsUiZhHans extends TranslationsUiEn {
+  _TranslationsUiZhHans._(TranslationsZhHans root)
+    : this._root = root,
+      super.internal(root);
+
+  final TranslationsZhHans _root; // ignore: unused_field
+
+  // Translations
+  @override
+  late final _TranslationsUiShellZhHans shell = _TranslationsUiShellZhHans._(
+    _root,
+  );
+  @override
+  late final _TranslationsUiFirstRunZhHans first_run =
+      _TranslationsUiFirstRunZhHans._(_root);
+  @override
+  late final _TranslationsUiQuickZhHans quick = _TranslationsUiQuickZhHans._(
+    _root,
+  );
+  @override
+  late final _TranslationsUiProvidersZhHans providers =
+      _TranslationsUiProvidersZhHans._(_root);
 }
 
 // Path: common.ui
 class _TranslationsCommonUiZhHans extends TranslationsCommonUiEn {
   _TranslationsCommonUiZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -246,8 +284,8 @@ class _TranslationsCommonUiZhHans extends TranslationsCommonUiEn {
 // Path: common.language
 class _TranslationsCommonLanguageZhHans extends TranslationsCommonLanguageEn {
   _TranslationsCommonLanguageZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -327,8 +365,8 @@ class _TranslationsCommonLanguageZhHans extends TranslationsCommonLanguageEn {
 // Path: common.theme_mode
 class _TranslationsCommonThemeModeZhHans extends TranslationsCommonThemeModeEn {
   _TranslationsCommonThemeModeZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -345,8 +383,8 @@ class _TranslationsCommonThemeModeZhHans extends TranslationsCommonThemeModeEn {
 class _TranslationsCommonThemeStyleZhHans
     extends TranslationsCommonThemeStyleEn {
   _TranslationsCommonThemeStyleZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -360,8 +398,8 @@ class _TranslationsCommonThemeStyleZhHans
 // Path: common.provider
 class _TranslationsCommonProviderZhHans extends TranslationsCommonProviderEn {
   _TranslationsCommonProviderZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -395,8 +433,8 @@ class _TranslationsCommonProviderZhHans extends TranslationsCommonProviderEn {
 // Path: app.tray
 class _TranslationsAppTrayZhHans extends TranslationsAppTrayEn {
   _TranslationsAppTrayZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -410,20 +448,22 @@ class _TranslationsAppTrayZhHans extends TranslationsAppTrayEn {
 class _TranslationsMiniTranslatorLimitedBannerZhHans
     extends TranslationsMiniTranslatorLimitedBannerEn {
   _TranslationsMiniTranslatorLimitedBannerZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
   // Translations
   @override
   late final _TranslationsMiniTranslatorLimitedBannerPermissionZhHans
-      permission =
-      _TranslationsMiniTranslatorLimitedBannerPermissionZhHans._(_root);
+  permission = _TranslationsMiniTranslatorLimitedBannerPermissionZhHans._(
+    _root,
+  );
   @override
   late final _TranslationsMiniTranslatorLimitedBannerInstructionZhHans
-      instruction =
-      _TranslationsMiniTranslatorLimitedBannerInstructionZhHans._(_root);
+  instruction = _TranslationsMiniTranslatorLimitedBannerInstructionZhHans._(
+    _root,
+  );
   @override
   late final _TranslationsMiniTranslatorLimitedBannerActionZhHans action =
       _TranslationsMiniTranslatorLimitedBannerActionZhHans._(_root);
@@ -439,8 +479,8 @@ class _TranslationsMiniTranslatorLimitedBannerZhHans
 class _TranslationsMiniTranslatorInputZhHans
     extends TranslationsMiniTranslatorInputEn {
   _TranslationsMiniTranslatorInputZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -458,8 +498,8 @@ class _TranslationsMiniTranslatorInputZhHans
 class _TranslationsMiniTranslatorToolbarZhHans
     extends TranslationsMiniTranslatorToolbarEn {
   _TranslationsMiniTranslatorToolbarZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -476,8 +516,8 @@ class _TranslationsMiniTranslatorToolbarZhHans
 class _TranslationsMiniTranslatorButtonZhHans
     extends TranslationsMiniTranslatorButtonEn {
   _TranslationsMiniTranslatorButtonZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -500,8 +540,8 @@ class _TranslationsMiniTranslatorButtonZhHans
 class _TranslationsMiniTranslatorLanguageZhHans
     extends TranslationsMiniTranslatorLanguageEn {
   _TranslationsMiniTranslatorLanguageZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -526,8 +566,8 @@ class _TranslationsMiniTranslatorLanguageZhHans
 class _TranslationsMiniTranslatorMessageZhHans
     extends TranslationsMiniTranslatorMessageEn {
   _TranslationsMiniTranslatorMessageZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -546,8 +586,8 @@ class _TranslationsMiniTranslatorMessageZhHans
 class _TranslationsMiniTranslatorResultZhHans
     extends TranslationsMiniTranslatorResultEn {
   _TranslationsMiniTranslatorResultZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -588,8 +628,8 @@ class _TranslationsMiniTranslatorResultZhHans
 class _TranslationsWorkbenchHistoryPageZhHans
     extends TranslationsWorkbenchHistoryPageEn {
   _TranslationsWorkbenchHistoryPageZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -666,8 +706,8 @@ class _TranslationsWorkbenchHistoryPageZhHans
 class _TranslationsWorkbenchSubtitleZhHans
     extends TranslationsWorkbenchSubtitleEn {
   _TranslationsWorkbenchSubtitleZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -682,8 +722,8 @@ class _TranslationsWorkbenchSubtitleZhHans
 class _TranslationsWorkbenchPlaceholderZhHans
     extends TranslationsWorkbenchPlaceholderEn {
   _TranslationsWorkbenchPlaceholderZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -698,8 +738,8 @@ class _TranslationsWorkbenchPlaceholderZhHans
 class _TranslationsWorkbenchGlossaryPageZhHans
     extends TranslationsWorkbenchGlossaryPageEn {
   _TranslationsWorkbenchGlossaryPageZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -824,8 +864,8 @@ class _TranslationsWorkbenchGlossaryPageZhHans
 class _TranslationsWorkbenchTranslationZhHans
     extends TranslationsWorkbenchTranslationEn {
   _TranslationsWorkbenchTranslationZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -891,13 +931,37 @@ class _TranslationsWorkbenchTranslationZhHans
   String newline_hint({required Object key}) => '${key} 换行';
   @override
   String get failed_body => '这一段没有拿到译文。检查网络连接后重试，或展开看每个服务的原因逐个处理。';
+  @override
+  String get clear => '清空';
+  @override
+  String get swap_languages => '交换语言';
+  @override
+  String get services => '翻译服务';
+  @override
+  String get configure_services => '配置服务';
+  @override
+  String get retry => '重试';
+  @override
+  String character_count({required Object count}) => '${count} 个字符';
+  @override
+  String get language_pair_not_installed => '请先在 macOS“语言与地区”中安装这个语言组合，然后重试。';
+  @override
+  String get unsupported_language_pair => '当前翻译服务不支持这个语言组合。';
+  @override
+  String get source_language_detection_failed => '无法识别原文语言，请手动选择源语言后重试。';
+  @override
+  String get network_error => '无法连接翻译服务，请检查网络后重试。';
+  @override
+  String partial_failure({required Object count}) => '${count} 个服务失败，可切换查看原因';
+  @override
+  String get streaming => '正在生成译文…';
 }
 
 // Path: workbench.status
 class _TranslationsWorkbenchStatusZhHans extends TranslationsWorkbenchStatusEn {
   _TranslationsWorkbenchStatusZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -913,8 +977,8 @@ class _TranslationsWorkbenchStatusZhHans extends TranslationsWorkbenchStatusEn {
 // Path: settings.general
 class _TranslationsSettingsGeneralZhHans extends TranslationsSettingsGeneralEn {
   _TranslationsSettingsGeneralZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -942,8 +1006,8 @@ class _TranslationsSettingsGeneralZhHans extends TranslationsSettingsGeneralEn {
 class _TranslationsSettingsAppearanceZhHans
     extends TranslationsSettingsAppearanceEn {
   _TranslationsSettingsAppearanceZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -961,8 +1025,8 @@ class _TranslationsSettingsAppearanceZhHans
 class _TranslationsSettingsShortcutsZhHans
     extends TranslationsSettingsShortcutsEn {
   _TranslationsSettingsShortcutsZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -997,8 +1061,8 @@ class _TranslationsSettingsShortcutsZhHans
 class _TranslationsSettingsAdvancedZhHans
     extends TranslationsSettingsAdvancedEn {
   _TranslationsSettingsAdvancedZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -1023,8 +1087,8 @@ class _TranslationsSettingsAdvancedZhHans
 class _TranslationsSettingsServicesZhHans
     extends TranslationsSettingsServicesEn {
   _TranslationsSettingsServicesZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -1054,8 +1118,8 @@ class _TranslationsSettingsServicesZhHans
 class _TranslationsSettingsProvidersZhHans
     extends TranslationsSettingsProvidersEn {
   _TranslationsSettingsProvidersZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -1097,8 +1161,8 @@ class _TranslationsSettingsProvidersZhHans
 // Path: settings.layout
 class _TranslationsSettingsLayoutZhHans extends TranslationsSettingsLayoutEn {
   _TranslationsSettingsLayoutZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -1121,8 +1185,8 @@ class _TranslationsSettingsLayoutZhHans extends TranslationsSettingsLayoutEn {
 // Path: settings.about
 class _TranslationsSettingsAboutZhHans extends TranslationsSettingsAboutEn {
   _TranslationsSettingsAboutZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -1151,11 +1215,153 @@ class _TranslationsSettingsAboutZhHans extends TranslationsSettingsAboutEn {
   String get update => '更新';
 }
 
+// Path: settings.permissions
+class _TranslationsSettingsPermissionsZhHans
+    extends TranslationsSettingsPermissionsEn {
+  _TranslationsSettingsPermissionsZhHans._(TranslationsZhHans root)
+    : this._root = root,
+      super.internal(root);
+
+  final TranslationsZhHans _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get title => '权限';
+  @override
+  String get windows_note => 'Windows 上无需额外授权即可使用划词和截图。';
+  @override
+  String get recheck => '重新检查';
+}
+
+// Path: ui.shell
+class _TranslationsUiShellZhHans extends TranslationsUiShellEn {
+  _TranslationsUiShellZhHans._(TranslationsZhHans root)
+    : this._root = root,
+      super.internal(root);
+
+  final TranslationsZhHans _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get app_name => 'LinguaRay';
+  @override
+  String get translate => '翻译';
+  @override
+  String get settings => '设置';
+  @override
+  String get minimize => '最小化';
+  @override
+  String get maximize => '最大化';
+  @override
+  String get close => '关闭';
+}
+
+// Path: ui.first_run
+class _TranslationsUiFirstRunZhHans extends TranslationsUiFirstRunEn {
+  _TranslationsUiFirstRunZhHans._(TranslationsZhHans root)
+    : this._root = root,
+      super.internal(root);
+
+  final TranslationsZhHans _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get title => '开始使用 LinguaRay';
+  @override
+  String get subtitle => '完成这几步后，就可以从任何应用唤起翻译。';
+  @override
+  String get permissions_title => '系统权限';
+  @override
+  String get permissions_body => '划词和截图 OCR 需要辅助功能与屏幕录制权限。';
+  @override
+  String get accessibility => '辅助功能';
+  @override
+  String get screen_recording => '屏幕录制';
+  @override
+  String get shortcuts_title => '全局快捷键';
+  @override
+  String get shortcuts_body => '四个首版动作已准备好。若有冲突，可稍后在设置中修改。';
+  @override
+  String get services_title => '翻译服务';
+  @override
+  String get services_body => '至少启用一个翻译服务。';
+  @override
+  String get granted => '已授权';
+  @override
+  String get denied => '未授权';
+  @override
+  String get not_required => '当前系统无需授权';
+  @override
+  String get unknown => '状态未知';
+  @override
+  String get checking => '正在检查…';
+  @override
+  String get conflict => '有快捷键冲突。可先跳过，之后在设置中修复。';
+  @override
+  String get no_provider => '还没有可用的翻译服务。';
+  @override
+  String get ready => '已有可用服务。';
+  @override
+  String get grant => '授权';
+  @override
+  String get recheck => '重新检查';
+  @override
+  String get configure_services => '配置服务';
+  @override
+  String get start => '开始使用';
+  @override
+  String get skip => '稍后再说';
+}
+
+// Path: ui.quick
+class _TranslationsUiQuickZhHans extends TranslationsUiQuickEn {
+  _TranslationsUiQuickZhHans._(TranslationsZhHans root)
+    : this._root = root,
+      super.internal(root);
+
+  final TranslationsZhHans _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get title => '快捷翻译';
+  @override
+  String get input_hint => '输入、粘贴，或由划词和截图填入';
+  @override
+  String get pin => '置顶';
+  @override
+  String get unpin => '取消置顶';
+  @override
+  String get permission_denied => '没有所需的系统权限';
+  @override
+  String get permission_next => '打开系统设置授予辅助功能或屏幕录制权限，然后返回重新检查。';
+  @override
+  String get capture_cancelled => '已取消截图。原文未改动。';
+}
+
+// Path: ui.providers
+class _TranslationsUiProvidersZhHans extends TranslationsUiProvidersEn {
+  _TranslationsUiProvidersZhHans._(TranslationsZhHans root)
+    : this._root = root,
+      super.internal(root);
+
+  final TranslationsZhHans _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get secret_stored => '密钥已保存在系统钥匙串';
+  @override
+  String get secret_placeholder => '留空则保留已保存的密钥';
+  @override
+  String get validation_missing => '请填写必填项。';
+  @override
+  String get save_failed => '无法保存服务商，请检查配置后重试。';
+}
+
 // Path: common.ui.button
 class _TranslationsCommonUiButtonZhHans extends TranslationsCommonUiButtonEn {
   _TranslationsCommonUiButtonZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -1182,8 +1388,8 @@ class _TranslationsCommonUiButtonZhHans extends TranslationsCommonUiButtonEn {
 class _TranslationsCommonUiFeedbackZhHans
     extends TranslationsCommonUiFeedbackEn {
   _TranslationsCommonUiFeedbackZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -1196,8 +1402,8 @@ class _TranslationsCommonUiFeedbackZhHans
 class _TranslationsAppTrayContextMenuZhHans
     extends TranslationsAppTrayContextMenuEn {
   _TranslationsAppTrayContextMenuZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -1219,9 +1425,9 @@ class _TranslationsAppTrayContextMenuZhHans
 class _TranslationsMiniTranslatorLimitedBannerPermissionZhHans
     extends TranslationsMiniTranslatorLimitedBannerPermissionEn {
   _TranslationsMiniTranslatorLimitedBannerPermissionZhHans._(
-      TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    TranslationsZhHans root,
+  ) : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -1238,9 +1444,9 @@ class _TranslationsMiniTranslatorLimitedBannerPermissionZhHans
 class _TranslationsMiniTranslatorLimitedBannerInstructionZhHans
     extends TranslationsMiniTranslatorLimitedBannerInstructionEn {
   _TranslationsMiniTranslatorLimitedBannerInstructionZhHans._(
-      TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    TranslationsZhHans root,
+  ) : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -1257,9 +1463,9 @@ class _TranslationsMiniTranslatorLimitedBannerInstructionZhHans
 class _TranslationsMiniTranslatorLimitedBannerActionZhHans
     extends TranslationsMiniTranslatorLimitedBannerActionEn {
   _TranslationsMiniTranslatorLimitedBannerActionZhHans._(
-      TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    TranslationsZhHans root,
+  ) : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -1274,9 +1480,9 @@ class _TranslationsMiniTranslatorLimitedBannerActionZhHans
 class _TranslationsMiniTranslatorLimitedBannerFeedbackZhHans
     extends TranslationsMiniTranslatorLimitedBannerFeedbackEn {
   _TranslationsMiniTranslatorLimitedBannerFeedbackZhHans._(
-      TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    TranslationsZhHans root,
+  ) : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -1291,9 +1497,9 @@ class _TranslationsMiniTranslatorLimitedBannerFeedbackZhHans
 class _TranslationsMiniTranslatorLimitedBannerTooltipZhHans
     extends TranslationsMiniTranslatorLimitedBannerTooltipEn {
   _TranslationsMiniTranslatorLimitedBannerTooltipZhHans._(
-      TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    TranslationsZhHans root,
+  ) : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -1306,8 +1512,8 @@ class _TranslationsMiniTranslatorLimitedBannerTooltipZhHans
 class _TranslationsMiniTranslatorToolbarTooltipZhHans
     extends TranslationsMiniTranslatorToolbarTooltipEn {
   _TranslationsMiniTranslatorToolbarTooltipZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -1326,8 +1532,8 @@ class _TranslationsMiniTranslatorToolbarTooltipZhHans
 class _TranslationsMiniTranslatorToolbarMenuZhHans
     extends TranslationsMiniTranslatorToolbarMenuEn {
   _TranslationsMiniTranslatorToolbarMenuZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -1346,8 +1552,8 @@ class _TranslationsMiniTranslatorToolbarMenuZhHans
 class _TranslationsSettingsGeneralSectionZhHans
     extends TranslationsSettingsGeneralSectionEn {
   _TranslationsSettingsGeneralSectionZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -1378,8 +1584,8 @@ class _TranslationsSettingsGeneralSectionZhHans
 class _TranslationsSettingsGeneralRowZhHans
     extends TranslationsSettingsGeneralRowEn {
   _TranslationsSettingsGeneralRowZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -1436,8 +1642,8 @@ class _TranslationsSettingsGeneralRowZhHans
 class _TranslationsSettingsGeneralButtonZhHans
     extends TranslationsSettingsGeneralButtonEn {
   _TranslationsSettingsGeneralButtonZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -1458,8 +1664,8 @@ class _TranslationsSettingsGeneralButtonZhHans
 class _TranslationsSettingsGeneralOptionZhHans
     extends TranslationsSettingsGeneralOptionEn {
   _TranslationsSettingsGeneralOptionZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -1482,8 +1688,8 @@ class _TranslationsSettingsGeneralOptionZhHans
 class _TranslationsSettingsGeneralEditorZhHans
     extends TranslationsSettingsGeneralEditorEn {
   _TranslationsSettingsGeneralEditorZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -1513,8 +1719,8 @@ class _TranslationsSettingsGeneralEditorZhHans
 class _TranslationsSettingsAppearanceSectionZhHans
     extends TranslationsSettingsAppearanceSectionEn {
   _TranslationsSettingsAppearanceSectionZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -1531,8 +1737,8 @@ class _TranslationsSettingsAppearanceSectionZhHans
 class _TranslationsSettingsShortcutsSectionZhHans
     extends TranslationsSettingsShortcutsSectionEn {
   _TranslationsSettingsShortcutsSectionZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -1549,8 +1755,8 @@ class _TranslationsSettingsShortcutsSectionZhHans
 class _TranslationsSettingsShortcutsRowZhHans
     extends TranslationsSettingsShortcutsRowEn {
   _TranslationsSettingsShortcutsRowZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -1571,8 +1777,8 @@ class _TranslationsSettingsShortcutsRowZhHans
 class _TranslationsSettingsShortcutsResetDialogZhHans
     extends TranslationsSettingsShortcutsResetDialogEn {
   _TranslationsSettingsShortcutsResetDialogZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -1591,8 +1797,8 @@ class _TranslationsSettingsShortcutsResetDialogZhHans
 class _TranslationsSettingsShortcutsGroupZhHans
     extends TranslationsSettingsShortcutsGroupEn {
   _TranslationsSettingsShortcutsGroupZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -1609,8 +1815,8 @@ class _TranslationsSettingsShortcutsGroupZhHans
 class _TranslationsSettingsServicesButtonZhHans
     extends TranslationsSettingsServicesButtonEn {
   _TranslationsSettingsServicesButtonZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -1623,8 +1829,8 @@ class _TranslationsSettingsServicesButtonZhHans
 class _TranslationsSettingsServicesSectionZhHans
     extends TranslationsSettingsServicesSectionEn {
   _TranslationsSettingsServicesSectionZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -1637,8 +1843,8 @@ class _TranslationsSettingsServicesSectionZhHans
 class _TranslationsSettingsServicesEditorZhHans
     extends TranslationsSettingsServicesEditorEn {
   _TranslationsSettingsServicesEditorZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -1662,8 +1868,8 @@ class _TranslationsSettingsServicesEditorZhHans
 class _TranslationsSettingsServicesDetailZhHans
     extends TranslationsSettingsServicesDetailEn {
   _TranslationsSettingsServicesDetailZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -1673,8 +1879,9 @@ class _TranslationsSettingsServicesDetailZhHans
       _TranslationsSettingsServicesDetailRowZhHans._(_root);
   @override
   late final _TranslationsSettingsServicesDetailDeleteDialogZhHans
-      delete_dialog =
-      _TranslationsSettingsServicesDetailDeleteDialogZhHans._(_root);
+  delete_dialog = _TranslationsSettingsServicesDetailDeleteDialogZhHans._(
+    _root,
+  );
   @override
   String get prompt_variables =>
       '可用变量：{{sourceLanguage}}、{{targetLanguage}}、{{text}}';
@@ -1684,8 +1891,8 @@ class _TranslationsSettingsServicesDetailZhHans
 class _TranslationsSettingsServicesItemZhHans
     extends TranslationsSettingsServicesItemEn {
   _TranslationsSettingsServicesItemZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -1698,8 +1905,8 @@ class _TranslationsSettingsServicesItemZhHans
 class _TranslationsSettingsProvidersSectionZhHans
     extends TranslationsSettingsProvidersSectionEn {
   _TranslationsSettingsProvidersSectionZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -1714,8 +1921,8 @@ class _TranslationsSettingsProvidersSectionZhHans
 class _TranslationsSettingsProvidersItemZhHans
     extends TranslationsSettingsProvidersItemEn {
   _TranslationsSettingsProvidersItemZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -1732,8 +1939,8 @@ class _TranslationsSettingsProvidersItemZhHans
 class _TranslationsSettingsProvidersButtonZhHans
     extends TranslationsSettingsProvidersButtonEn {
   _TranslationsSettingsProvidersButtonZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -1746,8 +1953,8 @@ class _TranslationsSettingsProvidersButtonZhHans
 class _TranslationsSettingsProvidersAlertZhHans
     extends TranslationsSettingsProvidersAlertEn {
   _TranslationsSettingsProvidersAlertZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -1760,8 +1967,8 @@ class _TranslationsSettingsProvidersAlertZhHans
 class _TranslationsSettingsProvidersIntroZhHans
     extends TranslationsSettingsProvidersIntroEn {
   _TranslationsSettingsProvidersIntroZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -1776,8 +1983,8 @@ class _TranslationsSettingsProvidersIntroZhHans
 class _TranslationsSettingsProvidersEditorZhHans
     extends TranslationsSettingsProvidersEditorEn {
   _TranslationsSettingsProvidersEditorZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -1801,8 +2008,9 @@ class _TranslationsSettingsProvidersEditorZhHans
   String get add_title => '添加 {}';
   @override
   late final _TranslationsSettingsProvidersEditorCapabilityNoteZhHans
-      capability_note =
-      _TranslationsSettingsProvidersEditorCapabilityNoteZhHans._(_root);
+  capability_note = _TranslationsSettingsProvidersEditorCapabilityNoteZhHans._(
+    _root,
+  );
   @override
   late final _TranslationsSettingsProvidersEditorTestZhHans test =
       _TranslationsSettingsProvidersEditorTestZhHans._(_root);
@@ -1812,8 +2020,8 @@ class _TranslationsSettingsProvidersEditorZhHans
 class _TranslationsSettingsProvidersDetailZhHans
     extends TranslationsSettingsProvidersDetailEn {
   _TranslationsSettingsProvidersDetailZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -1836,8 +2044,8 @@ class _TranslationsSettingsProvidersDetailZhHans
 class _TranslationsSettingsProvidersCapabilityZhHans
     extends TranslationsSettingsProvidersCapabilityEn {
   _TranslationsSettingsProvidersCapabilityZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -1856,8 +2064,8 @@ class _TranslationsSettingsProvidersCapabilityZhHans
 class _TranslationsSettingsProvidersDescriptionZhHans
     extends TranslationsSettingsProvidersDescriptionEn {
   _TranslationsSettingsProvidersDescriptionZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -1876,8 +2084,8 @@ class _TranslationsSettingsProvidersDescriptionZhHans
 class _TranslationsSettingsProvidersDeleteDialogZhHans
     extends TranslationsSettingsProvidersDeleteDialogEn {
   _TranslationsSettingsProvidersDeleteDialogZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -1892,8 +2100,8 @@ class _TranslationsSettingsProvidersDeleteDialogZhHans
 class _TranslationsSettingsLayoutEmptyZhHans
     extends TranslationsSettingsLayoutEmptyEn {
   _TranslationsSettingsLayoutEmptyZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -1908,8 +2116,8 @@ class _TranslationsSettingsLayoutEmptyZhHans
 class _TranslationsAppTrayContextMenuDevToolsZhHans
     extends TranslationsAppTrayContextMenuDevToolsEn {
   _TranslationsAppTrayContextMenuDevToolsZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -1924,8 +2132,8 @@ class _TranslationsAppTrayContextMenuDevToolsZhHans
 class _TranslationsSettingsGeneralEditorRowZhHans
     extends TranslationsSettingsGeneralEditorRowEn {
   _TranslationsSettingsGeneralEditorRowZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -1940,8 +2148,8 @@ class _TranslationsSettingsGeneralEditorRowZhHans
 class _TranslationsSettingsShortcutsGroupGlobalZhHans
     extends TranslationsSettingsShortcutsGroupGlobalEn {
   _TranslationsSettingsShortcutsGroupGlobalZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -1956,8 +2164,8 @@ class _TranslationsSettingsShortcutsGroupGlobalZhHans
 class _TranslationsSettingsShortcutsGroupInAppZhHans
     extends TranslationsSettingsShortcutsGroupInAppEn {
   _TranslationsSettingsShortcutsGroupInAppZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -1972,8 +2180,8 @@ class _TranslationsSettingsShortcutsGroupInAppZhHans
 class _TranslationsSettingsServicesEditorRowZhHans
     extends TranslationsSettingsServicesEditorRowEn {
   _TranslationsSettingsServicesEditorRowZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -1988,8 +2196,8 @@ class _TranslationsSettingsServicesEditorRowZhHans
 class _TranslationsSettingsServicesDetailRowZhHans
     extends TranslationsSettingsServicesDetailRowEn {
   _TranslationsSettingsServicesDetailRowZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -2008,9 +2216,9 @@ class _TranslationsSettingsServicesDetailRowZhHans
 class _TranslationsSettingsServicesDetailDeleteDialogZhHans
     extends TranslationsSettingsServicesDetailDeleteDialogEn {
   _TranslationsSettingsServicesDetailDeleteDialogZhHans._(
-      TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    TranslationsZhHans root,
+  ) : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -2025,8 +2233,8 @@ class _TranslationsSettingsServicesDetailDeleteDialogZhHans
 class _TranslationsSettingsProvidersEditorRowZhHans
     extends TranslationsSettingsProvidersEditorRowEn {
   _TranslationsSettingsProvidersEditorRowZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -2043,9 +2251,9 @@ class _TranslationsSettingsProvidersEditorRowZhHans
 class _TranslationsSettingsProvidersEditorPlaceholderZhHans
     extends TranslationsSettingsProvidersEditorPlaceholderEn {
   _TranslationsSettingsProvidersEditorPlaceholderZhHans._(
-      TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    TranslationsZhHans root,
+  ) : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -2058,9 +2266,9 @@ class _TranslationsSettingsProvidersEditorPlaceholderZhHans
 class _TranslationsSettingsProvidersEditorTypePickerZhHans
     extends TranslationsSettingsProvidersEditorTypePickerEn {
   _TranslationsSettingsProvidersEditorTypePickerZhHans._(
-      TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    TranslationsZhHans root,
+  ) : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -2077,8 +2285,8 @@ class _TranslationsSettingsProvidersEditorTypePickerZhHans
 class _TranslationsSettingsProvidersEditorTooltipZhHans
     extends TranslationsSettingsProvidersEditorTooltipEn {
   _TranslationsSettingsProvidersEditorTooltipZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -2091,8 +2299,8 @@ class _TranslationsSettingsProvidersEditorTooltipZhHans
 class _TranslationsSettingsProvidersEditorStepZhHans
     extends TranslationsSettingsProvidersEditorStepEn {
   _TranslationsSettingsProvidersEditorStepZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -2107,9 +2315,9 @@ class _TranslationsSettingsProvidersEditorStepZhHans
 class _TranslationsSettingsProvidersEditorCapabilityNoteZhHans
     extends TranslationsSettingsProvidersEditorCapabilityNoteEn {
   _TranslationsSettingsProvidersEditorCapabilityNoteZhHans._(
-      TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    TranslationsZhHans root,
+  ) : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -2126,8 +2334,8 @@ class _TranslationsSettingsProvidersEditorCapabilityNoteZhHans
 class _TranslationsSettingsProvidersEditorTestZhHans
     extends TranslationsSettingsProvidersEditorTestEn {
   _TranslationsSettingsProvidersEditorTestZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -2161,8 +2369,8 @@ class _TranslationsSettingsProvidersEditorTestZhHans
 class _TranslationsSettingsProvidersDetailTooltipZhHans
     extends TranslationsSettingsProvidersDetailTooltipEn {
   _TranslationsSettingsProvidersDetailTooltipZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -2175,8 +2383,8 @@ class _TranslationsSettingsProvidersDetailTooltipZhHans
 class _TranslationsSettingsProvidersDetailRowZhHans
     extends TranslationsSettingsProvidersDetailRowEn {
   _TranslationsSettingsProvidersDetailRowZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -2189,8 +2397,8 @@ class _TranslationsSettingsProvidersDetailRowZhHans
 class _TranslationsSettingsProvidersDetailSectionZhHans
     extends TranslationsSettingsProvidersDetailSectionEn {
   _TranslationsSettingsProvidersDetailSectionZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -2205,8 +2413,8 @@ class _TranslationsSettingsProvidersDetailSectionZhHans
 class _TranslationsSettingsProvidersDetailModelsZhHans
     extends TranslationsSettingsProvidersDetailModelsEn {
   _TranslationsSettingsProvidersDetailModelsZhHans._(TranslationsZhHans root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsZhHans _root; // ignore: unused_field
 
@@ -2320,8 +2528,9 @@ extension on TranslationsZhHans {
       'mini_translator.limited_banner.tooltip.help' => '查看帮助文档',
       'mini_translator.input.hint' => '在此处输入单词或文本',
       'mini_translator.input.extracting_text' => '正在提取文字...',
-      'mini_translator.input.hint_translate_to' =>
-        ({required Object language}) => '输入单词或文本，翻译为${language}',
+      'mini_translator.input.hint_translate_to' => ({
+        required Object language,
+      }) => '输入单词或文本，翻译为${language}',
       'mini_translator.toolbar.tooltip.extract_text_from_screen_capture' =>
         '截取屏幕区域并识别文字',
       'mini_translator.toolbar.tooltip.extract_text_from_clipboard' =>
@@ -2351,22 +2560,26 @@ extension on TranslationsZhHans {
         '未配置默认文字识别服务，请在设置中配置。',
       'mini_translator.message.ocr_recognition_failed' => '文字识别失败',
       'mini_translator.result.translating' => '正在翻译…',
-      'mini_translator.result.stale_requery' => ({required Object key}) =>
-          '原文已修改 · ${key} 重新翻译',
-      'mini_translator.result.compare_services' => ({required Object count}) =>
-          '对比 ${count} 个服务',
+      'mini_translator.result.stale_requery' => ({
+        required Object key,
+      }) => '原文已修改 · ${key} 重新翻译',
+      'mini_translator.result.compare_services' => ({
+        required Object count,
+      }) => '对比 ${count} 个服务',
       'mini_translator.result.collapse_compare' => '收起对比',
       'mini_translator.result.set_preferred' => '设为首选',
       'mini_translator.result.retry' => '重试',
       'mini_translator.result.no_result' => '所有服务都没有返回结果 —— 检查网络，或换一个服务再试。',
       'mini_translator.result.no_result_note' => '原文已保留，重试不会重复计入历史。',
-      'mini_translator.result.no_result_meta' => ({required Object count}) =>
-          '${count} 个服务都没有返回结果',
+      'mini_translator.result.no_result_meta' => ({
+        required Object count,
+      }) => '${count} 个服务都没有返回结果',
       'mini_translator.result.no_result_body' =>
         '没有拿到译文。检查网络后按 ⏎ 重试，或展开看每个服务的原因。',
       'mini_translator.result.check_services' => '检查服务',
-      'mini_translator.result.show_reasons' => ({required Object count}) =>
-          '查看 ${count} 个服务的原因',
+      'mini_translator.result.show_reasons' => ({
+        required Object count,
+      }) => '查看 ${count} 个服务的原因',
       'mini_translator.result.collapse_reasons' => '收起原因',
       'mini_translator.result.unknown_error' => '服务没有说明原因。',
       'mini_translator.result.no_result_tag' => '未返回结果',
@@ -2379,38 +2592,44 @@ extension on TranslationsZhHans {
       'workbench.history_page.search' => '搜索',
       'workbench.history_page.search_placeholder' => '搜索原文、译文或服务',
       'workbench.history_page.search_label' => '搜索历史',
-      'workbench.history_page.entry_count' => (
-              {required Object label, required Object count}) =>
-          '${label} · ${count} 条',
+      'workbench.history_page.entry_count' => ({
+        required Object label,
+        required Object count,
+      }) => '${label} · ${count} 条',
       'workbench.history_page.by_time' => '按时间',
       'workbench.history_page.loading' => '正在载入历史…',
       'workbench.history_page.load_failed' => '历史载入失败',
       'workbench.history_page.retry' => '重试',
       'workbench.history_page.empty_title' => '还没有翻译历史',
       'workbench.history_page.empty_description' => '完成一次翻译后，首选译文会自动保存在这里。',
-      'workbench.history_page.no_results' => ({required Object query}) =>
-          '没有匹配「${query}」的记录',
+      'workbench.history_page.no_results' => ({
+        required Object query,
+      }) => '没有匹配「${query}」的记录',
       'workbench.history_page.clear_search' => '清除搜索',
       'workbench.history_page.select' => '多选',
-      'workbench.history_page.selected_count' => ({required Object count}) =>
-          '已选 ${count} 条',
+      'workbench.history_page.selected_count' => ({
+        required Object count,
+      }) => '已选 ${count} 条',
       'workbench.history_page.exit_select' => '退出多选',
       'workbench.history_page.add_to_glossary' => '加入术语库',
       'workbench.history_page.favorite' => '收藏',
       'workbench.history_page.unfavorite' => '取消收藏',
-      'workbench.history_page.delete_confirm' => ({required Object count}) =>
-          '确定删除选中的 ${count} 条历史？此操作无法撤销。',
+      'workbench.history_page.delete_confirm' => ({
+        required Object count,
+      }) => '确定删除选中的 ${count} 条历史？此操作无法撤销。',
       'workbench.history_page.no_glossary' => '请先创建一个术语库',
-      'workbench.history_page.added_to_glossary' => ({required Object count}) =>
-          '已将 ${count} 条记录加入术语库',
+      'workbench.history_page.added_to_glossary' => ({
+        required Object count,
+      }) => '已将 ${count} 条记录加入术语库',
       'workbench.history_page.favorite_flag' => '已收藏',
       'workbench.history_page.edited_flag' => '我改过',
       'workbench.history_page.edit_history_hint' => '修改后的译文会保存到历史',
       'workbench.history_page.copy_translation' => '复制译文',
       'workbench.history_page.more_actions' => '更多',
       'workbench.history_page.delete_title_one' => '删除这条记录',
-      'workbench.history_page.delete_title_many' => ({required Object count}) =>
-          '删除 ${count} 条记录',
+      'workbench.history_page.delete_title_many' => ({
+        required Object count,
+      }) => '删除 ${count} 条记录',
       'workbench.history_page.delete_message' =>
         '删除后无法恢复。收藏和你改过的译文也会一起删除，术语库不受影响。',
       'workbench.glossary' => '术语库',
@@ -2431,24 +2650,27 @@ extension on TranslationsZhHans {
       'workbench.glossary_page.search' => '搜索',
       'workbench.glossary_page.search_placeholder' => '搜索术语或指定译法',
       'workbench.glossary_page.search_label' => '搜索术语库',
-      'workbench.glossary_page.entry_count' => (
-              {required Object name, required Object count}) =>
-          '${name} · ${count} 条',
+      'workbench.glossary_page.entry_count' => ({
+        required Object name,
+        required Object count,
+      }) => '${name} · ${count} 条',
       'workbench.glossary_page.priority_note' => '术语优先级高于任何服务输出',
       'workbench.glossary_page.new_book' => '新建术语库',
       'workbench.glossary_page.new_book_placeholder' => '术语库名称',
       'workbench.glossary_page.rename_book' => '重命名',
-      'workbench.glossary_page.delete_book_confirm' => (
-              {required Object name, required Object count}) =>
-          '删除「${name}」及其中的 ${count} 条术语？',
+      'workbench.glossary_page.delete_book_confirm' => ({
+        required Object name,
+        required Object count,
+      }) => '删除「${name}」及其中的 ${count} 条术语？',
       'workbench.glossary_page.disabled' => '已停用',
       'workbench.glossary_page.enable' => '启用',
       'workbench.glossary_page.disable' => '停用',
       'workbench.glossary_page.empty_title' => '这个术语库还是空的',
       'workbench.glossary_page.empty_description' =>
         '术语优先级高于任何服务输出。可以逐条新增，也可以把 CSV 拖进来合并。',
-      'workbench.glossary_page.no_results_title' => ({required Object query}) =>
-          '没有匹配「${query}」的术语',
+      'workbench.glossary_page.no_results_title' => ({
+        required Object query,
+      }) => '没有匹配「${query}」的术语',
       'workbench.glossary_page.no_results_description' => '换个关键词，或直接新增一条。',
       'workbench.glossary_page.no_books_title' => '还没有术语库',
       'workbench.glossary_page.no_books_description' =>
@@ -2457,8 +2679,9 @@ extension on TranslationsZhHans {
       'workbench.glossary_page.new_book_subtitle' => '按领域分库，翻译时全部生效',
       'workbench.glossary_page.name' => '名称',
       'workbench.glossary_page.name_taken' => '名称 · 已存在',
-      'workbench.glossary_page.name_taken_hint' => ({required Object name}) =>
-          '已经有一个叫「${name}」的术语库了。',
+      'workbench.glossary_page.name_taken_hint' => ({
+        required Object name,
+      }) => '已经有一个叫「${name}」的术语库了。',
       'workbench.glossary_page.name_placeholder' => '机器学习',
       'workbench.glossary_page.source_language' => '源语言',
       'workbench.glossary_page.target_language' => '目标语言',
@@ -2470,8 +2693,9 @@ extension on TranslationsZhHans {
       'workbench.glossary_page.seed_tbx_hint' => '行业术语交换格式',
       'workbench.glossary_page.seed_blank_note' =>
         '建好后可以逐条新增，也可以把 CSV / TBX 拖进列表里合并。',
-      'workbench.glossary_page.seed_file_note' => ({required Object format}) =>
-          '创建后立即导入 ${format} 文件 · 重复的原文按文件里的译法为准',
+      'workbench.glossary_page.seed_file_note' => ({
+        required Object format,
+      }) => '创建后立即导入 ${format} 文件 · 重复的原文按文件里的译法为准',
       'workbench.glossary_page.choose_file' => '选择文件…',
       'workbench.glossary_page.create' => '创建',
       'workbench.glossary_page.add_entry_subtitle' => '术语优先级高于任何服务输出',
@@ -2480,13 +2704,15 @@ extension on TranslationsZhHans {
       'workbench.glossary_page.forbidden_hint' =>
         '服务给出这些说法时会被标为冲突；多个用 / 分隔，留空表示不禁用。',
       'workbench.glossary_page.forbidden_placeholder_full' => '强制教学 / 强制教师',
-      'workbench.glossary_page.duplicate' => (
-              {required Object term, required Object book}) =>
-          '「${term}」已在${book}中，保存会覆盖原有译法。',
+      'workbench.glossary_page.duplicate' => ({
+        required Object term,
+        required Object book,
+      }) => '「${term}」已在${book}中，保存会覆盖原有译法。',
       'workbench.glossary_page.duplicate_book_fallback' => '该术语库',
       'workbench.glossary_page.keep_adding' => '保存后继续添加下一条',
-      'workbench.glossary_page.added_count' => ({required Object count}) =>
-          '本次已添加 ${count} 条',
+      'workbench.glossary_page.added_count' => ({
+        required Object count,
+      }) => '本次已添加 ${count} 条',
       'workbench.glossary_page.overwrite' => '覆盖',
       'workbench.glossary_page.done' => '完成',
       'workbench.translation.source' => '原文',
@@ -2516,12 +2742,32 @@ extension on TranslationsZhHans {
       'workbench.translation.quality_hint' => '译文生成后计算。',
       'workbench.translation.shortcuts' => '快捷键',
       'workbench.translation.other_services_disabled' => '其他服务已停用',
-      'workbench.translation.input_hint_translate_to' =>
-        ({required Object language}) => '输入或粘贴要翻译的文本，翻译为${language}',
-      'workbench.translation.newline_hint' => ({required Object key}) =>
-          '${key} 换行',
+      'workbench.translation.input_hint_translate_to' => ({
+        required Object language,
+      }) => '输入或粘贴要翻译的文本，翻译为${language}',
+      'workbench.translation.newline_hint' => ({
+        required Object key,
+      }) => '${key} 换行',
       'workbench.translation.failed_body' =>
         '这一段没有拿到译文。检查网络连接后重试，或展开看每个服务的原因逐个处理。',
+      'workbench.translation.clear' => '清空',
+      'workbench.translation.swap_languages' => '交换语言',
+      'workbench.translation.services' => '翻译服务',
+      'workbench.translation.configure_services' => '配置服务',
+      'workbench.translation.retry' => '重试',
+      'workbench.translation.character_count' => ({
+        required Object count,
+      }) => '${count} 个字符',
+      'workbench.translation.language_pair_not_installed' =>
+        '请先在 macOS“语言与地区”中安装这个语言组合，然后重试。',
+      'workbench.translation.unsupported_language_pair' => '当前翻译服务不支持这个语言组合。',
+      'workbench.translation.source_language_detection_failed' =>
+        '无法识别原文语言，请手动选择源语言后重试。',
+      'workbench.translation.network_error' => '无法连接翻译服务，请检查网络后重试。',
+      'workbench.translation.partial_failure' => ({
+        required Object count,
+      }) => '${count} 个服务失败，可切换查看原因',
+      'workbench.translation.streaming' => '正在生成译文…',
       'workbench.status.runtime_ready' => '翻译运行时已就绪',
       'workbench.status.settings_synced' => '设置已同步',
       'workbench.status.shortcuts' => '⌥Space 小窗 · ⌥⇧2 截图',
@@ -2613,8 +2859,9 @@ extension on TranslationsZhHans {
       'settings.shortcuts.record_placeholder' => '录制快捷键',
       'settings.shortcuts.recording' => '按下快捷键…',
       'settings.shortcuts.clear' => '清除',
-      'settings.shortcuts.conflict' => ({required Object label}) =>
-          '与「${label}」冲突',
+      'settings.shortcuts.conflict' => ({
+        required Object label,
+      }) => '与「${label}」冲突',
       'settings.advanced.title' => '高级',
       'settings.advanced.api_server' => '本地 API 服务',
       'settings.advanced.api_server_description' =>
@@ -2721,6 +2968,49 @@ extension on TranslationsZhHans {
       'settings.about.license' => '许可证',
       'settings.about.open_changelog' => '查看更新日志',
       'settings.about.update' => '更新',
+      'settings.permissions.title' => '权限',
+      'settings.permissions.windows_note' => 'Windows 上无需额外授权即可使用划词和截图。',
+      'settings.permissions.recheck' => '重新检查',
+      'ui.shell.app_name' => 'LinguaRay',
+      'ui.shell.translate' => '翻译',
+      'ui.shell.settings' => '设置',
+      'ui.shell.minimize' => '最小化',
+      'ui.shell.maximize' => '最大化',
+      'ui.shell.close' => '关闭',
+      'ui.first_run.title' => '开始使用 LinguaRay',
+      'ui.first_run.subtitle' => '完成这几步后，就可以从任何应用唤起翻译。',
+      'ui.first_run.permissions_title' => '系统权限',
+      'ui.first_run.permissions_body' => '划词和截图 OCR 需要辅助功能与屏幕录制权限。',
+      'ui.first_run.accessibility' => '辅助功能',
+      'ui.first_run.screen_recording' => '屏幕录制',
+      'ui.first_run.shortcuts_title' => '全局快捷键',
+      'ui.first_run.shortcuts_body' => '四个首版动作已准备好。若有冲突，可稍后在设置中修改。',
+      'ui.first_run.services_title' => '翻译服务',
+      'ui.first_run.services_body' => '至少启用一个翻译服务。',
+      'ui.first_run.granted' => '已授权',
+      'ui.first_run.denied' => '未授权',
+      'ui.first_run.not_required' => '当前系统无需授权',
+      'ui.first_run.unknown' => '状态未知',
+      'ui.first_run.checking' => '正在检查…',
+      'ui.first_run.conflict' => '有快捷键冲突。可先跳过，之后在设置中修复。',
+      'ui.first_run.no_provider' => '还没有可用的翻译服务。',
+      'ui.first_run.ready' => '已有可用服务。',
+      'ui.first_run.grant' => '授权',
+      'ui.first_run.recheck' => '重新检查',
+      'ui.first_run.configure_services' => '配置服务',
+      'ui.first_run.start' => '开始使用',
+      'ui.first_run.skip' => '稍后再说',
+      'ui.quick.title' => '快捷翻译',
+      'ui.quick.input_hint' => '输入、粘贴，或由划词和截图填入',
+      'ui.quick.pin' => '置顶',
+      'ui.quick.unpin' => '取消置顶',
+      'ui.quick.permission_denied' => '没有所需的系统权限',
+      'ui.quick.permission_next' => '打开系统设置授予辅助功能或屏幕录制权限，然后返回重新检查。',
+      'ui.quick.capture_cancelled' => '已取消截图。原文未改动。',
+      'ui.providers.secret_stored' => '密钥已保存在系统钥匙串',
+      'ui.providers.secret_placeholder' => '留空则保留已保存的密钥',
+      'ui.providers.validation_missing' => '请填写必填项。',
+      'ui.providers.save_failed' => '无法保存服务商，请检查配置后重试。',
       _ => null,
     };
   }

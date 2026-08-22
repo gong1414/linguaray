@@ -10,7 +10,7 @@ import 'platform_types.dart';
 
 class CaptureController {
   CaptureController({PermissionController? permissions})
-      : _permissions = permissions ?? permissionController;
+    : _permissions = permissions ?? permissionController;
 
   final PermissionController _permissions;
 
@@ -24,8 +24,9 @@ class CaptureController {
 
     final cursor = DisplayManager.instance.getCursorPosition();
     final display = _displayAt(cursor);
-    final directory =
-        await Directory.systemTemp.createTemp('linguaray-capture-');
+    final directory = await Directory.systemTemp.createTemp(
+      'linguaray-capture-',
+    );
     final imagePath = '${directory.path}/region.png';
     try {
       final data = await screenCapturer.capture(
@@ -80,7 +81,9 @@ class CaptureController {
         );
       }
 
-      final response = await runtime.ocr(providerId: serviceId).recognizeText(
+      final response = await runtime
+          .ocr(providerId: serviceId)
+          .recognizeText(
             request: RecognizeTextRequest(imagePath: capture.imagePath),
           );
       if (response.text.trim().isEmpty) {

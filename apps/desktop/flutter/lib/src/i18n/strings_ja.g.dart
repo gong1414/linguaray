@@ -3,11 +3,11 @@
 ///
 // coverage:ignore-file
 // ignore_for_file: type=lint, unused_import
-// dart format off
 
 import 'package:flutter/widgets.dart';
 import 'package:intl/intl.dart';
 import 'package:slang/generated.dart';
+
 import 'strings.g.dart';
 
 // Path: <root>
@@ -15,25 +15,30 @@ class TranslationsJa extends Translations
     with BaseTranslations<AppLocale, Translations> {
   /// You can call this constructor and build your own translation instance of this locale.
   /// Constructing via the enum [AppLocale.build] is preferred.
-  TranslationsJa(
-      {Map<String, Node>? overrides,
-      PluralResolver? cardinalResolver,
-      PluralResolver? ordinalResolver,
-      TranslationMetadata<AppLocale, Translations>? meta})
-      : assert(overrides == null,
-            'Set "translation_overrides: true" in order to enable this feature.'),
-        $meta = meta ??
-            TranslationMetadata(
-              locale: AppLocale.ja,
-              overrides: overrides ?? {},
-              cardinalResolver: cardinalResolver,
-              ordinalResolver: ordinalResolver,
-            ),
-        super(
-            cardinalResolver: cardinalResolver,
-            ordinalResolver: ordinalResolver) {
+  TranslationsJa({
+    Map<String, Node>? overrides,
+    PluralResolver? cardinalResolver,
+    PluralResolver? ordinalResolver,
+    TranslationMetadata<AppLocale, Translations>? meta,
+  }) : assert(
+         overrides == null,
+         'Set "translation_overrides: true" in order to enable this feature.',
+       ),
+       $meta =
+           meta ??
+           TranslationMetadata(
+             locale: AppLocale.ja,
+             overrides: overrides ?? {},
+             cardinalResolver: cardinalResolver,
+             ordinalResolver: ordinalResolver,
+           ),
+       super(
+         cardinalResolver: cardinalResolver,
+         ordinalResolver: ordinalResolver,
+       ) {
     super.$meta.setFlatMapFunction(
-        $meta.getTranslation); // copy base translations to super.$meta
+      $meta.getTranslation,
+    ); // copy base translations to super.$meta
     $meta.setFlatMapFunction(_flatMapFunction);
   }
 
@@ -49,9 +54,9 @@ class TranslationsJa extends Translations
   late final TranslationsJa _root = this; // ignore: unused_field
 
   @override
-  TranslationsJa $copyWith(
-          {TranslationMetadata<AppLocale, Translations>? meta}) =>
-      TranslationsJa(meta: meta ?? this.$meta);
+  TranslationsJa $copyWith({
+    TranslationMetadata<AppLocale, Translations>? meta,
+  }) => TranslationsJa(meta: meta ?? this.$meta);
 
   // Translations
   @override
@@ -62,18 +67,20 @@ class TranslationsJa extends Translations
   late final _TranslationsMiniTranslatorJa mini_translator =
       _TranslationsMiniTranslatorJa._(_root);
   @override
-  late final _TranslationsWorkbenchJa workbench =
-      _TranslationsWorkbenchJa._(_root);
+  late final _TranslationsWorkbenchJa workbench = _TranslationsWorkbenchJa._(
+    _root,
+  );
   @override
-  late final _TranslationsSettingsJa settings =
-      _TranslationsSettingsJa._(_root);
+  late final _TranslationsSettingsJa settings = _TranslationsSettingsJa._(
+    _root,
+  );
 }
 
 // Path: common
 class _TranslationsCommonJa extends TranslationsCommonEn {
   _TranslationsCommonJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -97,8 +104,8 @@ class _TranslationsCommonJa extends TranslationsCommonEn {
 // Path: app
 class _TranslationsAppJa extends TranslationsAppEn {
   _TranslationsAppJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -110,8 +117,8 @@ class _TranslationsAppJa extends TranslationsAppEn {
 // Path: mini_translator
 class _TranslationsMiniTranslatorJa extends TranslationsMiniTranslatorEn {
   _TranslationsMiniTranslatorJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -142,8 +149,8 @@ class _TranslationsMiniTranslatorJa extends TranslationsMiniTranslatorEn {
 // Path: workbench
 class _TranslationsWorkbenchJa extends TranslationsWorkbenchEn {
   _TranslationsWorkbenchJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -189,8 +196,8 @@ class _TranslationsWorkbenchJa extends TranslationsWorkbenchEn {
 // Path: settings
 class _TranslationsSettingsJa extends TranslationsSettingsEn {
   _TranslationsSettingsJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -226,8 +233,8 @@ class _TranslationsSettingsJa extends TranslationsSettingsEn {
 // Path: common.ui
 class _TranslationsCommonUiJa extends TranslationsCommonUiEn {
   _TranslationsCommonUiJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -243,8 +250,8 @@ class _TranslationsCommonUiJa extends TranslationsCommonUiEn {
 // Path: common.language
 class _TranslationsCommonLanguageJa extends TranslationsCommonLanguageEn {
   _TranslationsCommonLanguageJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -324,8 +331,8 @@ class _TranslationsCommonLanguageJa extends TranslationsCommonLanguageEn {
 // Path: common.theme_mode
 class _TranslationsCommonThemeModeJa extends TranslationsCommonThemeModeEn {
   _TranslationsCommonThemeModeJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -341,8 +348,8 @@ class _TranslationsCommonThemeModeJa extends TranslationsCommonThemeModeEn {
 // Path: common.theme_style
 class _TranslationsCommonThemeStyleJa extends TranslationsCommonThemeStyleEn {
   _TranslationsCommonThemeStyleJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -356,8 +363,8 @@ class _TranslationsCommonThemeStyleJa extends TranslationsCommonThemeStyleEn {
 // Path: common.provider
 class _TranslationsCommonProviderJa extends TranslationsCommonProviderEn {
   _TranslationsCommonProviderJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -391,8 +398,8 @@ class _TranslationsCommonProviderJa extends TranslationsCommonProviderEn {
 // Path: app.tray
 class _TranslationsAppTrayJa extends TranslationsAppTrayEn {
   _TranslationsAppTrayJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -406,8 +413,8 @@ class _TranslationsAppTrayJa extends TranslationsAppTrayEn {
 class _TranslationsMiniTranslatorLimitedBannerJa
     extends TranslationsMiniTranslatorLimitedBannerEn {
   _TranslationsMiniTranslatorLimitedBannerJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -433,8 +440,8 @@ class _TranslationsMiniTranslatorLimitedBannerJa
 class _TranslationsMiniTranslatorInputJa
     extends TranslationsMiniTranslatorInputEn {
   _TranslationsMiniTranslatorInputJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -452,8 +459,8 @@ class _TranslationsMiniTranslatorInputJa
 class _TranslationsMiniTranslatorToolbarJa
     extends TranslationsMiniTranslatorToolbarEn {
   _TranslationsMiniTranslatorToolbarJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -470,8 +477,8 @@ class _TranslationsMiniTranslatorToolbarJa
 class _TranslationsMiniTranslatorButtonJa
     extends TranslationsMiniTranslatorButtonEn {
   _TranslationsMiniTranslatorButtonJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -494,8 +501,8 @@ class _TranslationsMiniTranslatorButtonJa
 class _TranslationsMiniTranslatorLanguageJa
     extends TranslationsMiniTranslatorLanguageEn {
   _TranslationsMiniTranslatorLanguageJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -520,8 +527,8 @@ class _TranslationsMiniTranslatorLanguageJa
 class _TranslationsMiniTranslatorMessageJa
     extends TranslationsMiniTranslatorMessageEn {
   _TranslationsMiniTranslatorMessageJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -541,8 +548,8 @@ class _TranslationsMiniTranslatorMessageJa
 class _TranslationsMiniTranslatorResultJa
     extends TranslationsMiniTranslatorResultEn {
   _TranslationsMiniTranslatorResultJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -569,8 +576,8 @@ class _TranslationsMiniTranslatorResultJa
 class _TranslationsWorkbenchHistoryPageJa
     extends TranslationsWorkbenchHistoryPageEn {
   _TranslationsWorkbenchHistoryPageJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -636,8 +643,8 @@ class _TranslationsWorkbenchHistoryPageJa
 // Path: workbench.subtitle
 class _TranslationsWorkbenchSubtitleJa extends TranslationsWorkbenchSubtitleEn {
   _TranslationsWorkbenchSubtitleJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -652,8 +659,8 @@ class _TranslationsWorkbenchSubtitleJa extends TranslationsWorkbenchSubtitleEn {
 class _TranslationsWorkbenchPlaceholderJa
     extends TranslationsWorkbenchPlaceholderEn {
   _TranslationsWorkbenchPlaceholderJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -668,8 +675,8 @@ class _TranslationsWorkbenchPlaceholderJa
 class _TranslationsWorkbenchGlossaryPageJa
     extends TranslationsWorkbenchGlossaryPageEn {
   _TranslationsWorkbenchGlossaryPageJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -738,8 +745,8 @@ class _TranslationsWorkbenchGlossaryPageJa
 class _TranslationsWorkbenchTranslationJa
     extends TranslationsWorkbenchTranslationEn {
   _TranslationsWorkbenchTranslationJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -801,13 +808,25 @@ class _TranslationsWorkbenchTranslationJa
   @override
   String input_hint_translate_to({required Object language}) =>
       '翻訳するテキストを入力または貼り付け、${language}に翻訳';
+  @override
+  String get clear => 'クリア';
+  @override
+  String get swap_languages => '言語を入れ替える';
+  @override
+  String get services => '翻訳サービス';
+  @override
+  String get configure_services => 'サービスを設定';
+  @override
+  String get retry => '再試行';
+  @override
+  String character_count({required Object count}) => '${count} 文字';
 }
 
 // Path: workbench.status
 class _TranslationsWorkbenchStatusJa extends TranslationsWorkbenchStatusEn {
   _TranslationsWorkbenchStatusJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -823,8 +842,8 @@ class _TranslationsWorkbenchStatusJa extends TranslationsWorkbenchStatusEn {
 // Path: settings.general
 class _TranslationsSettingsGeneralJa extends TranslationsSettingsGeneralEn {
   _TranslationsSettingsGeneralJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -852,8 +871,8 @@ class _TranslationsSettingsGeneralJa extends TranslationsSettingsGeneralEn {
 class _TranslationsSettingsAppearanceJa
     extends TranslationsSettingsAppearanceEn {
   _TranslationsSettingsAppearanceJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -870,8 +889,8 @@ class _TranslationsSettingsAppearanceJa
 // Path: settings.shortcuts
 class _TranslationsSettingsShortcutsJa extends TranslationsSettingsShortcutsEn {
   _TranslationsSettingsShortcutsJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -897,8 +916,8 @@ class _TranslationsSettingsShortcutsJa extends TranslationsSettingsShortcutsEn {
 // Path: settings.advanced
 class _TranslationsSettingsAdvancedJa extends TranslationsSettingsAdvancedEn {
   _TranslationsSettingsAdvancedJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -923,8 +942,8 @@ class _TranslationsSettingsAdvancedJa extends TranslationsSettingsAdvancedEn {
 // Path: settings.services
 class _TranslationsSettingsServicesJa extends TranslationsSettingsServicesEn {
   _TranslationsSettingsServicesJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -953,8 +972,8 @@ class _TranslationsSettingsServicesJa extends TranslationsSettingsServicesEn {
 // Path: settings.providers
 class _TranslationsSettingsProvidersJa extends TranslationsSettingsProvidersEn {
   _TranslationsSettingsProvidersJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -996,8 +1015,8 @@ class _TranslationsSettingsProvidersJa extends TranslationsSettingsProvidersEn {
 // Path: settings.layout
 class _TranslationsSettingsLayoutJa extends TranslationsSettingsLayoutEn {
   _TranslationsSettingsLayoutJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -1020,8 +1039,8 @@ class _TranslationsSettingsLayoutJa extends TranslationsSettingsLayoutEn {
 // Path: settings.about
 class _TranslationsSettingsAboutJa extends TranslationsSettingsAboutEn {
   _TranslationsSettingsAboutJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -1053,8 +1072,8 @@ class _TranslationsSettingsAboutJa extends TranslationsSettingsAboutEn {
 // Path: common.ui.button
 class _TranslationsCommonUiButtonJa extends TranslationsCommonUiButtonEn {
   _TranslationsCommonUiButtonJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -1080,8 +1099,8 @@ class _TranslationsCommonUiButtonJa extends TranslationsCommonUiButtonEn {
 // Path: common.ui.feedback
 class _TranslationsCommonUiFeedbackJa extends TranslationsCommonUiFeedbackEn {
   _TranslationsCommonUiFeedbackJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -1094,8 +1113,8 @@ class _TranslationsCommonUiFeedbackJa extends TranslationsCommonUiFeedbackEn {
 class _TranslationsAppTrayContextMenuJa
     extends TranslationsAppTrayContextMenuEn {
   _TranslationsAppTrayContextMenuJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -1117,8 +1136,8 @@ class _TranslationsAppTrayContextMenuJa
 class _TranslationsMiniTranslatorLimitedBannerPermissionJa
     extends TranslationsMiniTranslatorLimitedBannerPermissionEn {
   _TranslationsMiniTranslatorLimitedBannerPermissionJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -1135,8 +1154,8 @@ class _TranslationsMiniTranslatorLimitedBannerPermissionJa
 class _TranslationsMiniTranslatorLimitedBannerInstructionJa
     extends TranslationsMiniTranslatorLimitedBannerInstructionEn {
   _TranslationsMiniTranslatorLimitedBannerInstructionJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -1153,8 +1172,8 @@ class _TranslationsMiniTranslatorLimitedBannerInstructionJa
 class _TranslationsMiniTranslatorLimitedBannerActionJa
     extends TranslationsMiniTranslatorLimitedBannerActionEn {
   _TranslationsMiniTranslatorLimitedBannerActionJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -1169,8 +1188,8 @@ class _TranslationsMiniTranslatorLimitedBannerActionJa
 class _TranslationsMiniTranslatorLimitedBannerFeedbackJa
     extends TranslationsMiniTranslatorLimitedBannerFeedbackEn {
   _TranslationsMiniTranslatorLimitedBannerFeedbackJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -1185,8 +1204,8 @@ class _TranslationsMiniTranslatorLimitedBannerFeedbackJa
 class _TranslationsMiniTranslatorLimitedBannerTooltipJa
     extends TranslationsMiniTranslatorLimitedBannerTooltipEn {
   _TranslationsMiniTranslatorLimitedBannerTooltipJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -1199,8 +1218,8 @@ class _TranslationsMiniTranslatorLimitedBannerTooltipJa
 class _TranslationsMiniTranslatorToolbarTooltipJa
     extends TranslationsMiniTranslatorToolbarTooltipEn {
   _TranslationsMiniTranslatorToolbarTooltipJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -1219,8 +1238,8 @@ class _TranslationsMiniTranslatorToolbarTooltipJa
 class _TranslationsMiniTranslatorToolbarMenuJa
     extends TranslationsMiniTranslatorToolbarMenuEn {
   _TranslationsMiniTranslatorToolbarMenuJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -1239,8 +1258,8 @@ class _TranslationsMiniTranslatorToolbarMenuJa
 class _TranslationsSettingsGeneralSectionJa
     extends TranslationsSettingsGeneralSectionEn {
   _TranslationsSettingsGeneralSectionJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -1271,8 +1290,8 @@ class _TranslationsSettingsGeneralSectionJa
 class _TranslationsSettingsGeneralRowJa
     extends TranslationsSettingsGeneralRowEn {
   _TranslationsSettingsGeneralRowJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -1329,8 +1348,8 @@ class _TranslationsSettingsGeneralRowJa
 class _TranslationsSettingsGeneralButtonJa
     extends TranslationsSettingsGeneralButtonEn {
   _TranslationsSettingsGeneralButtonJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -1351,8 +1370,8 @@ class _TranslationsSettingsGeneralButtonJa
 class _TranslationsSettingsGeneralOptionJa
     extends TranslationsSettingsGeneralOptionEn {
   _TranslationsSettingsGeneralOptionJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -1375,8 +1394,8 @@ class _TranslationsSettingsGeneralOptionJa
 class _TranslationsSettingsGeneralEditorJa
     extends TranslationsSettingsGeneralEditorEn {
   _TranslationsSettingsGeneralEditorJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -1406,8 +1425,8 @@ class _TranslationsSettingsGeneralEditorJa
 class _TranslationsSettingsAppearanceSectionJa
     extends TranslationsSettingsAppearanceSectionEn {
   _TranslationsSettingsAppearanceSectionJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -1424,8 +1443,8 @@ class _TranslationsSettingsAppearanceSectionJa
 class _TranslationsSettingsShortcutsSectionJa
     extends TranslationsSettingsShortcutsSectionEn {
   _TranslationsSettingsShortcutsSectionJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -1442,8 +1461,8 @@ class _TranslationsSettingsShortcutsSectionJa
 class _TranslationsSettingsShortcutsRowJa
     extends TranslationsSettingsShortcutsRowEn {
   _TranslationsSettingsShortcutsRowJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -1464,8 +1483,8 @@ class _TranslationsSettingsShortcutsRowJa
 class _TranslationsSettingsShortcutsResetDialogJa
     extends TranslationsSettingsShortcutsResetDialogEn {
   _TranslationsSettingsShortcutsResetDialogJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -1484,8 +1503,8 @@ class _TranslationsSettingsShortcutsResetDialogJa
 class _TranslationsSettingsShortcutsGroupJa
     extends TranslationsSettingsShortcutsGroupEn {
   _TranslationsSettingsShortcutsGroupJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -1502,8 +1521,8 @@ class _TranslationsSettingsShortcutsGroupJa
 class _TranslationsSettingsServicesButtonJa
     extends TranslationsSettingsServicesButtonEn {
   _TranslationsSettingsServicesButtonJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -1516,8 +1535,8 @@ class _TranslationsSettingsServicesButtonJa
 class _TranslationsSettingsServicesSectionJa
     extends TranslationsSettingsServicesSectionEn {
   _TranslationsSettingsServicesSectionJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -1530,8 +1549,8 @@ class _TranslationsSettingsServicesSectionJa
 class _TranslationsSettingsServicesEditorJa
     extends TranslationsSettingsServicesEditorEn {
   _TranslationsSettingsServicesEditorJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -1556,8 +1575,8 @@ class _TranslationsSettingsServicesEditorJa
 class _TranslationsSettingsServicesDetailJa
     extends TranslationsSettingsServicesDetailEn {
   _TranslationsSettingsServicesDetailJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -1577,8 +1596,8 @@ class _TranslationsSettingsServicesDetailJa
 class _TranslationsSettingsServicesItemJa
     extends TranslationsSettingsServicesItemEn {
   _TranslationsSettingsServicesItemJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -1591,8 +1610,8 @@ class _TranslationsSettingsServicesItemJa
 class _TranslationsSettingsProvidersSectionJa
     extends TranslationsSettingsProvidersSectionEn {
   _TranslationsSettingsProvidersSectionJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -1607,8 +1626,8 @@ class _TranslationsSettingsProvidersSectionJa
 class _TranslationsSettingsProvidersItemJa
     extends TranslationsSettingsProvidersItemEn {
   _TranslationsSettingsProvidersItemJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -1625,8 +1644,8 @@ class _TranslationsSettingsProvidersItemJa
 class _TranslationsSettingsProvidersButtonJa
     extends TranslationsSettingsProvidersButtonEn {
   _TranslationsSettingsProvidersButtonJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -1639,8 +1658,8 @@ class _TranslationsSettingsProvidersButtonJa
 class _TranslationsSettingsProvidersAlertJa
     extends TranslationsSettingsProvidersAlertEn {
   _TranslationsSettingsProvidersAlertJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -1653,8 +1672,8 @@ class _TranslationsSettingsProvidersAlertJa
 class _TranslationsSettingsProvidersIntroJa
     extends TranslationsSettingsProvidersIntroEn {
   _TranslationsSettingsProvidersIntroJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -1670,8 +1689,8 @@ class _TranslationsSettingsProvidersIntroJa
 class _TranslationsSettingsProvidersEditorJa
     extends TranslationsSettingsProvidersEditorEn {
   _TranslationsSettingsProvidersEditorJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -1695,8 +1714,9 @@ class _TranslationsSettingsProvidersEditorJa
   String get add_title => '{} を追加';
   @override
   late final _TranslationsSettingsProvidersEditorCapabilityNoteJa
-      capability_note =
-      _TranslationsSettingsProvidersEditorCapabilityNoteJa._(_root);
+  capability_note = _TranslationsSettingsProvidersEditorCapabilityNoteJa._(
+    _root,
+  );
   @override
   late final _TranslationsSettingsProvidersEditorTestJa test =
       _TranslationsSettingsProvidersEditorTestJa._(_root);
@@ -1706,8 +1726,8 @@ class _TranslationsSettingsProvidersEditorJa
 class _TranslationsSettingsProvidersDetailJa
     extends TranslationsSettingsProvidersDetailEn {
   _TranslationsSettingsProvidersDetailJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -1730,8 +1750,8 @@ class _TranslationsSettingsProvidersDetailJa
 class _TranslationsSettingsProvidersCapabilityJa
     extends TranslationsSettingsProvidersCapabilityEn {
   _TranslationsSettingsProvidersCapabilityJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -1750,8 +1770,8 @@ class _TranslationsSettingsProvidersCapabilityJa
 class _TranslationsSettingsProvidersDescriptionJa
     extends TranslationsSettingsProvidersDescriptionEn {
   _TranslationsSettingsProvidersDescriptionJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -1770,8 +1790,8 @@ class _TranslationsSettingsProvidersDescriptionJa
 class _TranslationsSettingsProvidersDeleteDialogJa
     extends TranslationsSettingsProvidersDeleteDialogEn {
   _TranslationsSettingsProvidersDeleteDialogJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -1786,8 +1806,8 @@ class _TranslationsSettingsProvidersDeleteDialogJa
 class _TranslationsSettingsLayoutEmptyJa
     extends TranslationsSettingsLayoutEmptyEn {
   _TranslationsSettingsLayoutEmptyJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -1802,8 +1822,8 @@ class _TranslationsSettingsLayoutEmptyJa
 class _TranslationsAppTrayContextMenuDevToolsJa
     extends TranslationsAppTrayContextMenuDevToolsEn {
   _TranslationsAppTrayContextMenuDevToolsJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -1818,8 +1838,8 @@ class _TranslationsAppTrayContextMenuDevToolsJa
 class _TranslationsSettingsGeneralEditorRowJa
     extends TranslationsSettingsGeneralEditorRowEn {
   _TranslationsSettingsGeneralEditorRowJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -1834,8 +1854,8 @@ class _TranslationsSettingsGeneralEditorRowJa
 class _TranslationsSettingsShortcutsGroupGlobalJa
     extends TranslationsSettingsShortcutsGroupGlobalEn {
   _TranslationsSettingsShortcutsGroupGlobalJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -1850,8 +1870,8 @@ class _TranslationsSettingsShortcutsGroupGlobalJa
 class _TranslationsSettingsShortcutsGroupInAppJa
     extends TranslationsSettingsShortcutsGroupInAppEn {
   _TranslationsSettingsShortcutsGroupInAppJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -1866,8 +1886,8 @@ class _TranslationsSettingsShortcutsGroupInAppJa
 class _TranslationsSettingsServicesEditorRowJa
     extends TranslationsSettingsServicesEditorRowEn {
   _TranslationsSettingsServicesEditorRowJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -1882,8 +1902,8 @@ class _TranslationsSettingsServicesEditorRowJa
 class _TranslationsSettingsServicesDetailRowJa
     extends TranslationsSettingsServicesDetailRowEn {
   _TranslationsSettingsServicesDetailRowJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -1902,8 +1922,8 @@ class _TranslationsSettingsServicesDetailRowJa
 class _TranslationsSettingsServicesDetailDeleteDialogJa
     extends TranslationsSettingsServicesDetailDeleteDialogEn {
   _TranslationsSettingsServicesDetailDeleteDialogJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -1918,8 +1938,8 @@ class _TranslationsSettingsServicesDetailDeleteDialogJa
 class _TranslationsSettingsProvidersEditorRowJa
     extends TranslationsSettingsProvidersEditorRowEn {
   _TranslationsSettingsProvidersEditorRowJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -1936,8 +1956,8 @@ class _TranslationsSettingsProvidersEditorRowJa
 class _TranslationsSettingsProvidersEditorPlaceholderJa
     extends TranslationsSettingsProvidersEditorPlaceholderEn {
   _TranslationsSettingsProvidersEditorPlaceholderJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -1950,8 +1970,8 @@ class _TranslationsSettingsProvidersEditorPlaceholderJa
 class _TranslationsSettingsProvidersEditorTypePickerJa
     extends TranslationsSettingsProvidersEditorTypePickerEn {
   _TranslationsSettingsProvidersEditorTypePickerJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -1968,8 +1988,8 @@ class _TranslationsSettingsProvidersEditorTypePickerJa
 class _TranslationsSettingsProvidersEditorTooltipJa
     extends TranslationsSettingsProvidersEditorTooltipEn {
   _TranslationsSettingsProvidersEditorTooltipJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -1982,8 +2002,8 @@ class _TranslationsSettingsProvidersEditorTooltipJa
 class _TranslationsSettingsProvidersEditorStepJa
     extends TranslationsSettingsProvidersEditorStepEn {
   _TranslationsSettingsProvidersEditorStepJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -1998,8 +2018,8 @@ class _TranslationsSettingsProvidersEditorStepJa
 class _TranslationsSettingsProvidersEditorCapabilityNoteJa
     extends TranslationsSettingsProvidersEditorCapabilityNoteEn {
   _TranslationsSettingsProvidersEditorCapabilityNoteJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -2016,8 +2036,8 @@ class _TranslationsSettingsProvidersEditorCapabilityNoteJa
 class _TranslationsSettingsProvidersEditorTestJa
     extends TranslationsSettingsProvidersEditorTestEn {
   _TranslationsSettingsProvidersEditorTestJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -2052,8 +2072,8 @@ class _TranslationsSettingsProvidersEditorTestJa
 class _TranslationsSettingsProvidersDetailTooltipJa
     extends TranslationsSettingsProvidersDetailTooltipEn {
   _TranslationsSettingsProvidersDetailTooltipJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -2066,8 +2086,8 @@ class _TranslationsSettingsProvidersDetailTooltipJa
 class _TranslationsSettingsProvidersDetailRowJa
     extends TranslationsSettingsProvidersDetailRowEn {
   _TranslationsSettingsProvidersDetailRowJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -2080,8 +2100,8 @@ class _TranslationsSettingsProvidersDetailRowJa
 class _TranslationsSettingsProvidersDetailSectionJa
     extends TranslationsSettingsProvidersDetailSectionEn {
   _TranslationsSettingsProvidersDetailSectionJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -2096,8 +2116,8 @@ class _TranslationsSettingsProvidersDetailSectionJa
 class _TranslationsSettingsProvidersDetailModelsJa
     extends TranslationsSettingsProvidersDetailModelsEn {
   _TranslationsSettingsProvidersDetailModelsJa._(TranslationsJa root)
-      : this._root = root,
-        super.internal(root);
+    : this._root = root,
+      super.internal(root);
 
   final TranslationsJa _root; // ignore: unused_field
 
@@ -2212,8 +2232,9 @@ extension on TranslationsJa {
       'mini_translator.limited_banner.tooltip.help' => 'ヘルプを表示',
       'mini_translator.input.hint' => 'ここに単語またはテキストを入力',
       'mini_translator.input.extracting_text' => 'テキストを抽出中...',
-      'mini_translator.input.hint_translate_to' =>
-        ({required Object language}) => '単語またはテキストを入力して${language}に翻訳',
+      'mini_translator.input.hint_translate_to' => ({
+        required Object language,
+      }) => '単語またはテキストを入力して${language}に翻訳',
       'mini_translator.toolbar.tooltip.extract_text_from_screen_capture' =>
         '画面領域をキャプチャしてテキストを認識',
       'mini_translator.toolbar.tooltip.extract_text_from_clipboard' =>
@@ -2245,10 +2266,12 @@ extension on TranslationsJa {
         'デフォルトのテキスト認識サービスが設定されていません。設定で設定してください。',
       'mini_translator.message.ocr_recognition_failed' => 'テキスト認識に失敗しました',
       'mini_translator.result.translating' => '翻訳中…',
-      'mini_translator.result.stale_requery' => ({required Object key}) =>
-          '原文が変更されました · ${key} 再翻訳',
-      'mini_translator.result.compare_services' => ({required Object count}) =>
-          '${count} 個のサービスを比較',
+      'mini_translator.result.stale_requery' => ({
+        required Object key,
+      }) => '原文が変更されました · ${key} 再翻訳',
+      'mini_translator.result.compare_services' => ({
+        required Object count,
+      }) => '${count} 個のサービスを比較',
       'mini_translator.result.collapse_compare' => '比較を閉じる',
       'mini_translator.result.set_preferred' => '優先に設定',
       'mini_translator.result.retry' => '再試行',
@@ -2264,30 +2287,35 @@ extension on TranslationsJa {
       'workbench.history_page.search' => '検索',
       'workbench.history_page.search_placeholder' => '原文、訳文、サービスを検索',
       'workbench.history_page.search_label' => '履歴を検索',
-      'workbench.history_page.entry_count' => (
-              {required Object label, required Object count}) =>
-          '${label} · ${count} 件',
+      'workbench.history_page.entry_count' => ({
+        required Object label,
+        required Object count,
+      }) => '${label} · ${count} 件',
       'workbench.history_page.by_time' => '時間順',
       'workbench.history_page.loading' => '履歴を読み込み中…',
       'workbench.history_page.load_failed' => '履歴を読み込めませんでした',
       'workbench.history_page.retry' => '再試行',
       'workbench.history_page.empty_title' => '翻訳履歴はまだありません',
       'workbench.history_page.empty_description' => '翻訳が完了すると、優先訳がここに保存されます。',
-      'workbench.history_page.no_results' => ({required Object query}) =>
-          '「${query}」に一致する履歴はありません',
+      'workbench.history_page.no_results' => ({
+        required Object query,
+      }) => '「${query}」に一致する履歴はありません',
       'workbench.history_page.clear_search' => '検索をクリア',
       'workbench.history_page.select' => '複数選択',
-      'workbench.history_page.selected_count' => ({required Object count}) =>
-          '${count} 件選択中',
+      'workbench.history_page.selected_count' => ({
+        required Object count,
+      }) => '${count} 件選択中',
       'workbench.history_page.exit_select' => '選択を終了',
       'workbench.history_page.add_to_glossary' => '用語集に追加',
       'workbench.history_page.favorite' => 'お気に入り',
       'workbench.history_page.unfavorite' => 'お気に入り解除',
-      'workbench.history_page.delete_confirm' => ({required Object count}) =>
-          '選択した ${count} 件の履歴を削除しますか？元に戻せません。',
+      'workbench.history_page.delete_confirm' => ({
+        required Object count,
+      }) => '選択した ${count} 件の履歴を削除しますか？元に戻せません。',
       'workbench.history_page.no_glossary' => '先に用語集を作成してください',
-      'workbench.history_page.added_to_glossary' => ({required Object count}) =>
-          '${count} 件を用語集に追加しました',
+      'workbench.history_page.added_to_glossary' => ({
+        required Object count,
+      }) => '${count} 件を用語集に追加しました',
       'workbench.history_page.favorite_flag' => 'お気に入り',
       'workbench.history_page.edited_flag' => '編集済み',
       'workbench.history_page.edit_history_hint' => '編集した訳文は履歴に保存されます',
@@ -2309,24 +2337,27 @@ extension on TranslationsJa {
       'workbench.glossary_page.search' => '検索',
       'workbench.glossary_page.search_placeholder' => '用語または指定訳を検索',
       'workbench.glossary_page.search_label' => '用語集を検索',
-      'workbench.glossary_page.entry_count' => (
-              {required Object name, required Object count}) =>
-          '${name} · ${count} 件',
+      'workbench.glossary_page.entry_count' => ({
+        required Object name,
+        required Object count,
+      }) => '${name} · ${count} 件',
       'workbench.glossary_page.priority_note' => '用語集はどのサービスの出力よりも優先されます',
       'workbench.glossary_page.new_book' => '用語集を作成',
       'workbench.glossary_page.new_book_placeholder' => '用語集の名前',
       'workbench.glossary_page.rename_book' => '名前を変更',
-      'workbench.glossary_page.delete_book_confirm' => (
-              {required Object name, required Object count}) =>
-          '「${name}」と、その ${count} 件の用語を削除しますか？',
+      'workbench.glossary_page.delete_book_confirm' => ({
+        required Object name,
+        required Object count,
+      }) => '「${name}」と、その ${count} 件の用語を削除しますか？',
       'workbench.glossary_page.disabled' => '無効',
       'workbench.glossary_page.enable' => '有効にする',
       'workbench.glossary_page.disable' => '無効にする',
       'workbench.glossary_page.empty_title' => 'この用語集は空です',
       'workbench.glossary_page.empty_description' =>
         '用語集はどのサービスの出力よりも優先されます。1 件ずつ追加するか、CSV をドロップして取り込めます。',
-      'workbench.glossary_page.no_results_title' => ({required Object query}) =>
-          '「${query}」に一致する用語はありません',
+      'workbench.glossary_page.no_results_title' => ({
+        required Object query,
+      }) => '「${query}」に一致する用語はありません',
       'workbench.glossary_page.no_results_description' =>
         '別のキーワードを試すか、新しく追加してください。',
       'workbench.glossary_page.no_books_title' => '用語集がまだありません',
@@ -2360,8 +2391,17 @@ extension on TranslationsJa {
       'workbench.translation.quality_hint' => '訳文の生成後に計算されます。',
       'workbench.translation.shortcuts' => 'ショートカット',
       'workbench.translation.other_services_disabled' => '他のサービスは無効です',
-      'workbench.translation.input_hint_translate_to' =>
-        ({required Object language}) => '翻訳するテキストを入力または貼り付け、${language}に翻訳',
+      'workbench.translation.input_hint_translate_to' => ({
+        required Object language,
+      }) => '翻訳するテキストを入力または貼り付け、${language}に翻訳',
+      'workbench.translation.clear' => 'クリア',
+      'workbench.translation.swap_languages' => '言語を入れ替える',
+      'workbench.translation.services' => '翻訳サービス',
+      'workbench.translation.configure_services' => 'サービスを設定',
+      'workbench.translation.retry' => '再試行',
+      'workbench.translation.character_count' => ({
+        required Object count,
+      }) => '${count} 文字',
       'workbench.status.runtime_ready' => '翻訳ランタイム準備完了',
       'workbench.status.settings_synced' => '設定を同期済み',
       'workbench.status.shortcuts' => '⌥Space クイックウィンドウ · ⌥⇧2 キャプチャ',
@@ -2523,8 +2563,7 @@ extension on TranslationsJa {
       'settings.providers.editor.test.passed_footer' => '接続テストに合格しました',
       'settings.providers.editor.test.retest' => '再テスト',
       'settings.providers.editor.test.tips_title' => '試せること',
-      'settings.providers.editor.test.tips_llm' =>
-        '· キーが選んだプロバイダーの種類と一致しているか確認\n· Base URL に /v1 が必要か確認\n· プロバイダーのコンソールでそのモデルが有効か確認',
+      'settings.providers.editor.test.tips_llm' => '· キーが選んだプロバイダーの種類と一致しているか確認\n· Base URL に /v1 が必要か確認\n· プロバイダーのコンソールでそのモデルが有効か確認',
       'settings.providers.editor.test.tips_traditional' =>
         '· 認証情報が選んだプロバイダーの種類と一致しているか確認\n· プロバイダーのコンソールでサービスが有効か確認',
       'settings.providers.editor.test.failed_suffix' => '検証に失敗',

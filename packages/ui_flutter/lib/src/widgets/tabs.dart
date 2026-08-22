@@ -48,8 +48,9 @@ class Tabs<T> extends StatelessWidget {
                 final item = items[i];
                 final active = item.value == value;
                 return Pressable(
-                  onPressed:
-                      onChanged == null ? null : () => onChanged!(item.value),
+                  onPressed: onChanged == null
+                      ? null
+                      : () => onChanged!(item.value),
                   borderRadius: radius,
                   selected: active,
                   isButton: false,

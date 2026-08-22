@@ -82,15 +82,15 @@ void main() {
     }
 
     Widget column(List<Widget> children, {double gap = 10}) => Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (var i = 0; i < children.length; i++) ...[
-              if (i > 0) SizedBox(height: gap),
-              children[i],
-            ],
-          ],
-        );
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (var i = 0; i < children.length; i++) ...[
+          if (i > 0) SizedBox(height: gap),
+          children[i],
+        ],
+      ],
+    );
 
     testWidgets('translation blocks', (tester) async {
       await expectGolden(

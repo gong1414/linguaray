@@ -3,7 +3,6 @@
 ///
 // coverage:ignore-file
 // ignore_for_file: type=lint, unused_import
-// dart format off
 
 part of 'strings.g.dart';
 
@@ -20,20 +19,23 @@ class Translations with BaseTranslations<AppLocale, Translations> {
 
   /// You can call this constructor and build your own translation instance of this locale.
   /// Constructing via the enum [AppLocale.build] is preferred.
-  Translations(
-      {Map<String, Node>? overrides,
-      PluralResolver? cardinalResolver,
-      PluralResolver? ordinalResolver,
-      TranslationMetadata<AppLocale, Translations>? meta})
-      : assert(overrides == null,
-            'Set "translation_overrides: true" in order to enable this feature.'),
-        $meta = meta ??
-            TranslationMetadata(
-              locale: AppLocale.en,
-              overrides: overrides ?? {},
-              cardinalResolver: cardinalResolver,
-              ordinalResolver: ordinalResolver,
-            ) {
+  Translations({
+    Map<String, Node>? overrides,
+    PluralResolver? cardinalResolver,
+    PluralResolver? ordinalResolver,
+    TranslationMetadata<AppLocale, Translations>? meta,
+  }) : assert(
+         overrides == null,
+         'Set "translation_overrides: true" in order to enable this feature.',
+       ),
+       $meta =
+           meta ??
+           TranslationMetadata(
+             locale: AppLocale.en,
+             overrides: overrides ?? {},
+             cardinalResolver: cardinalResolver,
+             ordinalResolver: ordinalResolver,
+           ) {
     $meta.setFlatMapFunction(_flatMapFunction);
   }
 
@@ -46,9 +48,9 @@ class Translations with BaseTranslations<AppLocale, Translations> {
 
   late final Translations _root = this; // ignore: unused_field
 
-  Translations $copyWith(
-          {TranslationMetadata<AppLocale, Translations>? meta}) =>
-      Translations(meta: meta ?? this.$meta);
+  Translations $copyWith({
+    TranslationMetadata<AppLocale, Translations>? meta,
+  }) => Translations(meta: meta ?? this.$meta);
 
   // Translations
   late final TranslationsCommonEn common = TranslationsCommonEn.internal(_root);
@@ -57,8 +59,10 @@ class Translations with BaseTranslations<AppLocale, Translations> {
       TranslationsMiniTranslatorEn.internal(_root);
   late final TranslationsWorkbenchEn workbench =
       TranslationsWorkbenchEn.internal(_root);
-  late final TranslationsSettingsEn settings =
-      TranslationsSettingsEn.internal(_root);
+  late final TranslationsSettingsEn settings = TranslationsSettingsEn.internal(
+    _root,
+  );
+  late final TranslationsUiEn ui = TranslationsUiEn.internal(_root);
 }
 
 // Path: common
@@ -189,6 +193,27 @@ class TranslationsSettingsEn {
       TranslationsSettingsLayoutEn.internal(_root);
   late final TranslationsSettingsAboutEn about =
       TranslationsSettingsAboutEn.internal(_root);
+  late final TranslationsSettingsPermissionsEn permissions =
+      TranslationsSettingsPermissionsEn.internal(_root);
+}
+
+// Path: ui
+class TranslationsUiEn {
+  TranslationsUiEn.internal(this._root);
+
+  final Translations _root; // ignore: unused_field
+
+  // Translations
+  late final TranslationsUiShellEn shell = TranslationsUiShellEn.internal(
+    _root,
+  );
+  late final TranslationsUiFirstRunEn first_run =
+      TranslationsUiFirstRunEn.internal(_root);
+  late final TranslationsUiQuickEn quick = TranslationsUiQuickEn.internal(
+    _root,
+  );
+  late final TranslationsUiProvidersEn providers =
+      TranslationsUiProvidersEn.internal(_root);
 }
 
 // Path: common.ui
@@ -1030,6 +1055,47 @@ class TranslationsWorkbenchTranslationEn {
   /// en: 'This passage did not get a translation. Check your connection and retry, or expand to work through each service's reason.'
   String get failed_body =>
       'This passage did not get a translation. Check your connection and retry, or expand to work through each service\'s reason.';
+
+  /// en: 'Clear'
+  String get clear => 'Clear';
+
+  /// en: 'Swap languages'
+  String get swap_languages => 'Swap languages';
+
+  /// en: 'Translation services'
+  String get services => 'Translation services';
+
+  /// en: 'Configure services'
+  String get configure_services => 'Configure services';
+
+  /// en: 'Try again'
+  String get retry => 'Try again';
+
+  /// en: '$count characters'
+  String character_count({required Object count}) => '${count} characters';
+
+  /// en: 'Install this language pair in macOS Language & Region, then try again.'
+  String get language_pair_not_installed =>
+      'Install this language pair in macOS Language & Region, then try again.';
+
+  /// en: 'The selected service does not support this language pair.'
+  String get unsupported_language_pair =>
+      'The selected service does not support this language pair.';
+
+  /// en: 'The source language could not be detected. Choose it manually and try again.'
+  String get source_language_detection_failed =>
+      'The source language could not be detected. Choose it manually and try again.';
+
+  /// en: 'The translation service could not be reached. Check your connection and try again.'
+  String get network_error =>
+      'The translation service could not be reached. Check your connection and try again.';
+
+  /// en: '$count services failed. Switch to inspect the reason.'
+  String partial_failure({required Object count}) =>
+      '${count} services failed. Switch to inspect the reason.';
+
+  /// en: 'Writing translation…'
+  String get streaming => 'Writing translation…';
 }
 
 // Path: workbench.status
@@ -1285,6 +1351,187 @@ class TranslationsSettingsAboutEn {
 
   /// en: 'Update'
   String get update => 'Update';
+}
+
+// Path: settings.permissions
+class TranslationsSettingsPermissionsEn {
+  TranslationsSettingsPermissionsEn.internal(this._root);
+
+  final Translations _root; // ignore: unused_field
+
+  // Translations
+
+  /// en: 'Permissions'
+  String get title => 'Permissions';
+
+  /// en: 'Windows does not require extra permissions for selection or capture.'
+  String get windows_note =>
+      'Windows does not require extra permissions for selection or capture.';
+
+  /// en: 'Recheck'
+  String get recheck => 'Recheck';
+}
+
+// Path: ui.shell
+class TranslationsUiShellEn {
+  TranslationsUiShellEn.internal(this._root);
+
+  final Translations _root; // ignore: unused_field
+
+  // Translations
+
+  /// en: 'LinguaRay'
+  String get app_name => 'LinguaRay';
+
+  /// en: 'Translate'
+  String get translate => 'Translate';
+
+  /// en: 'Settings'
+  String get settings => 'Settings';
+
+  /// en: 'Minimize'
+  String get minimize => 'Minimize';
+
+  /// en: 'Maximize'
+  String get maximize => 'Maximize';
+
+  /// en: 'Close'
+  String get close => 'Close';
+}
+
+// Path: ui.first_run
+class TranslationsUiFirstRunEn {
+  TranslationsUiFirstRunEn.internal(this._root);
+
+  final Translations _root; // ignore: unused_field
+
+  // Translations
+
+  /// en: 'Set up LinguaRay'
+  String get title => 'Set up LinguaRay';
+
+  /// en: 'A few checks, then you can translate from any app.'
+  String get subtitle => 'A few checks, then you can translate from any app.';
+
+  /// en: 'Permissions'
+  String get permissions_title => 'Permissions';
+
+  /// en: 'Selection translate and capture OCR need Accessibility and Screen Recording.'
+  String get permissions_body =>
+      'Selection translate and capture OCR need Accessibility and Screen Recording.';
+
+  /// en: 'Accessibility'
+  String get accessibility => 'Accessibility';
+
+  /// en: 'Screen Recording'
+  String get screen_recording => 'Screen Recording';
+
+  /// en: 'Global shortcuts'
+  String get shortcuts_title => 'Global shortcuts';
+
+  /// en: 'The four first-release actions are ready. Conflicts can be fixed later in Settings.'
+  String get shortcuts_body =>
+      'The four first-release actions are ready. Conflicts can be fixed later in Settings.';
+
+  /// en: 'Translation services'
+  String get services_title => 'Translation services';
+
+  /// en: 'Enable at least one translation service.'
+  String get services_body => 'Enable at least one translation service.';
+
+  /// en: 'Granted'
+  String get granted => 'Granted';
+
+  /// en: 'Not granted'
+  String get denied => 'Not granted';
+
+  /// en: 'Not required on this system'
+  String get not_required => 'Not required on this system';
+
+  /// en: 'Unknown'
+  String get unknown => 'Unknown';
+
+  /// en: 'Checking…'
+  String get checking => 'Checking…';
+
+  /// en: 'A shortcut is in conflict. You can skip this and fix it in Settings.'
+  String get conflict =>
+      'A shortcut is in conflict. You can skip this and fix it in Settings.';
+
+  /// en: 'No translation service is available yet.'
+  String get no_provider => 'No translation service is available yet.';
+
+  /// en: 'A translation service is ready.'
+  String get ready => 'A translation service is ready.';
+
+  /// en: 'Grant access'
+  String get grant => 'Grant access';
+
+  /// en: 'Recheck'
+  String get recheck => 'Recheck';
+
+  /// en: 'Configure services'
+  String get configure_services => 'Configure services';
+
+  /// en: 'Get started'
+  String get start => 'Get started';
+
+  /// en: 'Skip for now'
+  String get skip => 'Skip for now';
+}
+
+// Path: ui.quick
+class TranslationsUiQuickEn {
+  TranslationsUiQuickEn.internal(this._root);
+
+  final Translations _root; // ignore: unused_field
+
+  // Translations
+
+  /// en: 'Quick translate'
+  String get title => 'Quick translate';
+
+  /// en: 'Type, paste, or fill from selection or capture'
+  String get input_hint => 'Type, paste, or fill from selection or capture';
+
+  /// en: 'Pin window'
+  String get pin => 'Pin window';
+
+  /// en: 'Unpin window'
+  String get unpin => 'Unpin window';
+
+  /// en: 'Required system permissions are missing'
+  String get permission_denied => 'Required system permissions are missing';
+
+  /// en: 'Grant Accessibility or Screen Recording in System Settings, then return and recheck.'
+  String get permission_next =>
+      'Grant Accessibility or Screen Recording in System Settings, then return and recheck.';
+
+  /// en: 'Capture was cancelled. Your text was not changed.'
+  String get capture_cancelled =>
+      'Capture was cancelled. Your text was not changed.';
+}
+
+// Path: ui.providers
+class TranslationsUiProvidersEn {
+  TranslationsUiProvidersEn.internal(this._root);
+
+  final Translations _root; // ignore: unused_field
+
+  // Translations
+
+  /// en: 'Key saved in the system keychain'
+  String get secret_stored => 'Key saved in the system keychain';
+
+  /// en: 'Leave blank to keep the saved key'
+  String get secret_placeholder => 'Leave blank to keep the saved key';
+
+  /// en: 'Fill in the required fields.'
+  String get validation_missing => 'Fill in the required fields.';
+
+  /// en: 'The provider could not be saved. Check its settings and try again.'
+  String get save_failed =>
+      'The provider could not be saved. Check its settings and try again.';
 }
 
 // Path: common.ui.button
@@ -1971,7 +2218,7 @@ class TranslationsSettingsProvidersEditorEn {
   String get add_title => 'Add {}';
 
   late final TranslationsSettingsProvidersEditorCapabilityNoteEn
-      capability_note =
+  capability_note =
       TranslationsSettingsProvidersEditorCapabilityNoteEn.internal(_root);
   late final TranslationsSettingsProvidersEditorTestEn test =
       TranslationsSettingsProvidersEditorTestEn.internal(_root);
@@ -2459,8 +2706,7 @@ extension on Translations {
       'app.tray.context_menu.check_for_updates' => 'Check for Updates',
       'app.tray.context_menu.settings' => 'Settings',
       'app.tray.context_menu.quit' => 'Quit',
-      'mini_translator.limited_banner.permission.missing_both' =>
-        'Grant Screen Recording and Accessibility permissions to enable all features.',
+      'mini_translator.limited_banner.permission.missing_both' => 'Grant Screen Recording and Accessibility permissions to enable all features.',
       'mini_translator.limited_banner.permission.missing_screen_capture' =>
         'Grant Screen Recording permission to enable all features.',
       'mini_translator.limited_banner.permission.missing_accessibility' =>
@@ -2474,14 +2720,13 @@ extension on Translations {
       'mini_translator.limited_banner.action.recheck' => 'Recheck',
       'mini_translator.limited_banner.feedback.enabled' =>
         'Screen text extraction is enabled.',
-      'mini_translator.limited_banner.feedback.still_missing' =>
-        'Required permissions are still missing.\nPlease check your settings and try again.',
+      'mini_translator.limited_banner.feedback.still_missing' => 'Required permissions are still missing.\nPlease check your settings and try again.',
       'mini_translator.limited_banner.tooltip.help' => 'View help',
       'mini_translator.input.hint' => 'Enter the word or text here',
       'mini_translator.input.extracting_text' => 'Extracting text...',
-      'mini_translator.input.hint_translate_to' => (
-              {required Object language}) =>
-          'Type a word or text to translate into ${language}',
+      'mini_translator.input.hint_translate_to' => ({
+        required Object language,
+      }) => 'Type a word or text to translate into ${language}',
       'mini_translator.toolbar.tooltip.extract_text_from_screen_capture' =>
         'Capture screen area and recognize text',
       'mini_translator.toolbar.tooltip.extract_text_from_clipboard' =>
@@ -2512,29 +2757,30 @@ extension on Translations {
         'No text entered or text not extracted',
       'mini_translator.message.capture_screen_area_canceled' =>
         'Capture screen area has been canceled',
-      'mini_translator.message.ocr_service_not_configured' =>
-        'No default text recognition service configured. Please set one in Settings.',
+      'mini_translator.message.ocr_service_not_configured' => 'No default text recognition service configured. Please set one in Settings.',
       'mini_translator.message.ocr_recognition_failed' =>
         'Text recognition failed',
       'mini_translator.result.translating' => 'Translating…',
-      'mini_translator.result.stale_requery' => ({required Object key}) =>
-          'Source changed · ${key} retranslate',
-      'mini_translator.result.compare_services' => ({required Object count}) =>
-          'Compare ${count} services',
+      'mini_translator.result.stale_requery' => ({
+        required Object key,
+      }) => 'Source changed · ${key} retranslate',
+      'mini_translator.result.compare_services' => ({
+        required Object count,
+      }) => 'Compare ${count} services',
       'mini_translator.result.collapse_compare' => 'Collapse',
       'mini_translator.result.set_preferred' => 'Set as preferred',
       'mini_translator.result.retry' => 'Retry',
-      'mini_translator.result.no_result' =>
-        'No service returned a result — check your network or try another service.',
+      'mini_translator.result.no_result' => 'No service returned a result — check your network or try another service.',
       'mini_translator.result.no_result_note' =>
         'Your text is kept; retrying will not duplicate history.',
-      'mini_translator.result.no_result_meta' => ({required Object count}) =>
-          '${count} services returned nothing',
-      'mini_translator.result.no_result_body' =>
-        'No translation came back. Check your network and press ⏎ to retry, or expand to see each service\'s reason.',
+      'mini_translator.result.no_result_meta' => ({
+        required Object count,
+      }) => '${count} services returned nothing',
+      'mini_translator.result.no_result_body' => 'No translation came back. Check your network and press ⏎ to retry, or expand to see each service\'s reason.',
       'mini_translator.result.check_services' => 'Check services',
-      'mini_translator.result.show_reasons' => ({required Object count}) =>
-          'Why ${count} services failed',
+      'mini_translator.result.show_reasons' => ({
+        required Object count,
+      }) => 'Why ${count} services failed',
       'mini_translator.result.collapse_reasons' => 'Hide reasons',
       'mini_translator.result.unknown_error' => 'The service gave no reason.',
       'mini_translator.result.no_result_tag' => 'no result',
@@ -2548,9 +2794,10 @@ extension on Translations {
       'workbench.history_page.search_placeholder' =>
         'Search source, translation, or service',
       'workbench.history_page.search_label' => 'Search history',
-      'workbench.history_page.entry_count' => (
-              {required Object label, required Object count}) =>
-          '${label} · ${count} entries',
+      'workbench.history_page.entry_count' => ({
+        required Object label,
+        required Object count,
+      }) => '${label} · ${count} entries',
       'workbench.history_page.by_time' => 'By time',
       'workbench.history_page.loading' => 'Loading history…',
       'workbench.history_page.load_failed' => 'Failed to load history',
@@ -2558,21 +2805,25 @@ extension on Translations {
       'workbench.history_page.empty_title' => 'No translation history yet',
       'workbench.history_page.empty_description' =>
         'Your preferred result is saved here after a successful translation.',
-      'workbench.history_page.no_results' => ({required Object query}) =>
-          'No history matches “${query}”',
+      'workbench.history_page.no_results' => ({
+        required Object query,
+      }) => 'No history matches “${query}”',
       'workbench.history_page.clear_search' => 'Clear search',
       'workbench.history_page.select' => 'Select',
-      'workbench.history_page.selected_count' => ({required Object count}) =>
-          '${count} selected',
+      'workbench.history_page.selected_count' => ({
+        required Object count,
+      }) => '${count} selected',
       'workbench.history_page.exit_select' => 'Exit selection',
       'workbench.history_page.add_to_glossary' => 'Add to glossary',
       'workbench.history_page.favorite' => 'Favorite',
       'workbench.history_page.unfavorite' => 'Unfavorite',
-      'workbench.history_page.delete_confirm' => ({required Object count}) =>
-          'Delete the selected ${count} history entries? This cannot be undone.',
+      'workbench.history_page.delete_confirm' => ({
+        required Object count,
+      }) => 'Delete the selected ${count} history entries? This cannot be undone.',
       'workbench.history_page.no_glossary' => 'Create a glossary first',
-      'workbench.history_page.added_to_glossary' => ({required Object count}) =>
-          'Added ${count} entries to the glossary',
+      'workbench.history_page.added_to_glossary' => ({
+        required Object count,
+      }) => 'Added ${count} entries to the glossary',
       'workbench.history_page.favorite_flag' => 'Favorite',
       'workbench.history_page.edited_flag' => 'Edited',
       'workbench.history_page.edit_history_hint' =>
@@ -2580,10 +2831,10 @@ extension on Translations {
       'workbench.history_page.copy_translation' => 'Copy translation',
       'workbench.history_page.more_actions' => 'More',
       'workbench.history_page.delete_title_one' => 'Delete this record',
-      'workbench.history_page.delete_title_many' => ({required Object count}) =>
-          'Delete ${count} records',
-      'workbench.history_page.delete_message' =>
-        'This cannot be undone. Favourites and your own wording go with it; the glossary is untouched.',
+      'workbench.history_page.delete_title_many' => ({
+        required Object count,
+      }) => 'Delete ${count} records',
+      'workbench.history_page.delete_message' => 'This cannot be undone. Favourites and your own wording go with it; the glossary is untouched.',
       'workbench.glossary' => 'Glossary',
       'workbench.recent_languages' => 'Recent Languages',
       'workbench.not_configured' => 'Not configured',
@@ -2604,37 +2855,39 @@ extension on Translations {
       'workbench.glossary_page.search_placeholder' =>
         'Search terms or required translations',
       'workbench.glossary_page.search_label' => 'Search the glossary',
-      'workbench.glossary_page.entry_count' => (
-              {required Object name, required Object count}) =>
-          '${name} · ${count} terms',
+      'workbench.glossary_page.entry_count' => ({
+        required Object name,
+        required Object count,
+      }) => '${name} · ${count} terms',
       'workbench.glossary_page.priority_note' =>
         'Glossary terms outrank any service output',
       'workbench.glossary_page.new_book' => 'New glossary',
       'workbench.glossary_page.new_book_placeholder' => 'Glossary name',
       'workbench.glossary_page.rename_book' => 'Rename',
-      'workbench.glossary_page.delete_book_confirm' => (
-              {required Object name, required Object count}) =>
-          'Delete “${name}” and all ${count} of its terms?',
+      'workbench.glossary_page.delete_book_confirm' => ({
+        required Object name,
+        required Object count,
+      }) => 'Delete “${name}” and all ${count} of its terms?',
       'workbench.glossary_page.disabled' => 'Off',
       'workbench.glossary_page.enable' => 'Enable',
       'workbench.glossary_page.disable' => 'Disable',
       'workbench.glossary_page.empty_title' => 'This glossary is empty',
-      'workbench.glossary_page.empty_description' =>
-        'Glossary terms outrank any service output. Add them one at a time, or drop in a CSV to merge.',
-      'workbench.glossary_page.no_results_title' => ({required Object query}) =>
-          'No terms match “${query}”',
+      'workbench.glossary_page.empty_description' => 'Glossary terms outrank any service output. Add them one at a time, or drop in a CSV to merge.',
+      'workbench.glossary_page.no_results_title' => ({
+        required Object query,
+      }) => 'No terms match “${query}”',
       'workbench.glossary_page.no_results_description' =>
         'Try another keyword, or add the term.',
       'workbench.glossary_page.no_books_title' => 'No glossaries yet',
-      'workbench.glossary_page.no_books_description' =>
-        'A glossary keeps your chosen wording consistent across every service. Create one, then start adding terms.',
+      'workbench.glossary_page.no_books_description' => 'A glossary keeps your chosen wording consistent across every service. Create one, then start adding terms.',
       'workbench.glossary_page.loading' => 'Loading…',
       'workbench.glossary_page.new_book_subtitle' =>
         'One book per domain; all of them apply while translating',
       'workbench.glossary_page.name' => 'Name',
       'workbench.glossary_page.name_taken' => 'Name · already exists',
-      'workbench.glossary_page.name_taken_hint' => ({required Object name}) =>
-          'There is already a glossary called “${name}”.',
+      'workbench.glossary_page.name_taken_hint' => ({
+        required Object name,
+      }) => 'There is already a glossary called “${name}”.',
       'workbench.glossary_page.name_placeholder' => 'Machine learning',
       'workbench.glossary_page.source_language' => 'Source language',
       'workbench.glossary_page.target_language' => 'Target language',
@@ -2648,27 +2901,28 @@ extension on Translations {
         'Two columns: term / translation',
       'workbench.glossary_page.seed_tbx_hint' =>
         'Industry term exchange format',
-      'workbench.glossary_page.seed_blank_note' =>
-        'Once it exists you can add entries one by one, or drop a CSV / TBX onto the list to merge.',
-      'workbench.glossary_page.seed_file_note' => ({required Object format}) =>
-          'Imports the ${format} file right after creating · duplicates take the file’s translation',
+      'workbench.glossary_page.seed_blank_note' => 'Once it exists you can add entries one by one, or drop a CSV / TBX onto the list to merge.',
+      'workbench.glossary_page.seed_file_note' => ({
+        required Object format,
+      }) => 'Imports the ${format} file right after creating · duplicates take the file’s translation',
       'workbench.glossary_page.choose_file' => 'Choose file…',
       'workbench.glossary_page.create' => 'Create',
       'workbench.glossary_page.add_entry_subtitle' =>
         'A term outranks anything a service returns',
       'workbench.glossary_page.book' => 'Glossary',
       'workbench.glossary_page.forbidden_label' => 'Forbidden translations',
-      'workbench.glossary_page.forbidden_hint' =>
-        'A service offering these is flagged as a conflict; separate several with /, leave empty to forbid none.',
+      'workbench.glossary_page.forbidden_hint' => 'A service offering these is flagged as a conflict; separate several with /, leave empty to forbid none.',
       'workbench.glossary_page.forbidden_placeholder_full' =>
         'forced teaching / forcing teacher',
-      'workbench.glossary_page.duplicate' => (
-              {required Object term, required Object book}) =>
-          '“${term}” is already in ${book}; saving overwrites the existing translation.',
+      'workbench.glossary_page.duplicate' => ({
+        required Object term,
+        required Object book,
+      }) => '“${term}” is already in ${book}; saving overwrites the existing translation.',
       'workbench.glossary_page.duplicate_book_fallback' => 'this glossary',
       'workbench.glossary_page.keep_adding' => 'Keep adding after saving',
-      'workbench.glossary_page.added_count' => ({required Object count}) =>
-          'Added ${count} so far',
+      'workbench.glossary_page.added_count' => ({
+        required Object count,
+      }) => 'Added ${count} so far',
       'workbench.glossary_page.overwrite' => 'Overwrite',
       'workbench.glossary_page.done' => 'Done',
       'workbench.translation.source' => 'Source',
@@ -2704,13 +2958,30 @@ extension on Translations {
       'workbench.translation.shortcuts' => 'Shortcuts',
       'workbench.translation.other_services_disabled' =>
         'Other services are disabled',
-      'workbench.translation.input_hint_translate_to' => (
-              {required Object language}) =>
-          'Type or paste text to translate into ${language}',
-      'workbench.translation.newline_hint' => ({required Object key}) =>
-          '${key} for a new line',
-      'workbench.translation.failed_body' =>
-        'This passage did not get a translation. Check your connection and retry, or expand to work through each service\'s reason.',
+      'workbench.translation.input_hint_translate_to' => ({
+        required Object language,
+      }) => 'Type or paste text to translate into ${language}',
+      'workbench.translation.newline_hint' => ({
+        required Object key,
+      }) => '${key} for a new line',
+      'workbench.translation.failed_body' => 'This passage did not get a translation. Check your connection and retry, or expand to work through each service\'s reason.',
+      'workbench.translation.clear' => 'Clear',
+      'workbench.translation.swap_languages' => 'Swap languages',
+      'workbench.translation.services' => 'Translation services',
+      'workbench.translation.configure_services' => 'Configure services',
+      'workbench.translation.retry' => 'Try again',
+      'workbench.translation.character_count' => ({
+        required Object count,
+      }) => '${count} characters',
+      'workbench.translation.language_pair_not_installed' => 'Install this language pair in macOS Language & Region, then try again.',
+      'workbench.translation.unsupported_language_pair' =>
+        'The selected service does not support this language pair.',
+      'workbench.translation.source_language_detection_failed' => 'The source language could not be detected. Choose it manually and try again.',
+      'workbench.translation.network_error' => 'The translation service could not be reached. Check your connection and try again.',
+      'workbench.translation.partial_failure' => ({
+        required Object count,
+      }) => '${count} services failed. Switch to inspect the reason.',
+      'workbench.translation.streaming' => 'Writing translation…',
       'workbench.status.runtime_ready' => 'Translation runtime ready',
       'workbench.status.settings_synced' => 'Settings synced',
       'workbench.status.shortcuts' => '⌥Space Quick window · ⌥⇧2 Capture',
@@ -2766,8 +3037,7 @@ extension on Translations {
         'Capturing text from the screen needs to read screen contents.',
       'settings.general.row.screen_selection_access_hint' =>
         'Capturing selected text needs to read selections in other apps.',
-      'settings.general.row.no_translation_targets' =>
-        'No translation targets yet — add one to set the default language to translate into.',
+      'settings.general.row.no_translation_targets' => 'No translation targets yet — add one to set the default language to translate into.',
       'settings.general.button.add_provider' => 'Add...',
       'settings.general.button.add_target' => 'Add Target...',
       'settings.general.button.manage_targets' =>
@@ -2829,8 +3099,9 @@ extension on Translations {
       'settings.shortcuts.record_placeholder' => 'Record shortcut',
       'settings.shortcuts.recording' => 'Press keys…',
       'settings.shortcuts.clear' => 'Clear',
-      'settings.shortcuts.conflict' => ({required Object label}) =>
-          'Conflicts with “${label}”',
+      'settings.shortcuts.conflict' => ({
+        required Object label,
+      }) => 'Conflicts with “${label}”',
       'settings.advanced.title' => 'Advanced',
       'settings.advanced.api_server' => 'Local API server',
       'settings.advanced.api_server_description' =>
@@ -2849,10 +3120,8 @@ extension on Translations {
       'settings.services.editor.row.system_prompt' => 'System Prompt',
       'settings.services.editor.prompt_placeholder' =>
         'Leave blank to use the default prompt for this kind',
-      'settings.services.editor.variant_hint' =>
-        '{} already has a {} service; this one is added alongside it as a second configuration.',
-      'settings.services.editor.traditional_note' =>
-        '{} is a traditional endpoint — no model or prompt to tune. Its parameters live on the provider\'s detail page.',
+      'settings.services.editor.variant_hint' => '{} already has a {} service; this one is added alongside it as a second configuration.',
+      'settings.services.editor.traditional_note' => '{} is a traditional endpoint — no model or prompt to tune. Its parameters live on the provider\'s detail page.',
       'settings.services.detail.row.id' => 'Service ID',
       'settings.services.detail.row.name' => 'Name',
       'settings.services.detail.row.provider' => 'Provider',
@@ -2866,8 +3135,7 @@ extension on Translations {
       'settings.services.item.none_of_kind' => 'No {} service available yet.',
       'settings.providers.title' => 'Providers',
       'settings.providers.section.services' => 'Available Services',
-      'settings.providers.section.services_description' =>
-        'View available services from configured providers and switch between service types.',
+      'settings.providers.section.services_description' => 'View available services from configured providers and switch between service types.',
       'settings.providers.item.empty' =>
         'No providers configured. Add one to enable translation services.',
       'settings.providers.item.loading' => 'Loading providers...',
@@ -2876,8 +3144,7 @@ extension on Translations {
       'settings.providers.alert.error' => 'Error',
       'settings.providers.intro.body' =>
         'Manage the service providers used by the app.',
-      'settings.providers.intro.warning' =>
-        'Connected providers may process the text or images you send. Only enable services you trust.',
+      'settings.providers.intro.warning' => 'Connected providers may process the text or images you send. Only enable services you trust.',
       'settings.providers.editor.row.id' => 'Provider ID',
       'settings.providers.editor.row.type' => 'Provider Type',
       'settings.providers.editor.row.default_model' => 'Default Model',
@@ -2908,10 +3175,8 @@ extension on Translations {
         'Connection test passed',
       'settings.providers.editor.test.retest' => 'Test Again',
       'settings.providers.editor.test.tips_title' => 'Things to try',
-      'settings.providers.editor.test.tips_llm' =>
-        '· Check the key matches the provider type you picked\n· Check whether the Base URL needs /v1\n· Confirm the model is enabled in the provider console',
-      'settings.providers.editor.test.tips_traditional' =>
-        '· Check the credentials match the provider type you picked\n· Confirm the service is enabled in the provider console',
+      'settings.providers.editor.test.tips_llm' => '· Check the key matches the provider type you picked\n· Check whether the Base URL needs /v1\n· Confirm the model is enabled in the provider console',
+      'settings.providers.editor.test.tips_traditional' => '· Check the credentials match the provider type you picked\n· Confirm the service is enabled in the provider console',
       'settings.providers.editor.test.failed_suffix' => 'verification failed',
       'settings.providers.editor.test.passed_suffix' => 'verified',
       'settings.providers.detail.tooltip.edit' => 'Edit provider',
@@ -2961,6 +3226,55 @@ extension on Translations {
       'settings.about.license' => 'License',
       'settings.about.open_changelog' => 'Open Changelog',
       'settings.about.update' => 'Update',
+      'settings.permissions.title' => 'Permissions',
+      'settings.permissions.windows_note' =>
+        'Windows does not require extra permissions for selection or capture.',
+      'settings.permissions.recheck' => 'Recheck',
+      'ui.shell.app_name' => 'LinguaRay',
+      'ui.shell.translate' => 'Translate',
+      'ui.shell.settings' => 'Settings',
+      'ui.shell.minimize' => 'Minimize',
+      'ui.shell.maximize' => 'Maximize',
+      'ui.shell.close' => 'Close',
+      'ui.first_run.title' => 'Set up LinguaRay',
+      'ui.first_run.subtitle' =>
+        'A few checks, then you can translate from any app.',
+      'ui.first_run.permissions_title' => 'Permissions',
+      'ui.first_run.permissions_body' => 'Selection translate and capture OCR need Accessibility and Screen Recording.',
+      'ui.first_run.accessibility' => 'Accessibility',
+      'ui.first_run.screen_recording' => 'Screen Recording',
+      'ui.first_run.shortcuts_title' => 'Global shortcuts',
+      'ui.first_run.shortcuts_body' => 'The four first-release actions are ready. Conflicts can be fixed later in Settings.',
+      'ui.first_run.services_title' => 'Translation services',
+      'ui.first_run.services_body' =>
+        'Enable at least one translation service.',
+      'ui.first_run.granted' => 'Granted',
+      'ui.first_run.denied' => 'Not granted',
+      'ui.first_run.not_required' => 'Not required on this system',
+      'ui.first_run.unknown' => 'Unknown',
+      'ui.first_run.checking' => 'Checking…',
+      'ui.first_run.conflict' =>
+        'A shortcut is in conflict. You can skip this and fix it in Settings.',
+      'ui.first_run.no_provider' => 'No translation service is available yet.',
+      'ui.first_run.ready' => 'A translation service is ready.',
+      'ui.first_run.grant' => 'Grant access',
+      'ui.first_run.recheck' => 'Recheck',
+      'ui.first_run.configure_services' => 'Configure services',
+      'ui.first_run.start' => 'Get started',
+      'ui.first_run.skip' => 'Skip for now',
+      'ui.quick.title' => 'Quick translate',
+      'ui.quick.input_hint' => 'Type, paste, or fill from selection or capture',
+      'ui.quick.pin' => 'Pin window',
+      'ui.quick.unpin' => 'Unpin window',
+      'ui.quick.permission_denied' => 'Required system permissions are missing',
+      'ui.quick.permission_next' => 'Grant Accessibility or Screen Recording in System Settings, then return and recheck.',
+      'ui.quick.capture_cancelled' =>
+        'Capture was cancelled. Your text was not changed.',
+      'ui.providers.secret_stored' => 'Key saved in the system keychain',
+      'ui.providers.secret_placeholder' => 'Leave blank to keep the saved key',
+      'ui.providers.validation_missing' => 'Fill in the required fields.',
+      'ui.providers.save_failed' =>
+        'The provider could not be saved. Check its settings and try again.',
       _ => null,
     };
   }

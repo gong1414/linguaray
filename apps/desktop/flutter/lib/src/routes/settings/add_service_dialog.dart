@@ -96,9 +96,9 @@ class _AddServiceDialogState extends State<AddServiceDialog> {
   bool get _isEditing => widget.service != null;
 
   ProviderConfigEntry get _provider => widget.providers.firstWhere(
-        (entry) => entry.id == _providerId,
-        orElse: () => widget.providers.first,
-      );
+    (entry) => entry.id == _providerId,
+    orElse: () => widget.providers.first,
+  );
 
   bool get _isLlm => isLlmProviderType(_provider.type);
 
@@ -112,7 +112,8 @@ class _AddServiceDialogState extends State<AddServiceDialog> {
     super.initState();
     final service = widget.service;
     final preferred = service?.providerId ?? widget.defaultProviderId;
-    _providerId = preferred != null &&
+    _providerId =
+        preferred != null &&
             widget.providers.any((entry) => entry.id == preferred)
         ? preferred
         : widget.providers.first.id;
@@ -172,8 +173,8 @@ class _AddServiceDialogState extends State<AddServiceDialog> {
     });
     try {
       final models = await runtime.settings().listModels(
-            providerId: providerId,
-          );
+        providerId: providerId,
+      );
       if (!mounted || providerId != _providerId) return;
       setState(() {
         _models = models;

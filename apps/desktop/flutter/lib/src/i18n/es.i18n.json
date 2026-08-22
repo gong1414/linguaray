@@ -268,7 +268,13 @@
       "quality_hint": "Se calculan cuando llega la traducción.",
       "shortcuts": "Atajos",
       "other_services_disabled": "Los demás servicios están desactivados",
-      "input_hint_translate_to": "Escribe o pega el texto para traducir al $language"
+      "input_hint_translate_to": "Escribe o pega el texto para traducir al $language",
+      "clear": "Borrar",
+      "swap_languages": "Intercambiar idiomas",
+      "services": "Servicios de traducción",
+      "configure_services": "Configurar servicios",
+      "retry": "Reintentar",
+      "character_count": "$count caracteres"
     },
     "status": {
       "runtime_ready": "Motor de traducción listo",

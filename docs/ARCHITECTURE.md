@@ -4,29 +4,39 @@ LinguaRay separates the desktop interface from translation capabilities so UI
 work can be inspected and changed without rebuilding product logic.
 
 ```text
-┌─────────────────────────────────────────────────────────┐
-│ Flutter UI                                              │
-│ routes · widgets · Widgetbook · view state              │
-└──────────────────────────┬──────────────────────────────┘
-                           │ typed controllers
-┌──────────────────────────▼──────────────────────────────┐
-│ Application and platform services                       │
-│ shortcuts · windows · tray · permissions · secure store │
-└──────────────────────────┬──────────────────────────────┘
-                           │ UniFFI
-┌──────────────────────────▼──────────────────────────────┐
-│ Rust runtime                                             │
-│ translation · OCR · providers · settings · persistence   │
-└─────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────┐
+│ Flutter views                                             │
+│ Material 3 · Widgetbook · immutable props · user intents  │
+└───────────────────────────┬───────────────────────────────┘
+                            │ Riverpod view models
+┌───────────────────────────▼───────────────────────────────┐
+│ Pure Dart application layer                               │
+│ use cases · entities · repository and platform ports      │
+└───────────────────────────┬───────────────────────────────┘
+                            │ adapter implementations
+┌───────────────────────────▼───────────────────────────────┐
+│ Rust runtime / desktop platform                           │
+│ translation · OCR · settings / windows · tray · shortcuts │
+└───────────────────────────────────────────────────────────┘
 ```
 
 ## Layers
 
 ### Flutter application
 
-`apps/desktop/flutter` contains routes, controllers, desktop lifecycle code,
-and platform integrations. Widgets render state and send user intent to a
-controller. They do not read platform permissions or call plugins directly.
+`apps/desktop/flutter` contains routes, Riverpod view models, adapters, desktop
+lifecycle code, and platform integrations. Widgets render immutable state and
+send user intent to a view model. They do not import generated runtime models,
+read platform permissions, or call plugins directly.
+
+View models depend on use cases from `packages/application`, which is a pure
+Dart package with no Flutter, FFI, networking, or platform-plugin dependency.
+Its ports are implemented by adapters in the desktop app. This is the enforced
+dependency direction:
+
+```text
+view → view model → use case → port ← runtime/platform adapter
+```
 
 The quick translator is a dynamically sized utility window. The workbench is
 the persistent surface for input translation and settings. Startup guidance is
@@ -34,8 +44,9 @@ a route inside the workbench rather than a separate native onboarding window.
 
 ### Design system
 
-`packages/ui_flutter` contains reusable tokens, themes, and controls.
-Application-specific translation widgets remain in the desktop application.
+`packages/ui_flutter` projects LinguaRay's brand onto Flutter's official
+Material 3 components. Material 3 is the sole foundation for new screens;
+product-specific translation widgets remain in the desktop application.
 Widgetbook exposes product states independently of runtime and provider access.
 
 ### Platform services
@@ -58,12 +69,17 @@ binding paths observe the same state.
 
 ## Data flow
 
-1. A shortcut, tray action, or widget produces a typed user action.
-2. A controller refreshes required platform state and requests selection,
-   input, or a captured image.
-3. The controller calls the Rust runtime with plain typed data.
-4. Streaming or completed runtime results are mapped to UI state.
-5. Widgets render loading, success, recoverable error, or permission states.
+1. A shortcut, tray action, or view produces a typed user intent.
+2. A Riverpod view model invokes an application use case.
+3. The use case coordinates one or more abstract ports using pure models.
+4. A desktop adapter maps those requests to the Rust runtime or a platform
+   service and maps generated types back at the boundary.
+5. The view model publishes immutable loading, streaming, success, or
+   recoverable-error state for Material widgets to render.
+
+Application tests replace ports with in-memory fakes. Widget and golden tests
+render views without initializing Rust or loading secrets. Integration tests
+exercise the adapters and native window behavior separately.
 
 External provider calls are replaced by local stubs in automated tests. System
 OCR uses fixed, non-sensitive fixture images.

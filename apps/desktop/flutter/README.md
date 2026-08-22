@@ -1,6 +1,10 @@
-# Beyond Translate Desktop
+# LinguaRay Desktop
 
-## Desktop Codegen
+The desktop host uses Material 3 views and Riverpod view models. Product
+capabilities are accessed through the pure Dart contracts in
+`packages/application`; runtime and platform types stop at adapter boundaries.
+
+## Code generation
 
 Run commands from the repository root.
 

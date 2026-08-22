@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart' hide Image;
 import 'package:go_router/go_router.dart';
+import 'package:linguaray_ui/linguaray_ui.dart' show LinguaRayMaterialTheme;
 import 'package:nativeapi/nativeapi.dart';
 
 import '../i18n/i18n.dart';
@@ -16,14 +17,12 @@ import '../services/mac_app_presentation.dart';
 import '../services/runtime.dart' show runtimeDataDirectory;
 import '../services/settings_store.dart';
 import '../services/shortcut_service/shortcut_service.dart';
-import '../theme/app_theme.dart';
+import '../ui/quick_translate/quick_translate_screen.dart';
 import '../utils/language_util.dart';
 import '../widgets/toast_host.dart';
-import '../widgets/ui.dart' show DesignThemeProvider;
 import '__root.dart';
 import 'debug/runtime.dart' as debug_runtime_route;
 import 'debug/widget_showcase.dart' as widget_showcase_route;
-import 'mini_translator/mini_translator.dart';
 import 'workbench/index.dart' as workbench_route;
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -43,7 +42,8 @@ GoRouter createWorkbenchAppRouter({String? initialLocation}) {
       if (kDebugMode) ...widget_showcase_route.$appRoutes,
       ...workbench_route.$appRoutes,
     ],
-    initialLocation: initialLocation ??
+    initialLocation:
+        initialLocation ??
         (onboardingController.isComplete
             ? pendingWorkbenchLocation
             : '/welcome'),
@@ -57,7 +57,7 @@ GoRouter createMiniTranslatorAppRouter() {
     routes: [
       GoRoute(
         path: '/',
-        builder: (context, state) => const MiniTranslatorPage(),
+        builder: (context, state) => const QuickTranslateScreen(),
       ),
     ],
     debugLogDiagnostics: false,
@@ -101,34 +101,16 @@ class _WorkbenchAppState extends State<WorkbenchApp> {
     return MaterialApp.router(
       debugShowCheckedModeBanner: false,
       title: kWorkbenchWindowTitle,
-      theme: appThemeData(
-        tokensFor(Brightness.light, family: settingsStore.themeFamily),
-      ),
-      darkTheme: appThemeData(
-        tokensFor(Brightness.dark, family: settingsStore.themeFamily),
-      ),
+      theme: LinguaRayMaterialTheme.light(),
+      darkTheme: LinguaRayMaterialTheme.dark(),
       themeMode: settingsStore.themeMode,
-      builder: (context, child) => _withDesignTokens(context, child!),
+      builder: (context, child) => ToastHost(child: child!),
       routerConfig: _router,
       localizationsDelegates: context.localizationDelegates,
       supportedLocales: context.supportedLocales,
       locale: context.locale,
     );
   }
-}
-
-/// Publishes the token set matching the resolved Material brightness, so every
-/// `ui` widget below reads the same palette [appThemeData] was built from —
-/// and gives the window its own [ToastHost], so each window stacks its own
-/// notifications.
-Widget _withDesignTokens(BuildContext context, Widget child) {
-  return DesignThemeProvider(
-    tokens: tokensFor(
-      Theme.of(context).brightness,
-      family: settingsStore.themeFamily,
-    ),
-    child: ToastHost(child: child),
-  );
 }
 
 class MiniTranslatorApp extends StatefulWidget {
@@ -162,14 +144,10 @@ class _MiniTranslatorAppState extends State<MiniTranslatorApp> {
     return MaterialApp.router(
       debugShowCheckedModeBanner: false,
       title: kMiniTranslatorWindowTitle,
-      theme: appThemeData(
-        tokensFor(Brightness.light, family: settingsStore.themeFamily),
-      ),
-      darkTheme: appThemeData(
-        tokensFor(Brightness.dark, family: settingsStore.themeFamily),
-      ),
+      theme: LinguaRayMaterialTheme.light(),
+      darkTheme: LinguaRayMaterialTheme.dark(),
       themeMode: settingsStore.themeMode,
-      builder: (context, child) => _withDesignTokens(context, child!),
+      builder: (context, child) => ToastHost(child: child!),
       routerConfig: _router,
       localizationsDelegates: context.localizationDelegates,
       supportedLocales: context.supportedLocales,
@@ -316,20 +294,18 @@ class _RootBodyViewState extends State<_RootBodyView>
 
     // ── 设置 ──
     menu.addItem(
-      MenuItem(t.app.tray.context_menu.settings)
-        ..on<MenuItemClickedEvent>((_) {
-          showSettingsWindow();
-        }),
+      MenuItem(t.app.tray.context_menu.settings)..on<MenuItemClickedEvent>((_) {
+        showSettingsWindow();
+      }),
     );
 
     menu.addSeparator();
 
     // ── 退出 ──
     menu.addItem(
-      MenuItem(t.app.tray.context_menu.quit)
-        ..on<MenuItemClickedEvent>((_) {
-          exit(0);
-        }),
+      MenuItem(t.app.tray.context_menu.quit)..on<MenuItemClickedEvent>((_) {
+        exit(0);
+      }),
     );
 
     return menu;
@@ -341,11 +317,11 @@ class _RootBodyViewState extends State<_RootBodyView>
       valueListenable: appSurface,
       builder: (context, surface, _) => switch (surface) {
         AppSurface.workbench => const WorkbenchApp(
-            key: ValueKey(AppSurface.workbench),
-          ),
+          key: ValueKey(AppSurface.workbench),
+        ),
         AppSurface.miniTranslator => const MiniTranslatorApp(
-            key: ValueKey(AppSurface.miniTranslator),
-          ),
+          key: ValueKey(AppSurface.miniTranslator),
+        ),
       },
     );
   }

@@ -78,25 +78,25 @@ void main() {
     }
 
     Widget column(List<Widget> children, {double gap = 10}) => Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (var i = 0; i < children.length; i++) ...[
-              if (i > 0) SizedBox(height: gap),
-              children[i],
-            ],
-          ],
-        );
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (var i = 0; i < children.length; i++) ...[
+          if (i > 0) SizedBox(height: gap),
+          children[i],
+        ],
+      ],
+    );
 
     Widget row(List<Widget> children, {double gap = 8}) => Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (var i = 0; i < children.length; i++) ...[
-              if (i > 0) SizedBox(width: gap),
-              children[i],
-            ],
-          ],
-        );
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (var i = 0; i < children.length; i++) ...[
+          if (i > 0) SizedBox(width: gap),
+          children[i],
+        ],
+      ],
+    );
 
     testWidgets('button variants', (tester) async {
       await expectGolden(

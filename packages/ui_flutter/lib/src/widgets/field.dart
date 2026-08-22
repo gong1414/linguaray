@@ -22,8 +22,9 @@ BoxDecoration controlDecoration(
   final error = state == FieldState.error;
 
   return BoxDecoration(
-    color:
-        error ? colors.dangerSurface : (focused ? colors.window : colors.card),
+    color: error
+        ? colors.dangerSurface
+        : (focused ? colors.window : colors.card),
     // Focus and error change the border's *colour* only, so the width stays on
     // the hairline in every state. Thickening it here would shift the text by
     // half a pixel the moment the field takes focus.
@@ -244,13 +245,14 @@ class _TextAreaState extends State<TextArea> {
     final colors = tokens.colors;
     final error = widget.state == FieldState.error;
 
-    final style = (widget.mono
-            ? tokens.typography.monoStyle(fontSize: 12)
-            : tokens.typography.sansStyle(fontSize: 12))
-        .copyWith(
-      height: 1.6,
-      color: error ? colors.dangerDeep : colors.fg,
-    );
+    final style =
+        (widget.mono
+                ? tokens.typography.monoStyle(fontSize: 12)
+                : tokens.typography.sansStyle(fontSize: 12))
+            .copyWith(
+              height: 1.6,
+              color: error ? colors.dangerDeep : colors.fg,
+            );
 
     return AnimatedContainer(
       duration: kTransitionDuration,
@@ -410,10 +412,11 @@ class _SelectState<T> extends State<Select<T>> {
         .map((item) => item.label)
         .firstOrNull;
 
-    final style = (widget.mono
-            ? tokens.typography.monoStyle(fontSize: 12)
-            : tokens.typography.sansStyle(fontSize: 12))
-        .copyWith(height: 1, color: error ? colors.dangerDeep : colors.fg);
+    final style =
+        (widget.mono
+                ? tokens.typography.monoStyle(fontSize: 12)
+                : tokens.typography.sansStyle(fontSize: 12))
+            .copyWith(height: 1, color: error ? colors.dangerDeep : colors.fg);
 
     return CompositedTransformTarget(
       link: _link,
@@ -492,13 +495,14 @@ class _SelectRow extends StatelessWidget {
             : (state.hovered ? colors.subtle : null),
         child: Text(
           label,
-          style: (mono
-                  ? tokens.typography.monoStyle(fontSize: 12)
-                  : tokens.typography.sansStyle(fontSize: 12))
-              .copyWith(
-            height: 1,
-            color: selected ? tokens.selectionFg : colors.fg,
-          ),
+          style:
+              (mono
+                      ? tokens.typography.monoStyle(fontSize: 12)
+                      : tokens.typography.sansStyle(fontSize: 12))
+                  .copyWith(
+                    height: 1,
+                    color: selected ? tokens.selectionFg : colors.fg,
+                  ),
         ),
       ),
     );
@@ -534,8 +538,9 @@ class Field extends StatelessWidget {
         Align(
           alignment: AlignmentDirectional.centerStart,
           child: Label(
-            tone:
-                state == FieldState.error ? LabelTone.danger : LabelTone.subtle,
+            tone: state == FieldState.error
+                ? LabelTone.danger
+                : LabelTone.subtle,
             child: label,
           ),
         ),
@@ -548,8 +553,9 @@ class Field extends StatelessWidget {
               fontSize: 12,
               fontWeight: FontWeight.w500,
               height: 1.6,
-              color:
-                  state == FieldState.error ? colors.dangerFg : colors.fgSubtle,
+              color: state == FieldState.error
+                  ? colors.dangerFg
+                  : colors.fgSubtle,
             ),
             child: hint!,
           ),
@@ -584,10 +590,11 @@ class FieldValue extends StatelessWidget {
         borderRadius: BorderRadius.circular(tokens.radii.control),
       ),
       child: DefaultTextStyle(
-        style: (mono
-                ? tokens.typography.monoStyle(fontSize: 12)
-                : tokens.typography.sansStyle(fontSize: 12))
-            .copyWith(height: 1, color: colors.fg),
+        style:
+            (mono
+                    ? tokens.typography.monoStyle(fontSize: 12)
+                    : tokens.typography.sansStyle(fontSize: 12))
+                .copyWith(height: 1, color: colors.fg),
         child: child,
       ),
     );

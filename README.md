@@ -88,12 +88,13 @@ flutter run -d macos -t lib/widgetbook.dart
 LinguaRay keeps interface code and capabilities separate:
 
 ```text
-Flutter UI → controllers → platform services / UniFFI → Rust runtime
+Material 3 views → Riverpod view models → application ports → adapters → Rust
 ```
 
-- `apps/desktop/flutter` contains the desktop host, routes, controllers, and
-  platform integrations.
-- `packages/ui_flutter` is the reusable Flutter design system.
+- `apps/desktop/flutter` contains the desktop host, routes, view models,
+  adapters, and platform integrations.
+- `packages/application` contains pure Dart use cases, models, and ports.
+- `packages/ui_flutter` applies the LinguaRay brand to Material 3.
 - `packages/runtime` exposes the Rust runtime to Dart and Swift through UniFFI.
 - `crates` contains translation, OCR, provider, settings, and shared core logic.
 

@@ -1,32 +1,34 @@
 /// The LinguaRay design system for Flutter.
 ///
-/// The LinguaRay design-system atoms: tokens, four themes, and widgets under
-/// plain, generic names.
+/// Material 3 is the foundation for every new LinguaRay screen. The
+/// [LinguaRayMaterialTheme] projects the brand colors, typography, shapes, and
+/// accessible desktop control sizes onto Flutter's maintained components.
 ///
 /// The boundary is deliberate: nothing here knows a LinguaRay
 /// concept. The product's own widgets that compose these — the language pair,
 /// the glossary mark, the provider row, the floating ball — live in the app, at
 /// `apps/desktop/flutter/lib/src/widgets/`.
 ///
-/// Several of the exported names (`Badge`, `Button`, `Checkbox`, `Dialog`,
-/// `Divider`, `IconButton`, `Radio`, `Step`, `Switch`) are also Material's. This
-/// package never imports Material, so nothing clashes internally, but an app
-/// that uses both should import one of them with a prefix:
+/// The generic legacy atoms remain exported while existing settings and window
+/// chrome migrate. Their names can overlap Material widgets, so code touching
+/// those surfaces should import this package with an explicit `show` list or a
+/// prefix:
 ///
 /// ```dart
 /// import 'package:linguaray_ui/linguaray_ui.dart' as ui;
 /// ```
 ///
-/// Wrap the tree in a [DesignThemeProvider] to establish the palette:
+/// New surfaces establish their theme with:
 ///
 /// ```dart
-/// DesignThemeProvider(
-///   theme: DesignThemeName.studioLight,
-///   child: ui.Button(variant: ui.ButtonVariant.primary, child: Text('翻译')),
+/// Theme(
+///   data: ui.LinguaRayMaterialTheme.light(),
+///   child: const TranslationView(),
 /// )
 /// ```
 library;
 
+export 'src/theme/material_theme.dart';
 export 'src/theme/text_styles.dart';
 export 'src/theme/theme.dart';
 export 'src/theme/themes.dart';

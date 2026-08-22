@@ -54,7 +54,9 @@ class LlmStream {
     );
 
     try {
-      runtime.llm(providerId: providerId).translateStream(
+      runtime
+          .llm(providerId: providerId)
+          .translateStream(
             sourceLang: sourceLang,
             targetLang: targetLang,
             text: text,
@@ -91,12 +93,10 @@ class _StreamCallbackImpl extends StreamCallback {
   final void Function(String error) _onError;
 
   _StreamCallbackImpl({
-    required void Function(String) onChunk,
-    required void Function(String) onFinish,
-    required void Function(String) onError,
-  })  : _onChunk = onChunk,
-        _onFinish = onFinish,
-        _onError = onError;
+    required this._onChunk,
+    required this._onFinish,
+    required this._onError,
+  });
 
   @override
   void onChunk(String content) => _onChunk(content);

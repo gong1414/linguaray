@@ -140,8 +140,9 @@ class ToastHostState extends State<ToastHost> {
                   icon: entry.icon,
                   action: entry.action,
                   // danger keeps its ✕; timed toasts just leave on their own.
-                  onDismiss:
-                      entry.remaining == null ? () => _dismiss(entry) : null,
+                  onDismiss: entry.remaining == null
+                      ? () => _dismiss(entry)
+                      : null,
                   child: Text(entry.message),
                 ),
               ),

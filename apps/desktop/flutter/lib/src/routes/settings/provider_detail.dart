@@ -106,8 +106,8 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     });
     try {
       final models = await runtime.settings().listModels(
-            providerId: widget.provider.id,
-          );
+        providerId: widget.provider.id,
+      );
       if (!mounted) return;
       setState(() => _models = models);
     } catch (_) {
@@ -137,10 +137,10 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
         existingFields: _persistedFields,
       );
       final provider = await runtime.settings().updateProvider(
-            providerId: widget.provider.id,
-            providerType: providerTypeValue(widget.provider.type),
-            fields: protectedFields,
-          );
+        providerId: widget.provider.id,
+        providerType: providerTypeValue(widget.provider.type),
+        fields: protectedFields,
+      );
       await providerCredentialsController.hydrateProvider(provider);
       _persistedFields = Map<String, String>.of(provider.fields);
       for (final entry in _fieldControllers.entries) {

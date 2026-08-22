@@ -908,6 +908,68 @@ impl RuntimeSettings {
         .map_err(|e: String| RuntimeError::from(e))
     }
 
+    /// Validates and probes a provider without changing persisted settings or
+    /// the process-wide runtime engine. The caller supplies credentials read
+    /// from secure storage; they live only in this temporary provider object.
+    ///
+    /// LLM providers are probed by listing models. Traditional translation
+    /// providers translate a small fixed phrase. The returned number is the
+    /// model count for LLM providers and zero for traditional providers.
+    pub async fn test_provider(
+        &self,
+        provider_id: String,
+        provider_type: String,
+        fields: HashMap<String, String>,
+    ) -> Result<u32, RuntimeError> {
+        let provider_id = validate_provider_id(provider_id).map_err(RuntimeError::from)?;
+        let provider_type =
+            validate_required("provider_type", provider_type).map_err(RuntimeError::from)?;
+        let provider_type = crate::domain::settings::parse_provider_type(&provider_type)
+            .map_err(RuntimeError::from)?;
+        let entry = ProviderConfigEntry {
+            id: provider_id.clone(),
+            r#type: provider_type,
+            fields,
+            created_at: None,
+        };
+        let config = crate::domain::settings::provider_config_from_settings(&entry)
+            .map_err(RuntimeError::from)?;
+        let mut providers = std::collections::BTreeMap::new();
+        providers.insert(provider_id.clone(), config);
+        let engine = engine::build_from_engine_config(linguaray_engine::EngineConfig { providers })
+            .map_err(RuntimeError::from)?;
+        let provider = engine
+            .require(&provider_id)
+            .map_err(|error| RuntimeError::from(error.to_string()))?
+            .clone();
+
+        run_on_worker_thread(move || async move {
+            if provider.llm().is_some() {
+                let models = provider
+                    .list_models()
+                    .await
+                    .map_err(|error| error.to_string())?;
+                return u32::try_from(models.len())
+                    .map_err(|_| "provider returned too many models".to_owned());
+            }
+
+            let translation = provider
+                .translation()
+                .ok_or_else(|| "provider does not support translation".to_owned())?;
+            translation
+                .translate(TranslateRequest {
+                    source_language: Some("en".to_owned()),
+                    target_language: Some("zh-Hans".to_owned()),
+                    text: "Hello".to_owned(),
+                })
+                .await
+                .map_err(|error| error.to_string())?;
+            Ok(0)
+        })
+        .await
+        .map_err(RuntimeError::from)
+    }
+
     pub async fn get_service(
         &self,
         service_id: String,

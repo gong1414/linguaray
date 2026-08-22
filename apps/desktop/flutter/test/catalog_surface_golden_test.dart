@@ -3,27 +3,19 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:linguaray_desktop/src/theme/app_theme.dart';
-import 'package:linguaray_desktop/src/widgets/ui.dart'
-    show DesignFont, DesignThemeProvider, DesignTokens, DesignTypography;
 import 'package:linguaray_desktop/widgetbook.dart';
+import 'package:linguaray_ui/linguaray_ui.dart' show LinguaRayMaterialTheme;
 
 import 'support/golden_comparator.dart';
-
-const _fixedTypography = DesignTypography(
-  display: DesignFont(family: 'Golden Sans'),
-  sans: DesignFont(family: 'Golden Sans'),
-  cjk: DesignFont(family: 'Golden Sans'),
-  label: DesignFont(family: 'Golden Sans'),
-  mono: DesignFont(family: 'Golden Mono'),
-);
 
 void main() {
   installGoldenComparator();
 
   setUpAll(() async {
     await _loadFont('Golden Sans', 'resources/fonts/MiSans-Regular.ttf');
+    await _loadFont('MiSans', 'resources/fonts/MiSans-Regular.ttf');
     await _loadFont('Golden Mono', 'resources/fonts/RobotoMono-Regular.ttf');
+    await _loadFont('MaterialIcons', 'fonts/MaterialIcons-Regular.otf');
     await _loadFont(
       'packages/fluentui_system_icons/FluentSystemIcons-Regular',
       'packages/fluentui_system_icons/fonts/FluentSystemIcons-Regular.ttf',
@@ -38,34 +30,61 @@ void main() {
     final states = buildCatalogGoldenStates(platform: target);
     for (final brightness in Brightness.values) {
       for (final entry in states.entries) {
-        testWidgets('${entry.key} ${brightness.name} $platform',
-            (tester) async {
+        testWidgets('${entry.key} ${brightness.name} $platform', (
+          tester,
+        ) async {
           tester.view.devicePixelRatio = 1;
           tester.view.physicalSize = const Size(1000, 700);
           addTearDown(tester.view.reset);
 
-          final DesignTokens tokens = tokensFor(brightness).copyWith(
-            typography: _fixedTypography,
+          final baseTheme = LinguaRayMaterialTheme.forBrightness(brightness);
+          final fixedTextTheme = baseTheme.textTheme.apply(
+            fontFamily: 'Golden Sans',
+          );
+          final theme = baseTheme.copyWith(
+            platform: target,
+            textTheme: fixedTextTheme,
+            listTileTheme: baseTheme.listTileTheme.copyWith(
+              titleTextStyle: fixedTextTheme.titleMedium,
+              subtitleTextStyle: fixedTextTheme.bodyMedium?.copyWith(
+                color: baseTheme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            navigationRailTheme: baseTheme.navigationRailTheme.copyWith(
+              selectedLabelTextStyle: fixedTextTheme.labelMedium?.copyWith(
+                color: baseTheme.colorScheme.primary,
+                fontWeight: FontWeight.w600,
+              ),
+              unselectedLabelTextStyle: fixedTextTheme.labelMedium?.copyWith(
+                color: baseTheme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            chipTheme: baseTheme.chipTheme.copyWith(
+              labelStyle: fixedTextTheme.labelMedium,
+            ),
+            filledButtonTheme: FilledButtonThemeData(
+              style: baseTheme.filledButtonTheme.style?.copyWith(
+                textStyle: WidgetStatePropertyAll(fixedTextTheme.labelLarge),
+              ),
+            ),
+            outlinedButtonTheme: OutlinedButtonThemeData(
+              style: baseTheme.outlinedButtonTheme.style?.copyWith(
+                textStyle: WidgetStatePropertyAll(fixedTextTheme.labelLarge),
+              ),
+            ),
           );
           await tester.pumpWidget(
-            Theme(
-              data: appThemeData(tokens),
-              child: DesignThemeProvider(
-                tokens: tokens,
-                child: Directionality(
-                  textDirection: TextDirection.ltr,
-                  child: RepaintBoundary(
-                    key: const ValueKey('catalog-golden'),
-                    child: SizedBox(
-                      width: 1000,
-                      height: 700,
-                      child: ColoredBox(
-                        color: tokens.colors.canvas,
-                        child: Center(
-                          child: entry.value,
-                        ),
-                      ),
-                    ),
+            MaterialApp(
+              debugShowCheckedModeBanner: false,
+              theme: theme,
+              home: RepaintBoundary(
+                key: const ValueKey('catalog-golden'),
+                child: SizedBox(
+                  width: 1000,
+                  height: 700,
+                  child: ColoredBox(
+                    color: theme.scaffoldBackgroundColor,
+                    child: Center(child: entry.value),
                   ),
                 ),
               ),

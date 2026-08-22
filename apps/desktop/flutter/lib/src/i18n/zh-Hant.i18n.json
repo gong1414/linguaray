@@ -268,7 +268,13 @@
       "quality_hint": "譯文產生後計算。",
       "shortcuts": "快捷鍵",
       "other_services_disabled": "其他服務已停用",
-      "input_hint_translate_to": "輸入或貼上要翻譯的文字，翻譯為$language"
+      "input_hint_translate_to": "輸入或貼上要翻譯的文字，翻譯為$language",
+      "clear": "清除",
+      "swap_languages": "交換語言",
+      "services": "翻譯服務",
+      "configure_services": "設定服務",
+      "retry": "重試",
+      "character_count": "$count 個字元"
     },
     "status": {
       "runtime_ready": "翻譯執行環境已就緒",

@@ -77,28 +77,29 @@ class _ToastState extends State<Toast> with SingleTickerProviderStateMixin {
     final tokens = context.tokens;
     final colors = tokens.colors;
 
-    final icon = widget.icon ??
+    final icon =
+        widget.icon ??
         switch (widget.tone) {
           ToastTone.neutral => Icon(
-              FluentIcons.info_20_filled,
-              size: 16,
-              color: colors.fgSubtle,
-            ),
+            FluentIcons.info_20_filled,
+            size: 16,
+            color: colors.fgSubtle,
+          ),
           ToastTone.success => Icon(
-              FluentIcons.checkmark_circle_20_filled,
-              size: 16,
-              color: colors.success,
-            ),
+            FluentIcons.checkmark_circle_20_filled,
+            size: 16,
+            color: colors.success,
+          ),
           ToastTone.warn => Icon(
-              FluentIcons.warning_20_filled,
-              size: 16,
-              color: colors.warnStrong,
-            ),
+            FluentIcons.warning_20_filled,
+            size: 16,
+            color: colors.warnStrong,
+          ),
           ToastTone.danger => Icon(
-              FluentIcons.dismiss_circle_20_filled,
-              size: 16,
-              color: colors.danger,
-            ),
+            FluentIcons.dismiss_circle_20_filled,
+            size: 16,
+            color: colors.danger,
+          ),
         };
 
     // Same elevation language as MiniWindow/Dialog — a bright floating card,
@@ -167,10 +168,7 @@ class _ToastState extends State<Toast> with SingleTickerProviderStateMixin {
             opacity: t.clamp(0.0, 1.0),
             child: Transform.translate(
               offset: Offset(0, 10 * (1 - t)),
-              child: Transform.scale(
-                scale: 0.98 + 0.02 * t,
-                child: child,
-              ),
+              child: Transform.scale(scale: 0.98 + 0.02 * t, child: child),
             ),
           );
         },
@@ -206,11 +204,8 @@ class _DismissButton extends StatelessWidget {
         child: TweenAnimationBuilder<Color?>(
           duration: kTransitionDuration,
           tween: ColorTween(end: state.hovered ? colors.fg : colors.fgMuted),
-          builder: (context, color, _) => Icon(
-            FluentIcons.dismiss_20_regular,
-            size: 14,
-            color: color,
-          ),
+          builder: (context, color, _) =>
+              Icon(FluentIcons.dismiss_20_regular, size: 14, color: color),
         ),
       ),
     );
@@ -239,8 +234,9 @@ class ToastViewport extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ordered =
-        placement == ToastPlacement.top ? children.reversed.toList() : children;
+    final ordered = placement == ToastPlacement.top
+        ? children.reversed.toList()
+        : children;
 
     return Positioned(
       left: 0,

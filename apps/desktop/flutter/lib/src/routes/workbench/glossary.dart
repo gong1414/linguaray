@@ -137,9 +137,9 @@ class _WorkbenchGlossaryPageState extends State<WorkbenchGlossaryPage> {
   }
 
   static List<String> _parseForbidden(String value) => [
-        for (final part in value.split('/'))
-          if (part.trim().isNotEmpty) part.trim(),
-      ];
+    for (final part in value.split('/'))
+      if (part.trim().isNotEmpty) part.trim(),
+  ];
 
   // ── Book editing ───────────────────────────────────────────────────────
 
@@ -280,7 +280,7 @@ class _WorkbenchGlossaryPageState extends State<WorkbenchGlossaryPage> {
                         entry.enabled
                             ? '${entry.name} ${entry.entryCount}'
                             : '${entry.name} · '
-                                '${t.workbench.glossary_page.disabled}',
+                                  '${t.workbench.glossary_page.disabled}',
                       ),
                     ),
                   RailAction(
@@ -291,9 +291,7 @@ class _WorkbenchGlossaryPageState extends State<WorkbenchGlossaryPage> {
               ),
               Expanded(
                 child: book == null && _header != _HeaderMode.creating
-                    ? _NoBooks(
-                        onCreate: _openNewBookDialog,
-                      )
+                    ? _NoBooks(onCreate: _openNewBookDialog)
                     : Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
@@ -609,8 +607,9 @@ class _WorkbenchGlossaryPageState extends State<WorkbenchGlossaryPage> {
             style: tokens.typography.sansStyle(
               fontSize: 11,
               height: 1,
-              color:
-                  error == null ? tokens.colors.fgSubtle : tokens.colors.danger,
+              color: error == null
+                  ? tokens.colors.fgSubtle
+                  : tokens.colors.danger,
             ),
           ),
         ),

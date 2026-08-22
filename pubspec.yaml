@@ -3,10 +3,11 @@ publish_to: "none"
 repository: https://github.com/gong1414/linguaray
 
 environment:
-  sdk: ">=3.6.0 <4.0.0"
+  sdk: ">=3.13.1 <4.0.0"
 
 workspace:
   - apps/desktop/flutter
+  - packages/application
   - packages/runtime
   - packages/ui_flutter
 

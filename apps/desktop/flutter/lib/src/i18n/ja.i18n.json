@@ -268,7 +268,13 @@
       "quality_hint": "訳文の生成後に計算されます。",
       "shortcuts": "ショートカット",
       "other_services_disabled": "他のサービスは無効です",
-      "input_hint_translate_to": "翻訳するテキストを入力または貼り付け、$languageに翻訳"
+      "input_hint_translate_to": "翻訳するテキストを入力または貼り付け、$languageに翻訳",
+      "clear": "クリア",
+      "swap_languages": "言語を入れ替える",
+      "services": "翻訳サービス",
+      "configure_services": "サービスを設定",
+      "retry": "再試行",
+      "character_count": "$count 文字"
     },
     "status": {
       "runtime_ready": "翻訳ランタイム準備完了",

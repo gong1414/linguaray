@@ -15,13 +15,13 @@ const _kThin = '\u2009';
 /// ⌘ is a Mac keyboard's; elsewhere the key in that position is Ctrl, and
 /// `TextField` accepts it there for the same mode.
 String inputSubmitShortcutGlyphs(InputSubmitMode mode) => switch (mode) {
-      InputSubmitMode.enter => '⏎',
-      InputSubmitMode.commandEnter => kIsMacOS ? '⌘$_kThin⏎' : '⌃$_kThin⏎',
-    };
+  InputSubmitMode.enter => '⏎',
+  InputSubmitMode.commandEnter => kIsMacOS ? '⌘$_kThin⏎' : '⌃$_kThin⏎',
+};
 
 /// The key that writes a newline instead — the other half of 提交方式, and the
 /// one the hint under the box names. Whichever key does not submit does this.
 String inputNewlineShortcutGlyphs(InputSubmitMode mode) => switch (mode) {
-      InputSubmitMode.enter => '⇧$_kThin⏎',
-      InputSubmitMode.commandEnter => '⏎',
-    };
+  InputSubmitMode.enter => '⇧$_kThin⏎',
+  InputSubmitMode.commandEnter => '⏎',
+};

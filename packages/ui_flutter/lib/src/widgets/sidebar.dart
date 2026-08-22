@@ -274,7 +274,8 @@ class _ResizableColumnState extends State<_ResizableColumn> {
     final right = event.logicalKey == LogicalKeyboardKey.arrowRight;
     if (!left && !right) return KeyEventResult.ignored;
     final pressed = HardwareKeyboard.instance.logicalKeysPressed;
-    final coarse = pressed.contains(LogicalKeyboardKey.shiftLeft) ||
+    final coarse =
+        pressed.contains(LogicalKeyboardKey.shiftLeft) ||
         pressed.contains(LogicalKeyboardKey.shiftRight);
     final step = coarse ? _kCoarseKeyStep : _kKeyStep;
     widget.onWidthChange(_clamp(widget.width + (right ? step : -step)));
@@ -289,8 +290,9 @@ class _ResizableColumnState extends State<_ResizableColumn> {
     // up. The handle sits just inside the edge, because Flutter drops any
     // pointer that falls outside a box — a handle hanging over the pane beside
     // it would lose those pixels to that pane.
-    final indicatorOpacity =
-        _dragging || _focused ? 1.0 : (_hovered ? 0.6 : 0.0);
+    final indicatorOpacity = _dragging || _focused
+        ? 1.0
+        : (_hovered ? 0.6 : 0.0);
 
     return Stack(
       // The column keeps whatever constraints the Stack was handed, so a
@@ -440,8 +442,8 @@ class NavItem extends StatelessWidget {
             color: active
                 ? tokens.selection
                 : (state.hovered
-                    ? colors.accent.withValues(alpha: 0.08)
-                    : null),
+                      ? colors.accent.withValues(alpha: 0.08)
+                      : null),
             borderRadius: radius,
           ),
           child: DefaultTextStyle(
@@ -836,8 +838,9 @@ class Aside extends StatelessWidget {
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final minContentHeight =
-              constraints.maxHeight > 36 ? constraints.maxHeight - 36 : 0.0;
+          final minContentHeight = constraints.maxHeight > 36
+              ? constraints.maxHeight - 36
+              : 0.0;
           final pinsLastCard =
               children.length > 1 && children.last is SidebarCard;
 

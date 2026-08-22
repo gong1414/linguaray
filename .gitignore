@@ -23,6 +23,7 @@ __pycache__/
 *.pyd
 
 # Build artifacts
+**/build/
 **/dist/
 !assets/brand/linguaray/dist/
 !assets/brand/linguaray/dist/**

@@ -25,10 +25,7 @@ void main() {
         workArea: workArea,
       );
       expect(position, const Offset(842, 368));
-      expect(
-        workArea.contains(position),
-        isTrue,
-      );
+      expect(workArea.contains(position), isTrue);
       expect(position.dx + size.width, lessThanOrEqualTo(workArea.right));
       expect(position.dy + size.height, lessThanOrEqualTo(workArea.bottom));
     });

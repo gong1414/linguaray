@@ -117,12 +117,12 @@ class _ServicesSettingsPageState extends State<ServicesSettingsPage> {
 
     try {
       await runtime.settings().updateService(
-            serviceId: draft.id,
-            providerId: draft.providerId,
-            serviceType: draft.type,
-            name: draft.name,
-            fields: draft.fields,
-          );
+        serviceId: draft.id,
+        providerId: draft.providerId,
+        serviceType: draft.type,
+        name: draft.name,
+        fields: draft.fields,
+      );
       await settingsStore.reloadServices();
     } catch (error) {
       // The runtime refuses a service it cannot construct — a bad key, an
@@ -179,12 +179,12 @@ class _ServicesSettingsPageState extends State<ServicesSettingsPage> {
     }
     try {
       await runtime.settings().updateService(
-            serviceId: service.id,
-            providerId: service.providerId,
-            serviceType: service.type,
-            name: service.name,
-            fields: fields,
-          );
+        serviceId: service.id,
+        providerId: service.providerId,
+        serviceType: service.type,
+        name: service.name,
+        fields: fields,
+      );
       await settingsStore.reloadServices();
     } catch (error) {
       if (mounted) setState(() => _errorMessage = error.toString());
@@ -209,11 +209,11 @@ class _ServicesSettingsPageState extends State<ServicesSettingsPage> {
     final id = providerIdOfService(serviceId);
     final patch = switch (type) {
       ServiceType.translation => GeneralSettingsPatch(
-          defaultTranslationService: id,
-        ),
+        defaultTranslationService: id,
+      ),
       ServiceType.dictionary => GeneralSettingsPatch(
-          defaultDirectoryService: id,
-        ),
+        defaultDirectoryService: id,
+      ),
       ServiceType.ocr => GeneralSettingsPatch(defaultOcrService: id),
       ServiceType.llm => null,
     };

@@ -18,12 +18,13 @@ import 'ui.dart'
 /// Which chrome the shell draws, derived from the real OS. macOS maps to null
 /// so [WindowTitlebar] keeps its default — null means macOS.
 WindowPlatform? _shellPlatform(TargetPlatform? targetPlatform) {
-  final platform = targetPlatform ??
+  final platform =
+      targetPlatform ??
       (kIsWindows
           ? TargetPlatform.windows
           : kIsLinux
-              ? TargetPlatform.linux
-              : TargetPlatform.macOS);
+          ? TargetPlatform.linux
+          : TargetPlatform.macOS);
   return switch (platform) {
     TargetPlatform.windows => WindowPlatform.windows,
     TargetPlatform.linux => WindowPlatform.linux,
@@ -181,19 +182,19 @@ class Workbench extends StatelessWidget {
                 Sidebar(
                   header: isMacChrome
                       ? (onToggleCollapsed == null
-                          ? const SizedBox.shrink()
-                          : Row(
-                              children: [
-                                const Spacer(),
-                                IconActionButton(
-                                  icon: FluentIcons
-                                      .panel_left_contract_20_regular,
-                                  iconSize: 16,
-                                  tooltip: '收起侧边栏',
-                                  onPressed: onToggleCollapsed,
-                                ),
-                              ],
-                            ))
+                            ? const SizedBox.shrink()
+                            : Row(
+                                children: [
+                                  const Spacer(),
+                                  IconActionButton(
+                                    icon: FluentIcons
+                                        .panel_left_contract_20_regular,
+                                    iconSize: 16,
+                                    tooltip: '收起侧边栏',
+                                    onPressed: onToggleCollapsed,
+                                  ),
+                                ],
+                              ))
                       // The strip doubles as titlebar on these platforms, so
                       // the whole band drags, not just the mark.
                       : _TitlebarDragArea(

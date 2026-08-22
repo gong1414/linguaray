@@ -54,9 +54,9 @@ class _WorkbenchLibraryPageState extends State<WorkbenchLibraryPage> {
   /// The rows a footer action applies to. Only a selection has them now: a
   /// single record is acted on from the row itself.
   List<HistoryEntry> get _selectedEntries => [
-        for (final entry in _rows)
-          if (_selected.contains(entry.id)) entry,
-      ];
+    for (final entry in _rows)
+      if (_selected.contains(entry.id)) entry,
+  ];
 
   @override
   void initState() {
@@ -190,9 +190,7 @@ class _WorkbenchLibraryPageState extends State<WorkbenchLibraryPage> {
                   RailItem(
                     active: _store.filter == HistoryFilter.edited,
                     onPressed: () => _setFilter(HistoryFilter.edited),
-                    child: Text(
-                      '${strings.edited} ${_store.counts.edited}',
-                    ),
+                    child: Text('${strings.edited} ${_store.counts.edited}'),
                   ),
                 ],
               ),
@@ -265,10 +263,7 @@ class _WorkbenchLibraryPageState extends State<WorkbenchLibraryPage> {
     if (_store.error != null && _rows.isEmpty) {
       return EmptyState(
         title: Text(strings.load_failed),
-        action: Button(
-          onPressed: _store.reload,
-          child: Text(strings.retry),
-        ),
+        action: Button(onPressed: _store.reload, child: Text(strings.retry)),
       );
     }
     if (_rows.isEmpty) {
@@ -380,15 +375,15 @@ class _WorkbenchLibraryPageState extends State<WorkbenchLibraryPage> {
 
   Widget _buildRow(HistoryEntry entry) {
     final strings = t.workbench.history_page;
-    final time = DateFormat('yyyy-MM-dd HH:mm').format(
-      DateTime.fromMillisecondsSinceEpoch(entry.createdAt * 1000),
-    );
+    final time = DateFormat('yyyy-MM-dd HH:mm')
+        .format(DateTime.fromMillisecondsSinceEpoch(entry.createdAt * 1000));
     final flags = [
       if (entry.favorite) strings.favorite_flag,
       if (entry.edited) strings.edited_flag,
     ];
-    final active =
-        _selecting ? _selected.contains(entry.id) : entry.id == _activeId;
+    final active = _selecting
+        ? _selected.contains(entry.id)
+        : entry.id == _activeId;
     return ListCard(
       eyebrow: Text(
         entry.serviceName.isEmpty ? entry.serviceId : entry.serviceName,

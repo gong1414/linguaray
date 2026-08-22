@@ -28,9 +28,9 @@ void main() {
   void putOnClipboard(String? text) {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(SystemChannels.platform, (call) async {
-      if (call.method != 'Clipboard.getData') return null;
-      return text == null ? null : <String, Object?>{'text': text};
-    });
+          if (call.method != 'Clipboard.getData') return null;
+          return text == null ? null : <String, Object?>{'text': text};
+        });
     addTearDown(() {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(SystemChannels.platform, null);
@@ -40,7 +40,9 @@ void main() {
   /// Mounts a focused multiline field. `MaterialApp` is what carries
   /// `DefaultTextEditingShortcuts`, which is what turns ⌃V into a paste.
   Future<TextEditingController> pump(
-      WidgetTester tester, String initial) async {
+    WidgetTester tester,
+    String initial,
+  ) async {
     final controller = TextEditingController(text: initial);
     addTearDown(controller.dispose);
     await tester.pumpWidget(

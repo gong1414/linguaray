@@ -162,6 +162,46 @@ fn hydrated_provider_secrets_never_enter_settings_json() {
 }
 
 #[test]
+fn provider_probe_does_not_mutate_settings() {
+    let runtime = create_runtime();
+
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async {
+            let settings = runtime.clone().settings();
+            let before = settings
+                .get_json()
+                .await
+                .expect("failed to read settings before probe");
+
+            let result = settings
+                .test_provider(
+                    "temporary-openai".to_owned(),
+                    "openai".to_owned(),
+                    HashMap::from([
+                        ("apiKey".to_owned(), "temporary-secret".to_owned()),
+                        ("defaultModel".to_owned(), String::new()),
+                    ]),
+                )
+                .await;
+
+            assert!(result.is_err(), "invalid temporary provider should fail");
+            let after = settings
+                .get_json()
+                .await
+                .expect("failed to read settings after probe");
+            assert_eq!(after, before);
+            assert!(settings
+                .get_provider("temporary-openai".to_owned())
+                .await
+                .expect("failed to query provider")
+                .is_none());
+        });
+}
+
+#[test]
 fn reset_shortcuts_persists_rust_defaults_to_settings_file() {
     let data_dir = unique_data_dir();
     let settings_file = data_dir.join("settings.json");

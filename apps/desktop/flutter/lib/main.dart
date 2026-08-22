@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:linguaray_runtime/linguaray_runtime.dart' as linguaray_runtime;
 
 import 'src/i18n/i18n.dart';
@@ -43,6 +44,6 @@ Future<void> main() async {
   );
   debugPrint('[LinguaRay] Locale initialized.');
 
-  runApp(const RootView());
+  runApp(const ProviderScope(child: RootView()));
   debugPrint('[LinguaRay] Root widget mounted.');
 }

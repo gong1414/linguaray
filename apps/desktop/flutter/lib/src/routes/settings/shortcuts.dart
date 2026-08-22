@@ -34,44 +34,46 @@ enum _Binding {
 
 extension on _Binding {
   String read(ShortcutSettings shortcuts) => switch (this) {
-        _Binding.toggleMiniTranslator => shortcuts.toggleMiniTranslator,
-        _Binding.extractTextFromScreenSelection =>
-          shortcuts.extractTextFromScreenSelection,
-        _Binding.extractTextFromScreenCapture =>
-          shortcuts.extractTextFromScreenCapture,
-        _Binding.extractTextFromClipboard => shortcuts.extractTextFromClipboard,
-      };
+    _Binding.toggleMiniTranslator => shortcuts.toggleMiniTranslator,
+    _Binding.extractTextFromScreenSelection =>
+      shortcuts.extractTextFromScreenSelection,
+    _Binding.extractTextFromScreenCapture =>
+      shortcuts.extractTextFromScreenCapture,
+    _Binding.extractTextFromClipboard => shortcuts.extractTextFromClipboard,
+  };
 
   ShortcutSettingsPatch patch(String value) => switch (this) {
-        _Binding.toggleMiniTranslator =>
-          ShortcutSettingsPatch(toggleMiniTranslator: value),
-        _Binding.extractTextFromScreenSelection =>
-          ShortcutSettingsPatch(extractTextFromScreenSelection: value),
-        _Binding.extractTextFromScreenCapture =>
-          ShortcutSettingsPatch(extractTextFromScreenCapture: value),
-        _Binding.extractTextFromClipboard =>
-          ShortcutSettingsPatch(extractTextFromClipboard: value),
-      };
+    _Binding.toggleMiniTranslator => ShortcutSettingsPatch(
+      toggleMiniTranslator: value,
+    ),
+    _Binding.extractTextFromScreenSelection => ShortcutSettingsPatch(
+      extractTextFromScreenSelection: value,
+    ),
+    _Binding.extractTextFromScreenCapture => ShortcutSettingsPatch(
+      extractTextFromScreenCapture: value,
+    ),
+    _Binding.extractTextFromClipboard => ShortcutSettingsPatch(
+      extractTextFromClipboard: value,
+    ),
+  };
 
   String get label => switch (this) {
-        _Binding.toggleMiniTranslator =>
-          t.settings.shortcuts.row.toggle_mini_translator,
-        _Binding.extractTextFromScreenSelection =>
-          t.settings.shortcuts.row.extract_text_from_screen_selection,
-        _Binding.extractTextFromScreenCapture =>
-          t.settings.shortcuts.row.extract_text_from_screen_capture,
-        _Binding.extractTextFromClipboard =>
-          t.settings.shortcuts.row.extract_text_from_clipboard,
-      };
+    _Binding.toggleMiniTranslator =>
+      t.settings.shortcuts.row.toggle_mini_translator,
+    _Binding.extractTextFromScreenSelection =>
+      t.settings.shortcuts.row.extract_text_from_screen_selection,
+    _Binding.extractTextFromScreenCapture =>
+      t.settings.shortcuts.row.extract_text_from_screen_capture,
+    _Binding.extractTextFromClipboard =>
+      t.settings.shortcuts.row.extract_text_from_clipboard,
+  };
 
   TriggerAction get action => switch (this) {
-        _Binding.toggleMiniTranslator => TriggerAction.toggleQuickWindow,
-        _Binding.extractTextFromScreenSelection =>
-          TriggerAction.translateSelection,
-        _Binding.extractTextFromScreenCapture =>
-          TriggerAction.captureAndTranslate,
-        _Binding.extractTextFromClipboard => TriggerAction.translateInput,
-      };
+    _Binding.toggleMiniTranslator => TriggerAction.toggleQuickWindow,
+    _Binding.extractTextFromScreenSelection => TriggerAction.translateSelection,
+    _Binding.extractTextFromScreenCapture => TriggerAction.captureAndTranslate,
+    _Binding.extractTextFromClipboard => TriggerAction.translateInput,
+  };
 }
 
 /// Every binding at its default — the state 恢复默认 returns the page to, and
@@ -255,10 +257,9 @@ class _ShortcutsSettingsPageState extends State<ShortcutsSettingsPage> {
     final text = t.settings.shortcuts;
     final atDefault =
         settingsStore.general.inputSubmitMode == InputSubmitMode.enter &&
-            _Binding.values.every(
-              (binding) =>
-                  binding.read(shortcuts) == _kDefaultBindings[binding],
-            );
+        _Binding.values.every(
+          (binding) => binding.read(shortcuts) == _kDefaultBindings[binding],
+        );
 
     return SettingsPage(
       children: [
@@ -269,9 +270,7 @@ class _ShortcutsSettingsPageState extends State<ShortcutsSettingsPage> {
             // The first run goes unlabelled — a single key that shows the
             // window is not a category.
             PreferenceSection(
-              children: [
-                _buildRow(_Binding.toggleMiniTranslator, shortcuts),
-              ],
+              children: [_buildRow(_Binding.toggleMiniTranslator, shortcuts)],
             ),
             PreferenceSection(
               label: Text(text.section.text_extraction),
@@ -335,9 +334,9 @@ class _ShortcutsSettingsPageState extends State<ShortcutsSettingsPage> {
         .firstOrNull;
     final registrationError =
         registration?.state == ShortcutRegistrationState.conflict ||
-                registration?.state == ShortcutRegistrationState.invalid
-            ? registration?.conflictReason
-            : null;
+            registration?.state == ShortcutRegistrationState.invalid
+        ? registration?.conflictReason
+        : null;
     final text = t.settings.shortcuts;
 
     return PreferenceRow(
@@ -349,8 +348,7 @@ class _ShortcutsSettingsPageState extends State<ShortcutsSettingsPage> {
                 conflict == null
                     ? registrationError!
                     : text.conflict(label: conflict.label),
-                style: DefaultTextStyle.of(context)
-                    .style
+                style: DefaultTextStyle.of(context).style
                     .copyWith(color: context.colors.dangerFg),
               ),
             ),

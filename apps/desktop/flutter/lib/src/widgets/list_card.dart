@@ -62,10 +62,7 @@ class ListCard extends StatelessWidget {
               opacity: hovered ? 1 : 0,
               child: IgnorePointer(
                 ignoring: !hovered,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: actions,
-                ),
+                child: Row(mainAxisSize: MainAxisSize.min, children: actions),
               ),
             ),
           ),

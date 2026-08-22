@@ -8,14 +8,13 @@ String? format(
   bool alt = false,
   bool shift = false,
   bool meta = false,
-}) =>
-    formatShortcut(
-      physicalKey: key,
-      control: control,
-      alt: alt,
-      shift: shift,
-      meta: meta,
-    );
+}) => formatShortcut(
+  physicalKey: key,
+  control: control,
+  alt: alt,
+  shift: shift,
+  meta: meta,
+);
 
 void main() {
   test('a key on its own is typing, not a shortcut', () {

@@ -53,8 +53,9 @@ void main() {
       expect(text.brightness, tokens.brightness);
     });
 
-    testOn(TargetPlatform.linux, 'dresses the Flutter selection to match',
-        (tester) async {
+    testOn(TargetPlatform.linux, 'dresses the Flutter selection to match', (
+      tester,
+    ) async {
       await pump(tester, const TranslationText('hello'));
 
       expect(
@@ -78,8 +79,9 @@ void main() {
       expect(field.brightness, tokens.brightness);
     });
 
-    testOn(TargetPlatform.linux, 'carries the accent into EditableText',
-        (tester) async {
+    testOn(TargetPlatform.linux, 'carries the accent into EditableText', (
+      tester,
+    ) async {
       await pump(tester, const TextField());
 
       final editable = tester.widget<EditableText>(
@@ -90,8 +92,9 @@ void main() {
     });
   });
 
-  testOn(TargetPlatform.macOS, 'a dark theme reaches AppKit as dark',
-      (tester) async {
+  testOn(TargetPlatform.macOS, 'a dark theme reaches AppKit as dark', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       Directionality(
         textDirection: TextDirection.ltr,

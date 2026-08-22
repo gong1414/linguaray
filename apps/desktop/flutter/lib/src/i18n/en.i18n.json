@@ -310,7 +310,19 @@
       "other_services_disabled": "Other services are disabled",
       "input_hint_translate_to": "Type or paste text to translate into $language",
       "newline_hint": "$key for a new line",
-      "failed_body": "This passage did not get a translation. Check your connection and retry, or expand to work through each service's reason."
+      "failed_body": "This passage did not get a translation. Check your connection and retry, or expand to work through each service's reason.",
+      "clear": "Clear",
+      "swap_languages": "Swap languages",
+      "services": "Translation services",
+      "configure_services": "Configure services",
+      "retry": "Try again",
+      "character_count": "$count characters",
+      "language_pair_not_installed": "Install this language pair in macOS Language & Region, then try again.",
+      "unsupported_language_pair": "The selected service does not support this language pair.",
+      "source_language_detection_failed": "The source language could not be detected. Choose it manually and try again.",
+      "network_error": "The translation service could not be reached. Check your connection and try again.",
+      "partial_failure": "$count services failed. Switch to inspect the reason.",
+      "streaming": "Writing translation…"
     },
     "status": {
       "runtime_ready": "Translation runtime ready",
@@ -606,6 +618,61 @@
       "license": "License",
       "open_changelog": "Open Changelog",
       "update": "Update"
+    },
+    "permissions": {
+      "title": "Permissions",
+      "windows_note": "Windows does not require extra permissions for selection or capture.",
+      "recheck": "Recheck"
+    }
+  },
+  "ui": {
+    "shell": {
+      "app_name": "LinguaRay",
+      "translate": "Translate",
+      "settings": "Settings",
+      "minimize": "Minimize",
+      "maximize": "Maximize",
+      "close": "Close"
+    },
+    "first_run": {
+      "title": "Set up LinguaRay",
+      "subtitle": "A few checks, then you can translate from any app.",
+      "permissions_title": "Permissions",
+      "permissions_body": "Selection translate and capture OCR need Accessibility and Screen Recording.",
+      "accessibility": "Accessibility",
+      "screen_recording": "Screen Recording",
+      "shortcuts_title": "Global shortcuts",
+      "shortcuts_body": "The four first-release actions are ready. Conflicts can be fixed later in Settings.",
+      "services_title": "Translation services",
+      "services_body": "Enable at least one translation service.",
+      "granted": "Granted",
+      "denied": "Not granted",
+      "not_required": "Not required on this system",
+      "unknown": "Unknown",
+      "checking": "Checking…",
+      "conflict": "A shortcut is in conflict. You can skip this and fix it in Settings.",
+      "no_provider": "No translation service is available yet.",
+      "ready": "A translation service is ready.",
+      "grant": "Grant access",
+      "recheck": "Recheck",
+      "configure_services": "Configure services",
+      "start": "Get started",
+      "skip": "Skip for now"
+    },
+    "quick": {
+      "title": "Quick translate",
+      "input_hint": "Type, paste, or fill from selection or capture",
+      "pin": "Pin window",
+      "unpin": "Unpin window",
+      "permission_denied": "Required system permissions are missing",
+      "permission_next": "Grant Accessibility or Screen Recording in System Settings, then return and recheck.",
+      "capture_cancelled": "Capture was cancelled. Your text was not changed."
+    },
+    "providers": {
+      "secret_stored": "Key saved in the system keychain",
+      "secret_placeholder": "Leave blank to keep the saved key",
+      "validation_missing": "Fill in the required fields.",
+      "save_failed": "The provider could not be saved. Check its settings and try again."
     }
   }
 }
