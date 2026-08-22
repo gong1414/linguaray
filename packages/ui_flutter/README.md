@@ -1,14 +1,12 @@
 # LinguaRay UI
 
-The reusable Flutter design system for LinguaRay. The internal package name
-remains `linguaray_ui` for upstream compatibility; user-facing branding
-and product components belong to LinguaRay.
+The reusable Flutter design system for LinguaRay, published internally as the
+`linguaray_ui` package.
 
-Primitives only, which is where React draws the line too: no translation,
-provider, glossary or language-pair concept reaches this package, and it ships
-no sample data. The product's own widgets and tokens live in the app, under
-`apps/desktop/flutter/lib/src/`, the way React's live in `apps/storybook/src/`.
-The [widget map](#widget-map) below names both halves.
+Primitives only: no translation, provider, glossary or language-pair concept
+reaches this package, and it ships no sample data. The product's own widgets
+and tokens live in the app, under `apps/desktop/flutter/lib/src/` — the
+[widget map](#widget-map) below names both halves.
 
 ## Using it
 
@@ -32,20 +30,15 @@ with a prefix, as above.
 
 ## Tokens
 
-`lib/src/theme/` mirrors `packages/ui/src/styles/` field for field, and inherits
-its split:
-
-| React | Flutter |
-| --- | --- |
-| `styles/constants.css` — what no theme may touch | the `DesignTokens` defaults for `metrics` and the type scale |
-| `styles/themes/*.css` — one file per theme | `DesignThemes.studioLight` and friends in `themes.dart` |
+`lib/src/theme/` splits into the `DesignTokens` defaults (`metrics` and the
+type scale) and one entry per palette in `themes.dart`
+(`DesignThemes.studioLight` and friends).
 
 **A theme may change exactly three families: colour, radii and shadows.** The
 structural constants — sidebar and titlebar sizes, the 11/12/13/15/17 type
 scale, the hairline unit — are the same in all four. Every field defaults to the
-**Studio Light** value, which is how the CSS is written too: `studio-light.css`
-doubles as the `:root` baseline and each `[data-theme=…]` block overrides only
-what it changes. A theme is therefore "the baseline, plus these overrides":
+**Studio Light** value, and each theme overrides only what it changes, so a
+theme reads as "the baseline, plus these overrides":
 
 ```dart
 DesignThemes.studioDark; // brightness, gradients, colours, shadows
@@ -61,86 +54,50 @@ context.radii;    // corner radii
 context.metrics;  // sidebar / titlebar / window sizes
 context.typography;
 context.shadows;
-context.themeName;     // which palette is active — React's useTheme()
+context.themeName;     // which palette is active
 context.hairlineWidth; // one device pixel
 ```
 
-Type recipes come off `DesignTypography` and match the CSS classes:
-`sansStyle`, `displayStyle`, `cjkStyle`, `monoStyle`, `labelStyle`
-(`.type-label`), `numericStyle` (`.type-numeric`).
+Type recipes come off `DesignTypography`: `sansStyle`, `displayStyle`,
+`cjkStyle`, `monoStyle`, `labelStyle`, `numericStyle`.
 
 Two unrelated things are called hairline: `context.hairlineWidth` is the
 separator's *width*, while its colour comes from `colors.hairline` /
 `hairlineStrong` / `hairlineSoft` (plus `accentHairline`, `warnHairline`,
 `dangerHairline`).
 
-The CSS calls a few families something else — `--corner-*`, `--elevation-*` and
-`--type-*` — only because `--radius-*`, `--shadow-*` and `--text-*` are
-Tailwind's own namespaces there. Both names exist on that side; Dart has no such
-clash and keeps `radii`, `shadows` and `typography`.
-
 ## Widget map
 
-| React (`packages/ui`) | Flutter |
-| --- | --- |
-| `Badge` | `Badge` |
-| `Button` | `Button` |
-| `Callout` | `Callout` |
-| `CheckboxOption` | `Checkbox` |
-| `RadioOption` / `RadioGroup` | `Radio` / `RadioList` |
-| `Toggle` | `Switch` |
-| `SegmentedControl` | `SegmentedControl` |
-| `PillTabs` | `Tabs` (+ `TabItem`) |
-| `OptionCard` | `OptionCard` |
-| `Kbd` | `Kbd` |
-| `SectionLabel` | `Label` |
-| `Surface` / `Divider` | `Surface` / `Divider` |
-| `Dialog*` | `Dialog`, `DialogHeader`, `DialogBody`, `DialogFooter` |
-| `EmptyState` | `EmptyState` |
-| `Field` / `Input` / `Textarea` / `Select` / `FieldValue` | `Field` / `Input` / `TextArea` / `Select` / `FieldValue` |
-| `SearchField` | `SearchField` |
-| `ProgressBar` / `Meter` / `Spinner` | `ProgressBar` / `Meter` / `Spinner` |
-| `Step` / `StepList` | `Step` / `StepList` |
-| `Table*` | `DataTable`, `DataTableHead`, `DataTableRow`, `DataTableCell` |
-| `MiniWindow` / `MiniPanel` | `PopoverWindow` / `PopoverPanel` |
-| `BrowserFrame` | `BrowserFrame` |
-| — | `FloatingToolbar` / `ToolbarSeparator` (in-page overlay bar; no React twin) |
-| `WindowFrame` and friends | `WindowFrame`, `WindowTitlebar`, `WindowBody`, `WindowMain`, `WindowContent`, `WindowFooter`, `TrafficLights` |
-| `Sidebar` and friends | `Sidebar`, `SidebarGroup`, `SidebarCard`, `NavItem`, `Rail`, `RailItem`, `Aside` |
-| `Stage` / `ActionBar` | `Stage` / `ActionBar` |
-| — | `Pressable`, `HoverRegion`, `FocusRing` (interaction primitives) |
+The atoms this package ships:
+
+`Badge`, `Button`, `Callout`, `Checkbox`, `Radio` (+ `RadioList`), `Switch`,
+`SegmentedControl`, `Tabs` (+ `TabItem`), `OptionCard`, `Kbd`, `Label`,
+`Surface` / `Divider`, `Dialog` / `DialogHeader` / `DialogBody` /
+`DialogFooter`, `EmptyState`, `Field` / `Input` / `TextArea` / `Select` /
+`FieldValue`, `SearchField`, `ProgressBar` / `Meter` / `Spinner`, `Step` /
+`StepList`, `DataTable` family, `PopoverWindow` / `PopoverPanel`,
+`BrowserFrame`, `FloatingToolbar` / `ToolbarSeparator` (in-page overlay bar),
+`WindowFrame` / `WindowTitlebar` / `WindowBody` / `WindowMain` /
+`WindowContent` / `WindowFooter` / `TrafficLights`, `Sidebar` /
+`SidebarGroup` / `SidebarCard` / `NavItem` / `Rail` / `RailItem` / `Aside`,
+`Stage` / `ActionBar`, and the interaction primitives `Pressable`,
+`HoverRegion`, `FocusRing`.
 
 ### In the app, not here
 
 The product's own widgets, for when you are looking one up and land here first.
 They live in `apps/desktop/flutter/lib/src/widgets/`, and take generic slots the
-same way the atoms do — the product words go in at the call site.
+same way the atoms do — the product words go in at the call site:
 
-| React (`apps/storybook/src/components`) | Flutter (`apps/desktop/flutter/lib/src/widgets`) |
-| --- | --- |
-| `ProviderAvatar` | `Avatar` (colour + glyph; no provider table) |
-| `ProviderListItem` | `ListTile` |
-| `HistoryItem` | `ListCard` |
-| `TermMark` | `Mark` |
-| `SourceBlock` | `TextBlock` |
-| `PreferredTranslation` | `HighlightBlock` |
-| `ServiceCard` | `TitledCard` |
-| `TermCard` | `InfoCard` |
-| `DictionaryEntry` | `DetailBlock` |
-| `ShortcutRow` | `SettingRow` |
-| `StatBlock` / `SegmentGauge` | `Stat` / `SegmentGauge` |
-| `SelectionBubble` | `PopoverCard` |
-| `PageThumb` | `Thumbnail` |
-| `LanguagePair` | `SwapPair` |
-| `FloatingBall` | `FloatingBall` |
-| `BilingualParagraph` | `AnnotatedParagraph` |
+`Avatar` (colour + glyph; no provider table), `ListTile`, `ListCard`, `Mark`,
+`TextBlock`, `HighlightBlock`, `TitledCard`, `InfoCard`, `DetailBlock`,
+`SettingRow`, `Stat` / `SegmentGauge`, `Thumbnail`, `SwapPair`.
 
 Their tokens moved with them, into
-`apps/desktop/flutter/lib/src/theme/product_tokens.dart` — the twin of React's
-`apps/storybook/src/styles/product.css`. Provider brand colours, the marker on a
-preferred translation, and the source / translation type recipes are all product
-concepts. They layer on top of the tokens here and are reached the same way,
-`context.product` beside `context.tokens`.
+`apps/desktop/flutter/lib/src/theme/product_tokens.dart`. Provider brand
+colours, the marker on a preferred translation, and the source / translation
+type recipes are all product concepts. They layer on top of the tokens here and
+are reached the same way, `context.product` beside `context.tokens`.
 
 ## Gallery
 
@@ -154,9 +111,9 @@ The product's widgets have their own gallery in the app, at `/debug/widgets`.
 
 ## Tests
 
-`test/widget_metrics_test.dart` asserts the fixed geometry the deck pins with
-Tailwind height utilities — the numbers a font's own line box would otherwise
-drift off (control heights, the switch box, the sidebar group's gaps).
+`test/widget_metrics_test.dart` asserts the fixed geometry — the numbers a
+font's own line box would otherwise drift off (control heights, the switch box,
+the sidebar group's gaps).
 
 `test/golden_test.dart` renders each block on its own at DPR 1 into
 `test/goldens/<block>.png`, ~10 KB each, so a regression names the block it
@@ -175,18 +132,15 @@ Both have twins on the app's side of the boundary, covering the widgets that
 live there: `test/business_widget_golden_test.dart` and
 `test/design_widget_alignment_test.dart`.
 
-## Notes on the port
+## Design notes
 
-- **Hairlines.** The CSS halves borders to 0.5px on Retina so a separator is
-  one device pixel. `context.hairlineWidth` does the same.
+- **Hairlines.** `context.hairlineWidth` resolves to half a logical pixel on
+  Retina so a separator is one device pixel.
 - **Line height.** Every recipe sets
-  `leadingDistribution: TextLeadingDistribution.even`, which is how CSS
-  distributes leading — without it a `leading-none` chip sits taller here than
-  on the web.
-- **Focus.** `:focus-visible { outline: 3px solid … }` becomes `FocusRing`,
-  a 3px stroke just outside the box following its corner radius, shown for
-  keyboard focus only.
-- **Selection.** `--selection` resolves to the accent while the window is
-  key; `WindowFrame(unfocused: true)` swaps in the unemphasized pair by
-  re-scoping the tokens, so every row inside picks it up without threading
-  state down.
+  `leadingDistribution: TextLeadingDistribution.even`; without it a
+  tight-leading chip sits taller than its design.
+- **Focus.** `FocusRing` is a 3px stroke just outside the box following its
+  corner radius, shown for keyboard focus only.
+- **Selection.** `--selection` resolves to the accent while the window is key;
+  `WindowFrame(unfocused: true)` swaps in the unemphasized pair by re-scoping
+  the tokens, so every row inside picks it up without threading state down.

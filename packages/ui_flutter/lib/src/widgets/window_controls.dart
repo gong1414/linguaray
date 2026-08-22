@@ -32,10 +32,9 @@ String _defaultLabel(CaptionButton button) => switch (button) {
 /// corner. Hover paints the whole strip — close in the system's red — rather
 /// than tinting the glyph, which is how DWM draws them.
 ///
-/// The React component is decorative, like `TrafficLights`; this port also
-/// accepts [onPressed] because on the Flutter side the cluster sits in a real
-/// window and has to answer for it. Left null, the strips stay inert, matching
-/// the deck.
+/// Like `TrafficLights`, the strips are decorative by default; this widget
+/// also accepts [onPressed] because the cluster sits in a real window and has
+/// to answer for it. Left null, the strips stay inert, matching the deck.
 ///
 /// The strips stretch to the band they sit in, so they expect a bounded
 /// height — the titlebar's.

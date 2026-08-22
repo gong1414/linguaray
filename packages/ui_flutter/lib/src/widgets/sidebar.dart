@@ -263,9 +263,9 @@ class _ResizableColumnState extends State<_ResizableColumn> {
     final colors = context.tokens.colors;
 
     // Nothing is drawn in the grab area: the separator itself is what lights
-    // up. React lets the handle straddle the edge; here it sits just inside,
-    // because Flutter drops any pointer that falls outside a box — a handle
-    // hanging over the pane beside it would lose those pixels to that pane.
+    // up. The handle sits just inside the edge, because Flutter drops any
+    // pointer that falls outside a box — a handle hanging over the pane beside
+    // it would lose those pixels to that pane.
     final indicatorOpacity =
         _dragging || _focused ? 1.0 : (_hovered ? 0.6 : 0.0);
 
@@ -339,7 +339,7 @@ class SidebarGroup extends StatelessWidget {
 
   final Widget? label;
 
-  /// The React source uses `first:mt-0`; set this on the first group.
+  /// Set this on the first group so it does not add the usual top margin.
   final bool first;
   final List<Widget> children;
 
@@ -613,8 +613,8 @@ class _RailState extends State<Rail> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           for (var i = 0; i < children.length; i++) ...[
-                            // RailAction maps to the React component's
-                            // `mt-auto`: the spacer eats the spare height, and
+                            // A RailAction as the last child pins to the
+                            // bottom: the spacer eats the spare height, and
                             // disappears once the list is long enough to
                             // scroll.
                             if (pinsLastItem && i == children.length - 1)
@@ -671,7 +671,7 @@ class RailGroup extends StatelessWidget {
 
   final Widget? label;
 
-  /// The React source uses `first:mt-0`; set this on the first run.
+  /// Set this on the first run so it does not add the usual top margin.
   final bool first;
   final List<Widget> children;
 
@@ -831,7 +831,7 @@ class Aside extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     for (var i = 0; i < children.length; i++) ...[
-                      // SidebarCard maps to the React component's `mt-auto`.
+                      // A SidebarCard as the last child pins to the bottom.
                       // The spacer consumes spare height but disappears once
                       // the content is tall enough to scroll.
                       if (pinsLastCard && i == children.length - 1)

@@ -1,13 +1,12 @@
 /// The LinguaRay design system for Flutter.
 ///
-/// A port of the React `@linguaray/ui` atoms: same tokens, same four
-/// themes, same widgets — under plain, generic names.
+/// The LinguaRay design-system atoms: tokens, four themes, and widgets under
+/// plain, generic names.
 ///
-/// The boundary is the React package's: nothing here knows a LinguaRay
+/// The boundary is deliberate: nothing here knows a LinguaRay
 /// concept. The product's own widgets that compose these — the language pair,
 /// the glossary mark, the provider row, the floating ball — live in the app, at
-/// `apps/desktop/flutter/lib/src/widgets/`, the way React's live in
-/// `apps/storybook/src/components`.
+/// `apps/desktop/flutter/lib/src/widgets/`.
 ///
 /// Several of the exported names (`Badge`, `Button`, `Checkbox`, `Dialog`,
 /// `Divider`, `IconButton`, `Radio`, `Step`, `Switch`) are also Material's. This

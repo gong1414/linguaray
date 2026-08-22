@@ -6,8 +6,7 @@ import 'package:linguaray_ui/src/theme/tokens.dart';
 /// Carries the active [DesignTokens] down the tree.
 ///
 /// Theming is a token swap, so providers can be nested or placed side by side —
-/// useful for showing two rounds on one page, exactly like the React package's
-/// `data-theme` attribute.
+/// useful for showing two rounds on one page.
 class DesignTheme extends InheritedWidget {
   const DesignTheme({super.key, required this.tokens, required super.child});
 
@@ -30,9 +29,8 @@ class DesignTheme extends InheritedWidget {
 /// Deliberately separate from [DesignTheme]: widgets re-scope *tokens* fairly
 /// often — the menu and select overlays carry them across into the app's
 /// overlay, [WindowFrame] swaps the selection pair — and none of those change
-/// which theme is active. React draws the same line, where a nested element may
-/// override CSS variables while `data-theme` stays on the provider and
-/// `useTheme()` walks past to find it.
+/// which theme is active. A nested subtree may swap the tokens it renders
+/// with, but the theme name stays what the enclosing scope set.
 ///
 /// The product layer needs this because it has tokens of its own that vary by
 /// theme (see the app's `product_tokens.dart`).
@@ -61,8 +59,7 @@ class DesignThemeProvider extends StatelessWidget {
   });
 
   /// Which palette is active. Still the subtree's identity when [tokens]
-  /// overrides the values, the way `data-theme` stays on the element no matter
-  /// what a consumer's own CSS does to the variables under it.
+  /// overrides the values, whatever a consumer re-scopes under it.
   final DesignThemeName theme;
 
   /// An explicit token set, for consumers that customise the palette.
@@ -89,11 +86,11 @@ class DesignThemeProvider extends StatelessWidget {
   }
 }
 
-/// Convenience accessors, mirroring how the React components reach for a token.
+/// Convenience accessors for the design tokens and palette in scope.
 extension DesignThemeContext on BuildContext {
   DesignTokens get tokens => DesignTheme.of(this);
 
-  /// The active palette — React's `useTheme().theme`.
+  /// The active palette.
   DesignThemeName get themeName => DesignThemeScope.of(this);
 
   DesignColors get colors => DesignTheme.of(this).colors;

@@ -45,8 +45,6 @@ class GlossaryBookDraft {
 /// 新建术语库 — opened from the rail's 新建术语库 and the 术语库 titlebar. A book
 /// is a name plus a language direction; 初始内容 either leaves it empty or seeds
 /// it from a CSV / TBX file.
-///
-/// Port of `apps/storybook/src/screens/new-glossary-dialog.tsx`.
 class NewGlossaryDialog extends StatefulWidget {
   const NewGlossaryDialog({
     super.key,
@@ -289,8 +287,6 @@ class GlossaryEntryDraft {
 ///
 /// 保存后继续添加 keeps it up and clears the fields, since terms are usually
 /// entered in runs; a term already in the target book turns 保存 into 覆盖.
-///
-/// Port of `apps/storybook/src/screens/add-term-dialog.tsx`.
 class AddTermDialog extends StatefulWidget {
   const AddTermDialog({
     super.key,

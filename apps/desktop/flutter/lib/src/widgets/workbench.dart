@@ -16,8 +16,7 @@ import 'ui.dart'
         WindowTitlebar;
 
 /// Which chrome the shell draws, derived from the real OS. macOS maps to null
-/// so [WindowTitlebar] keeps its default — the same convention as the React
-/// `platform` prop, where undefined means macOS.
+/// so [WindowTitlebar] keeps its default — null means macOS.
 WindowPlatform? _shellPlatform(TargetPlatform? targetPlatform) {
   final platform = targetPlatform ??
       (kIsWindows

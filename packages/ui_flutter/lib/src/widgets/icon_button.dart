@@ -6,9 +6,8 @@ import 'package:linguaray_ui/src/widgets/pressable.dart';
 /// clipboard, settings. AppKit style: no box by default, an accent read when
 /// [active], and a soft hover wash so the row still feels tappable.
 ///
-/// The glyph is a plain [Icon] (usually a `FluentIcons.*_20_regular`, the same
-/// set the React kit draws via `@fluentui/react-icons`); its colour is fed
-/// through [IconTheme], so pass it without an explicit colour.
+/// The glyph is a plain [Icon] (usually a `FluentIcons.*_20_regular`); its
+/// colour is fed through [IconTheme], so pass it without an explicit colour.
 class IconButton extends StatelessWidget {
   const IconButton({
     super.key,
@@ -20,21 +19,20 @@ class IconButton extends StatelessWidget {
     this.onPressed,
   });
 
-  /// Accessible name — the `aria-label` of the React component.
+  /// Accessible name, announced by screen readers.
   final String label;
 
   /// Persistent on-state — the pin button, for instance.
   final bool active;
 
-  /// Mirrors the `disabled` attribute React passes straight to the `<button>`.
   /// Kept separate from a null [onPressed] so a caller can grey the affordance
   /// out without having to drop the handler it already has.
   final bool enabled;
   final Widget icon;
 
-  /// Glyph size, fed through [IconTheme]. The React kit sets it per call site
-  /// on the `<Icon>` child — 18 in the mini-window toolbar, 16 in the sidebar
-  /// header, 13 on the document zoom stepper.
+  /// Glyph size, fed through [IconTheme]. It is set per call site — 18 in the
+  /// mini-window toolbar, 16 in the sidebar header, 13 on the document zoom
+  /// stepper.
   final double iconSize;
 
   final VoidCallback? onPressed;
@@ -57,10 +55,9 @@ class IconButton extends StatelessWidget {
             : (state.hovered ? colors.fg : colors.fgMuted);
 
         return Opacity(
-          // React leaves a disabled icon button to the browser's own `:disabled`
-          // rendering; on a `<button>` carrying no box that reads as no change
-          // at all, so both native ports dim the glyph instead and withhold the
-          // hover wash.
+          // The button carries no box by default, so a disabled one would
+          // otherwise read as no change at all — dim the glyph and withhold
+          // the hover wash instead.
           opacity: disabled ? 0.35 : 1,
           child: AnimatedContainer(
             duration: kTransitionDuration,

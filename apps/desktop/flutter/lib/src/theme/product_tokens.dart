@@ -1,8 +1,8 @@
 /// The tokens and type recipes only LinguaRay itself has a use for.
 ///
-/// The Flutter twin of `apps/storybook/src/styles/product.css`. The kit stays
-/// domain-free, so anything that encodes a product concept lives here instead:
-/// the provider brand colours, the marker on a preferred translation, and the
+/// The product's own tokens — the ones the domain-free kit must not know
+/// about. Anything that encodes a product concept lives here instead: the
+/// provider brand colours, the marker on a preferred translation, and the
 /// typography of a source / translation pair.
 ///
 /// Everything below layers on top of the kit's theme tokens and is reached the
@@ -22,9 +22,8 @@ import '../widgets/ui.dart'
 
 /// The tokens the product layer adds to the design system.
 ///
-/// Only [highlightGlow] varies by theme, so one const instance covers the other
-/// three palettes — the same shape as `product.css`, where a single `:root`
-/// block is followed by two `[data-theme=…]` overrides.
+/// Only [highlightGlow] varies by theme, so one const instance covers the
+/// other three palettes, with the glow overridden for Studio Dark.
 @immutable
 class ProductTokens {
   const ProductTokens({this.highlightGlow = const <BoxShadow>[]});
@@ -72,8 +71,8 @@ extension ProductTokensContext on BuildContext {
   ProductTokens get product => ProductTokens.forTheme(themeName);
 }
 
-/// The product's own type recipes — `.type-translation` and `.type-source` in
-/// `product.css`. They compose the kit's faces rather than redeclaring them.
+/// The product's own type recipes. They compose the kit's faces rather than
+/// redeclaring them.
 extension ProductTypographyStyles on DesignTypography {
   /// 译文正文：CJK face, larger and airier than the source text.
   TextStyle translationStyle({Color? color}) => cjkStyle(
