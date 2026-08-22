@@ -2,81 +2,98 @@
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/brand/linguaray/dist/readme/linguaray-readme-dark.svg">
     <source media="(prefers-color-scheme: light)" srcset="assets/brand/linguaray/dist/readme/linguaray-readme-light.svg">
-    <img alt="LinguaRay" src="assets/brand/linguaray/dist/readme/linguaray-readme-light.svg" width="560">
+    <img alt="LinguaRay" src="assets/brand/linguaray/dist/readme/linguaray-readme-light.svg" width="480">
   </picture>
 
-  <p>A privacy-first translator that stays one shortcut away.</p>
+  <p><strong>Translate text where you find it.</strong></p>
+  <p>A privacy-minded desktop translator for macOS and Windows, built with Flutter and Rust.</p>
 
   [![CI](https://github.com/gong1414/linguaray/actions/workflows/ci.yml/badge.svg)](https://github.com/gong1414/linguaray/actions/workflows/ci.yml)
-  [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-  [![Flutter](https://img.shields.io/badge/Flutter-3.47.1-02569B?logo=flutter)](https://flutter.dev/)
-  [![Platforms](https://img.shields.io/badge/platform-macOS%20%7C%20Windows-59636E)](#platform-support)
+  [![License: MIT](https://img.shields.io/badge/license-MIT-0F766E.svg)](LICENSE)
+  [![Flutter](https://img.shields.io/badge/Flutter-3.47.1-02569B?logo=flutter&logoColor=white)](https://flutter.dev/)
+  [![Platforms](https://img.shields.io/badge/platform-macOS%20%7C%20Windows-475569)](#platform-support)
 
   **English** · [简体中文](README-ZH.md)
 </div>
 
-## About
-
-LinguaRay is an open-source desktop translator for macOS and Windows. Select
-text, type or paste, or capture a screen region, then translate without moving
-your workflow into a browser tab.
+> [!IMPORTANT]
+> LinguaRay is in active pre-release development. The core workflows and
+> desktop builds are tested in CI, but there is no signed stable release yet.
+> For evaluation, run the application from source.
 
 <p align="center">
-  <img src="docs/images/workbench.png" alt="LinguaRay workbench translating English into Chinese" width="860">
+  <img src="docs/images/workbench.png" alt="LinguaRay translating English text into Simplified Chinese" width="900">
 </p>
 
-### Highlights
+## Why LinguaRay?
 
-- **One shortcut away** — open the quick translator, translate selected text,
-  or start a screen capture with configurable global shortcuts.
-- **Text and image translation** — handle selections, clipboard input, and
-  screenshot OCR through one focused interface.
-- **Provider choice** — use operating-system services or configure compatible
+Translation should be available inside the workflow you already have—not in
+another browser tab. LinguaRay combines a focused workbench with a compact
+translator that can be opened from the menu bar or a global shortcut.
+
+- **Text, selection, and screenshots** — translate typed or pasted text,
+  selected text from another app, or a captured screen region with OCR.
+- **Native desktop behavior** — menu-bar access, configurable shortcuts,
+  permission recovery, active-display placement, and DPI-aware windows.
+- **Provider choice** — use system capabilities or configure compatible
   translation providers without coupling the interface to one vendor.
-- **Private credentials** — API keys live in the operating system's secure
-  storage and are never written to the regular settings file.
-- **Native desktop behavior** — tray access, permission recovery, multi-display
-  placement, and platform-aware window handling.
-- **Inspectable UI** — important states are available in Widgetbook and covered
-  by golden tests.
+- **Private by design** — credentials remain in operating-system secure
+  storage; normal settings and UI state contain only secret references.
+- **UI and runtime are separate** — Flutter renders the experience while the
+  Rust runtime owns translation, OCR, providers, and persisted settings.
+
+## Current capabilities
+
+| Capability | Status |
+| --- | --- |
+| Input and clipboard translation | Implemented and covered by automated tests |
+| Quick translator and selected-text workflow | Implemented; requires platform permissions where applicable |
+| Screenshot capture and system OCR | Implemented for macOS and Windows |
+| Global shortcuts, tray access, and window placement | Implemented |
+| Provider configuration and secure credential storage | Implemented |
+| macOS and Windows desktop builds | Built and exercised by CI |
+| Signed installers and stable releases | Not published yet |
+
+History, dictionaries, TTS, auto-update, and Linux packages are outside the
+current release scope. Half-finished features stay hidden until they meet the
+same test and platform requirements as the core workflows.
 
 ## Platform support
 
-| Platform | Minimum | Status |
+| Platform | Minimum version | Build status |
 | --- | --- | --- |
-| macOS | 13.0 | Supported |
-| Windows | Windows 10 | Supported |
+| macOS | 13.0 | Supported in CI |
+| Windows | Windows 10 | Supported in CI |
 
-Linux is not part of the current release matrix.
+Linux is not currently supported.
 
-## Download
-
-Builds are published on the
-[Releases](https://github.com/gong1414/linguaray/releases) page. Until the first
-signed release is available, run LinguaRay from source using the steps below.
-
-> Public CI artifacts are unsigned unless a maintainer supplies platform
-> signing credentials.
-
-## Build from source
+## Run from source
 
 ### Prerequisites
 
 - [Flutter 3.47.1](https://docs.flutter.dev/install/archive) with Dart 3.13.1
 - the current stable [Rust toolchain](https://www.rust-lang.org/tools/install)
-- Xcode and CocoaPods on macOS, or Visual Studio with the Desktop development
-  with C++ workload on Windows
+- macOS: Xcode and CocoaPods
+- Windows: Visual Studio with the **Desktop development with C++** workload
+
+Confirm the desktop toolchain first:
+
+```bash
+flutter doctor
+```
+
+Then clone and run LinguaRay:
 
 ```bash
 git clone https://github.com/gong1414/linguaray.git
 cd linguaray
 dart pub get
 cd apps/desktop/flutter
-flutter run -d macos        # use windows on Windows
+flutter run -d macos        # use: flutter run -d windows on Windows
 ```
 
-Flutter hot reload is the normal way to adjust and inspect the interface. Run
-the component catalog independently with:
+Flutter hot reload is the normal UI development loop. The isolated component
+catalog is available through Widgetbook:
 
 ```bash
 cd apps/desktop/flutter
@@ -85,37 +102,65 @@ flutter run -d macos -t lib/widgetbook.dart
 
 ## Architecture
 
-LinguaRay keeps interface code and capabilities separate:
-
 ```text
-Material 3 views → Riverpod view models → application ports → adapters → Rust
+Flutter views
+    ↓ user intent / immutable state
+Riverpod view models
+    ↓
+Pure Dart use cases and ports
+    ↓ adapters
+Rust runtime (UniFFI) + typed desktop platform services
 ```
 
-- `apps/desktop/flutter` contains the desktop host, routes, view models,
-  adapters, and platform integrations.
-- `packages/application` contains pure Dart use cases, models, and ports.
-- `packages/ui_flutter` applies the LinguaRay brand to Material 3.
-- `packages/runtime` exposes the Rust runtime to Dart and Swift through UniFFI.
-- `crates` contains translation, OCR, provider, settings, and shared core logic.
+| Path | Responsibility |
+| --- | --- |
+| `apps/desktop/flutter` | Desktop host, routes, view models, adapters, and platform integration |
+| `packages/application` | Pure Dart use cases, models, and ports |
+| `packages/ui_flutter` | LinguaRay's Material 3 design system and test utilities |
+| `packages/runtime` | Dart, Rust, and Swift UniFFI bridge |
+| `crates` | Translation engines, OCR, provider configuration, and shared core logic |
 
-See [Architecture](docs/ARCHITECTURE.md) for boundaries and data flow, and
-[Contributing](CONTRIBUTING.md) for the development and test workflow.
+Read [the architecture guide](docs/ARCHITECTURE.md) for the dependency rules,
+data flow, and storage model.
 
-## Security and privacy
+## Development and testing
 
-LinguaRay only sends content to the provider you choose for an action you
-start. Provider secrets are stored through platform secure storage. Do not post
-credentials, private text, or sensitive screenshots in public issues.
+The repository is a Dart Pub Workspace managed with Melos. Common checks run
+from the repository root:
 
-Report vulnerabilities using the process in [SECURITY.md](SECURITY.md).
+```bash
+dart run melos run analyze
+dart run melos run test
+dart run melos run dependency_validator
+cargo fmt --all -- --check
+cargo clippy --locked --workspace --all-targets -- -D warnings
+cargo test --locked --workspace
+```
 
-## Contributing
+Cross-layer changes should pass the complete set. UI changes should include
+Widgetbook coverage and deliberate golden updates; desktop behavior should be
+verified on the affected operating system. See
+[CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow.
 
-Bug reports, focused feature proposals, documentation improvements, and code
-contributions are welcome. Before opening a pull request, read
-[CONTRIBUTING.md](CONTRIBUTING.md) and the
-[Code of Conduct](CODE_OF_CONDUCT.md).
+## Privacy and security
+
+LinguaRay sends content only when you initiate a translation and only to the
+provider selected for that action. Provider secrets are stored through the
+operating system's secure storage. Never post API keys, private text, or
+sensitive screenshots in a public issue.
+
+Please report vulnerabilities privately by following
+[SECURITY.md](SECURITY.md).
+
+## Community
+
+- Use [GitHub Discussions](https://github.com/gong1414/linguaray/discussions)
+  for questions and design conversations.
+- Use [Issues](https://github.com/gong1414/linguaray/issues) for reproducible
+  bugs and focused feature proposals.
+- Read [CONTRIBUTING.md](CONTRIBUTING.md) and the
+  [Code of Conduct](CODE_OF_CONDUCT.md) before opening a pull request.
 
 ## License
 
-LinguaRay is licensed under the [MIT License](LICENSE).
+LinguaRay is available under the [MIT License](LICENSE).

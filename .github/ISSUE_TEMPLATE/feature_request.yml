@@ -43,5 +43,3 @@ body:
       options:
         - label: I searched existing issues and discussions.
           required: true
-        - label: This request keeps UI and capability layers separated.
-          required: true
