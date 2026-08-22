@@ -73,7 +73,11 @@ jobs:
       - name: Resolve workspace dependencies
         working-directory: .
         run: dart pub get
-      - run: flutter test
+      # Runs `flutter test` for every workspace package (app, runtime,
+      # ui_flutter) so package-level suites stay gated in CI.
+      - name: Workspace tests
+        working-directory: .
+        run: dart run melos run test
       - name: Swift formatting
         if: runner.os == 'macOS'
         working-directory: .
