@@ -2,6 +2,5 @@ allow_pins: true
 exclude:
   - "build/**"
 ignore:
-  - dio
   - flutter_test
   - vclibs

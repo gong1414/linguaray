@@ -40,7 +40,7 @@ GoRouter createWorkbenchAppRouter({String? initialLocation}) {
     routes: <RouteBase>[
       ...$appRoutes,
       ...debug_runtime_route.$appRoutes,
-      ...widget_showcase_route.$appRoutes,
+      if (kDebugMode) ...widget_showcase_route.$appRoutes,
       ...workbench_route.$appRoutes,
     ],
     initialLocation: initialLocation ??
