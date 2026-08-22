@@ -1,5 +1,5 @@
 // Per-block goldens for the 业务组件 — the widgets that compose the design
-// system's atoms into BeyondTranslate's own vocabulary.
+// system's atoms into LinguaRay's own vocabulary.
 //
 // The atoms' own goldens live in `packages/ui_flutter/test/golden_test.dart`;
 // this suite is its twin on this side of the boundary, and shares its harness:

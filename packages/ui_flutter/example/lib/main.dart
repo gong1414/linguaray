@@ -9,7 +9,7 @@ class GalleryApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => WidgetsApp(
-        title: 'BeyondTranslate UI',
+        title: 'LinguaRay UI',
         color: const Color(0xFF6B4DFF),
         pageRouteBuilder: <T>(RouteSettings settings, WidgetBuilder builder) =>
             PageRouteBuilder<T>(
@@ -100,7 +100,7 @@ class _ThemeBar extends StatelessWidget {
       child: Row(
         children: [
           Text(
-            'BeyondTranslate UI · Flutter',
+            'LinguaRay UI · Flutter',
             style: tokens.typography.displayStyle(
               fontSize: 13,
               fontWeight: FontWeight.w700,

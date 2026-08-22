@@ -25,7 +25,7 @@ pub fn health() -> HealthResponse {
 pub fn index(path: &str) -> IndexResponse {
     let prefix = utils::normalized_prefix(path);
     IndexResponse {
-        message: "Welcome to BeyondTranslate API",
+        message: "Welcome to LinguaRay API",
         references: vec![format!("{prefix}/reference")],
     }
 }
@@ -44,7 +44,7 @@ pub fn reference_html() -> String {
         r#"<!doctype html>
 <html>
   <head>
-    <title>BeyondTranslate API Reference</title>
+    <title>LinguaRay API Reference</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>

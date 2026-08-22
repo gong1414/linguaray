@@ -1,9 +1,9 @@
-/// The BeyondTranslate design system for Flutter.
+/// The LinguaRay design system for Flutter.
 ///
 /// A port of the React `@beyondtranslate/ui` atoms: same tokens, same four
 /// themes, same widgets — under plain, generic names.
 ///
-/// The boundary is the React package's: nothing here knows a BeyondTranslate
+/// The boundary is the React package's: nothing here knows a LinguaRay
 /// concept. The product's own widgets that compose these — the language pair,
 /// the glossary mark, the provider row, the floating ball — live in the app, at
 /// `apps/desktop/flutter/lib/src/widgets/`, the way React's live in

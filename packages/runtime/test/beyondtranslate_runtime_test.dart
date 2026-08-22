@@ -18,7 +18,7 @@ void main() {
 
   test('greet wraps the input in a hello message', () {
     expect(rp.greet(name: 'World'), 'Hello, World!');
-    expect(rp.greet(name: 'BeyondTranslate'), 'Hello, BeyondTranslate!');
+    expect(rp.greet(name: 'LinguaRay'), 'Hello, LinguaRay!');
   });
 
   test('version returns a non-empty semver string', () {

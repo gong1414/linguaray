@@ -90,4 +90,4 @@ automation is practical and a short manual smoke-test note otherwise.
    a maintainer asks for a clean rebase.
 
 By contributing code, you agree that your contribution is licensed under the
-project's [GNU AGPL v3](LICENSE).
+project's [MIT License](LICENSE).
