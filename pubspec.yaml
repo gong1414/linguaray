@@ -33,11 +33,11 @@ melos:
       description: Check formatting of Dart, Rust, and Swift source files.
 
     fix:
-      exec: dart fix . --apply
+      run: dart run melos exec -c 1 -- dart fix . --apply
       description: Run `dart fix` for all packages.
 
     test:
-      exec: flutter test
+      run: dart run melos exec -c 1 -- flutter test
       description: Run `flutter test` for all packages.
 
     dependency_validator:
