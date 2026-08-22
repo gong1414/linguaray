@@ -3,7 +3,7 @@
 use crate::common::http_client::HttpClient;
 use async_trait::async_trait;
 use base64::Engine;
-use beyondtranslate_core::{
+use linguaray_core::{
     DetectLanguageRequest, DetectLanguageResponse, DictionaryError, DictionaryService,
     LookUpRequest, LookUpResponse, OcrError, OcrService, Provider, RecognizeTextRequest,
     RecognizeTextResponse, TextDetection, TextTranslation, TranslateRequest, TranslateResponse,

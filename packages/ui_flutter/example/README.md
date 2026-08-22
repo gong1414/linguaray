@@ -1,4 +1,4 @@
-# beyondtranslate_ui_example
+# linguaray_ui_example
 
 A new Flutter project.
 

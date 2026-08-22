@@ -9,13 +9,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.13.1"
-  beyondtranslate_ui:
-    dependency: "direct main"
-    description:
-      path: ".."
-      relative: true
-    source: path
-    version: "0.1.0"
   boolean_selector:
     dependency: transitive
     description:
@@ -106,6 +99,13 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.0.2"
+  linguaray_ui:
+    dependency: "direct main"
+    description:
+      path: ".."
+      relative: true
+    source: path
+    version: "0.1.0"
   lints:
     dependency: transitive
     description:

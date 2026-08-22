@@ -6,8 +6,8 @@ import Foundation
 // Depending on the consumer's build setup, the low-level FFI code
 // might be in a separate module, or it might be compiled inline into
 // this module. This is a bit of light hackery to work with both.
-#if canImport(beyondtranslate_runtimeFFI)
-  import beyondtranslate_runtimeFFI
+#if canImport(linguaray_runtimeFFI)
+  import linguaray_runtimeFFI
 #endif
 
 extension RustBuffer {
@@ -25,14 +25,14 @@ extension RustBuffer {
 
   fileprivate static func from(_ ptr: UnsafeBufferPointer<UInt8>) -> RustBuffer {
     try! rustCall {
-      ffi_beyondtranslate_runtime_rustbuffer_from_bytes(ForeignBytes(bufferPointer: ptr), $0)
+      ffi_linguaray_runtime_rustbuffer_from_bytes(ForeignBytes(bufferPointer: ptr), $0)
     }
   }
 
   // Frees the buffer in place.
   // The buffer must not be used after this is called.
   fileprivate func deallocate() {
-    try! rustCall { ffi_beyondtranslate_runtime_rustbuffer_free(self, $0) }
+    try! rustCall { ffi_linguaray_runtime_rustbuffer_free(self, $0) }
   }
 }
 
@@ -288,7 +288,7 @@ private func makeRustCall<T, E: Swift.Error>(
   _ callback: (UnsafeMutablePointer<RustCallStatus>) -> T,
   errorHandler: ((RustBuffer) throws -> E)?
 ) throws -> T {
-  uniffiEnsureBeyondtranslateRuntimeInitialized()
+  uniffiEnsureLinguarayRuntimeInitialized()
   var callStatus = RustCallStatus.init()
   let returnedVal = callback(&callStatus)
   try uniffiCheckCallStatus(callStatus: callStatus, errorHandler: errorHandler)
@@ -630,12 +630,12 @@ open class Runtime: RuntimeProtocol, @unchecked Sendable {
     @_documentation(visibility: private)
   #endif
   public func uniffiCloneHandle() -> UInt64 {
-    return try! rustCall { uniffi_beyondtranslate_runtime_fn_clone_runtime(self.handle, $0) }
+    return try! rustCall { uniffi_linguaray_runtime_fn_clone_runtime(self.handle, $0) }
   }
   public convenience init(dataDir: String) throws {
     let handle =
       try rustCallWithError(FfiConverterTypeRuntimeError_lift) {
-        uniffi_beyondtranslate_runtime_fn_constructor_runtime_new(
+        uniffi_linguaray_runtime_fn_constructor_runtime_new(
           FfiConverterString.lower(dataDir), $0
         )
       }
@@ -648,13 +648,13 @@ open class Runtime: RuntimeProtocol, @unchecked Sendable {
       return
     }
 
-    try! rustCall { uniffi_beyondtranslate_runtime_fn_free_runtime(handle, $0) }
+    try! rustCall { uniffi_linguaray_runtime_fn_free_runtime(handle, $0) }
   }
 
   open func dictionary(providerId: String) throws -> RuntimeDictionary {
     return try FfiConverterTypeRuntimeDictionary_lift(
       try rustCallWithError(FfiConverterTypeRuntimeError_lift) {
-        uniffi_beyondtranslate_runtime_fn_method_runtime_dictionary(
+        uniffi_linguaray_runtime_fn_method_runtime_dictionary(
           self.uniffiCloneHandle(),
           FfiConverterString.lower(providerId), $0
         )
@@ -664,7 +664,7 @@ open class Runtime: RuntimeProtocol, @unchecked Sendable {
   open func glossary() -> RuntimeGlossary {
     return try! FfiConverterTypeRuntimeGlossary_lift(
       try! rustCall {
-        uniffi_beyondtranslate_runtime_fn_method_runtime_glossary(
+        uniffi_linguaray_runtime_fn_method_runtime_glossary(
           self.uniffiCloneHandle(), $0
         )
       })
@@ -673,7 +673,7 @@ open class Runtime: RuntimeProtocol, @unchecked Sendable {
   open func history() -> RuntimeHistory {
     return try! FfiConverterTypeRuntimeHistory_lift(
       try! rustCall {
-        uniffi_beyondtranslate_runtime_fn_method_runtime_history(
+        uniffi_linguaray_runtime_fn_method_runtime_history(
           self.uniffiCloneHandle(), $0
         )
       })
@@ -685,7 +685,7 @@ open class Runtime: RuntimeProtocol, @unchecked Sendable {
   open func listAppLanguages() -> [LanguageInfo] {
     return try! FfiConverterSequenceTypeLanguageInfo.lift(
       try! rustCall {
-        uniffi_beyondtranslate_runtime_fn_method_runtime_list_app_languages(
+        uniffi_linguaray_runtime_fn_method_runtime_list_app_languages(
           self.uniffiCloneHandle(), $0
         )
       })
@@ -697,7 +697,7 @@ open class Runtime: RuntimeProtocol, @unchecked Sendable {
   open func listLanguages() -> [LanguageInfo] {
     return try! FfiConverterSequenceTypeLanguageInfo.lift(
       try! rustCall {
-        uniffi_beyondtranslate_runtime_fn_method_runtime_list_languages(
+        uniffi_linguaray_runtime_fn_method_runtime_list_languages(
           self.uniffiCloneHandle(), $0
         )
       })
@@ -706,7 +706,7 @@ open class Runtime: RuntimeProtocol, @unchecked Sendable {
   open func llm(providerId: String) throws -> RuntimeLlm {
     return try FfiConverterTypeRuntimeLlm_lift(
       try rustCallWithError(FfiConverterTypeRuntimeError_lift) {
-        uniffi_beyondtranslate_runtime_fn_method_runtime_llm(
+        uniffi_linguaray_runtime_fn_method_runtime_llm(
           self.uniffiCloneHandle(),
           FfiConverterString.lower(providerId), $0
         )
@@ -716,7 +716,7 @@ open class Runtime: RuntimeProtocol, @unchecked Sendable {
   open func ocr(providerId: String) throws -> RuntimeOcr {
     return try FfiConverterTypeRuntimeOcr_lift(
       try rustCallWithError(FfiConverterTypeRuntimeError_lift) {
-        uniffi_beyondtranslate_runtime_fn_method_runtime_ocr(
+        uniffi_linguaray_runtime_fn_method_runtime_ocr(
           self.uniffiCloneHandle(),
           FfiConverterString.lower(providerId), $0
         )
@@ -726,7 +726,7 @@ open class Runtime: RuntimeProtocol, @unchecked Sendable {
   open func permission() -> RuntimePermission {
     return try! FfiConverterTypeRuntimePermission_lift(
       try! rustCall {
-        uniffi_beyondtranslate_runtime_fn_method_runtime_permission(
+        uniffi_linguaray_runtime_fn_method_runtime_permission(
           self.uniffiCloneHandle(), $0
         )
       })
@@ -735,7 +735,7 @@ open class Runtime: RuntimeProtocol, @unchecked Sendable {
   open func settings() -> RuntimeSettings {
     return try! FfiConverterTypeRuntimeSettings_lift(
       try! rustCall {
-        uniffi_beyondtranslate_runtime_fn_method_runtime_settings(
+        uniffi_linguaray_runtime_fn_method_runtime_settings(
           self.uniffiCloneHandle(), $0
         )
       })
@@ -744,7 +744,7 @@ open class Runtime: RuntimeProtocol, @unchecked Sendable {
   open func startApiServer(host: String, port: UInt16) throws -> RuntimeApiServer {
     return try FfiConverterTypeRuntimeApiServer_lift(
       try rustCallWithError(FfiConverterTypeRuntimeError_lift) {
-        uniffi_beyondtranslate_runtime_fn_method_runtime_start_api_server(
+        uniffi_linguaray_runtime_fn_method_runtime_start_api_server(
           self.uniffiCloneHandle(),
           FfiConverterString.lower(host),
           FfiConverterUInt16.lower(port), $0
@@ -755,7 +755,7 @@ open class Runtime: RuntimeProtocol, @unchecked Sendable {
   open func textExtractor() -> RuntimeTextExtractor {
     return try! FfiConverterTypeRuntimeTextExtractor_lift(
       try! rustCall {
-        uniffi_beyondtranslate_runtime_fn_method_runtime_text_extractor(
+        uniffi_linguaray_runtime_fn_method_runtime_text_extractor(
           self.uniffiCloneHandle(), $0
         )
       })
@@ -764,7 +764,7 @@ open class Runtime: RuntimeProtocol, @unchecked Sendable {
   open func translation(providerId: String) throws -> RuntimeTranslation {
     return try FfiConverterTypeRuntimeTranslation_lift(
       try rustCallWithError(FfiConverterTypeRuntimeError_lift) {
-        uniffi_beyondtranslate_runtime_fn_method_runtime_translation(
+        uniffi_linguaray_runtime_fn_method_runtime_translation(
           self.uniffiCloneHandle(),
           FfiConverterString.lower(providerId), $0
         )
@@ -856,9 +856,7 @@ open class RuntimeApiServer: RuntimeApiServerProtocol, @unchecked Sendable {
     @_documentation(visibility: private)
   #endif
   public func uniffiCloneHandle() -> UInt64 {
-    return try! rustCall {
-      uniffi_beyondtranslate_runtime_fn_clone_runtimeapiserver(self.handle, $0)
-    }
+    return try! rustCall { uniffi_linguaray_runtime_fn_clone_runtimeapiserver(self.handle, $0) }
   }
   // No primary constructor declared for this class.
 
@@ -868,13 +866,13 @@ open class RuntimeApiServer: RuntimeApiServerProtocol, @unchecked Sendable {
       return
     }
 
-    try! rustCall { uniffi_beyondtranslate_runtime_fn_free_runtimeapiserver(handle, $0) }
+    try! rustCall { uniffi_linguaray_runtime_fn_free_runtimeapiserver(handle, $0) }
   }
 
   open func info() -> ApiServerInfo {
     return try! FfiConverterTypeApiServerInfo_lift(
       try! rustCall {
-        uniffi_beyondtranslate_runtime_fn_method_runtimeapiserver_info(
+        uniffi_linguaray_runtime_fn_method_runtimeapiserver_info(
           self.uniffiCloneHandle(), $0
         )
       })
@@ -882,7 +880,7 @@ open class RuntimeApiServer: RuntimeApiServerProtocol, @unchecked Sendable {
 
   open func stop() {
     try! rustCall {
-      uniffi_beyondtranslate_runtime_fn_method_runtimeapiserver_stop(
+      uniffi_linguaray_runtime_fn_method_runtimeapiserver_stop(
         self.uniffiCloneHandle(), $0
       )
     }
@@ -973,9 +971,7 @@ open class RuntimeDictionary: RuntimeDictionaryProtocol, @unchecked Sendable {
     @_documentation(visibility: private)
   #endif
   public func uniffiCloneHandle() -> UInt64 {
-    return try! rustCall {
-      uniffi_beyondtranslate_runtime_fn_clone_runtimedictionary(self.handle, $0)
-    }
+    return try! rustCall { uniffi_linguaray_runtime_fn_clone_runtimedictionary(self.handle, $0) }
   }
   // No primary constructor declared for this class.
 
@@ -985,21 +981,21 @@ open class RuntimeDictionary: RuntimeDictionaryProtocol, @unchecked Sendable {
       return
     }
 
-    try! rustCall { uniffi_beyondtranslate_runtime_fn_free_runtimedictionary(handle, $0) }
+    try! rustCall { uniffi_linguaray_runtime_fn_free_runtimedictionary(handle, $0) }
   }
 
   open func lookup(request: LookUpRequest) async throws -> LookUpResponse {
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimedictionary_lookup(
+          uniffi_linguaray_runtime_fn_method_runtimedictionary_lookup(
             self.uniffiCloneHandle(),
             FfiConverterTypeLookUpRequest_lower(request)
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
         liftFunc: FfiConverterTypeLookUpResponse_lift,
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
@@ -1147,9 +1143,7 @@ open class RuntimeGlossary: RuntimeGlossaryProtocol, @unchecked Sendable {
     @_documentation(visibility: private)
   #endif
   public func uniffiCloneHandle() -> UInt64 {
-    return try! rustCall {
-      uniffi_beyondtranslate_runtime_fn_clone_runtimeglossary(self.handle, $0)
-    }
+    return try! rustCall { uniffi_linguaray_runtime_fn_clone_runtimeglossary(self.handle, $0) }
   }
   // No primary constructor declared for this class.
 
@@ -1159,7 +1153,7 @@ open class RuntimeGlossary: RuntimeGlossaryProtocol, @unchecked Sendable {
       return
     }
 
-    try! rustCall { uniffi_beyondtranslate_runtime_fn_free_runtimeglossary(handle, $0) }
+    try! rustCall { uniffi_linguaray_runtime_fn_free_runtimeglossary(handle, $0) }
   }
 
   /**
@@ -1173,16 +1167,16 @@ open class RuntimeGlossary: RuntimeGlossaryProtocol, @unchecked Sendable {
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimeglossary_check(
+          uniffi_linguaray_runtime_fn_method_runtimeglossary_check(
             self.uniffiCloneHandle(),
             FfiConverterString.lower(source), FfiConverterString.lower(translated),
             FfiConverterOptionString.lower(sourceLanguage),
             FfiConverterOptionString.lower(targetLanguage)
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
         liftFunc: FfiConverterSequenceTypeGlossaryComplianceIssue.lift,
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
@@ -1195,14 +1189,14 @@ open class RuntimeGlossary: RuntimeGlossaryProtocol, @unchecked Sendable {
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimeglossary_count_entries(
+          uniffi_linguaray_runtime_fn_method_runtimeglossary_count_entries(
             self.uniffiCloneHandle(),
             FfiConverterString.lower(bookId), FfiConverterOptionString.lower(query)
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_u32,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_u32,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_u32,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_u32,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_u32,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_u32,
         liftFunc: FfiConverterUInt32.lift,
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
@@ -1215,14 +1209,14 @@ open class RuntimeGlossary: RuntimeGlossaryProtocol, @unchecked Sendable {
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimeglossary_delete_book(
+          uniffi_linguaray_runtime_fn_method_runtimeglossary_delete_book(
             self.uniffiCloneHandle(),
             FfiConverterString.lower(bookId)
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_i8,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_i8,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_i8,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_i8,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_i8,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_i8,
         liftFunc: FfiConverterBool.lift,
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
@@ -1235,14 +1229,14 @@ open class RuntimeGlossary: RuntimeGlossaryProtocol, @unchecked Sendable {
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimeglossary_delete_entry(
+          uniffi_linguaray_runtime_fn_method_runtimeglossary_delete_entry(
             self.uniffiCloneHandle(),
             FfiConverterString.lower(bookId), FfiConverterString.lower(entryId)
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_i8,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_i8,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_i8,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_i8,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_i8,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_i8,
         liftFunc: FfiConverterBool.lift,
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
@@ -1256,14 +1250,14 @@ open class RuntimeGlossary: RuntimeGlossaryProtocol, @unchecked Sendable {
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimeglossary_flush_hits(
+          uniffi_linguaray_runtime_fn_method_runtimeglossary_flush_hits(
             self.uniffiCloneHandle()
 
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_void,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_void,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_void,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_void,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_void,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_void,
         liftFunc: { $0 },
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
@@ -1273,14 +1267,14 @@ open class RuntimeGlossary: RuntimeGlossaryProtocol, @unchecked Sendable {
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimeglossary_get_book(
+          uniffi_linguaray_runtime_fn_method_runtimeglossary_get_book(
             self.uniffiCloneHandle(),
             FfiConverterString.lower(bookId)
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
         liftFunc: FfiConverterOptionTypeGlossaryBook.lift,
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
@@ -1290,14 +1284,14 @@ open class RuntimeGlossary: RuntimeGlossaryProtocol, @unchecked Sendable {
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimeglossary_list_books(
+          uniffi_linguaray_runtime_fn_method_runtimeglossary_list_books(
             self.uniffiCloneHandle()
 
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
         liftFunc: FfiConverterSequenceTypeGlossaryBook.lift,
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
@@ -1313,15 +1307,15 @@ open class RuntimeGlossary: RuntimeGlossaryProtocol, @unchecked Sendable {
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimeglossary_list_entries(
+          uniffi_linguaray_runtime_fn_method_runtimeglossary_list_entries(
             self.uniffiCloneHandle(),
             FfiConverterString.lower(bookId), FfiConverterOptionString.lower(query),
             FfiConverterUInt32.lower(offset), FfiConverterUInt32.lower(limit)
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
         liftFunc: FfiConverterSequenceTypeGlossaryEntry.lift,
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
@@ -1337,15 +1331,15 @@ open class RuntimeGlossary: RuntimeGlossaryProtocol, @unchecked Sendable {
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimeglossary_match_text(
+          uniffi_linguaray_runtime_fn_method_runtimeglossary_match_text(
             self.uniffiCloneHandle(),
             FfiConverterString.lower(text), FfiConverterOptionString.lower(sourceLanguage),
             FfiConverterOptionString.lower(targetLanguage)
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
         liftFunc: FfiConverterSequenceTypeGlossaryMatch.lift,
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
@@ -1359,14 +1353,14 @@ open class RuntimeGlossary: RuntimeGlossaryProtocol, @unchecked Sendable {
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimeglossary_upsert_book(
+          uniffi_linguaray_runtime_fn_method_runtimeglossary_upsert_book(
             self.uniffiCloneHandle(),
             FfiConverterTypeGlossaryBookInput_lower(input)
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
         liftFunc: FfiConverterTypeGlossaryBook_lift,
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
@@ -1380,14 +1374,14 @@ open class RuntimeGlossary: RuntimeGlossaryProtocol, @unchecked Sendable {
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimeglossary_upsert_entry(
+          uniffi_linguaray_runtime_fn_method_runtimeglossary_upsert_entry(
             self.uniffiCloneHandle(),
             FfiConverterString.lower(bookId), FfiConverterTypeGlossaryEntryInput_lower(input)
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
         liftFunc: FfiConverterTypeGlossaryEntry_lift,
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
@@ -1486,7 +1480,7 @@ open class RuntimeHistory: RuntimeHistoryProtocol, @unchecked Sendable {
     @_documentation(visibility: private)
   #endif
   public func uniffiCloneHandle() -> UInt64 {
-    return try! rustCall { uniffi_beyondtranslate_runtime_fn_clone_runtimehistory(self.handle, $0) }
+    return try! rustCall { uniffi_linguaray_runtime_fn_clone_runtimehistory(self.handle, $0) }
   }
   // No primary constructor declared for this class.
 
@@ -1496,21 +1490,21 @@ open class RuntimeHistory: RuntimeHistoryProtocol, @unchecked Sendable {
       return
     }
 
-    try! rustCall { uniffi_beyondtranslate_runtime_fn_free_runtimehistory(handle, $0) }
+    try! rustCall { uniffi_linguaray_runtime_fn_free_runtimehistory(handle, $0) }
   }
 
   open func counts() async throws -> HistoryCounts {
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimehistory_counts(
+          uniffi_linguaray_runtime_fn_method_runtimehistory_counts(
             self.uniffiCloneHandle()
 
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
         liftFunc: FfiConverterTypeHistoryCounts_lift,
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
@@ -1520,14 +1514,14 @@ open class RuntimeHistory: RuntimeHistoryProtocol, @unchecked Sendable {
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimehistory_delete_entries(
+          uniffi_linguaray_runtime_fn_method_runtimehistory_delete_entries(
             self.uniffiCloneHandle(),
             FfiConverterSequenceString.lower(entryIds)
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_u32,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_u32,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_u32,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_u32,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_u32,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_u32,
         liftFunc: FfiConverterUInt32.lift,
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
@@ -1537,14 +1531,14 @@ open class RuntimeHistory: RuntimeHistoryProtocol, @unchecked Sendable {
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimehistory_list_entries(
+          uniffi_linguaray_runtime_fn_method_runtimehistory_list_entries(
             self.uniffiCloneHandle(),
             FfiConverterTypeHistoryFilter_lower(filter), FfiConverterOptionString.lower(query)
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
         liftFunc: FfiConverterSequenceTypeHistoryEntry.lift,
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
@@ -1554,14 +1548,14 @@ open class RuntimeHistory: RuntimeHistoryProtocol, @unchecked Sendable {
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimehistory_set_favorite(
+          uniffi_linguaray_runtime_fn_method_runtimehistory_set_favorite(
             self.uniffiCloneHandle(),
             FfiConverterString.lower(entryId), FfiConverterBool.lower(favorite)
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
         liftFunc: FfiConverterOptionTypeHistoryEntry.lift,
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
@@ -1571,14 +1565,14 @@ open class RuntimeHistory: RuntimeHistoryProtocol, @unchecked Sendable {
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimehistory_upsert_entry(
+          uniffi_linguaray_runtime_fn_method_runtimehistory_upsert_entry(
             self.uniffiCloneHandle(),
             FfiConverterTypeHistoryEntryInput_lower(input)
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
         liftFunc: FfiConverterTypeHistoryEntry_lift,
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
@@ -1679,7 +1673,7 @@ open class RuntimeLlm: RuntimeLlmProtocol, @unchecked Sendable {
     @_documentation(visibility: private)
   #endif
   public func uniffiCloneHandle() -> UInt64 {
-    return try! rustCall { uniffi_beyondtranslate_runtime_fn_clone_runtimellm(self.handle, $0) }
+    return try! rustCall { uniffi_linguaray_runtime_fn_clone_runtimellm(self.handle, $0) }
   }
   // No primary constructor declared for this class.
 
@@ -1689,7 +1683,7 @@ open class RuntimeLlm: RuntimeLlmProtocol, @unchecked Sendable {
       return
     }
 
-    try! rustCall { uniffi_beyondtranslate_runtime_fn_free_runtimellm(handle, $0) }
+    try! rustCall { uniffi_linguaray_runtime_fn_free_runtimellm(handle, $0) }
   }
 
   open func alternatives(
@@ -1698,16 +1692,16 @@ open class RuntimeLlm: RuntimeLlmProtocol, @unchecked Sendable {
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimellm_alternatives(
+          uniffi_linguaray_runtime_fn_method_runtimellm_alternatives(
             self.uniffiCloneHandle(),
             FfiConverterString.lower(text), FfiConverterString.lower(sourceLang),
             FfiConverterString.lower(targetLang), FfiConverterUInt32.lower(count),
             FfiConverterOptionString.lower(style)
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
         liftFunc: FfiConverterSequenceString.lift,
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
@@ -1717,14 +1711,14 @@ open class RuntimeLlm: RuntimeLlmProtocol, @unchecked Sendable {
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimellm_chat(
+          uniffi_linguaray_runtime_fn_method_runtimellm_chat(
             self.uniffiCloneHandle(),
             FfiConverterString.lower(model), FfiConverterSequenceTypeChatMessage.lower(messages)
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
         liftFunc: FfiConverterTypeChatResponse_lift,
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
@@ -1734,14 +1728,14 @@ open class RuntimeLlm: RuntimeLlmProtocol, @unchecked Sendable {
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimellm_explain(
+          uniffi_linguaray_runtime_fn_method_runtimellm_explain(
             self.uniffiCloneHandle(),
             FfiConverterString.lower(source), FfiConverterString.lower(translation)
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
         liftFunc: FfiConverterString.lift,
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
@@ -1751,14 +1745,14 @@ open class RuntimeLlm: RuntimeLlmProtocol, @unchecked Sendable {
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimellm_polish(
+          uniffi_linguaray_runtime_fn_method_runtimellm_polish(
             self.uniffiCloneHandle(),
             FfiConverterString.lower(text), FfiConverterString.lower(style)
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
         liftFunc: FfiConverterString.lift,
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
@@ -1768,7 +1762,7 @@ open class RuntimeLlm: RuntimeLlmProtocol, @unchecked Sendable {
     sourceLang: String, targetLang: String, text: String, callback: StreamCallback
   ) {
     try! rustCall {
-      uniffi_beyondtranslate_runtime_fn_method_runtimellm_translate_stream(
+      uniffi_linguaray_runtime_fn_method_runtimellm_translate_stream(
         self.uniffiCloneHandle(),
         FfiConverterString.lower(sourceLang),
         FfiConverterString.lower(targetLang),
@@ -1861,7 +1855,7 @@ open class RuntimeOcr: RuntimeOcrProtocol, @unchecked Sendable {
     @_documentation(visibility: private)
   #endif
   public func uniffiCloneHandle() -> UInt64 {
-    return try! rustCall { uniffi_beyondtranslate_runtime_fn_clone_runtimeocr(self.handle, $0) }
+    return try! rustCall { uniffi_linguaray_runtime_fn_clone_runtimeocr(self.handle, $0) }
   }
   // No primary constructor declared for this class.
 
@@ -1871,21 +1865,21 @@ open class RuntimeOcr: RuntimeOcrProtocol, @unchecked Sendable {
       return
     }
 
-    try! rustCall { uniffi_beyondtranslate_runtime_fn_free_runtimeocr(handle, $0) }
+    try! rustCall { uniffi_linguaray_runtime_fn_free_runtimeocr(handle, $0) }
   }
 
   open func recognizeText(request: RecognizeTextRequest) async throws -> RecognizeTextResponse {
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimeocr_recognize_text(
+          uniffi_linguaray_runtime_fn_method_runtimeocr_recognize_text(
             self.uniffiCloneHandle(),
             FfiConverterTypeRecognizeTextRequest_lower(request)
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
         liftFunc: FfiConverterTypeRecognizeTextResponse_lift,
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
@@ -1998,9 +1992,7 @@ open class RuntimePermission: RuntimePermissionProtocol, @unchecked Sendable {
     @_documentation(visibility: private)
   #endif
   public func uniffiCloneHandle() -> UInt64 {
-    return try! rustCall {
-      uniffi_beyondtranslate_runtime_fn_clone_runtimepermission(self.handle, $0)
-    }
+    return try! rustCall { uniffi_linguaray_runtime_fn_clone_runtimepermission(self.handle, $0) }
   }
   // No primary constructor declared for this class.
 
@@ -2010,7 +2002,7 @@ open class RuntimePermission: RuntimePermissionProtocol, @unchecked Sendable {
       return
     }
 
-    try! rustCall { uniffi_beyondtranslate_runtime_fn_free_runtimepermission(handle, $0) }
+    try! rustCall { uniffi_linguaray_runtime_fn_free_runtimepermission(handle, $0) }
   }
 
   /**
@@ -2021,14 +2013,14 @@ open class RuntimePermission: RuntimePermissionProtocol, @unchecked Sendable {
     return
       try! await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimepermission_is_accessibility_permission_granted(
+          uniffi_linguaray_runtime_fn_method_runtimepermission_is_accessibility_permission_granted(
             self.uniffiCloneHandle()
 
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_i8,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_i8,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_i8,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_i8,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_i8,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_i8,
         liftFunc: FfiConverterBool.lift,
         errorHandler: nil
 
@@ -2043,14 +2035,14 @@ open class RuntimePermission: RuntimePermissionProtocol, @unchecked Sendable {
     return
       try! await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimepermission_is_screen_recording_permission_granted(
+          uniffi_linguaray_runtime_fn_method_runtimepermission_is_screen_recording_permission_granted(
             self.uniffiCloneHandle()
 
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_i8,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_i8,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_i8,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_i8,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_i8,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_i8,
         liftFunc: FfiConverterBool.lift,
         errorHandler: nil
 
@@ -2066,14 +2058,14 @@ open class RuntimePermission: RuntimePermissionProtocol, @unchecked Sendable {
     return
       try! await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimepermission_request_accessibility_permission(
+          uniffi_linguaray_runtime_fn_method_runtimepermission_request_accessibility_permission(
             self.uniffiCloneHandle(),
             FfiConverterBool.lower(onlyOpenSystemSettings)
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_void,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_void,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_void,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_void,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_void,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_void,
         liftFunc: { $0 },
         errorHandler: nil
 
@@ -2089,14 +2081,14 @@ open class RuntimePermission: RuntimePermissionProtocol, @unchecked Sendable {
     return
       try! await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimepermission_request_screen_recording_permission(
+          uniffi_linguaray_runtime_fn_method_runtimepermission_request_screen_recording_permission(
             self.uniffiCloneHandle(),
             FfiConverterBool.lower(onlyOpenSystemSettings)
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_void,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_void,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_void,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_void,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_void,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_void,
         liftFunc: { $0 },
         errorHandler: nil
 
@@ -2256,9 +2248,7 @@ open class RuntimeSettings: RuntimeSettingsProtocol, @unchecked Sendable {
     @_documentation(visibility: private)
   #endif
   public func uniffiCloneHandle() -> UInt64 {
-    return try! rustCall {
-      uniffi_beyondtranslate_runtime_fn_clone_runtimesettings(self.handle, $0)
-    }
+    return try! rustCall { uniffi_linguaray_runtime_fn_clone_runtimesettings(self.handle, $0) }
   }
   // No primary constructor declared for this class.
 
@@ -2268,21 +2258,21 @@ open class RuntimeSettings: RuntimeSettingsProtocol, @unchecked Sendable {
       return
     }
 
-    try! rustCall { uniffi_beyondtranslate_runtime_fn_free_runtimesettings(handle, $0) }
+    try! rustCall { uniffi_linguaray_runtime_fn_free_runtimesettings(handle, $0) }
   }
 
   open func deleteProvider(providerId: String) async throws -> ProviderConfigEntry? {
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimesettings_delete_provider(
+          uniffi_linguaray_runtime_fn_method_runtimesettings_delete_provider(
             self.uniffiCloneHandle(),
             FfiConverterString.lower(providerId)
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
         liftFunc: FfiConverterOptionTypeProviderConfigEntry.lift,
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
@@ -2292,14 +2282,14 @@ open class RuntimeSettings: RuntimeSettingsProtocol, @unchecked Sendable {
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimesettings_delete_service(
+          uniffi_linguaray_runtime_fn_method_runtimesettings_delete_service(
             self.uniffiCloneHandle(),
             FfiConverterString.lower(serviceId)
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
         liftFunc: FfiConverterOptionTypeServiceConfigEntry.lift,
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
@@ -2309,14 +2299,14 @@ open class RuntimeSettings: RuntimeSettingsProtocol, @unchecked Sendable {
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimesettings_generate_provider_id(
+          uniffi_linguaray_runtime_fn_method_runtimesettings_generate_provider_id(
             self.uniffiCloneHandle(),
             FfiConverterString.lower(providerType)
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
         liftFunc: FfiConverterString.lift,
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
@@ -2336,15 +2326,15 @@ open class RuntimeSettings: RuntimeSettingsProtocol, @unchecked Sendable {
     return
       try! await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimesettings_get_active_translation_targets(
+          uniffi_linguaray_runtime_fn_method_runtimesettings_get_active_translation_targets(
             self.uniffiCloneHandle(),
             FfiConverterSequenceTypeTranslationTarget.lower(targets),
             FfiConverterOptionString.lower(detectedLanguage)
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
         liftFunc: FfiConverterSequenceTypeTranslationTarget.lift,
         errorHandler: nil
 
@@ -2355,14 +2345,14 @@ open class RuntimeSettings: RuntimeSettingsProtocol, @unchecked Sendable {
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimesettings_get_advanced(
+          uniffi_linguaray_runtime_fn_method_runtimesettings_get_advanced(
             self.uniffiCloneHandle()
 
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
         liftFunc: FfiConverterTypeAdvancedSettings_lift,
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
@@ -2372,14 +2362,14 @@ open class RuntimeSettings: RuntimeSettingsProtocol, @unchecked Sendable {
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimesettings_get_appearance(
+          uniffi_linguaray_runtime_fn_method_runtimesettings_get_appearance(
             self.uniffiCloneHandle()
 
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
         liftFunc: FfiConverterTypeAppearanceSettings_lift,
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
@@ -2389,14 +2379,14 @@ open class RuntimeSettings: RuntimeSettingsProtocol, @unchecked Sendable {
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimesettings_get_general(
+          uniffi_linguaray_runtime_fn_method_runtimesettings_get_general(
             self.uniffiCloneHandle()
 
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
         liftFunc: FfiConverterTypeGeneralSettings_lift,
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
@@ -2406,14 +2396,14 @@ open class RuntimeSettings: RuntimeSettingsProtocol, @unchecked Sendable {
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimesettings_get_json(
+          uniffi_linguaray_runtime_fn_method_runtimesettings_get_json(
             self.uniffiCloneHandle()
 
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
         liftFunc: FfiConverterString.lift,
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
@@ -2423,14 +2413,14 @@ open class RuntimeSettings: RuntimeSettingsProtocol, @unchecked Sendable {
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimesettings_get_provider(
+          uniffi_linguaray_runtime_fn_method_runtimesettings_get_provider(
             self.uniffiCloneHandle(),
             FfiConverterString.lower(providerId)
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
         liftFunc: FfiConverterOptionTypeProviderConfigEntry.lift,
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
@@ -2440,14 +2430,14 @@ open class RuntimeSettings: RuntimeSettingsProtocol, @unchecked Sendable {
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimesettings_get_service(
+          uniffi_linguaray_runtime_fn_method_runtimesettings_get_service(
             self.uniffiCloneHandle(),
             FfiConverterString.lower(serviceId)
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
         liftFunc: FfiConverterOptionTypeServiceConfigEntry.lift,
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
@@ -2457,14 +2447,14 @@ open class RuntimeSettings: RuntimeSettingsProtocol, @unchecked Sendable {
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimesettings_get_shortcuts(
+          uniffi_linguaray_runtime_fn_method_runtimesettings_get_shortcuts(
             self.uniffiCloneHandle()
 
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
         liftFunc: FfiConverterTypeShortcutSettings_lift,
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
@@ -2474,14 +2464,14 @@ open class RuntimeSettings: RuntimeSettingsProtocol, @unchecked Sendable {
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimesettings_list_models(
+          uniffi_linguaray_runtime_fn_method_runtimesettings_list_models(
             self.uniffiCloneHandle(),
             FfiConverterString.lower(providerId)
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
         liftFunc: FfiConverterSequenceString.lift,
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
@@ -2491,14 +2481,14 @@ open class RuntimeSettings: RuntimeSettingsProtocol, @unchecked Sendable {
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimesettings_list_providers(
+          uniffi_linguaray_runtime_fn_method_runtimesettings_list_providers(
             self.uniffiCloneHandle()
 
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
         liftFunc: FfiConverterSequenceTypeProviderConfigEntry.lift,
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
@@ -2508,14 +2498,14 @@ open class RuntimeSettings: RuntimeSettingsProtocol, @unchecked Sendable {
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimesettings_list_services(
+          uniffi_linguaray_runtime_fn_method_runtimesettings_list_services(
             self.uniffiCloneHandle()
 
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
         liftFunc: FfiConverterSequenceTypeServiceConfigEntry.lift,
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
@@ -2525,14 +2515,14 @@ open class RuntimeSettings: RuntimeSettingsProtocol, @unchecked Sendable {
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimesettings_reset_shortcuts(
+          uniffi_linguaray_runtime_fn_method_runtimesettings_reset_shortcuts(
             self.uniffiCloneHandle()
 
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
         liftFunc: FfiConverterTypeShortcutSettings_lift,
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
@@ -2547,14 +2537,14 @@ open class RuntimeSettings: RuntimeSettingsProtocol, @unchecked Sendable {
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimesettings_set_provider_secrets(
+          uniffi_linguaray_runtime_fn_method_runtimesettings_set_provider_secrets(
             self.uniffiCloneHandle(),
             FfiConverterString.lower(providerId), FfiConverterDictionaryStringString.lower(secrets)
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_void,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_void,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_void,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_void,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_void,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_void,
         liftFunc: { $0 },
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
@@ -2569,7 +2559,7 @@ open class RuntimeSettings: RuntimeSettingsProtocol, @unchecked Sendable {
   open func subscribe() -> SettingsSubscription {
     return try! FfiConverterTypeSettingsSubscription_lift(
       try! rustCall {
-        uniffi_beyondtranslate_runtime_fn_method_runtimesettings_subscribe(
+        uniffi_linguaray_runtime_fn_method_runtimesettings_subscribe(
           self.uniffiCloneHandle(), $0
         )
       })
@@ -2579,14 +2569,14 @@ open class RuntimeSettings: RuntimeSettingsProtocol, @unchecked Sendable {
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimesettings_update_advanced(
+          uniffi_linguaray_runtime_fn_method_runtimesettings_update_advanced(
             self.uniffiCloneHandle(),
             FfiConverterTypeAdvancedSettingsPatch_lower(patch)
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
         liftFunc: FfiConverterTypeAdvancedSettings_lift,
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
@@ -2596,14 +2586,14 @@ open class RuntimeSettings: RuntimeSettingsProtocol, @unchecked Sendable {
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimesettings_update_appearance(
+          uniffi_linguaray_runtime_fn_method_runtimesettings_update_appearance(
             self.uniffiCloneHandle(),
             FfiConverterTypeAppearanceSettingsPatch_lower(patch)
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
         liftFunc: FfiConverterTypeAppearanceSettings_lift,
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
@@ -2613,14 +2603,14 @@ open class RuntimeSettings: RuntimeSettingsProtocol, @unchecked Sendable {
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimesettings_update_general(
+          uniffi_linguaray_runtime_fn_method_runtimesettings_update_general(
             self.uniffiCloneHandle(),
             FfiConverterTypeGeneralSettingsPatch_lower(patch)
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
         liftFunc: FfiConverterTypeGeneralSettings_lift,
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
@@ -2632,15 +2622,15 @@ open class RuntimeSettings: RuntimeSettingsProtocol, @unchecked Sendable {
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimesettings_update_provider(
+          uniffi_linguaray_runtime_fn_method_runtimesettings_update_provider(
             self.uniffiCloneHandle(),
             FfiConverterString.lower(providerId), FfiConverterString.lower(providerType),
             FfiConverterDictionaryStringString.lower(fields)
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
         liftFunc: FfiConverterTypeProviderConfigEntry_lift,
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
@@ -2653,16 +2643,16 @@ open class RuntimeSettings: RuntimeSettingsProtocol, @unchecked Sendable {
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimesettings_update_service(
+          uniffi_linguaray_runtime_fn_method_runtimesettings_update_service(
             self.uniffiCloneHandle(),
             FfiConverterString.lower(serviceId), FfiConverterString.lower(providerId),
             FfiConverterTypeServiceType_lower(serviceType), FfiConverterString.lower(name),
             FfiConverterDictionaryStringString.lower(fields)
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
         liftFunc: FfiConverterTypeServiceConfigEntry_lift,
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
@@ -2672,14 +2662,14 @@ open class RuntimeSettings: RuntimeSettingsProtocol, @unchecked Sendable {
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimesettings_update_shortcuts(
+          uniffi_linguaray_runtime_fn_method_runtimesettings_update_shortcuts(
             self.uniffiCloneHandle(),
             FfiConverterTypeShortcutSettingsPatch_lower(patch)
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
         liftFunc: FfiConverterTypeShortcutSettings_lift,
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
@@ -2809,9 +2799,7 @@ open class RuntimeTextExtractor: RuntimeTextExtractorProtocol, @unchecked Sendab
     @_documentation(visibility: private)
   #endif
   public func uniffiCloneHandle() -> UInt64 {
-    return try! rustCall {
-      uniffi_beyondtranslate_runtime_fn_clone_runtimetextextractor(self.handle, $0)
-    }
+    return try! rustCall { uniffi_linguaray_runtime_fn_clone_runtimetextextractor(self.handle, $0) }
   }
   // No primary constructor declared for this class.
 
@@ -2821,7 +2809,7 @@ open class RuntimeTextExtractor: RuntimeTextExtractorProtocol, @unchecked Sendab
       return
     }
 
-    try! rustCall { uniffi_beyondtranslate_runtime_fn_free_runtimetextextractor(handle, $0) }
+    try! rustCall { uniffi_linguaray_runtime_fn_free_runtimetextextractor(handle, $0) }
   }
 
   /**
@@ -2831,14 +2819,14 @@ open class RuntimeTextExtractor: RuntimeTextExtractorProtocol, @unchecked Sendab
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimetextextractor_extract_from_clipboard(
+          uniffi_linguaray_runtime_fn_method_runtimetextextractor_extract_from_clipboard(
             self.uniffiCloneHandle()
 
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
         liftFunc: FfiConverterString.lift,
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
@@ -2858,14 +2846,14 @@ open class RuntimeTextExtractor: RuntimeTextExtractorProtocol, @unchecked Sendab
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimetextextractor_extract_from_screen_capture(
+          uniffi_linguaray_runtime_fn_method_runtimetextextractor_extract_from_screen_capture(
             self.uniffiCloneHandle()
 
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
         liftFunc: FfiConverterString.lift,
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
@@ -2883,14 +2871,14 @@ open class RuntimeTextExtractor: RuntimeTextExtractorProtocol, @unchecked Sendab
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimetextextractor_extract_from_screen_selection(
+          uniffi_linguaray_runtime_fn_method_runtimetextextractor_extract_from_screen_selection(
             self.uniffiCloneHandle()
 
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
         liftFunc: FfiConverterString.lift,
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
@@ -2904,14 +2892,14 @@ open class RuntimeTextExtractor: RuntimeTextExtractorProtocol, @unchecked Sendab
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimetextextractor_extract_from_screen_selection_detailed(
+          uniffi_linguaray_runtime_fn_method_runtimetextextractor_extract_from_screen_selection_detailed(
             self.uniffiCloneHandle()
 
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
         liftFunc: FfiConverterTypeSelectionExtraction_lift,
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
@@ -3006,9 +2994,7 @@ open class RuntimeTranslation: RuntimeTranslationProtocol, @unchecked Sendable {
     @_documentation(visibility: private)
   #endif
   public func uniffiCloneHandle() -> UInt64 {
-    return try! rustCall {
-      uniffi_beyondtranslate_runtime_fn_clone_runtimetranslation(self.handle, $0)
-    }
+    return try! rustCall { uniffi_linguaray_runtime_fn_clone_runtimetranslation(self.handle, $0) }
   }
   // No primary constructor declared for this class.
 
@@ -3018,21 +3004,21 @@ open class RuntimeTranslation: RuntimeTranslationProtocol, @unchecked Sendable {
       return
     }
 
-    try! rustCall { uniffi_beyondtranslate_runtime_fn_free_runtimetranslation(handle, $0) }
+    try! rustCall { uniffi_linguaray_runtime_fn_free_runtimetranslation(handle, $0) }
   }
 
   open func detectLanguage(request: DetectLanguageRequest) async throws -> DetectLanguageResponse {
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimetranslation_detect_language(
+          uniffi_linguaray_runtime_fn_method_runtimetranslation_detect_language(
             self.uniffiCloneHandle(),
             FfiConverterTypeDetectLanguageRequest_lower(request)
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
         liftFunc: FfiConverterTypeDetectLanguageResponse_lift,
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
@@ -3042,14 +3028,14 @@ open class RuntimeTranslation: RuntimeTranslationProtocol, @unchecked Sendable {
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_runtimetranslation_translate(
+          uniffi_linguaray_runtime_fn_method_runtimetranslation_translate(
             self.uniffiCloneHandle(),
             FfiConverterTypeTranslateRequest_lower(request)
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
         liftFunc: FfiConverterTypeTranslateResponse_lift,
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
@@ -3168,9 +3154,7 @@ open class SettingsSubscription: SettingsSubscriptionProtocol, @unchecked Sendab
     @_documentation(visibility: private)
   #endif
   public func uniffiCloneHandle() -> UInt64 {
-    return try! rustCall {
-      uniffi_beyondtranslate_runtime_fn_clone_settingssubscription(self.handle, $0)
-    }
+    return try! rustCall { uniffi_linguaray_runtime_fn_clone_settingssubscription(self.handle, $0) }
   }
   // No primary constructor declared for this class.
 
@@ -3180,7 +3164,7 @@ open class SettingsSubscription: SettingsSubscriptionProtocol, @unchecked Sendab
       return
     }
 
-    try! rustCall { uniffi_beyondtranslate_runtime_fn_free_settingssubscription(handle, $0) }
+    try! rustCall { uniffi_linguaray_runtime_fn_free_settingssubscription(handle, $0) }
   }
 
   /**
@@ -3193,14 +3177,14 @@ open class SettingsSubscription: SettingsSubscriptionProtocol, @unchecked Sendab
     return
       try await uniffiRustCallAsync(
         rustFutureFunc: {
-          uniffi_beyondtranslate_runtime_fn_method_settingssubscription_next(
+          uniffi_linguaray_runtime_fn_method_settingssubscription_next(
             self.uniffiCloneHandle()
 
           )
         },
-        pollFunc: ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-        completeFunc: ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-        freeFunc: ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
         liftFunc: FfiConverterOptionTypeSettingsChange.lift,
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
@@ -7172,7 +7156,7 @@ private struct UniffiCallbackInterfaceStreamCallback {
 }
 
 private func uniffiCallbackInitStreamCallback() {
-  uniffi_beyondtranslate_runtime_fn_init_callback_vtable_streamcallback(
+  uniffi_linguaray_runtime_fn_init_callback_vtable_streamcallback(
     UniffiCallbackInterfaceStreamCallback.vtablePtr)
 }
 
@@ -8533,7 +8517,7 @@ private func uniffiRustCallAsync<F, T>(
 ) async throws -> T {
   // Make sure to call the ensure init function since future creation doesn't have a
   // RustCallStatus param, so doesn't use makeRustCall()
-  uniffiEnsureBeyondtranslateRuntimeInitialized()
+  uniffiEnsureLinguarayRuntimeInitialized()
   let rustFuture = rustFutureFunc()
   defer {
     freeFunc(rustFuture)
@@ -8570,7 +8554,7 @@ private func uniffiFutureContinuationCallback(handle: UInt64, pollResult: Int8) 
 public func echoDetectLanguageRequest(request: DetectLanguageRequest) -> DetectLanguageRequest {
   return try! FfiConverterTypeDetectLanguageRequest_lift(
     try! rustCall {
-      uniffi_beyondtranslate_runtime_fn_func_echo_detect_language_request(
+      uniffi_linguaray_runtime_fn_func_echo_detect_language_request(
         FfiConverterTypeDetectLanguageRequest_lower(request), $0
       )
     })
@@ -8578,7 +8562,7 @@ public func echoDetectLanguageRequest(request: DetectLanguageRequest) -> DetectL
 public func echoDetectLanguageResponse(response: DetectLanguageResponse) -> DetectLanguageResponse {
   return try! FfiConverterTypeDetectLanguageResponse_lift(
     try! rustCall {
-      uniffi_beyondtranslate_runtime_fn_func_echo_detect_language_response(
+      uniffi_linguaray_runtime_fn_func_echo_detect_language_response(
         FfiConverterTypeDetectLanguageResponse_lower(response), $0
       )
     })
@@ -8586,7 +8570,7 @@ public func echoDetectLanguageResponse(response: DetectLanguageResponse) -> Dete
 public func echoLanguagePair(languagePair: LanguagePair) -> LanguagePair {
   return try! FfiConverterTypeLanguagePair_lift(
     try! rustCall {
-      uniffi_beyondtranslate_runtime_fn_func_echo_language_pair(
+      uniffi_linguaray_runtime_fn_func_echo_language_pair(
         FfiConverterTypeLanguagePair_lower(languagePair), $0
       )
     })
@@ -8594,7 +8578,7 @@ public func echoLanguagePair(languagePair: LanguagePair) -> LanguagePair {
 public func echoLookUpRequest(request: LookUpRequest) -> LookUpRequest {
   return try! FfiConverterTypeLookUpRequest_lift(
     try! rustCall {
-      uniffi_beyondtranslate_runtime_fn_func_echo_look_up_request(
+      uniffi_linguaray_runtime_fn_func_echo_look_up_request(
         FfiConverterTypeLookUpRequest_lower(request), $0
       )
     })
@@ -8602,7 +8586,7 @@ public func echoLookUpRequest(request: LookUpRequest) -> LookUpRequest {
 public func echoLookUpResponse(response: LookUpResponse) -> LookUpResponse {
   return try! FfiConverterTypeLookUpResponse_lift(
     try! rustCall {
-      uniffi_beyondtranslate_runtime_fn_func_echo_look_up_response(
+      uniffi_linguaray_runtime_fn_func_echo_look_up_response(
         FfiConverterTypeLookUpResponse_lower(response), $0
       )
     })
@@ -8610,7 +8594,7 @@ public func echoLookUpResponse(response: LookUpResponse) -> LookUpResponse {
 public func echoRecognizeTextRequest(request: RecognizeTextRequest) -> RecognizeTextRequest {
   return try! FfiConverterTypeRecognizeTextRequest_lift(
     try! rustCall {
-      uniffi_beyondtranslate_runtime_fn_func_echo_recognize_text_request(
+      uniffi_linguaray_runtime_fn_func_echo_recognize_text_request(
         FfiConverterTypeRecognizeTextRequest_lower(request), $0
       )
     })
@@ -8618,7 +8602,7 @@ public func echoRecognizeTextRequest(request: RecognizeTextRequest) -> Recognize
 public func echoRecognizeTextResponse(response: RecognizeTextResponse) -> RecognizeTextResponse {
   return try! FfiConverterTypeRecognizeTextResponse_lift(
     try! rustCall {
-      uniffi_beyondtranslate_runtime_fn_func_echo_recognize_text_response(
+      uniffi_linguaray_runtime_fn_func_echo_recognize_text_response(
         FfiConverterTypeRecognizeTextResponse_lower(response), $0
       )
     })
@@ -8626,7 +8610,7 @@ public func echoRecognizeTextResponse(response: RecognizeTextResponse) -> Recogn
 public func echoRecognizedRect(rect: RecognizedRect) -> RecognizedRect {
   return try! FfiConverterTypeRecognizedRect_lift(
     try! rustCall {
-      uniffi_beyondtranslate_runtime_fn_func_echo_recognized_rect(
+      uniffi_linguaray_runtime_fn_func_echo_recognized_rect(
         FfiConverterTypeRecognizedRect_lower(rect), $0
       )
     })
@@ -8634,7 +8618,7 @@ public func echoRecognizedRect(rect: RecognizedRect) -> RecognizedRect {
 public func echoTextDetection(textDetection: TextDetection) -> TextDetection {
   return try! FfiConverterTypeTextDetection_lift(
     try! rustCall {
-      uniffi_beyondtranslate_runtime_fn_func_echo_text_detection(
+      uniffi_linguaray_runtime_fn_func_echo_text_detection(
         FfiConverterTypeTextDetection_lower(textDetection), $0
       )
     })
@@ -8642,7 +8626,7 @@ public func echoTextDetection(textDetection: TextDetection) -> TextDetection {
 public func echoTextRecognition(recognition: TextRecognition) -> TextRecognition {
   return try! FfiConverterTypeTextRecognition_lift(
     try! rustCall {
-      uniffi_beyondtranslate_runtime_fn_func_echo_text_recognition(
+      uniffi_linguaray_runtime_fn_func_echo_text_recognition(
         FfiConverterTypeTextRecognition_lower(recognition), $0
       )
     })
@@ -8650,7 +8634,7 @@ public func echoTextRecognition(recognition: TextRecognition) -> TextRecognition
 public func echoTextTranslation(textTranslation: TextTranslation) -> TextTranslation {
   return try! FfiConverterTypeTextTranslation_lift(
     try! rustCall {
-      uniffi_beyondtranslate_runtime_fn_func_echo_text_translation(
+      uniffi_linguaray_runtime_fn_func_echo_text_translation(
         FfiConverterTypeTextTranslation_lower(textTranslation), $0
       )
     })
@@ -8658,7 +8642,7 @@ public func echoTextTranslation(textTranslation: TextTranslation) -> TextTransla
 public func echoTranslateRequest(request: TranslateRequest) -> TranslateRequest {
   return try! FfiConverterTypeTranslateRequest_lift(
     try! rustCall {
-      uniffi_beyondtranslate_runtime_fn_func_echo_translate_request(
+      uniffi_linguaray_runtime_fn_func_echo_translate_request(
         FfiConverterTypeTranslateRequest_lower(request), $0
       )
     })
@@ -8666,7 +8650,7 @@ public func echoTranslateRequest(request: TranslateRequest) -> TranslateRequest 
 public func echoTranslateResponse(response: TranslateResponse) -> TranslateResponse {
   return try! FfiConverterTypeTranslateResponse_lift(
     try! rustCall {
-      uniffi_beyondtranslate_runtime_fn_func_echo_translate_response(
+      uniffi_linguaray_runtime_fn_func_echo_translate_response(
         FfiConverterTypeTranslateResponse_lower(response), $0
       )
     })
@@ -8674,7 +8658,7 @@ public func echoTranslateResponse(response: TranslateResponse) -> TranslateRespo
 public func echoWordDefinition(wordDefinition: WordDefinition) -> WordDefinition {
   return try! FfiConverterTypeWordDefinition_lift(
     try! rustCall {
-      uniffi_beyondtranslate_runtime_fn_func_echo_word_definition(
+      uniffi_linguaray_runtime_fn_func_echo_word_definition(
         FfiConverterTypeWordDefinition_lower(wordDefinition), $0
       )
     })
@@ -8682,7 +8666,7 @@ public func echoWordDefinition(wordDefinition: WordDefinition) -> WordDefinition
 public func echoWordEtymology(wordEtymology: WordEtymology) -> WordEtymology {
   return try! FfiConverterTypeWordEtymology_lift(
     try! rustCall {
-      uniffi_beyondtranslate_runtime_fn_func_echo_word_etymology(
+      uniffi_linguaray_runtime_fn_func_echo_word_etymology(
         FfiConverterTypeWordEtymology_lower(wordEtymology), $0
       )
     })
@@ -8690,7 +8674,7 @@ public func echoWordEtymology(wordEtymology: WordEtymology) -> WordEtymology {
 public func echoWordImage(wordImage: WordImage) -> WordImage {
   return try! FfiConverterTypeWordImage_lift(
     try! rustCall {
-      uniffi_beyondtranslate_runtime_fn_func_echo_word_image(
+      uniffi_linguaray_runtime_fn_func_echo_word_image(
         FfiConverterTypeWordImage_lower(wordImage), $0
       )
     })
@@ -8698,7 +8682,7 @@ public func echoWordImage(wordImage: WordImage) -> WordImage {
 public func echoWordPhrase(wordPhrase: WordPhrase) -> WordPhrase {
   return try! FfiConverterTypeWordPhrase_lift(
     try! rustCall {
-      uniffi_beyondtranslate_runtime_fn_func_echo_word_phrase(
+      uniffi_linguaray_runtime_fn_func_echo_word_phrase(
         FfiConverterTypeWordPhrase_lower(wordPhrase), $0
       )
     })
@@ -8706,7 +8690,7 @@ public func echoWordPhrase(wordPhrase: WordPhrase) -> WordPhrase {
 public func echoWordPronunciation(wordPronunciation: WordPronunciation) -> WordPronunciation {
   return try! FfiConverterTypeWordPronunciation_lift(
     try! rustCall {
-      uniffi_beyondtranslate_runtime_fn_func_echo_word_pronunciation(
+      uniffi_linguaray_runtime_fn_func_echo_word_pronunciation(
         FfiConverterTypeWordPronunciation_lower(wordPronunciation), $0
       )
     })
@@ -8714,7 +8698,7 @@ public func echoWordPronunciation(wordPronunciation: WordPronunciation) -> WordP
 public func echoWordSentence(wordSentence: WordSentence) -> WordSentence {
   return try! FfiConverterTypeWordSentence_lift(
     try! rustCall {
-      uniffi_beyondtranslate_runtime_fn_func_echo_word_sentence(
+      uniffi_linguaray_runtime_fn_func_echo_word_sentence(
         FfiConverterTypeWordSentence_lower(wordSentence), $0
       )
     })
@@ -8722,7 +8706,7 @@ public func echoWordSentence(wordSentence: WordSentence) -> WordSentence {
 public func echoWordSynonym(wordSynonym: WordSynonym) -> WordSynonym {
   return try! FfiConverterTypeWordSynonym_lift(
     try! rustCall {
-      uniffi_beyondtranslate_runtime_fn_func_echo_word_synonym(
+      uniffi_linguaray_runtime_fn_func_echo_word_synonym(
         FfiConverterTypeWordSynonym_lower(wordSynonym), $0
       )
     })
@@ -8730,7 +8714,7 @@ public func echoWordSynonym(wordSynonym: WordSynonym) -> WordSynonym {
 public func echoWordTag(wordTag: WordTag) -> WordTag {
   return try! FfiConverterTypeWordTag_lift(
     try! rustCall {
-      uniffi_beyondtranslate_runtime_fn_func_echo_word_tag(
+      uniffi_linguaray_runtime_fn_func_echo_word_tag(
         FfiConverterTypeWordTag_lower(wordTag), $0
       )
     })
@@ -8738,7 +8722,7 @@ public func echoWordTag(wordTag: WordTag) -> WordTag {
 public func echoWordTense(wordTense: WordTense) -> WordTense {
   return try! FfiConverterTypeWordTense_lift(
     try! rustCall {
-      uniffi_beyondtranslate_runtime_fn_func_echo_word_tense(
+      uniffi_linguaray_runtime_fn_func_echo_word_tense(
         FfiConverterTypeWordTense_lower(wordTense), $0
       )
     })
@@ -8755,318 +8739,316 @@ private let initializationResult: InitializationResult = {
   // Get the bindings contract version from our ComponentInterface
   let bindings_contract_version = 30
   // Get the scaffolding contract version by calling the into the dylib
-  let scaffolding_contract_version = ffi_beyondtranslate_runtime_uniffi_contract_version()
+  let scaffolding_contract_version = ffi_linguaray_runtime_uniffi_contract_version()
   if bindings_contract_version != scaffolding_contract_version {
     return InitializationResult.contractVersionMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_func_echo_detect_language_request() != 60740 {
+  if uniffi_linguaray_runtime_checksum_func_echo_detect_language_request() != 6395 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_func_echo_detect_language_response() != 58261 {
+  if uniffi_linguaray_runtime_checksum_func_echo_detect_language_response() != 7460 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_func_echo_language_pair() != 17145 {
+  if uniffi_linguaray_runtime_checksum_func_echo_language_pair() != 61094 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_func_echo_look_up_request() != 38085 {
+  if uniffi_linguaray_runtime_checksum_func_echo_look_up_request() != 49925 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_func_echo_look_up_response() != 13954 {
+  if uniffi_linguaray_runtime_checksum_func_echo_look_up_response() != 4792 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_func_echo_recognize_text_request() != 29735 {
+  if uniffi_linguaray_runtime_checksum_func_echo_recognize_text_request() != 53297 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_func_echo_recognize_text_response() != 47790 {
+  if uniffi_linguaray_runtime_checksum_func_echo_recognize_text_response() != 20171 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_func_echo_recognized_rect() != 52548 {
+  if uniffi_linguaray_runtime_checksum_func_echo_recognized_rect() != 16570 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_func_echo_text_detection() != 26624 {
+  if uniffi_linguaray_runtime_checksum_func_echo_text_detection() != 44916 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_func_echo_text_recognition() != 44304 {
+  if uniffi_linguaray_runtime_checksum_func_echo_text_recognition() != 32726 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_func_echo_text_translation() != 22433 {
+  if uniffi_linguaray_runtime_checksum_func_echo_text_translation() != 57788 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_func_echo_translate_request() != 15797 {
+  if uniffi_linguaray_runtime_checksum_func_echo_translate_request() != 11135 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_func_echo_translate_response() != 60824 {
+  if uniffi_linguaray_runtime_checksum_func_echo_translate_response() != 40431 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_func_echo_word_definition() != 13074 {
+  if uniffi_linguaray_runtime_checksum_func_echo_word_definition() != 6951 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_func_echo_word_etymology() != 13993 {
+  if uniffi_linguaray_runtime_checksum_func_echo_word_etymology() != 11041 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_func_echo_word_image() != 48917 {
+  if uniffi_linguaray_runtime_checksum_func_echo_word_image() != 30922 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_func_echo_word_phrase() != 25809 {
+  if uniffi_linguaray_runtime_checksum_func_echo_word_phrase() != 24727 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_func_echo_word_pronunciation() != 34049 {
+  if uniffi_linguaray_runtime_checksum_func_echo_word_pronunciation() != 11656 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_func_echo_word_sentence() != 37267 {
+  if uniffi_linguaray_runtime_checksum_func_echo_word_sentence() != 45734 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_func_echo_word_synonym() != 27203 {
+  if uniffi_linguaray_runtime_checksum_func_echo_word_synonym() != 7204 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_func_echo_word_tag() != 60766 {
+  if uniffi_linguaray_runtime_checksum_func_echo_word_tag() != 37815 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_func_echo_word_tense() != 28625 {
+  if uniffi_linguaray_runtime_checksum_func_echo_word_tense() != 26227 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimeapiserver_info() != 36460 {
+  if uniffi_linguaray_runtime_checksum_method_runtimeapiserver_info() != 8149 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimeapiserver_stop() != 63804 {
+  if uniffi_linguaray_runtime_checksum_method_runtimeapiserver_stop() != 49630 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtime_dictionary() != 13965 {
+  if uniffi_linguaray_runtime_checksum_method_runtime_dictionary() != 16423 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtime_glossary() != 33226 {
+  if uniffi_linguaray_runtime_checksum_method_runtime_glossary() != 14175 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtime_history() != 28095 {
+  if uniffi_linguaray_runtime_checksum_method_runtime_history() != 14172 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtime_list_app_languages() != 62628 {
+  if uniffi_linguaray_runtime_checksum_method_runtime_list_app_languages() != 55126 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtime_list_languages() != 58600 {
+  if uniffi_linguaray_runtime_checksum_method_runtime_list_languages() != 51738 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtime_llm() != 58856 {
+  if uniffi_linguaray_runtime_checksum_method_runtime_llm() != 14942 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtime_ocr() != 40076 {
+  if uniffi_linguaray_runtime_checksum_method_runtime_ocr() != 36004 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtime_permission() != 10201 {
+  if uniffi_linguaray_runtime_checksum_method_runtime_permission() != 38074 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtime_settings() != 37764 {
+  if uniffi_linguaray_runtime_checksum_method_runtime_settings() != 26512 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtime_start_api_server() != 26599 {
+  if uniffi_linguaray_runtime_checksum_method_runtime_start_api_server() != 6527 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtime_text_extractor() != 21355 {
+  if uniffi_linguaray_runtime_checksum_method_runtime_text_extractor() != 60762 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtime_translation() != 36886 {
+  if uniffi_linguaray_runtime_checksum_method_runtime_translation() != 58975 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimedictionary_lookup() != 64628 {
+  if uniffi_linguaray_runtime_checksum_method_runtimedictionary_lookup() != 41773 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimeglossary_check() != 63423 {
+  if uniffi_linguaray_runtime_checksum_method_runtimeglossary_check() != 13948 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimeglossary_count_entries() != 55476 {
+  if uniffi_linguaray_runtime_checksum_method_runtimeglossary_count_entries() != 44215 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimeglossary_delete_book() != 16544 {
+  if uniffi_linguaray_runtime_checksum_method_runtimeglossary_delete_book() != 49149 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimeglossary_delete_entry() != 63607 {
+  if uniffi_linguaray_runtime_checksum_method_runtimeglossary_delete_entry() != 58587 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimeglossary_flush_hits() != 36653 {
+  if uniffi_linguaray_runtime_checksum_method_runtimeglossary_flush_hits() != 14399 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimeglossary_get_book() != 55021 {
+  if uniffi_linguaray_runtime_checksum_method_runtimeglossary_get_book() != 17114 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimeglossary_list_books() != 50485 {
+  if uniffi_linguaray_runtime_checksum_method_runtimeglossary_list_books() != 59735 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimeglossary_list_entries() != 44641 {
+  if uniffi_linguaray_runtime_checksum_method_runtimeglossary_list_entries() != 54433 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimeglossary_match_text() != 25986 {
+  if uniffi_linguaray_runtime_checksum_method_runtimeglossary_match_text() != 36972 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimeglossary_upsert_book() != 6404 {
+  if uniffi_linguaray_runtime_checksum_method_runtimeglossary_upsert_book() != 50056 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimeglossary_upsert_entry() != 60568 {
+  if uniffi_linguaray_runtime_checksum_method_runtimeglossary_upsert_entry() != 33639 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimehistory_counts() != 11944 {
+  if uniffi_linguaray_runtime_checksum_method_runtimehistory_counts() != 18206 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimehistory_delete_entries() != 28792 {
+  if uniffi_linguaray_runtime_checksum_method_runtimehistory_delete_entries() != 6382 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimehistory_list_entries() != 19749 {
+  if uniffi_linguaray_runtime_checksum_method_runtimehistory_list_entries() != 20079 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimehistory_set_favorite() != 31633 {
+  if uniffi_linguaray_runtime_checksum_method_runtimehistory_set_favorite() != 39465 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimehistory_upsert_entry() != 15258 {
+  if uniffi_linguaray_runtime_checksum_method_runtimehistory_upsert_entry() != 38058 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimellm_alternatives() != 63979 {
+  if uniffi_linguaray_runtime_checksum_method_runtimellm_alternatives() != 8857 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimellm_chat() != 7344 {
+  if uniffi_linguaray_runtime_checksum_method_runtimellm_chat() != 56944 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimellm_explain() != 52876 {
+  if uniffi_linguaray_runtime_checksum_method_runtimellm_explain() != 51688 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimellm_polish() != 19556 {
+  if uniffi_linguaray_runtime_checksum_method_runtimellm_polish() != 54993 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimellm_translate_stream() != 30677 {
+  if uniffi_linguaray_runtime_checksum_method_runtimellm_translate_stream() != 19511 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimeocr_recognize_text() != 10575 {
+  if uniffi_linguaray_runtime_checksum_method_runtimeocr_recognize_text() != 38562 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimepermission_is_accessibility_permission_granted()
-    != 49819
+  if uniffi_linguaray_runtime_checksum_method_runtimepermission_is_accessibility_permission_granted()
+    != 13464
   {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimepermission_is_screen_recording_permission_granted()
-    != 57183
+  if uniffi_linguaray_runtime_checksum_method_runtimepermission_is_screen_recording_permission_granted()
+    != 42396
   {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimepermission_request_accessibility_permission()
-    != 28036
+  if uniffi_linguaray_runtime_checksum_method_runtimepermission_request_accessibility_permission()
+    != 39655
   {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimepermission_request_screen_recording_permission()
-    != 9096
+  if uniffi_linguaray_runtime_checksum_method_runtimepermission_request_screen_recording_permission()
+    != 39088
   {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_delete_provider() != 20557 {
+  if uniffi_linguaray_runtime_checksum_method_runtimesettings_delete_provider() != 2747 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_delete_service() != 34145 {
+  if uniffi_linguaray_runtime_checksum_method_runtimesettings_delete_service() != 18787 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_generate_provider_id() != 9759 {
+  if uniffi_linguaray_runtime_checksum_method_runtimesettings_generate_provider_id() != 32771 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_get_active_translation_targets()
-    != 22616
+  if uniffi_linguaray_runtime_checksum_method_runtimesettings_get_active_translation_targets()
+    != 58548
   {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_get_advanced() != 3214 {
+  if uniffi_linguaray_runtime_checksum_method_runtimesettings_get_advanced() != 25561 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_get_appearance() != 54826 {
+  if uniffi_linguaray_runtime_checksum_method_runtimesettings_get_appearance() != 4650 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_get_general() != 54665 {
+  if uniffi_linguaray_runtime_checksum_method_runtimesettings_get_general() != 45042 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_get_json() != 31105 {
+  if uniffi_linguaray_runtime_checksum_method_runtimesettings_get_json() != 8367 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_get_provider() != 21807 {
+  if uniffi_linguaray_runtime_checksum_method_runtimesettings_get_provider() != 3200 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_get_service() != 11319 {
+  if uniffi_linguaray_runtime_checksum_method_runtimesettings_get_service() != 34868 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_get_shortcuts() != 44721 {
+  if uniffi_linguaray_runtime_checksum_method_runtimesettings_get_shortcuts() != 43726 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_list_models() != 22292 {
+  if uniffi_linguaray_runtime_checksum_method_runtimesettings_list_models() != 63054 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_list_providers() != 34940 {
+  if uniffi_linguaray_runtime_checksum_method_runtimesettings_list_providers() != 37023 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_list_services() != 5637 {
+  if uniffi_linguaray_runtime_checksum_method_runtimesettings_list_services() != 22013 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_reset_shortcuts() != 46222 {
+  if uniffi_linguaray_runtime_checksum_method_runtimesettings_reset_shortcuts() != 5146 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_set_provider_secrets() != 64081
+  if uniffi_linguaray_runtime_checksum_method_runtimesettings_set_provider_secrets() != 37353 {
+    return InitializationResult.apiChecksumMismatch
+  }
+  if uniffi_linguaray_runtime_checksum_method_runtimesettings_subscribe() != 61804 {
+    return InitializationResult.apiChecksumMismatch
+  }
+  if uniffi_linguaray_runtime_checksum_method_runtimesettings_update_advanced() != 40958 {
+    return InitializationResult.apiChecksumMismatch
+  }
+  if uniffi_linguaray_runtime_checksum_method_runtimesettings_update_appearance() != 33863 {
+    return InitializationResult.apiChecksumMismatch
+  }
+  if uniffi_linguaray_runtime_checksum_method_runtimesettings_update_general() != 40188 {
+    return InitializationResult.apiChecksumMismatch
+  }
+  if uniffi_linguaray_runtime_checksum_method_runtimesettings_update_provider() != 5640 {
+    return InitializationResult.apiChecksumMismatch
+  }
+  if uniffi_linguaray_runtime_checksum_method_runtimesettings_update_service() != 45329 {
+    return InitializationResult.apiChecksumMismatch
+  }
+  if uniffi_linguaray_runtime_checksum_method_runtimesettings_update_shortcuts() != 28763 {
+    return InitializationResult.apiChecksumMismatch
+  }
+  if uniffi_linguaray_runtime_checksum_method_runtimetextextractor_extract_from_clipboard() != 12972
   {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_subscribe() != 44725 {
-    return InitializationResult.apiChecksumMismatch
-  }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_update_advanced() != 46849 {
-    return InitializationResult.apiChecksumMismatch
-  }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_update_appearance() != 59073 {
-    return InitializationResult.apiChecksumMismatch
-  }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_update_general() != 47378 {
-    return InitializationResult.apiChecksumMismatch
-  }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_update_provider() != 46276 {
-    return InitializationResult.apiChecksumMismatch
-  }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_update_service() != 22489 {
-    return InitializationResult.apiChecksumMismatch
-  }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_update_shortcuts() != 11504 {
-    return InitializationResult.apiChecksumMismatch
-  }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimetextextractor_extract_from_clipboard()
-    != 61343
+  if uniffi_linguaray_runtime_checksum_method_runtimetextextractor_extract_from_screen_capture()
+    != 15072
   {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimetextextractor_extract_from_screen_capture()
-    != 38083
+  if uniffi_linguaray_runtime_checksum_method_runtimetextextractor_extract_from_screen_selection()
+    != 5216
   {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimetextextractor_extract_from_screen_selection()
-    != 57900
+  if uniffi_linguaray_runtime_checksum_method_runtimetextextractor_extract_from_screen_selection_detailed()
+    != 12534
   {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimetextextractor_extract_from_screen_selection_detailed()
-    != 35808
-  {
+  if uniffi_linguaray_runtime_checksum_method_runtimetranslation_detect_language() != 17562 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimetranslation_detect_language() != 29752 {
+  if uniffi_linguaray_runtime_checksum_method_runtimetranslation_translate() != 55464 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_runtimetranslation_translate() != 61207 {
+  if uniffi_linguaray_runtime_checksum_method_settingssubscription_next() != 52040 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_settingssubscription_next() != 20677 {
+  if uniffi_linguaray_runtime_checksum_constructor_runtime_new() != 29932 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_constructor_runtime_new() != 50884 {
+  if uniffi_linguaray_runtime_checksum_method_streamcallback_on_chunk() != 12210 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_streamcallback_on_chunk() != 51178 {
+  if uniffi_linguaray_runtime_checksum_method_streamcallback_on_finish() != 26362 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_beyondtranslate_runtime_checksum_method_streamcallback_on_finish() != 14728 {
-    return InitializationResult.apiChecksumMismatch
-  }
-  if uniffi_beyondtranslate_runtime_checksum_method_streamcallback_on_error() != 63263 {
+  if uniffi_linguaray_runtime_checksum_method_streamcallback_on_error() != 8985 {
     return InitializationResult.apiChecksumMismatch
   }
 
@@ -9076,7 +9058,7 @@ private let initializationResult: InitializationResult = {
 
 // Make the ensure init function public so that other modules which have external type references to
 // our types can call it.
-public func uniffiEnsureBeyondtranslateRuntimeInitialized() {
+public func uniffiEnsureLinguarayRuntimeInitialized() {
   switch initializationResult {
   case .ok:
     break

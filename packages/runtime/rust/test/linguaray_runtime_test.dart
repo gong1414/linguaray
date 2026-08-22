@@ -1,6 +1,6 @@
 import 'package:test/test.dart';
 
-import '../beyondtranslate_runtime.dart';
+import '../linguaray_runtime.dart';
 
 void main() {
   test('core model bindings round trip', () {

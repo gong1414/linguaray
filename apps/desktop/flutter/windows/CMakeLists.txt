@@ -95,7 +95,7 @@ if(PLUGIN_BUNDLED_LIBRARIES)
 endif()
 
 # Copy native assets produced by package build hooks (including the Rust
-# beyondtranslate_runtime DLL) next to the LinguaRay executable.
+# linguaray_runtime DLL) next to the LinguaRay executable.
 set(NATIVE_ASSETS_DIR "${PROJECT_BUILD_DIR}native_assets/windows/")
 install(DIRECTORY "${NATIVE_ASSETS_DIR}"
   DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"

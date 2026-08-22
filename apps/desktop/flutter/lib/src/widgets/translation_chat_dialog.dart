@@ -1,5 +1,5 @@
-import 'package:beyondtranslate_runtime/beyondtranslate_runtime.dart';
 import 'package:flutter/material.dart';
+import 'package:linguaray_runtime/linguaray_runtime.dart';
 
 import '../services/runtime.dart';
 import 'app_dialog.dart';

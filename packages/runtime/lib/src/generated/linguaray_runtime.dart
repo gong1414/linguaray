@@ -1,4 +1,4 @@
-library beyondtranslate_runtime;
+library linguaray_runtime;
 
 import "dart:async";
 import "dart:convert";
@@ -4605,7 +4605,7 @@ abstract class RuntimeApiServerInterface {
 
 final _RuntimeApiServerFinalizer = Finalizer<Pointer<Void>>((ptr) {
   rustCall((status) =>
-      uniffi_beyondtranslate_runtime_fn_free_runtimeapiserver(ptr, status));
+      uniffi_linguaray_runtime_fn_free_runtimeapiserver(ptr, status));
 });
 
 class RuntimeApiServer implements RuntimeApiServerInterface {
@@ -4622,7 +4622,7 @@ class RuntimeApiServer implements RuntimeApiServerInterface {
 
   Pointer<Void> uniffiClonePointer() {
     return rustCall((status) =>
-        uniffi_beyondtranslate_runtime_fn_clone_runtimeapiserver(_ptr, status));
+        uniffi_linguaray_runtime_fn_clone_runtimeapiserver(_ptr, status));
   }
 
   static int allocationSize(RuntimeApiServer value) {
@@ -4644,21 +4644,20 @@ class RuntimeApiServer implements RuntimeApiServerInterface {
   void dispose() {
     _RuntimeApiServerFinalizer.detach(this);
     rustCall((status) =>
-        uniffi_beyondtranslate_runtime_fn_free_runtimeapiserver(_ptr, status));
+        uniffi_linguaray_runtime_fn_free_runtimeapiserver(_ptr, status));
   }
 
   ApiServerInfo info() {
     return rustCallWithLifter(
-        (status) =>
-            uniffi_beyondtranslate_runtime_fn_method_runtimeapiserver_info(
-                uniffiClonePointer(), status),
+        (status) => uniffi_linguaray_runtime_fn_method_runtimeapiserver_info(
+            uniffiClonePointer(), status),
         FfiConverterApiServerInfo.lift,
         null);
   }
 
   void stop() {
     return rustCall((status) {
-      uniffi_beyondtranslate_runtime_fn_method_runtimeapiserver_stop(
+      uniffi_linguaray_runtime_fn_method_runtimeapiserver_stop(
           uniffiClonePointer(), status);
     }, null);
   }
@@ -4691,8 +4690,7 @@ abstract class RuntimeInterface {
 }
 
 final _RuntimeFinalizer = Finalizer<Pointer<Void>>((ptr) {
-  rustCall(
-      (status) => uniffi_beyondtranslate_runtime_fn_free_runtime(ptr, status));
+  rustCall((status) => uniffi_linguaray_runtime_fn_free_runtime(ptr, status));
 });
 
 class Runtime implements RuntimeInterface {
@@ -4703,9 +4701,8 @@ class Runtime implements RuntimeInterface {
   Runtime({
     required String dataDir,
   }) : _ptr = rustCall(
-            (status) =>
-                uniffi_beyondtranslate_runtime_fn_constructor_runtime_new(
-                    FfiConverterString.lower(dataDir), status),
+            (status) => uniffi_linguaray_runtime_fn_constructor_runtime_new(
+                FfiConverterString.lower(dataDir), status),
             runtimeExceptionErrorHandler) {
     _RuntimeFinalizer.attach(this, _ptr, detach: this);
   }
@@ -4717,8 +4714,8 @@ class Runtime implements RuntimeInterface {
   }
 
   Pointer<Void> uniffiClonePointer() {
-    return rustCall((status) =>
-        uniffi_beyondtranslate_runtime_fn_clone_runtime(_ptr, status));
+    return rustCall(
+        (status) => uniffi_linguaray_runtime_fn_clone_runtime(_ptr, status));
   }
 
   static int allocationSize(Runtime value) {
@@ -4739,15 +4736,15 @@ class Runtime implements RuntimeInterface {
 
   void dispose() {
     _RuntimeFinalizer.detach(this);
-    rustCall((status) =>
-        uniffi_beyondtranslate_runtime_fn_free_runtime(_ptr, status));
+    rustCall(
+        (status) => uniffi_linguaray_runtime_fn_free_runtime(_ptr, status));
   }
 
   RuntimeDictionary dictionary({
     required String providerId,
   }) {
     return rustCallWithLifter(
-        (status) => uniffi_beyondtranslate_runtime_fn_method_runtime_dictionary(
+        (status) => uniffi_linguaray_runtime_fn_method_runtime_dictionary(
             uniffiClonePointer(), FfiConverterString.lower(providerId), status),
         RuntimeDictionary.lift,
         runtimeExceptionErrorHandler);
@@ -4755,7 +4752,7 @@ class Runtime implements RuntimeInterface {
 
   RuntimeGlossary glossary() {
     return rustCallWithLifter(
-        (status) => uniffi_beyondtranslate_runtime_fn_method_runtime_glossary(
+        (status) => uniffi_linguaray_runtime_fn_method_runtime_glossary(
             uniffiClonePointer(), status),
         RuntimeGlossary.lift,
         null);
@@ -4763,7 +4760,7 @@ class Runtime implements RuntimeInterface {
 
   RuntimeHistory history() {
     return rustCallWithLifter(
-        (status) => uniffi_beyondtranslate_runtime_fn_method_runtime_history(
+        (status) => uniffi_linguaray_runtime_fn_method_runtime_history(
             uniffiClonePointer(), status),
         RuntimeHistory.lift,
         null);
@@ -4772,7 +4769,7 @@ class Runtime implements RuntimeInterface {
   List<LanguageInfo> listAppLanguages() {
     return rustCallWithLifter(
         (status) =>
-            uniffi_beyondtranslate_runtime_fn_method_runtime_list_app_languages(
+            uniffi_linguaray_runtime_fn_method_runtime_list_app_languages(
                 uniffiClonePointer(), status),
         FfiConverterSequenceLanguageInfo.lift,
         null);
@@ -4780,9 +4777,8 @@ class Runtime implements RuntimeInterface {
 
   List<LanguageInfo> listLanguages() {
     return rustCallWithLifter(
-        (status) =>
-            uniffi_beyondtranslate_runtime_fn_method_runtime_list_languages(
-                uniffiClonePointer(), status),
+        (status) => uniffi_linguaray_runtime_fn_method_runtime_list_languages(
+            uniffiClonePointer(), status),
         FfiConverterSequenceLanguageInfo.lift,
         null);
   }
@@ -4791,7 +4787,7 @@ class Runtime implements RuntimeInterface {
     required String providerId,
   }) {
     return rustCallWithLifter(
-        (status) => uniffi_beyondtranslate_runtime_fn_method_runtime_llm(
+        (status) => uniffi_linguaray_runtime_fn_method_runtime_llm(
             uniffiClonePointer(), FfiConverterString.lower(providerId), status),
         RuntimeLlm.lift,
         runtimeExceptionErrorHandler);
@@ -4801,7 +4797,7 @@ class Runtime implements RuntimeInterface {
     required String providerId,
   }) {
     return rustCallWithLifter(
-        (status) => uniffi_beyondtranslate_runtime_fn_method_runtime_ocr(
+        (status) => uniffi_linguaray_runtime_fn_method_runtime_ocr(
             uniffiClonePointer(), FfiConverterString.lower(providerId), status),
         RuntimeOcr.lift,
         runtimeExceptionErrorHandler);
@@ -4809,7 +4805,7 @@ class Runtime implements RuntimeInterface {
 
   RuntimePermission permission() {
     return rustCallWithLifter(
-        (status) => uniffi_beyondtranslate_runtime_fn_method_runtime_permission(
+        (status) => uniffi_linguaray_runtime_fn_method_runtime_permission(
             uniffiClonePointer(), status),
         RuntimePermission.lift,
         null);
@@ -4817,7 +4813,7 @@ class Runtime implements RuntimeInterface {
 
   RuntimeSettings settings() {
     return rustCallWithLifter(
-        (status) => uniffi_beyondtranslate_runtime_fn_method_runtime_settings(
+        (status) => uniffi_linguaray_runtime_fn_method_runtime_settings(
             uniffiClonePointer(), status),
         RuntimeSettings.lift,
         null);
@@ -4828,21 +4824,19 @@ class Runtime implements RuntimeInterface {
     required int port,
   }) {
     return rustCallWithLifter(
-        (status) =>
-            uniffi_beyondtranslate_runtime_fn_method_runtime_start_api_server(
-                uniffiClonePointer(),
-                FfiConverterString.lower(host),
-                FfiConverterUInt16.lower(port),
-                status),
+        (status) => uniffi_linguaray_runtime_fn_method_runtime_start_api_server(
+            uniffiClonePointer(),
+            FfiConverterString.lower(host),
+            FfiConverterUInt16.lower(port),
+            status),
         RuntimeApiServer.lift,
         runtimeExceptionErrorHandler);
   }
 
   RuntimeTextExtractor textExtractor() {
     return rustCallWithLifter(
-        (status) =>
-            uniffi_beyondtranslate_runtime_fn_method_runtime_text_extractor(
-                uniffiClonePointer(), status),
+        (status) => uniffi_linguaray_runtime_fn_method_runtime_text_extractor(
+            uniffiClonePointer(), status),
         RuntimeTextExtractor.lift,
         null);
   }
@@ -4851,11 +4845,8 @@ class Runtime implements RuntimeInterface {
     required String providerId,
   }) {
     return rustCallWithLifter(
-        (status) =>
-            uniffi_beyondtranslate_runtime_fn_method_runtime_translation(
-                uniffiClonePointer(),
-                FfiConverterString.lower(providerId),
-                status),
+        (status) => uniffi_linguaray_runtime_fn_method_runtime_translation(
+            uniffiClonePointer(), FfiConverterString.lower(providerId), status),
         RuntimeTranslation.lift,
         runtimeExceptionErrorHandler);
   }
@@ -4869,7 +4860,7 @@ abstract class RuntimeDictionaryInterface {
 
 final _RuntimeDictionaryFinalizer = Finalizer<Pointer<Void>>((ptr) {
   rustCall((status) =>
-      uniffi_beyondtranslate_runtime_fn_free_runtimedictionary(ptr, status));
+      uniffi_linguaray_runtime_fn_free_runtimedictionary(ptr, status));
 });
 
 class RuntimeDictionary implements RuntimeDictionaryInterface {
@@ -4886,8 +4877,7 @@ class RuntimeDictionary implements RuntimeDictionaryInterface {
 
   Pointer<Void> uniffiClonePointer() {
     return rustCall((status) =>
-        uniffi_beyondtranslate_runtime_fn_clone_runtimedictionary(
-            _ptr, status));
+        uniffi_linguaray_runtime_fn_clone_runtimedictionary(_ptr, status));
   }
 
   static int allocationSize(RuntimeDictionary value) {
@@ -4909,20 +4899,20 @@ class RuntimeDictionary implements RuntimeDictionaryInterface {
   void dispose() {
     _RuntimeDictionaryFinalizer.detach(this);
     rustCall((status) =>
-        uniffi_beyondtranslate_runtime_fn_free_runtimedictionary(_ptr, status));
+        uniffi_linguaray_runtime_fn_free_runtimedictionary(_ptr, status));
   }
 
   Future<LookUpResponse> lookup({
     required LookUpRequest request,
   }) {
     return uniffiRustCallAsync(
-      () => uniffi_beyondtranslate_runtime_fn_method_runtimedictionary_lookup(
+      () => uniffi_linguaray_runtime_fn_method_runtimedictionary_lookup(
         uniffiClonePointer(),
         FfiConverterLookUpRequest.lower(request),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
       FfiConverterLookUpResponse.lift,
       runtimeExceptionErrorHandler,
     );
@@ -4974,7 +4964,7 @@ abstract class RuntimeGlossaryInterface {
 
 final _RuntimeGlossaryFinalizer = Finalizer<Pointer<Void>>((ptr) {
   rustCall((status) =>
-      uniffi_beyondtranslate_runtime_fn_free_runtimeglossary(ptr, status));
+      uniffi_linguaray_runtime_fn_free_runtimeglossary(ptr, status));
 });
 
 class RuntimeGlossary implements RuntimeGlossaryInterface {
@@ -4991,7 +4981,7 @@ class RuntimeGlossary implements RuntimeGlossaryInterface {
 
   Pointer<Void> uniffiClonePointer() {
     return rustCall((status) =>
-        uniffi_beyondtranslate_runtime_fn_clone_runtimeglossary(_ptr, status));
+        uniffi_linguaray_runtime_fn_clone_runtimeglossary(_ptr, status));
   }
 
   static int allocationSize(RuntimeGlossary value) {
@@ -5013,7 +5003,7 @@ class RuntimeGlossary implements RuntimeGlossaryInterface {
   void dispose() {
     _RuntimeGlossaryFinalizer.detach(this);
     rustCall((status) =>
-        uniffi_beyondtranslate_runtime_fn_free_runtimeglossary(_ptr, status));
+        uniffi_linguaray_runtime_fn_free_runtimeglossary(_ptr, status));
   }
 
   Future<List<GlossaryComplianceIssue>> check({
@@ -5023,16 +5013,16 @@ class RuntimeGlossary implements RuntimeGlossaryInterface {
     required String? targetLanguage,
   }) {
     return uniffiRustCallAsync(
-      () => uniffi_beyondtranslate_runtime_fn_method_runtimeglossary_check(
+      () => uniffi_linguaray_runtime_fn_method_runtimeglossary_check(
         uniffiClonePointer(),
         FfiConverterString.lower(source),
         FfiConverterString.lower(translated),
         FfiConverterOptionalString.lower(sourceLanguage),
         FfiConverterOptionalString.lower(targetLanguage),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
       FfiConverterSequenceGlossaryComplianceIssue.lift,
       runtimeExceptionErrorHandler,
     );
@@ -5043,15 +5033,14 @@ class RuntimeGlossary implements RuntimeGlossaryInterface {
     required String? query,
   }) {
     return uniffiRustCallAsync(
-      () =>
-          uniffi_beyondtranslate_runtime_fn_method_runtimeglossary_count_entries(
+      () => uniffi_linguaray_runtime_fn_method_runtimeglossary_count_entries(
         uniffiClonePointer(),
         FfiConverterString.lower(bookId),
         FfiConverterOptionalString.lower(query),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_u32,
-      ffi_beyondtranslate_runtime_rust_future_complete_u32,
-      ffi_beyondtranslate_runtime_rust_future_free_u32,
+      ffi_linguaray_runtime_rust_future_poll_u32,
+      ffi_linguaray_runtime_rust_future_complete_u32,
+      ffi_linguaray_runtime_rust_future_free_u32,
       FfiConverterUInt32.lift,
       runtimeExceptionErrorHandler,
     );
@@ -5061,14 +5050,13 @@ class RuntimeGlossary implements RuntimeGlossaryInterface {
     required String bookId,
   }) {
     return uniffiRustCallAsync(
-      () =>
-          uniffi_beyondtranslate_runtime_fn_method_runtimeglossary_delete_book(
+      () => uniffi_linguaray_runtime_fn_method_runtimeglossary_delete_book(
         uniffiClonePointer(),
         FfiConverterString.lower(bookId),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_i8,
-      ffi_beyondtranslate_runtime_rust_future_complete_i8,
-      ffi_beyondtranslate_runtime_rust_future_free_i8,
+      ffi_linguaray_runtime_rust_future_poll_i8,
+      ffi_linguaray_runtime_rust_future_complete_i8,
+      ffi_linguaray_runtime_rust_future_free_i8,
       FfiConverterBool.lift,
       runtimeExceptionErrorHandler,
     );
@@ -5079,15 +5067,14 @@ class RuntimeGlossary implements RuntimeGlossaryInterface {
     required String entryId,
   }) {
     return uniffiRustCallAsync(
-      () =>
-          uniffi_beyondtranslate_runtime_fn_method_runtimeglossary_delete_entry(
+      () => uniffi_linguaray_runtime_fn_method_runtimeglossary_delete_entry(
         uniffiClonePointer(),
         FfiConverterString.lower(bookId),
         FfiConverterString.lower(entryId),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_i8,
-      ffi_beyondtranslate_runtime_rust_future_complete_i8,
-      ffi_beyondtranslate_runtime_rust_future_free_i8,
+      ffi_linguaray_runtime_rust_future_poll_i8,
+      ffi_linguaray_runtime_rust_future_complete_i8,
+      ffi_linguaray_runtime_rust_future_free_i8,
       FfiConverterBool.lift,
       runtimeExceptionErrorHandler,
     );
@@ -5095,12 +5082,12 @@ class RuntimeGlossary implements RuntimeGlossaryInterface {
 
   Future<void> flushHits() {
     return uniffiRustCallAsync(
-      () => uniffi_beyondtranslate_runtime_fn_method_runtimeglossary_flush_hits(
+      () => uniffi_linguaray_runtime_fn_method_runtimeglossary_flush_hits(
         uniffiClonePointer(),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_void,
-      ffi_beyondtranslate_runtime_rust_future_complete_void,
-      ffi_beyondtranslate_runtime_rust_future_free_void,
+      ffi_linguaray_runtime_rust_future_poll_void,
+      ffi_linguaray_runtime_rust_future_complete_void,
+      ffi_linguaray_runtime_rust_future_free_void,
       (_) {},
       runtimeExceptionErrorHandler,
     );
@@ -5110,13 +5097,13 @@ class RuntimeGlossary implements RuntimeGlossaryInterface {
     required String bookId,
   }) {
     return uniffiRustCallAsync(
-      () => uniffi_beyondtranslate_runtime_fn_method_runtimeglossary_get_book(
+      () => uniffi_linguaray_runtime_fn_method_runtimeglossary_get_book(
         uniffiClonePointer(),
         FfiConverterString.lower(bookId),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
       FfiConverterOptionalGlossaryBook.lift,
       runtimeExceptionErrorHandler,
     );
@@ -5124,12 +5111,12 @@ class RuntimeGlossary implements RuntimeGlossaryInterface {
 
   Future<List<GlossaryBook>> listBooks() {
     return uniffiRustCallAsync(
-      () => uniffi_beyondtranslate_runtime_fn_method_runtimeglossary_list_books(
+      () => uniffi_linguaray_runtime_fn_method_runtimeglossary_list_books(
         uniffiClonePointer(),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
       FfiConverterSequenceGlossaryBook.lift,
       runtimeExceptionErrorHandler,
     );
@@ -5142,17 +5129,16 @@ class RuntimeGlossary implements RuntimeGlossaryInterface {
     required int limit,
   }) {
     return uniffiRustCallAsync(
-      () =>
-          uniffi_beyondtranslate_runtime_fn_method_runtimeglossary_list_entries(
+      () => uniffi_linguaray_runtime_fn_method_runtimeglossary_list_entries(
         uniffiClonePointer(),
         FfiConverterString.lower(bookId),
         FfiConverterOptionalString.lower(query),
         FfiConverterUInt32.lower(offset),
         FfiConverterUInt32.lower(limit),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
       FfiConverterSequenceGlossaryEntry.lift,
       runtimeExceptionErrorHandler,
     );
@@ -5164,15 +5150,15 @@ class RuntimeGlossary implements RuntimeGlossaryInterface {
     required String? targetLanguage,
   }) {
     return uniffiRustCallAsync(
-      () => uniffi_beyondtranslate_runtime_fn_method_runtimeglossary_match_text(
+      () => uniffi_linguaray_runtime_fn_method_runtimeglossary_match_text(
         uniffiClonePointer(),
         FfiConverterString.lower(text),
         FfiConverterOptionalString.lower(sourceLanguage),
         FfiConverterOptionalString.lower(targetLanguage),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
       FfiConverterSequenceGlossaryMatch.lift,
       runtimeExceptionErrorHandler,
     );
@@ -5182,14 +5168,13 @@ class RuntimeGlossary implements RuntimeGlossaryInterface {
     required GlossaryBookInput input,
   }) {
     return uniffiRustCallAsync(
-      () =>
-          uniffi_beyondtranslate_runtime_fn_method_runtimeglossary_upsert_book(
+      () => uniffi_linguaray_runtime_fn_method_runtimeglossary_upsert_book(
         uniffiClonePointer(),
         FfiConverterGlossaryBookInput.lower(input),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
       FfiConverterGlossaryBook.lift,
       runtimeExceptionErrorHandler,
     );
@@ -5200,15 +5185,14 @@ class RuntimeGlossary implements RuntimeGlossaryInterface {
     required GlossaryEntryInput input,
   }) {
     return uniffiRustCallAsync(
-      () =>
-          uniffi_beyondtranslate_runtime_fn_method_runtimeglossary_upsert_entry(
+      () => uniffi_linguaray_runtime_fn_method_runtimeglossary_upsert_entry(
         uniffiClonePointer(),
         FfiConverterString.lower(bookId),
         FfiConverterGlossaryEntryInput.lower(input),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
       FfiConverterGlossaryEntry.lift,
       runtimeExceptionErrorHandler,
     );
@@ -5234,8 +5218,8 @@ abstract class RuntimeHistoryInterface {
 }
 
 final _RuntimeHistoryFinalizer = Finalizer<Pointer<Void>>((ptr) {
-  rustCall((status) =>
-      uniffi_beyondtranslate_runtime_fn_free_runtimehistory(ptr, status));
+  rustCall(
+      (status) => uniffi_linguaray_runtime_fn_free_runtimehistory(ptr, status));
 });
 
 class RuntimeHistory implements RuntimeHistoryInterface {
@@ -5252,7 +5236,7 @@ class RuntimeHistory implements RuntimeHistoryInterface {
 
   Pointer<Void> uniffiClonePointer() {
     return rustCall((status) =>
-        uniffi_beyondtranslate_runtime_fn_clone_runtimehistory(_ptr, status));
+        uniffi_linguaray_runtime_fn_clone_runtimehistory(_ptr, status));
   }
 
   static int allocationSize(RuntimeHistory value) {
@@ -5274,17 +5258,17 @@ class RuntimeHistory implements RuntimeHistoryInterface {
   void dispose() {
     _RuntimeHistoryFinalizer.detach(this);
     rustCall((status) =>
-        uniffi_beyondtranslate_runtime_fn_free_runtimehistory(_ptr, status));
+        uniffi_linguaray_runtime_fn_free_runtimehistory(_ptr, status));
   }
 
   Future<HistoryCounts> counts() {
     return uniffiRustCallAsync(
-      () => uniffi_beyondtranslate_runtime_fn_method_runtimehistory_counts(
+      () => uniffi_linguaray_runtime_fn_method_runtimehistory_counts(
         uniffiClonePointer(),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
       FfiConverterHistoryCounts.lift,
       runtimeExceptionErrorHandler,
     );
@@ -5294,14 +5278,13 @@ class RuntimeHistory implements RuntimeHistoryInterface {
     required List<String> entryIds,
   }) {
     return uniffiRustCallAsync(
-      () =>
-          uniffi_beyondtranslate_runtime_fn_method_runtimehistory_delete_entries(
+      () => uniffi_linguaray_runtime_fn_method_runtimehistory_delete_entries(
         uniffiClonePointer(),
         FfiConverterSequenceString.lower(entryIds),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_u32,
-      ffi_beyondtranslate_runtime_rust_future_complete_u32,
-      ffi_beyondtranslate_runtime_rust_future_free_u32,
+      ffi_linguaray_runtime_rust_future_poll_u32,
+      ffi_linguaray_runtime_rust_future_complete_u32,
+      ffi_linguaray_runtime_rust_future_free_u32,
       FfiConverterUInt32.lift,
       runtimeExceptionErrorHandler,
     );
@@ -5312,15 +5295,14 @@ class RuntimeHistory implements RuntimeHistoryInterface {
     required String? query,
   }) {
     return uniffiRustCallAsync(
-      () =>
-          uniffi_beyondtranslate_runtime_fn_method_runtimehistory_list_entries(
+      () => uniffi_linguaray_runtime_fn_method_runtimehistory_list_entries(
         uniffiClonePointer(),
         FfiConverterHistoryFilter.lower(filter),
         FfiConverterOptionalString.lower(query),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
       FfiConverterSequenceHistoryEntry.lift,
       runtimeExceptionErrorHandler,
     );
@@ -5331,15 +5313,14 @@ class RuntimeHistory implements RuntimeHistoryInterface {
     required bool favorite,
   }) {
     return uniffiRustCallAsync(
-      () =>
-          uniffi_beyondtranslate_runtime_fn_method_runtimehistory_set_favorite(
+      () => uniffi_linguaray_runtime_fn_method_runtimehistory_set_favorite(
         uniffiClonePointer(),
         FfiConverterString.lower(entryId),
         FfiConverterBool.lower(favorite),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
       FfiConverterOptionalHistoryEntry.lift,
       runtimeExceptionErrorHandler,
     );
@@ -5349,14 +5330,13 @@ class RuntimeHistory implements RuntimeHistoryInterface {
     required HistoryEntryInput input,
   }) {
     return uniffiRustCallAsync(
-      () =>
-          uniffi_beyondtranslate_runtime_fn_method_runtimehistory_upsert_entry(
+      () => uniffi_linguaray_runtime_fn_method_runtimehistory_upsert_entry(
         uniffiClonePointer(),
         FfiConverterHistoryEntryInput.lower(input),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
       FfiConverterHistoryEntry.lift,
       runtimeExceptionErrorHandler,
     );
@@ -5392,8 +5372,8 @@ abstract class RuntimeLlmInterface {
 }
 
 final _RuntimeLlmFinalizer = Finalizer<Pointer<Void>>((ptr) {
-  rustCall((status) =>
-      uniffi_beyondtranslate_runtime_fn_free_runtimellm(ptr, status));
+  rustCall(
+      (status) => uniffi_linguaray_runtime_fn_free_runtimellm(ptr, status));
 });
 
 class RuntimeLlm implements RuntimeLlmInterface {
@@ -5409,8 +5389,8 @@ class RuntimeLlm implements RuntimeLlmInterface {
   }
 
   Pointer<Void> uniffiClonePointer() {
-    return rustCall((status) =>
-        uniffi_beyondtranslate_runtime_fn_clone_runtimellm(_ptr, status));
+    return rustCall(
+        (status) => uniffi_linguaray_runtime_fn_clone_runtimellm(_ptr, status));
   }
 
   static int allocationSize(RuntimeLlm value) {
@@ -5431,8 +5411,8 @@ class RuntimeLlm implements RuntimeLlmInterface {
 
   void dispose() {
     _RuntimeLlmFinalizer.detach(this);
-    rustCall((status) =>
-        uniffi_beyondtranslate_runtime_fn_free_runtimellm(_ptr, status));
+    rustCall(
+        (status) => uniffi_linguaray_runtime_fn_free_runtimellm(_ptr, status));
   }
 
   Future<List<String>> alternatives({
@@ -5443,7 +5423,7 @@ class RuntimeLlm implements RuntimeLlmInterface {
     required String? style,
   }) {
     return uniffiRustCallAsync(
-      () => uniffi_beyondtranslate_runtime_fn_method_runtimellm_alternatives(
+      () => uniffi_linguaray_runtime_fn_method_runtimellm_alternatives(
         uniffiClonePointer(),
         FfiConverterString.lower(text),
         FfiConverterString.lower(sourceLang),
@@ -5451,9 +5431,9 @@ class RuntimeLlm implements RuntimeLlmInterface {
         FfiConverterUInt32.lower(count),
         FfiConverterOptionalString.lower(style),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
       FfiConverterSequenceString.lift,
       runtimeExceptionErrorHandler,
     );
@@ -5464,14 +5444,14 @@ class RuntimeLlm implements RuntimeLlmInterface {
     required List<ChatMessage> messages,
   }) {
     return uniffiRustCallAsync(
-      () => uniffi_beyondtranslate_runtime_fn_method_runtimellm_chat(
+      () => uniffi_linguaray_runtime_fn_method_runtimellm_chat(
         uniffiClonePointer(),
         FfiConverterString.lower(model),
         FfiConverterSequenceChatMessage.lower(messages),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
       FfiConverterChatResponse.lift,
       runtimeExceptionErrorHandler,
     );
@@ -5482,14 +5462,14 @@ class RuntimeLlm implements RuntimeLlmInterface {
     required String translation,
   }) {
     return uniffiRustCallAsync(
-      () => uniffi_beyondtranslate_runtime_fn_method_runtimellm_explain(
+      () => uniffi_linguaray_runtime_fn_method_runtimellm_explain(
         uniffiClonePointer(),
         FfiConverterString.lower(source),
         FfiConverterString.lower(translation),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
       FfiConverterString.lift,
       runtimeExceptionErrorHandler,
     );
@@ -5500,14 +5480,14 @@ class RuntimeLlm implements RuntimeLlmInterface {
     required String style,
   }) {
     return uniffiRustCallAsync(
-      () => uniffi_beyondtranslate_runtime_fn_method_runtimellm_polish(
+      () => uniffi_linguaray_runtime_fn_method_runtimellm_polish(
         uniffiClonePointer(),
         FfiConverterString.lower(text),
         FfiConverterString.lower(style),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
       FfiConverterString.lift,
       runtimeExceptionErrorHandler,
     );
@@ -5520,7 +5500,7 @@ class RuntimeLlm implements RuntimeLlmInterface {
     required StreamCallback callback,
   }) {
     return rustCall((status) {
-      uniffi_beyondtranslate_runtime_fn_method_runtimellm_translate_stream(
+      uniffi_linguaray_runtime_fn_method_runtimellm_translate_stream(
           uniffiClonePointer(),
           FfiConverterString.lower(sourceLang),
           FfiConverterString.lower(targetLang),
@@ -5538,8 +5518,8 @@ abstract class RuntimeOcrInterface {
 }
 
 final _RuntimeOcrFinalizer = Finalizer<Pointer<Void>>((ptr) {
-  rustCall((status) =>
-      uniffi_beyondtranslate_runtime_fn_free_runtimeocr(ptr, status));
+  rustCall(
+      (status) => uniffi_linguaray_runtime_fn_free_runtimeocr(ptr, status));
 });
 
 class RuntimeOcr implements RuntimeOcrInterface {
@@ -5555,8 +5535,8 @@ class RuntimeOcr implements RuntimeOcrInterface {
   }
 
   Pointer<Void> uniffiClonePointer() {
-    return rustCall((status) =>
-        uniffi_beyondtranslate_runtime_fn_clone_runtimeocr(_ptr, status));
+    return rustCall(
+        (status) => uniffi_linguaray_runtime_fn_clone_runtimeocr(_ptr, status));
   }
 
   static int allocationSize(RuntimeOcr value) {
@@ -5577,21 +5557,21 @@ class RuntimeOcr implements RuntimeOcrInterface {
 
   void dispose() {
     _RuntimeOcrFinalizer.detach(this);
-    rustCall((status) =>
-        uniffi_beyondtranslate_runtime_fn_free_runtimeocr(_ptr, status));
+    rustCall(
+        (status) => uniffi_linguaray_runtime_fn_free_runtimeocr(_ptr, status));
   }
 
   Future<RecognizeTextResponse> recognizeText({
     required RecognizeTextRequest request,
   }) {
     return uniffiRustCallAsync(
-      () => uniffi_beyondtranslate_runtime_fn_method_runtimeocr_recognize_text(
+      () => uniffi_linguaray_runtime_fn_method_runtimeocr_recognize_text(
         uniffiClonePointer(),
         FfiConverterRecognizeTextRequest.lower(request),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
       FfiConverterRecognizeTextResponse.lift,
       runtimeExceptionErrorHandler,
     );
@@ -5611,7 +5591,7 @@ abstract class RuntimePermissionInterface {
 
 final _RuntimePermissionFinalizer = Finalizer<Pointer<Void>>((ptr) {
   rustCall((status) =>
-      uniffi_beyondtranslate_runtime_fn_free_runtimepermission(ptr, status));
+      uniffi_linguaray_runtime_fn_free_runtimepermission(ptr, status));
 });
 
 class RuntimePermission implements RuntimePermissionInterface {
@@ -5628,8 +5608,7 @@ class RuntimePermission implements RuntimePermissionInterface {
 
   Pointer<Void> uniffiClonePointer() {
     return rustCall((status) =>
-        uniffi_beyondtranslate_runtime_fn_clone_runtimepermission(
-            _ptr, status));
+        uniffi_linguaray_runtime_fn_clone_runtimepermission(_ptr, status));
   }
 
   static int allocationSize(RuntimePermission value) {
@@ -5651,18 +5630,18 @@ class RuntimePermission implements RuntimePermissionInterface {
   void dispose() {
     _RuntimePermissionFinalizer.detach(this);
     rustCall((status) =>
-        uniffi_beyondtranslate_runtime_fn_free_runtimepermission(_ptr, status));
+        uniffi_linguaray_runtime_fn_free_runtimepermission(_ptr, status));
   }
 
   Future<bool> isAccessibilityPermissionGranted() {
     return uniffiRustCallAsync(
       () =>
-          uniffi_beyondtranslate_runtime_fn_method_runtimepermission_is_accessibility_permission_granted(
+          uniffi_linguaray_runtime_fn_method_runtimepermission_is_accessibility_permission_granted(
         uniffiClonePointer(),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_i8,
-      ffi_beyondtranslate_runtime_rust_future_complete_i8,
-      ffi_beyondtranslate_runtime_rust_future_free_i8,
+      ffi_linguaray_runtime_rust_future_poll_i8,
+      ffi_linguaray_runtime_rust_future_complete_i8,
+      ffi_linguaray_runtime_rust_future_free_i8,
       FfiConverterBool.lift,
       null,
     );
@@ -5671,12 +5650,12 @@ class RuntimePermission implements RuntimePermissionInterface {
   Future<bool> isScreenRecordingPermissionGranted() {
     return uniffiRustCallAsync(
       () =>
-          uniffi_beyondtranslate_runtime_fn_method_runtimepermission_is_screen_recording_permission_granted(
+          uniffi_linguaray_runtime_fn_method_runtimepermission_is_screen_recording_permission_granted(
         uniffiClonePointer(),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_i8,
-      ffi_beyondtranslate_runtime_rust_future_complete_i8,
-      ffi_beyondtranslate_runtime_rust_future_free_i8,
+      ffi_linguaray_runtime_rust_future_poll_i8,
+      ffi_linguaray_runtime_rust_future_complete_i8,
+      ffi_linguaray_runtime_rust_future_free_i8,
       FfiConverterBool.lift,
       null,
     );
@@ -5687,13 +5666,13 @@ class RuntimePermission implements RuntimePermissionInterface {
   }) {
     return uniffiRustCallAsync(
       () =>
-          uniffi_beyondtranslate_runtime_fn_method_runtimepermission_request_accessibility_permission(
+          uniffi_linguaray_runtime_fn_method_runtimepermission_request_accessibility_permission(
         uniffiClonePointer(),
         FfiConverterBool.lower(onlyOpenSystemSettings),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_void,
-      ffi_beyondtranslate_runtime_rust_future_complete_void,
-      ffi_beyondtranslate_runtime_rust_future_free_void,
+      ffi_linguaray_runtime_rust_future_poll_void,
+      ffi_linguaray_runtime_rust_future_complete_void,
+      ffi_linguaray_runtime_rust_future_free_void,
       (_) {},
       null,
     );
@@ -5704,13 +5683,13 @@ class RuntimePermission implements RuntimePermissionInterface {
   }) {
     return uniffiRustCallAsync(
       () =>
-          uniffi_beyondtranslate_runtime_fn_method_runtimepermission_request_screen_recording_permission(
+          uniffi_linguaray_runtime_fn_method_runtimepermission_request_screen_recording_permission(
         uniffiClonePointer(),
         FfiConverterBool.lower(onlyOpenSystemSettings),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_void,
-      ffi_beyondtranslate_runtime_rust_future_complete_void,
-      ffi_beyondtranslate_runtime_rust_future_free_void,
+      ffi_linguaray_runtime_rust_future_poll_void,
+      ffi_linguaray_runtime_rust_future_complete_void,
+      ffi_linguaray_runtime_rust_future_free_void,
       (_) {},
       null,
     );
@@ -5781,7 +5760,7 @@ abstract class RuntimeSettingsInterface {
 
 final _RuntimeSettingsFinalizer = Finalizer<Pointer<Void>>((ptr) {
   rustCall((status) =>
-      uniffi_beyondtranslate_runtime_fn_free_runtimesettings(ptr, status));
+      uniffi_linguaray_runtime_fn_free_runtimesettings(ptr, status));
 });
 
 class RuntimeSettings implements RuntimeSettingsInterface {
@@ -5798,7 +5777,7 @@ class RuntimeSettings implements RuntimeSettingsInterface {
 
   Pointer<Void> uniffiClonePointer() {
     return rustCall((status) =>
-        uniffi_beyondtranslate_runtime_fn_clone_runtimesettings(_ptr, status));
+        uniffi_linguaray_runtime_fn_clone_runtimesettings(_ptr, status));
   }
 
   static int allocationSize(RuntimeSettings value) {
@@ -5820,21 +5799,20 @@ class RuntimeSettings implements RuntimeSettingsInterface {
   void dispose() {
     _RuntimeSettingsFinalizer.detach(this);
     rustCall((status) =>
-        uniffi_beyondtranslate_runtime_fn_free_runtimesettings(_ptr, status));
+        uniffi_linguaray_runtime_fn_free_runtimesettings(_ptr, status));
   }
 
   Future<ProviderConfigEntry?> deleteProvider({
     required String providerId,
   }) {
     return uniffiRustCallAsync(
-      () =>
-          uniffi_beyondtranslate_runtime_fn_method_runtimesettings_delete_provider(
+      () => uniffi_linguaray_runtime_fn_method_runtimesettings_delete_provider(
         uniffiClonePointer(),
         FfiConverterString.lower(providerId),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
       FfiConverterOptionalProviderConfigEntry.lift,
       runtimeExceptionErrorHandler,
     );
@@ -5844,14 +5822,13 @@ class RuntimeSettings implements RuntimeSettingsInterface {
     required String serviceId,
   }) {
     return uniffiRustCallAsync(
-      () =>
-          uniffi_beyondtranslate_runtime_fn_method_runtimesettings_delete_service(
+      () => uniffi_linguaray_runtime_fn_method_runtimesettings_delete_service(
         uniffiClonePointer(),
         FfiConverterString.lower(serviceId),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
       FfiConverterOptionalServiceConfigEntry.lift,
       runtimeExceptionErrorHandler,
     );
@@ -5862,13 +5839,13 @@ class RuntimeSettings implements RuntimeSettingsInterface {
   }) {
     return uniffiRustCallAsync(
       () =>
-          uniffi_beyondtranslate_runtime_fn_method_runtimesettings_generate_provider_id(
+          uniffi_linguaray_runtime_fn_method_runtimesettings_generate_provider_id(
         uniffiClonePointer(),
         FfiConverterString.lower(providerType),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
       FfiConverterString.lift,
       runtimeExceptionErrorHandler,
     );
@@ -5880,14 +5857,14 @@ class RuntimeSettings implements RuntimeSettingsInterface {
   }) {
     return uniffiRustCallAsync(
       () =>
-          uniffi_beyondtranslate_runtime_fn_method_runtimesettings_get_active_translation_targets(
+          uniffi_linguaray_runtime_fn_method_runtimesettings_get_active_translation_targets(
         uniffiClonePointer(),
         FfiConverterSequenceTranslationTarget.lower(targets),
         FfiConverterOptionalString.lower(detectedLanguage),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
       FfiConverterSequenceTranslationTarget.lift,
       null,
     );
@@ -5895,13 +5872,12 @@ class RuntimeSettings implements RuntimeSettingsInterface {
 
   Future<AdvancedSettings> getAdvanced() {
     return uniffiRustCallAsync(
-      () =>
-          uniffi_beyondtranslate_runtime_fn_method_runtimesettings_get_advanced(
+      () => uniffi_linguaray_runtime_fn_method_runtimesettings_get_advanced(
         uniffiClonePointer(),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
       FfiConverterAdvancedSettings.lift,
       runtimeExceptionErrorHandler,
     );
@@ -5909,13 +5885,12 @@ class RuntimeSettings implements RuntimeSettingsInterface {
 
   Future<AppearanceSettings> getAppearance() {
     return uniffiRustCallAsync(
-      () =>
-          uniffi_beyondtranslate_runtime_fn_method_runtimesettings_get_appearance(
+      () => uniffi_linguaray_runtime_fn_method_runtimesettings_get_appearance(
         uniffiClonePointer(),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
       FfiConverterAppearanceSettings.lift,
       runtimeExceptionErrorHandler,
     );
@@ -5923,13 +5898,12 @@ class RuntimeSettings implements RuntimeSettingsInterface {
 
   Future<GeneralSettings> getGeneral() {
     return uniffiRustCallAsync(
-      () =>
-          uniffi_beyondtranslate_runtime_fn_method_runtimesettings_get_general(
+      () => uniffi_linguaray_runtime_fn_method_runtimesettings_get_general(
         uniffiClonePointer(),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
       FfiConverterGeneralSettings.lift,
       runtimeExceptionErrorHandler,
     );
@@ -5937,12 +5911,12 @@ class RuntimeSettings implements RuntimeSettingsInterface {
 
   Future<String> getJson() {
     return uniffiRustCallAsync(
-      () => uniffi_beyondtranslate_runtime_fn_method_runtimesettings_get_json(
+      () => uniffi_linguaray_runtime_fn_method_runtimesettings_get_json(
         uniffiClonePointer(),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
       FfiConverterString.lift,
       runtimeExceptionErrorHandler,
     );
@@ -5952,14 +5926,13 @@ class RuntimeSettings implements RuntimeSettingsInterface {
     required String providerId,
   }) {
     return uniffiRustCallAsync(
-      () =>
-          uniffi_beyondtranslate_runtime_fn_method_runtimesettings_get_provider(
+      () => uniffi_linguaray_runtime_fn_method_runtimesettings_get_provider(
         uniffiClonePointer(),
         FfiConverterString.lower(providerId),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
       FfiConverterOptionalProviderConfigEntry.lift,
       runtimeExceptionErrorHandler,
     );
@@ -5969,14 +5942,13 @@ class RuntimeSettings implements RuntimeSettingsInterface {
     required String serviceId,
   }) {
     return uniffiRustCallAsync(
-      () =>
-          uniffi_beyondtranslate_runtime_fn_method_runtimesettings_get_service(
+      () => uniffi_linguaray_runtime_fn_method_runtimesettings_get_service(
         uniffiClonePointer(),
         FfiConverterString.lower(serviceId),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
       FfiConverterOptionalServiceConfigEntry.lift,
       runtimeExceptionErrorHandler,
     );
@@ -5984,13 +5956,12 @@ class RuntimeSettings implements RuntimeSettingsInterface {
 
   Future<ShortcutSettings> getShortcuts() {
     return uniffiRustCallAsync(
-      () =>
-          uniffi_beyondtranslate_runtime_fn_method_runtimesettings_get_shortcuts(
+      () => uniffi_linguaray_runtime_fn_method_runtimesettings_get_shortcuts(
         uniffiClonePointer(),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
       FfiConverterShortcutSettings.lift,
       runtimeExceptionErrorHandler,
     );
@@ -6000,14 +5971,13 @@ class RuntimeSettings implements RuntimeSettingsInterface {
     required String providerId,
   }) {
     return uniffiRustCallAsync(
-      () =>
-          uniffi_beyondtranslate_runtime_fn_method_runtimesettings_list_models(
+      () => uniffi_linguaray_runtime_fn_method_runtimesettings_list_models(
         uniffiClonePointer(),
         FfiConverterString.lower(providerId),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
       FfiConverterSequenceString.lift,
       runtimeExceptionErrorHandler,
     );
@@ -6015,13 +5985,12 @@ class RuntimeSettings implements RuntimeSettingsInterface {
 
   Future<List<ProviderConfigEntry>> listProviders() {
     return uniffiRustCallAsync(
-      () =>
-          uniffi_beyondtranslate_runtime_fn_method_runtimesettings_list_providers(
+      () => uniffi_linguaray_runtime_fn_method_runtimesettings_list_providers(
         uniffiClonePointer(),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
       FfiConverterSequenceProviderConfigEntry.lift,
       runtimeExceptionErrorHandler,
     );
@@ -6029,13 +5998,12 @@ class RuntimeSettings implements RuntimeSettingsInterface {
 
   Future<List<ServiceConfigEntry>> listServices() {
     return uniffiRustCallAsync(
-      () =>
-          uniffi_beyondtranslate_runtime_fn_method_runtimesettings_list_services(
+      () => uniffi_linguaray_runtime_fn_method_runtimesettings_list_services(
         uniffiClonePointer(),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
       FfiConverterSequenceServiceConfigEntry.lift,
       runtimeExceptionErrorHandler,
     );
@@ -6043,13 +6011,12 @@ class RuntimeSettings implements RuntimeSettingsInterface {
 
   Future<ShortcutSettings> resetShortcuts() {
     return uniffiRustCallAsync(
-      () =>
-          uniffi_beyondtranslate_runtime_fn_method_runtimesettings_reset_shortcuts(
+      () => uniffi_linguaray_runtime_fn_method_runtimesettings_reset_shortcuts(
         uniffiClonePointer(),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
       FfiConverterShortcutSettings.lift,
       runtimeExceptionErrorHandler,
     );
@@ -6061,14 +6028,14 @@ class RuntimeSettings implements RuntimeSettingsInterface {
   }) {
     return uniffiRustCallAsync(
       () =>
-          uniffi_beyondtranslate_runtime_fn_method_runtimesettings_set_provider_secrets(
+          uniffi_linguaray_runtime_fn_method_runtimesettings_set_provider_secrets(
         uniffiClonePointer(),
         FfiConverterString.lower(providerId),
         FfiConverterMapStringToString.lower(secrets),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_void,
-      ffi_beyondtranslate_runtime_rust_future_complete_void,
-      ffi_beyondtranslate_runtime_rust_future_free_void,
+      ffi_linguaray_runtime_rust_future_poll_void,
+      ffi_linguaray_runtime_rust_future_complete_void,
+      ffi_linguaray_runtime_rust_future_free_void,
       (_) {},
       runtimeExceptionErrorHandler,
     );
@@ -6077,7 +6044,7 @@ class RuntimeSettings implements RuntimeSettingsInterface {
   SettingsSubscription subscribe() {
     return rustCallWithLifter(
         (status) =>
-            uniffi_beyondtranslate_runtime_fn_method_runtimesettings_subscribe(
+            uniffi_linguaray_runtime_fn_method_runtimesettings_subscribe(
                 uniffiClonePointer(), status),
         SettingsSubscription.lift,
         null);
@@ -6087,14 +6054,13 @@ class RuntimeSettings implements RuntimeSettingsInterface {
     required AdvancedSettingsPatch patch,
   }) {
     return uniffiRustCallAsync(
-      () =>
-          uniffi_beyondtranslate_runtime_fn_method_runtimesettings_update_advanced(
+      () => uniffi_linguaray_runtime_fn_method_runtimesettings_update_advanced(
         uniffiClonePointer(),
         FfiConverterAdvancedSettingsPatch.lower(patch),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
       FfiConverterAdvancedSettings.lift,
       runtimeExceptionErrorHandler,
     );
@@ -6105,13 +6071,13 @@ class RuntimeSettings implements RuntimeSettingsInterface {
   }) {
     return uniffiRustCallAsync(
       () =>
-          uniffi_beyondtranslate_runtime_fn_method_runtimesettings_update_appearance(
+          uniffi_linguaray_runtime_fn_method_runtimesettings_update_appearance(
         uniffiClonePointer(),
         FfiConverterAppearanceSettingsPatch.lower(patch),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
       FfiConverterAppearanceSettings.lift,
       runtimeExceptionErrorHandler,
     );
@@ -6121,14 +6087,13 @@ class RuntimeSettings implements RuntimeSettingsInterface {
     required GeneralSettingsPatch patch,
   }) {
     return uniffiRustCallAsync(
-      () =>
-          uniffi_beyondtranslate_runtime_fn_method_runtimesettings_update_general(
+      () => uniffi_linguaray_runtime_fn_method_runtimesettings_update_general(
         uniffiClonePointer(),
         FfiConverterGeneralSettingsPatch.lower(patch),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
       FfiConverterGeneralSettings.lift,
       runtimeExceptionErrorHandler,
     );
@@ -6140,16 +6105,15 @@ class RuntimeSettings implements RuntimeSettingsInterface {
     required Map<String, String> fields,
   }) {
     return uniffiRustCallAsync(
-      () =>
-          uniffi_beyondtranslate_runtime_fn_method_runtimesettings_update_provider(
+      () => uniffi_linguaray_runtime_fn_method_runtimesettings_update_provider(
         uniffiClonePointer(),
         FfiConverterString.lower(providerId),
         FfiConverterString.lower(providerType),
         FfiConverterMapStringToString.lower(fields),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
       FfiConverterProviderConfigEntry.lift,
       runtimeExceptionErrorHandler,
     );
@@ -6163,8 +6127,7 @@ class RuntimeSettings implements RuntimeSettingsInterface {
     required Map<String, String> fields,
   }) {
     return uniffiRustCallAsync(
-      () =>
-          uniffi_beyondtranslate_runtime_fn_method_runtimesettings_update_service(
+      () => uniffi_linguaray_runtime_fn_method_runtimesettings_update_service(
         uniffiClonePointer(),
         FfiConverterString.lower(serviceId),
         FfiConverterString.lower(providerId),
@@ -6172,9 +6135,9 @@ class RuntimeSettings implements RuntimeSettingsInterface {
         FfiConverterString.lower(name),
         FfiConverterMapStringToString.lower(fields),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
       FfiConverterServiceConfigEntry.lift,
       runtimeExceptionErrorHandler,
     );
@@ -6184,14 +6147,13 @@ class RuntimeSettings implements RuntimeSettingsInterface {
     required ShortcutSettingsPatch patch,
   }) {
     return uniffiRustCallAsync(
-      () =>
-          uniffi_beyondtranslate_runtime_fn_method_runtimesettings_update_shortcuts(
+      () => uniffi_linguaray_runtime_fn_method_runtimesettings_update_shortcuts(
         uniffiClonePointer(),
         FfiConverterShortcutSettingsPatch.lower(patch),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
       FfiConverterShortcutSettings.lift,
       runtimeExceptionErrorHandler,
     );
@@ -6207,7 +6169,7 @@ abstract class RuntimeTextExtractorInterface {
 
 final _RuntimeTextExtractorFinalizer = Finalizer<Pointer<Void>>((ptr) {
   rustCall((status) =>
-      uniffi_beyondtranslate_runtime_fn_free_runtimetextextractor(ptr, status));
+      uniffi_linguaray_runtime_fn_free_runtimetextextractor(ptr, status));
 });
 
 class RuntimeTextExtractor implements RuntimeTextExtractorInterface {
@@ -6224,8 +6186,7 @@ class RuntimeTextExtractor implements RuntimeTextExtractorInterface {
 
   Pointer<Void> uniffiClonePointer() {
     return rustCall((status) =>
-        uniffi_beyondtranslate_runtime_fn_clone_runtimetextextractor(
-            _ptr, status));
+        uniffi_linguaray_runtime_fn_clone_runtimetextextractor(_ptr, status));
   }
 
   static int allocationSize(RuntimeTextExtractor value) {
@@ -6247,19 +6208,18 @@ class RuntimeTextExtractor implements RuntimeTextExtractorInterface {
   void dispose() {
     _RuntimeTextExtractorFinalizer.detach(this);
     rustCall((status) =>
-        uniffi_beyondtranslate_runtime_fn_free_runtimetextextractor(
-            _ptr, status));
+        uniffi_linguaray_runtime_fn_free_runtimetextextractor(_ptr, status));
   }
 
   Future<String> extractFromClipboard() {
     return uniffiRustCallAsync(
       () =>
-          uniffi_beyondtranslate_runtime_fn_method_runtimetextextractor_extract_from_clipboard(
+          uniffi_linguaray_runtime_fn_method_runtimetextextractor_extract_from_clipboard(
         uniffiClonePointer(),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
       FfiConverterString.lift,
       runtimeExceptionErrorHandler,
     );
@@ -6268,12 +6228,12 @@ class RuntimeTextExtractor implements RuntimeTextExtractorInterface {
   Future<String> extractFromScreenCapture() {
     return uniffiRustCallAsync(
       () =>
-          uniffi_beyondtranslate_runtime_fn_method_runtimetextextractor_extract_from_screen_capture(
+          uniffi_linguaray_runtime_fn_method_runtimetextextractor_extract_from_screen_capture(
         uniffiClonePointer(),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
       FfiConverterString.lift,
       runtimeExceptionErrorHandler,
     );
@@ -6282,12 +6242,12 @@ class RuntimeTextExtractor implements RuntimeTextExtractorInterface {
   Future<String> extractFromScreenSelection() {
     return uniffiRustCallAsync(
       () =>
-          uniffi_beyondtranslate_runtime_fn_method_runtimetextextractor_extract_from_screen_selection(
+          uniffi_linguaray_runtime_fn_method_runtimetextextractor_extract_from_screen_selection(
         uniffiClonePointer(),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
       FfiConverterString.lift,
       runtimeExceptionErrorHandler,
     );
@@ -6296,12 +6256,12 @@ class RuntimeTextExtractor implements RuntimeTextExtractorInterface {
   Future<SelectionExtraction> extractFromScreenSelectionDetailed() {
     return uniffiRustCallAsync(
       () =>
-          uniffi_beyondtranslate_runtime_fn_method_runtimetextextractor_extract_from_screen_selection_detailed(
+          uniffi_linguaray_runtime_fn_method_runtimetextextractor_extract_from_screen_selection_detailed(
         uniffiClonePointer(),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
       FfiConverterSelectionExtraction.lift,
       runtimeExceptionErrorHandler,
     );
@@ -6319,7 +6279,7 @@ abstract class RuntimeTranslationInterface {
 
 final _RuntimeTranslationFinalizer = Finalizer<Pointer<Void>>((ptr) {
   rustCall((status) =>
-      uniffi_beyondtranslate_runtime_fn_free_runtimetranslation(ptr, status));
+      uniffi_linguaray_runtime_fn_free_runtimetranslation(ptr, status));
 });
 
 class RuntimeTranslation implements RuntimeTranslationInterface {
@@ -6336,8 +6296,7 @@ class RuntimeTranslation implements RuntimeTranslationInterface {
 
   Pointer<Void> uniffiClonePointer() {
     return rustCall((status) =>
-        uniffi_beyondtranslate_runtime_fn_clone_runtimetranslation(
-            _ptr, status));
+        uniffi_linguaray_runtime_fn_clone_runtimetranslation(_ptr, status));
   }
 
   static int allocationSize(RuntimeTranslation value) {
@@ -6359,8 +6318,7 @@ class RuntimeTranslation implements RuntimeTranslationInterface {
   void dispose() {
     _RuntimeTranslationFinalizer.detach(this);
     rustCall((status) =>
-        uniffi_beyondtranslate_runtime_fn_free_runtimetranslation(
-            _ptr, status));
+        uniffi_linguaray_runtime_fn_free_runtimetranslation(_ptr, status));
   }
 
   Future<DetectLanguageResponse> detectLanguage({
@@ -6368,13 +6326,13 @@ class RuntimeTranslation implements RuntimeTranslationInterface {
   }) {
     return uniffiRustCallAsync(
       () =>
-          uniffi_beyondtranslate_runtime_fn_method_runtimetranslation_detect_language(
+          uniffi_linguaray_runtime_fn_method_runtimetranslation_detect_language(
         uniffiClonePointer(),
         FfiConverterDetectLanguageRequest.lower(request),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
       FfiConverterDetectLanguageResponse.lift,
       runtimeExceptionErrorHandler,
     );
@@ -6384,14 +6342,13 @@ class RuntimeTranslation implements RuntimeTranslationInterface {
     required TranslateRequest request,
   }) {
     return uniffiRustCallAsync(
-      () =>
-          uniffi_beyondtranslate_runtime_fn_method_runtimetranslation_translate(
+      () => uniffi_linguaray_runtime_fn_method_runtimetranslation_translate(
         uniffiClonePointer(),
         FfiConverterTranslateRequest.lower(request),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
       FfiConverterTranslateResponse.lift,
       runtimeExceptionErrorHandler,
     );
@@ -6404,7 +6361,7 @@ abstract class SettingsSubscriptionInterface {
 
 final _SettingsSubscriptionFinalizer = Finalizer<Pointer<Void>>((ptr) {
   rustCall((status) =>
-      uniffi_beyondtranslate_runtime_fn_free_settingssubscription(ptr, status));
+      uniffi_linguaray_runtime_fn_free_settingssubscription(ptr, status));
 });
 
 class SettingsSubscription implements SettingsSubscriptionInterface {
@@ -6421,8 +6378,7 @@ class SettingsSubscription implements SettingsSubscriptionInterface {
 
   Pointer<Void> uniffiClonePointer() {
     return rustCall((status) =>
-        uniffi_beyondtranslate_runtime_fn_clone_settingssubscription(
-            _ptr, status));
+        uniffi_linguaray_runtime_fn_clone_settingssubscription(_ptr, status));
   }
 
   static int allocationSize(SettingsSubscription value) {
@@ -6444,18 +6400,17 @@ class SettingsSubscription implements SettingsSubscriptionInterface {
   void dispose() {
     _SettingsSubscriptionFinalizer.detach(this);
     rustCall((status) =>
-        uniffi_beyondtranslate_runtime_fn_free_settingssubscription(
-            _ptr, status));
+        uniffi_linguaray_runtime_fn_free_settingssubscription(_ptr, status));
   }
 
   Future<SettingsChange?> next() {
     return uniffiRustCallAsync(
-      () => uniffi_beyondtranslate_runtime_fn_method_settingssubscription_next(
+      () => uniffi_linguaray_runtime_fn_method_settingssubscription_next(
         uniffiClonePointer(),
       ),
-      ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer,
-      ffi_beyondtranslate_runtime_rust_future_free_rust_buffer,
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
       FfiConverterOptionalSettingsChange.lift,
       runtimeExceptionErrorHandler,
     );
@@ -6580,21 +6535,20 @@ final class RustBuffer extends Struct {
   external Pointer<Uint8> data;
   static RustBuffer alloc(int size) {
     return rustCall(
-        (status) => ffi_beyondtranslate_runtime_rustbuffer_alloc(size, status));
+        (status) => ffi_linguaray_runtime_rustbuffer_alloc(size, status));
   }
 
   static RustBuffer fromBytes(ForeignBytes bytes) {
-    return rustCall((status) =>
-        ffi_beyondtranslate_runtime_rustbuffer_from_bytes(bytes, status));
+    return rustCall(
+        (status) => ffi_linguaray_runtime_rustbuffer_from_bytes(bytes, status));
   }
 
   void free() {
-    rustCall(
-        (status) => ffi_beyondtranslate_runtime_rustbuffer_free(this, status));
+    rustCall((status) => ffi_linguaray_runtime_rustbuffer_free(this, status));
   }
 
   RustBuffer reserve(int additionalCapacity) {
-    return rustCall((status) => ffi_beyondtranslate_runtime_rustbuffer_reserve(
+    return rustCall((status) => ffi_linguaray_runtime_rustbuffer_reserve(
         this, additionalCapacity, status));
   }
 
@@ -6882,7 +6836,7 @@ void initStreamCallbackVTable() {
   streamCallbackVTable.ref.onFinish = streamCallbackOnFinishPointer;
   streamCallbackVTable.ref.onError = streamCallbackOnExceptionPointer;
   rustCall((status) {
-    uniffi_beyondtranslate_runtime_fn_init_callback_vtable_streamcallback(
+    uniffi_linguaray_runtime_fn_init_callback_vtable_streamcallback(
       streamCallbackVTable,
     );
     checkCallStatus(NullRustCallStatusErrorHandler(), status);
@@ -9435,15 +9389,13 @@ class UniffiHandleMap<T> {
   }
 }
 
-const _uniffiAssetId =
-    "package:beyondtranslate_runtime/uniffi:beyondtranslate_runtime";
+const _uniffiAssetId = "package:linguaray_runtime/uniffi:linguaray_runtime";
 DetectLanguageRequest echoDetectLanguageRequest({
   required DetectLanguageRequest request,
 }) {
   return rustCallWithLifter(
-      (status) =>
-          uniffi_beyondtranslate_runtime_fn_func_echo_detect_language_request(
-              FfiConverterDetectLanguageRequest.lower(request), status),
+      (status) => uniffi_linguaray_runtime_fn_func_echo_detect_language_request(
+          FfiConverterDetectLanguageRequest.lower(request), status),
       FfiConverterDetectLanguageRequest.lift,
       null);
 }
@@ -9453,7 +9405,7 @@ DetectLanguageResponse echoDetectLanguageResponse({
 }) {
   return rustCallWithLifter(
       (status) =>
-          uniffi_beyondtranslate_runtime_fn_func_echo_detect_language_response(
+          uniffi_linguaray_runtime_fn_func_echo_detect_language_response(
               FfiConverterDetectLanguageResponse.lower(response), status),
       FfiConverterDetectLanguageResponse.lift,
       null);
@@ -9463,7 +9415,7 @@ LanguagePair echoLanguagePair({
   required LanguagePair languagePair,
 }) {
   return rustCallWithLifter(
-      (status) => uniffi_beyondtranslate_runtime_fn_func_echo_language_pair(
+      (status) => uniffi_linguaray_runtime_fn_func_echo_language_pair(
           FfiConverterLanguagePair.lower(languagePair), status),
       FfiConverterLanguagePair.lift,
       null);
@@ -9473,7 +9425,7 @@ LookUpRequest echoLookUpRequest({
   required LookUpRequest request,
 }) {
   return rustCallWithLifter(
-      (status) => uniffi_beyondtranslate_runtime_fn_func_echo_look_up_request(
+      (status) => uniffi_linguaray_runtime_fn_func_echo_look_up_request(
           FfiConverterLookUpRequest.lower(request), status),
       FfiConverterLookUpRequest.lift,
       null);
@@ -9483,7 +9435,7 @@ LookUpResponse echoLookUpResponse({
   required LookUpResponse response,
 }) {
   return rustCallWithLifter(
-      (status) => uniffi_beyondtranslate_runtime_fn_func_echo_look_up_response(
+      (status) => uniffi_linguaray_runtime_fn_func_echo_look_up_response(
           FfiConverterLookUpResponse.lower(response), status),
       FfiConverterLookUpResponse.lift,
       null);
@@ -9493,9 +9445,8 @@ RecognizeTextRequest echoRecognizeTextRequest({
   required RecognizeTextRequest request,
 }) {
   return rustCallWithLifter(
-      (status) =>
-          uniffi_beyondtranslate_runtime_fn_func_echo_recognize_text_request(
-              FfiConverterRecognizeTextRequest.lower(request), status),
+      (status) => uniffi_linguaray_runtime_fn_func_echo_recognize_text_request(
+          FfiConverterRecognizeTextRequest.lower(request), status),
       FfiConverterRecognizeTextRequest.lift,
       null);
 }
@@ -9504,9 +9455,8 @@ RecognizeTextResponse echoRecognizeTextResponse({
   required RecognizeTextResponse response,
 }) {
   return rustCallWithLifter(
-      (status) =>
-          uniffi_beyondtranslate_runtime_fn_func_echo_recognize_text_response(
-              FfiConverterRecognizeTextResponse.lower(response), status),
+      (status) => uniffi_linguaray_runtime_fn_func_echo_recognize_text_response(
+          FfiConverterRecognizeTextResponse.lower(response), status),
       FfiConverterRecognizeTextResponse.lift,
       null);
 }
@@ -9515,7 +9465,7 @@ RecognizedRect echoRecognizedRect({
   required RecognizedRect rect,
 }) {
   return rustCallWithLifter(
-      (status) => uniffi_beyondtranslate_runtime_fn_func_echo_recognized_rect(
+      (status) => uniffi_linguaray_runtime_fn_func_echo_recognized_rect(
           FfiConverterRecognizedRect.lower(rect), status),
       FfiConverterRecognizedRect.lift,
       null);
@@ -9525,7 +9475,7 @@ TextDetection echoTextDetection({
   required TextDetection textDetection,
 }) {
   return rustCallWithLifter(
-      (status) => uniffi_beyondtranslate_runtime_fn_func_echo_text_detection(
+      (status) => uniffi_linguaray_runtime_fn_func_echo_text_detection(
           FfiConverterTextDetection.lower(textDetection), status),
       FfiConverterTextDetection.lift,
       null);
@@ -9535,7 +9485,7 @@ TextRecognition echoTextRecognition({
   required TextRecognition recognition,
 }) {
   return rustCallWithLifter(
-      (status) => uniffi_beyondtranslate_runtime_fn_func_echo_text_recognition(
+      (status) => uniffi_linguaray_runtime_fn_func_echo_text_recognition(
           FfiConverterTextRecognition.lower(recognition), status),
       FfiConverterTextRecognition.lift,
       null);
@@ -9545,7 +9495,7 @@ TextTranslation echoTextTranslation({
   required TextTranslation textTranslation,
 }) {
   return rustCallWithLifter(
-      (status) => uniffi_beyondtranslate_runtime_fn_func_echo_text_translation(
+      (status) => uniffi_linguaray_runtime_fn_func_echo_text_translation(
           FfiConverterTextTranslation.lower(textTranslation), status),
       FfiConverterTextTranslation.lift,
       null);
@@ -9555,7 +9505,7 @@ TranslateRequest echoTranslateRequest({
   required TranslateRequest request,
 }) {
   return rustCallWithLifter(
-      (status) => uniffi_beyondtranslate_runtime_fn_func_echo_translate_request(
+      (status) => uniffi_linguaray_runtime_fn_func_echo_translate_request(
           FfiConverterTranslateRequest.lower(request), status),
       FfiConverterTranslateRequest.lift,
       null);
@@ -9565,9 +9515,8 @@ TranslateResponse echoTranslateResponse({
   required TranslateResponse response,
 }) {
   return rustCallWithLifter(
-      (status) =>
-          uniffi_beyondtranslate_runtime_fn_func_echo_translate_response(
-              FfiConverterTranslateResponse.lower(response), status),
+      (status) => uniffi_linguaray_runtime_fn_func_echo_translate_response(
+          FfiConverterTranslateResponse.lower(response), status),
       FfiConverterTranslateResponse.lift,
       null);
 }
@@ -9576,7 +9525,7 @@ WordDefinition echoWordDefinition({
   required WordDefinition wordDefinition,
 }) {
   return rustCallWithLifter(
-      (status) => uniffi_beyondtranslate_runtime_fn_func_echo_word_definition(
+      (status) => uniffi_linguaray_runtime_fn_func_echo_word_definition(
           FfiConverterWordDefinition.lower(wordDefinition), status),
       FfiConverterWordDefinition.lift,
       null);
@@ -9586,7 +9535,7 @@ WordEtymology echoWordEtymology({
   required WordEtymology wordEtymology,
 }) {
   return rustCallWithLifter(
-      (status) => uniffi_beyondtranslate_runtime_fn_func_echo_word_etymology(
+      (status) => uniffi_linguaray_runtime_fn_func_echo_word_etymology(
           FfiConverterWordEtymology.lower(wordEtymology), status),
       FfiConverterWordEtymology.lift,
       null);
@@ -9596,7 +9545,7 @@ WordImage echoWordImage({
   required WordImage wordImage,
 }) {
   return rustCallWithLifter(
-      (status) => uniffi_beyondtranslate_runtime_fn_func_echo_word_image(
+      (status) => uniffi_linguaray_runtime_fn_func_echo_word_image(
           FfiConverterWordImage.lower(wordImage), status),
       FfiConverterWordImage.lift,
       null);
@@ -9606,7 +9555,7 @@ WordPhrase echoWordPhrase({
   required WordPhrase wordPhrase,
 }) {
   return rustCallWithLifter(
-      (status) => uniffi_beyondtranslate_runtime_fn_func_echo_word_phrase(
+      (status) => uniffi_linguaray_runtime_fn_func_echo_word_phrase(
           FfiConverterWordPhrase.lower(wordPhrase), status),
       FfiConverterWordPhrase.lift,
       null);
@@ -9616,9 +9565,8 @@ WordPronunciation echoWordPronunciation({
   required WordPronunciation wordPronunciation,
 }) {
   return rustCallWithLifter(
-      (status) =>
-          uniffi_beyondtranslate_runtime_fn_func_echo_word_pronunciation(
-              FfiConverterWordPronunciation.lower(wordPronunciation), status),
+      (status) => uniffi_linguaray_runtime_fn_func_echo_word_pronunciation(
+          FfiConverterWordPronunciation.lower(wordPronunciation), status),
       FfiConverterWordPronunciation.lift,
       null);
 }
@@ -9627,7 +9575,7 @@ WordSentence echoWordSentence({
   required WordSentence wordSentence,
 }) {
   return rustCallWithLifter(
-      (status) => uniffi_beyondtranslate_runtime_fn_func_echo_word_sentence(
+      (status) => uniffi_linguaray_runtime_fn_func_echo_word_sentence(
           FfiConverterWordSentence.lower(wordSentence), status),
       FfiConverterWordSentence.lift,
       null);
@@ -9637,7 +9585,7 @@ WordSynonym echoWordSynonym({
   required WordSynonym wordSynonym,
 }) {
   return rustCallWithLifter(
-      (status) => uniffi_beyondtranslate_runtime_fn_func_echo_word_synonym(
+      (status) => uniffi_linguaray_runtime_fn_func_echo_word_synonym(
           FfiConverterWordSynonym.lower(wordSynonym), status),
       FfiConverterWordSynonym.lift,
       null);
@@ -9647,7 +9595,7 @@ WordTag echoWordTag({
   required WordTag wordTag,
 }) {
   return rustCallWithLifter(
-      (status) => uniffi_beyondtranslate_runtime_fn_func_echo_word_tag(
+      (status) => uniffi_linguaray_runtime_fn_func_echo_word_tag(
           FfiConverterWordTag.lower(wordTag), status),
       FfiConverterWordTag.lift,
       null);
@@ -9657,7 +9605,7 @@ WordTense echoWordTense({
   required WordTense wordTense,
 }) {
   return rustCallWithLifter(
-      (status) => uniffi_beyondtranslate_runtime_fn_func_echo_word_tense(
+      (status) => uniffi_linguaray_runtime_fn_func_echo_word_tense(
           FfiConverterWordTense.lower(wordTense), status),
       FfiConverterWordTense.lift,
       null);
@@ -9665,77 +9613,72 @@ WordTense echoWordTense({
 
 @Native<Pointer<Void> Function(Pointer<Void>, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external Pointer<Void> uniffi_beyondtranslate_runtime_fn_clone_runtimeapiserver(
+external Pointer<Void> uniffi_linguaray_runtime_fn_clone_runtimeapiserver(
     Pointer<Void> handle, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<Void Function(Pointer<Void>, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external void uniffi_beyondtranslate_runtime_fn_free_runtimeapiserver(
+external void uniffi_linguaray_runtime_fn_free_runtimeapiserver(
     Pointer<Void> handle, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<RustBuffer Function(Pointer<Void>, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external RustBuffer
-    uniffi_beyondtranslate_runtime_fn_method_runtimeapiserver_info(
-        Pointer<Void> ptr, Pointer<RustCallStatus> uniffiStatus);
+external RustBuffer uniffi_linguaray_runtime_fn_method_runtimeapiserver_info(
+    Pointer<Void> ptr, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<Void Function(Pointer<Void>, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external void uniffi_beyondtranslate_runtime_fn_method_runtimeapiserver_stop(
+external void uniffi_linguaray_runtime_fn_method_runtimeapiserver_stop(
     Pointer<Void> ptr, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<Pointer<Void> Function(Pointer<Void>, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external Pointer<Void> uniffi_beyondtranslate_runtime_fn_clone_runtime(
+external Pointer<Void> uniffi_linguaray_runtime_fn_clone_runtime(
     Pointer<Void> handle, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<Void Function(Pointer<Void>, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external void uniffi_beyondtranslate_runtime_fn_free_runtime(
+external void uniffi_linguaray_runtime_fn_free_runtime(
     Pointer<Void> handle, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<Pointer<Void> Function(RustBuffer, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_constructor_runtime_new(
-        RustBuffer data_dir, Pointer<RustCallStatus> uniffiStatus);
+external Pointer<Void> uniffi_linguaray_runtime_fn_constructor_runtime_new(
+    RustBuffer data_dir, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<
     Pointer<Void> Function(Pointer<Void>, RustBuffer,
         Pointer<RustCallStatus>)>(assetId: _uniffiAssetId)
-external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtime_dictionary(
-        Pointer<Void> ptr,
-        RustBuffer provider_id,
-        Pointer<RustCallStatus> uniffiStatus);
+external Pointer<Void> uniffi_linguaray_runtime_fn_method_runtime_dictionary(
+    Pointer<Void> ptr,
+    RustBuffer provider_id,
+    Pointer<RustCallStatus> uniffiStatus);
 
 @Native<Pointer<Void> Function(Pointer<Void>, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtime_glossary(
-        Pointer<Void> ptr, Pointer<RustCallStatus> uniffiStatus);
+external Pointer<Void> uniffi_linguaray_runtime_fn_method_runtime_glossary(
+    Pointer<Void> ptr, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<Pointer<Void> Function(Pointer<Void>, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external Pointer<Void> uniffi_beyondtranslate_runtime_fn_method_runtime_history(
+external Pointer<Void> uniffi_linguaray_runtime_fn_method_runtime_history(
     Pointer<Void> ptr, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<RustBuffer Function(Pointer<Void>, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
 external RustBuffer
-    uniffi_beyondtranslate_runtime_fn_method_runtime_list_app_languages(
+    uniffi_linguaray_runtime_fn_method_runtime_list_app_languages(
         Pointer<Void> ptr, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<RustBuffer Function(Pointer<Void>, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external RustBuffer
-    uniffi_beyondtranslate_runtime_fn_method_runtime_list_languages(
-        Pointer<Void> ptr, Pointer<RustCallStatus> uniffiStatus);
+external RustBuffer uniffi_linguaray_runtime_fn_method_runtime_list_languages(
+    Pointer<Void> ptr, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<
     Pointer<Void> Function(Pointer<Void>, RustBuffer,
         Pointer<RustCallStatus>)>(assetId: _uniffiAssetId)
-external Pointer<Void> uniffi_beyondtranslate_runtime_fn_method_runtime_llm(
+external Pointer<Void> uniffi_linguaray_runtime_fn_method_runtime_llm(
     Pointer<Void> ptr,
     RustBuffer provider_id,
     Pointer<RustCallStatus> uniffiStatus);
@@ -9743,28 +9686,26 @@ external Pointer<Void> uniffi_beyondtranslate_runtime_fn_method_runtime_llm(
 @Native<
     Pointer<Void> Function(Pointer<Void>, RustBuffer,
         Pointer<RustCallStatus>)>(assetId: _uniffiAssetId)
-external Pointer<Void> uniffi_beyondtranslate_runtime_fn_method_runtime_ocr(
+external Pointer<Void> uniffi_linguaray_runtime_fn_method_runtime_ocr(
     Pointer<Void> ptr,
     RustBuffer provider_id,
     Pointer<RustCallStatus> uniffiStatus);
 
 @Native<Pointer<Void> Function(Pointer<Void>, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtime_permission(
-        Pointer<Void> ptr, Pointer<RustCallStatus> uniffiStatus);
+external Pointer<Void> uniffi_linguaray_runtime_fn_method_runtime_permission(
+    Pointer<Void> ptr, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<Pointer<Void> Function(Pointer<Void>, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtime_settings(
-        Pointer<Void> ptr, Pointer<RustCallStatus> uniffiStatus);
+external Pointer<Void> uniffi_linguaray_runtime_fn_method_runtime_settings(
+    Pointer<Void> ptr, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<
     Pointer<Void> Function(Pointer<Void>, RustBuffer, Uint16,
         Pointer<RustCallStatus>)>(assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtime_start_api_server(
+    uniffi_linguaray_runtime_fn_method_runtime_start_api_server(
         Pointer<Void> ptr,
         RustBuffer host,
         int port,
@@ -9773,95 +9714,92 @@ external Pointer<Void>
 @Native<Pointer<Void> Function(Pointer<Void>, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtime_text_extractor(
+    uniffi_linguaray_runtime_fn_method_runtime_text_extractor(
         Pointer<Void> ptr, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<
     Pointer<Void> Function(Pointer<Void>, RustBuffer,
         Pointer<RustCallStatus>)>(assetId: _uniffiAssetId)
-external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtime_translation(
-        Pointer<Void> ptr,
-        RustBuffer provider_id,
-        Pointer<RustCallStatus> uniffiStatus);
+external Pointer<Void> uniffi_linguaray_runtime_fn_method_runtime_translation(
+    Pointer<Void> ptr,
+    RustBuffer provider_id,
+    Pointer<RustCallStatus> uniffiStatus);
 
 @Native<Pointer<Void> Function(Pointer<Void>, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_clone_runtimedictionary(
-        Pointer<Void> handle, Pointer<RustCallStatus> uniffiStatus);
+external Pointer<Void> uniffi_linguaray_runtime_fn_clone_runtimedictionary(
+    Pointer<Void> handle, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<Void Function(Pointer<Void>, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external void uniffi_beyondtranslate_runtime_fn_free_runtimedictionary(
+external void uniffi_linguaray_runtime_fn_free_runtimedictionary(
     Pointer<Void> handle, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<Pointer<Void> Function(Pointer<Void>, RustBuffer)>(
     assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimedictionary_lookup(
+    uniffi_linguaray_runtime_fn_method_runtimedictionary_lookup(
         Pointer<Void> ptr, RustBuffer request);
 
 @Native<Pointer<Void> Function(Pointer<Void>, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external Pointer<Void> uniffi_beyondtranslate_runtime_fn_clone_runtimeglossary(
+external Pointer<Void> uniffi_linguaray_runtime_fn_clone_runtimeglossary(
     Pointer<Void> handle, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<Void Function(Pointer<Void>, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external void uniffi_beyondtranslate_runtime_fn_free_runtimeglossary(
+external void uniffi_linguaray_runtime_fn_free_runtimeglossary(
     Pointer<Void> handle, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<
     Pointer<Void> Function(Pointer<Void>, RustBuffer, RustBuffer, RustBuffer,
         RustBuffer)>(assetId: _uniffiAssetId)
-external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimeglossary_check(
-        Pointer<Void> ptr,
-        RustBuffer source,
-        RustBuffer translated,
-        RustBuffer source_language,
-        RustBuffer target_language);
+external Pointer<Void> uniffi_linguaray_runtime_fn_method_runtimeglossary_check(
+    Pointer<Void> ptr,
+    RustBuffer source,
+    RustBuffer translated,
+    RustBuffer source_language,
+    RustBuffer target_language);
 
 @Native<Pointer<Void> Function(Pointer<Void>, RustBuffer, RustBuffer)>(
     assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimeglossary_count_entries(
+    uniffi_linguaray_runtime_fn_method_runtimeglossary_count_entries(
         Pointer<Void> ptr, RustBuffer book_id, RustBuffer query);
 
 @Native<Pointer<Void> Function(Pointer<Void>, RustBuffer)>(
     assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimeglossary_delete_book(
+    uniffi_linguaray_runtime_fn_method_runtimeglossary_delete_book(
         Pointer<Void> ptr, RustBuffer book_id);
 
 @Native<Pointer<Void> Function(Pointer<Void>, RustBuffer, RustBuffer)>(
     assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimeglossary_delete_entry(
+    uniffi_linguaray_runtime_fn_method_runtimeglossary_delete_entry(
         Pointer<Void> ptr, RustBuffer book_id, RustBuffer entry_id);
 
 @Native<Pointer<Void> Function(Pointer<Void>)>(assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimeglossary_flush_hits(
+    uniffi_linguaray_runtime_fn_method_runtimeglossary_flush_hits(
         Pointer<Void> ptr);
 
 @Native<Pointer<Void> Function(Pointer<Void>, RustBuffer)>(
     assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimeglossary_get_book(
+    uniffi_linguaray_runtime_fn_method_runtimeglossary_get_book(
         Pointer<Void> ptr, RustBuffer book_id);
 
 @Native<Pointer<Void> Function(Pointer<Void>)>(assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimeglossary_list_books(
+    uniffi_linguaray_runtime_fn_method_runtimeglossary_list_books(
         Pointer<Void> ptr);
 
 @Native<
     Pointer<Void> Function(Pointer<Void>, RustBuffer, RustBuffer, Uint32,
         Uint32)>(assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimeglossary_list_entries(
+    uniffi_linguaray_runtime_fn_method_runtimeglossary_list_entries(
         Pointer<Void> ptr,
         RustBuffer book_id,
         RustBuffer query,
@@ -9872,7 +9810,7 @@ external Pointer<Void>
     Pointer<Void> Function(Pointer<Void>, RustBuffer, RustBuffer,
         RustBuffer)>(assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimeglossary_match_text(
+    uniffi_linguaray_runtime_fn_method_runtimeglossary_match_text(
         Pointer<Void> ptr,
         RustBuffer text,
         RustBuffer source_language,
@@ -9881,69 +9819,68 @@ external Pointer<Void>
 @Native<Pointer<Void> Function(Pointer<Void>, RustBuffer)>(
     assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimeglossary_upsert_book(
+    uniffi_linguaray_runtime_fn_method_runtimeglossary_upsert_book(
         Pointer<Void> ptr, RustBuffer input);
 
 @Native<Pointer<Void> Function(Pointer<Void>, RustBuffer, RustBuffer)>(
     assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimeglossary_upsert_entry(
+    uniffi_linguaray_runtime_fn_method_runtimeglossary_upsert_entry(
         Pointer<Void> ptr, RustBuffer book_id, RustBuffer input);
 
 @Native<Pointer<Void> Function(Pointer<Void>, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external Pointer<Void> uniffi_beyondtranslate_runtime_fn_clone_runtimehistory(
+external Pointer<Void> uniffi_linguaray_runtime_fn_clone_runtimehistory(
     Pointer<Void> handle, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<Void Function(Pointer<Void>, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external void uniffi_beyondtranslate_runtime_fn_free_runtimehistory(
+external void uniffi_linguaray_runtime_fn_free_runtimehistory(
     Pointer<Void> handle, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<Pointer<Void> Function(Pointer<Void>)>(assetId: _uniffiAssetId)
-external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimehistory_counts(
-        Pointer<Void> ptr);
+external Pointer<Void> uniffi_linguaray_runtime_fn_method_runtimehistory_counts(
+    Pointer<Void> ptr);
 
 @Native<Pointer<Void> Function(Pointer<Void>, RustBuffer)>(
     assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimehistory_delete_entries(
+    uniffi_linguaray_runtime_fn_method_runtimehistory_delete_entries(
         Pointer<Void> ptr, RustBuffer entry_ids);
 
 @Native<Pointer<Void> Function(Pointer<Void>, RustBuffer, RustBuffer)>(
     assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimehistory_list_entries(
+    uniffi_linguaray_runtime_fn_method_runtimehistory_list_entries(
         Pointer<Void> ptr, RustBuffer filter, RustBuffer query);
 
 @Native<Pointer<Void> Function(Pointer<Void>, RustBuffer, Int8)>(
     assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimehistory_set_favorite(
+    uniffi_linguaray_runtime_fn_method_runtimehistory_set_favorite(
         Pointer<Void> ptr, RustBuffer entry_id, int favorite);
 
 @Native<Pointer<Void> Function(Pointer<Void>, RustBuffer)>(
     assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimehistory_upsert_entry(
+    uniffi_linguaray_runtime_fn_method_runtimehistory_upsert_entry(
         Pointer<Void> ptr, RustBuffer input);
 
 @Native<Pointer<Void> Function(Pointer<Void>, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external Pointer<Void> uniffi_beyondtranslate_runtime_fn_clone_runtimellm(
+external Pointer<Void> uniffi_linguaray_runtime_fn_clone_runtimellm(
     Pointer<Void> handle, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<Void Function(Pointer<Void>, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external void uniffi_beyondtranslate_runtime_fn_free_runtimellm(
+external void uniffi_linguaray_runtime_fn_free_runtimellm(
     Pointer<Void> handle, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<
     Pointer<Void> Function(Pointer<Void>, RustBuffer, RustBuffer, RustBuffer,
         Uint32, RustBuffer)>(assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimellm_alternatives(
+    uniffi_linguaray_runtime_fn_method_runtimellm_alternatives(
         Pointer<Void> ptr,
         RustBuffer text,
         RustBuffer source_lang,
@@ -9953,207 +9890,203 @@ external Pointer<Void>
 
 @Native<Pointer<Void> Function(Pointer<Void>, RustBuffer, RustBuffer)>(
     assetId: _uniffiAssetId)
-external Pointer<Void> uniffi_beyondtranslate_runtime_fn_method_runtimellm_chat(
+external Pointer<Void> uniffi_linguaray_runtime_fn_method_runtimellm_chat(
     Pointer<Void> ptr, RustBuffer model, RustBuffer messages);
 
 @Native<Pointer<Void> Function(Pointer<Void>, RustBuffer, RustBuffer)>(
     assetId: _uniffiAssetId)
-external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimellm_explain(
-        Pointer<Void> ptr, RustBuffer source, RustBuffer translation);
+external Pointer<Void> uniffi_linguaray_runtime_fn_method_runtimellm_explain(
+    Pointer<Void> ptr, RustBuffer source, RustBuffer translation);
 
 @Native<Pointer<Void> Function(Pointer<Void>, RustBuffer, RustBuffer)>(
     assetId: _uniffiAssetId)
-external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimellm_polish(
-        Pointer<Void> ptr, RustBuffer text, RustBuffer style);
+external Pointer<Void> uniffi_linguaray_runtime_fn_method_runtimellm_polish(
+    Pointer<Void> ptr, RustBuffer text, RustBuffer style);
 
 @Native<
     Void Function(Pointer<Void>, RustBuffer, RustBuffer, RustBuffer, Uint64,
         Pointer<RustCallStatus>)>(assetId: _uniffiAssetId)
-external void
-    uniffi_beyondtranslate_runtime_fn_method_runtimellm_translate_stream(
-        Pointer<Void> ptr,
-        RustBuffer source_lang,
-        RustBuffer target_lang,
-        RustBuffer text,
-        int callback,
-        Pointer<RustCallStatus> uniffiStatus);
+external void uniffi_linguaray_runtime_fn_method_runtimellm_translate_stream(
+    Pointer<Void> ptr,
+    RustBuffer source_lang,
+    RustBuffer target_lang,
+    RustBuffer text,
+    int callback,
+    Pointer<RustCallStatus> uniffiStatus);
 
 @Native<Pointer<Void> Function(Pointer<Void>, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external Pointer<Void> uniffi_beyondtranslate_runtime_fn_clone_runtimeocr(
+external Pointer<Void> uniffi_linguaray_runtime_fn_clone_runtimeocr(
     Pointer<Void> handle, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<Void Function(Pointer<Void>, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external void uniffi_beyondtranslate_runtime_fn_free_runtimeocr(
+external void uniffi_linguaray_runtime_fn_free_runtimeocr(
     Pointer<Void> handle, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<Pointer<Void> Function(Pointer<Void>, RustBuffer)>(
     assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimeocr_recognize_text(
+    uniffi_linguaray_runtime_fn_method_runtimeocr_recognize_text(
         Pointer<Void> ptr, RustBuffer request);
 
 @Native<Pointer<Void> Function(Pointer<Void>, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_clone_runtimepermission(
-        Pointer<Void> handle, Pointer<RustCallStatus> uniffiStatus);
+external Pointer<Void> uniffi_linguaray_runtime_fn_clone_runtimepermission(
+    Pointer<Void> handle, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<Void Function(Pointer<Void>, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external void uniffi_beyondtranslate_runtime_fn_free_runtimepermission(
+external void uniffi_linguaray_runtime_fn_free_runtimepermission(
     Pointer<Void> handle, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<Pointer<Void> Function(Pointer<Void>)>(assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimepermission_is_accessibility_permission_granted(
+    uniffi_linguaray_runtime_fn_method_runtimepermission_is_accessibility_permission_granted(
         Pointer<Void> ptr);
 
 @Native<Pointer<Void> Function(Pointer<Void>)>(assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimepermission_is_screen_recording_permission_granted(
+    uniffi_linguaray_runtime_fn_method_runtimepermission_is_screen_recording_permission_granted(
         Pointer<Void> ptr);
 
 @Native<Pointer<Void> Function(Pointer<Void>, Int8)>(assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimepermission_request_accessibility_permission(
+    uniffi_linguaray_runtime_fn_method_runtimepermission_request_accessibility_permission(
         Pointer<Void> ptr, int only_open_system_settings);
 
 @Native<Pointer<Void> Function(Pointer<Void>, Int8)>(assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimepermission_request_screen_recording_permission(
+    uniffi_linguaray_runtime_fn_method_runtimepermission_request_screen_recording_permission(
         Pointer<Void> ptr, int only_open_system_settings);
 
 @Native<Pointer<Void> Function(Pointer<Void>, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external Pointer<Void> uniffi_beyondtranslate_runtime_fn_clone_runtimesettings(
+external Pointer<Void> uniffi_linguaray_runtime_fn_clone_runtimesettings(
     Pointer<Void> handle, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<Void Function(Pointer<Void>, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external void uniffi_beyondtranslate_runtime_fn_free_runtimesettings(
+external void uniffi_linguaray_runtime_fn_free_runtimesettings(
     Pointer<Void> handle, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<Pointer<Void> Function(Pointer<Void>, RustBuffer)>(
     assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimesettings_delete_provider(
+    uniffi_linguaray_runtime_fn_method_runtimesettings_delete_provider(
         Pointer<Void> ptr, RustBuffer provider_id);
 
 @Native<Pointer<Void> Function(Pointer<Void>, RustBuffer)>(
     assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimesettings_delete_service(
+    uniffi_linguaray_runtime_fn_method_runtimesettings_delete_service(
         Pointer<Void> ptr, RustBuffer service_id);
 
 @Native<Pointer<Void> Function(Pointer<Void>, RustBuffer)>(
     assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimesettings_generate_provider_id(
+    uniffi_linguaray_runtime_fn_method_runtimesettings_generate_provider_id(
         Pointer<Void> ptr, RustBuffer provider_type);
 
 @Native<Pointer<Void> Function(Pointer<Void>, RustBuffer, RustBuffer)>(
     assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimesettings_get_active_translation_targets(
+    uniffi_linguaray_runtime_fn_method_runtimesettings_get_active_translation_targets(
         Pointer<Void> ptr, RustBuffer targets, RustBuffer detected_language);
 
 @Native<Pointer<Void> Function(Pointer<Void>)>(assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimesettings_get_advanced(
+    uniffi_linguaray_runtime_fn_method_runtimesettings_get_advanced(
         Pointer<Void> ptr);
 
 @Native<Pointer<Void> Function(Pointer<Void>)>(assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimesettings_get_appearance(
+    uniffi_linguaray_runtime_fn_method_runtimesettings_get_appearance(
         Pointer<Void> ptr);
 
 @Native<Pointer<Void> Function(Pointer<Void>)>(assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimesettings_get_general(
+    uniffi_linguaray_runtime_fn_method_runtimesettings_get_general(
         Pointer<Void> ptr);
 
 @Native<Pointer<Void> Function(Pointer<Void>)>(assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimesettings_get_json(
+    uniffi_linguaray_runtime_fn_method_runtimesettings_get_json(
         Pointer<Void> ptr);
 
 @Native<Pointer<Void> Function(Pointer<Void>, RustBuffer)>(
     assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimesettings_get_provider(
+    uniffi_linguaray_runtime_fn_method_runtimesettings_get_provider(
         Pointer<Void> ptr, RustBuffer provider_id);
 
 @Native<Pointer<Void> Function(Pointer<Void>, RustBuffer)>(
     assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimesettings_get_service(
+    uniffi_linguaray_runtime_fn_method_runtimesettings_get_service(
         Pointer<Void> ptr, RustBuffer service_id);
 
 @Native<Pointer<Void> Function(Pointer<Void>)>(assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimesettings_get_shortcuts(
+    uniffi_linguaray_runtime_fn_method_runtimesettings_get_shortcuts(
         Pointer<Void> ptr);
 
 @Native<Pointer<Void> Function(Pointer<Void>, RustBuffer)>(
     assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimesettings_list_models(
+    uniffi_linguaray_runtime_fn_method_runtimesettings_list_models(
         Pointer<Void> ptr, RustBuffer provider_id);
 
 @Native<Pointer<Void> Function(Pointer<Void>)>(assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimesettings_list_providers(
+    uniffi_linguaray_runtime_fn_method_runtimesettings_list_providers(
         Pointer<Void> ptr);
 
 @Native<Pointer<Void> Function(Pointer<Void>)>(assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimesettings_list_services(
+    uniffi_linguaray_runtime_fn_method_runtimesettings_list_services(
         Pointer<Void> ptr);
 
 @Native<Pointer<Void> Function(Pointer<Void>)>(assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimesettings_reset_shortcuts(
+    uniffi_linguaray_runtime_fn_method_runtimesettings_reset_shortcuts(
         Pointer<Void> ptr);
 
 @Native<Pointer<Void> Function(Pointer<Void>, RustBuffer, RustBuffer)>(
     assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimesettings_set_provider_secrets(
+    uniffi_linguaray_runtime_fn_method_runtimesettings_set_provider_secrets(
         Pointer<Void> ptr, RustBuffer provider_id, RustBuffer secrets);
 
 @Native<Pointer<Void> Function(Pointer<Void>, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimesettings_subscribe(
+    uniffi_linguaray_runtime_fn_method_runtimesettings_subscribe(
         Pointer<Void> ptr, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<Pointer<Void> Function(Pointer<Void>, RustBuffer)>(
     assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimesettings_update_advanced(
+    uniffi_linguaray_runtime_fn_method_runtimesettings_update_advanced(
         Pointer<Void> ptr, RustBuffer patch);
 
 @Native<Pointer<Void> Function(Pointer<Void>, RustBuffer)>(
     assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimesettings_update_appearance(
+    uniffi_linguaray_runtime_fn_method_runtimesettings_update_appearance(
         Pointer<Void> ptr, RustBuffer patch);
 
 @Native<Pointer<Void> Function(Pointer<Void>, RustBuffer)>(
     assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimesettings_update_general(
+    uniffi_linguaray_runtime_fn_method_runtimesettings_update_general(
         Pointer<Void> ptr, RustBuffer patch);
 
 @Native<
     Pointer<Void> Function(Pointer<Void>, RustBuffer, RustBuffer,
         RustBuffer)>(assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimesettings_update_provider(
+    uniffi_linguaray_runtime_fn_method_runtimesettings_update_provider(
         Pointer<Void> ptr,
         RustBuffer provider_id,
         RustBuffer provider_type,
@@ -10163,7 +10096,7 @@ external Pointer<Void>
     Pointer<Void> Function(Pointer<Void>, RustBuffer, RustBuffer, RustBuffer,
         RustBuffer, RustBuffer)>(assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimesettings_update_service(
+    uniffi_linguaray_runtime_fn_method_runtimesettings_update_service(
         Pointer<Void> ptr,
         RustBuffer service_id,
         RustBuffer provider_id,
@@ -10174,223 +10107,213 @@ external Pointer<Void>
 @Native<Pointer<Void> Function(Pointer<Void>, RustBuffer)>(
     assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimesettings_update_shortcuts(
+    uniffi_linguaray_runtime_fn_method_runtimesettings_update_shortcuts(
         Pointer<Void> ptr, RustBuffer patch);
 
 @Native<Pointer<Void> Function(Pointer<Void>, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_clone_runtimetextextractor(
-        Pointer<Void> handle, Pointer<RustCallStatus> uniffiStatus);
+external Pointer<Void> uniffi_linguaray_runtime_fn_clone_runtimetextextractor(
+    Pointer<Void> handle, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<Void Function(Pointer<Void>, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external void uniffi_beyondtranslate_runtime_fn_free_runtimetextextractor(
+external void uniffi_linguaray_runtime_fn_free_runtimetextextractor(
     Pointer<Void> handle, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<Pointer<Void> Function(Pointer<Void>)>(assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimetextextractor_extract_from_clipboard(
+    uniffi_linguaray_runtime_fn_method_runtimetextextractor_extract_from_clipboard(
         Pointer<Void> ptr);
 
 @Native<Pointer<Void> Function(Pointer<Void>)>(assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimetextextractor_extract_from_screen_capture(
+    uniffi_linguaray_runtime_fn_method_runtimetextextractor_extract_from_screen_capture(
         Pointer<Void> ptr);
 
 @Native<Pointer<Void> Function(Pointer<Void>)>(assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimetextextractor_extract_from_screen_selection(
+    uniffi_linguaray_runtime_fn_method_runtimetextextractor_extract_from_screen_selection(
         Pointer<Void> ptr);
 
 @Native<Pointer<Void> Function(Pointer<Void>)>(assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimetextextractor_extract_from_screen_selection_detailed(
+    uniffi_linguaray_runtime_fn_method_runtimetextextractor_extract_from_screen_selection_detailed(
         Pointer<Void> ptr);
 
 @Native<Pointer<Void> Function(Pointer<Void>, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_clone_runtimetranslation(
-        Pointer<Void> handle, Pointer<RustCallStatus> uniffiStatus);
+external Pointer<Void> uniffi_linguaray_runtime_fn_clone_runtimetranslation(
+    Pointer<Void> handle, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<Void Function(Pointer<Void>, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external void uniffi_beyondtranslate_runtime_fn_free_runtimetranslation(
+external void uniffi_linguaray_runtime_fn_free_runtimetranslation(
     Pointer<Void> handle, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<Pointer<Void> Function(Pointer<Void>, RustBuffer)>(
     assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimetranslation_detect_language(
+    uniffi_linguaray_runtime_fn_method_runtimetranslation_detect_language(
         Pointer<Void> ptr, RustBuffer request);
 
 @Native<Pointer<Void> Function(Pointer<Void>, RustBuffer)>(
     assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_runtimetranslation_translate(
+    uniffi_linguaray_runtime_fn_method_runtimetranslation_translate(
         Pointer<Void> ptr, RustBuffer request);
 
 @Native<Pointer<Void> Function(Pointer<Void>, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_clone_settingssubscription(
-        Pointer<Void> handle, Pointer<RustCallStatus> uniffiStatus);
+external Pointer<Void> uniffi_linguaray_runtime_fn_clone_settingssubscription(
+    Pointer<Void> handle, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<Void Function(Pointer<Void>, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external void uniffi_beyondtranslate_runtime_fn_free_settingssubscription(
+external void uniffi_linguaray_runtime_fn_free_settingssubscription(
     Pointer<Void> handle, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<Pointer<Void> Function(Pointer<Void>)>(assetId: _uniffiAssetId)
 external Pointer<Void>
-    uniffi_beyondtranslate_runtime_fn_method_settingssubscription_next(
+    uniffi_linguaray_runtime_fn_method_settingssubscription_next(
         Pointer<Void> ptr);
 
 @Native<Void Function(Pointer<UniffiVTableCallbackInterfaceStreamCallback>)>(
     assetId: _uniffiAssetId)
-external void
-    uniffi_beyondtranslate_runtime_fn_init_callback_vtable_streamcallback(
-        Pointer<UniffiVTableCallbackInterfaceStreamCallback> vtable);
+external void uniffi_linguaray_runtime_fn_init_callback_vtable_streamcallback(
+    Pointer<UniffiVTableCallbackInterfaceStreamCallback> vtable);
 
 @Native<RustBuffer Function(RustBuffer, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
 external RustBuffer
-    uniffi_beyondtranslate_runtime_fn_func_echo_detect_language_request(
+    uniffi_linguaray_runtime_fn_func_echo_detect_language_request(
         RustBuffer request, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<RustBuffer Function(RustBuffer, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
 external RustBuffer
-    uniffi_beyondtranslate_runtime_fn_func_echo_detect_language_response(
+    uniffi_linguaray_runtime_fn_func_echo_detect_language_response(
         RustBuffer response, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<RustBuffer Function(RustBuffer, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external RustBuffer uniffi_beyondtranslate_runtime_fn_func_echo_language_pair(
+external RustBuffer uniffi_linguaray_runtime_fn_func_echo_language_pair(
     RustBuffer language_pair, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<RustBuffer Function(RustBuffer, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external RustBuffer uniffi_beyondtranslate_runtime_fn_func_echo_look_up_request(
+external RustBuffer uniffi_linguaray_runtime_fn_func_echo_look_up_request(
     RustBuffer request, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<RustBuffer Function(RustBuffer, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external RustBuffer
-    uniffi_beyondtranslate_runtime_fn_func_echo_look_up_response(
-        RustBuffer response, Pointer<RustCallStatus> uniffiStatus);
+external RustBuffer uniffi_linguaray_runtime_fn_func_echo_look_up_response(
+    RustBuffer response, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<RustBuffer Function(RustBuffer, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
 external RustBuffer
-    uniffi_beyondtranslate_runtime_fn_func_echo_recognize_text_request(
+    uniffi_linguaray_runtime_fn_func_echo_recognize_text_request(
         RustBuffer request, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<RustBuffer Function(RustBuffer, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
 external RustBuffer
-    uniffi_beyondtranslate_runtime_fn_func_echo_recognize_text_response(
+    uniffi_linguaray_runtime_fn_func_echo_recognize_text_response(
         RustBuffer response, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<RustBuffer Function(RustBuffer, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external RustBuffer uniffi_beyondtranslate_runtime_fn_func_echo_recognized_rect(
+external RustBuffer uniffi_linguaray_runtime_fn_func_echo_recognized_rect(
     RustBuffer rect, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<RustBuffer Function(RustBuffer, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external RustBuffer uniffi_beyondtranslate_runtime_fn_func_echo_text_detection(
+external RustBuffer uniffi_linguaray_runtime_fn_func_echo_text_detection(
     RustBuffer text_detection, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<RustBuffer Function(RustBuffer, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external RustBuffer
-    uniffi_beyondtranslate_runtime_fn_func_echo_text_recognition(
-        RustBuffer recognition, Pointer<RustCallStatus> uniffiStatus);
+external RustBuffer uniffi_linguaray_runtime_fn_func_echo_text_recognition(
+    RustBuffer recognition, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<RustBuffer Function(RustBuffer, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external RustBuffer
-    uniffi_beyondtranslate_runtime_fn_func_echo_text_translation(
-        RustBuffer text_translation, Pointer<RustCallStatus> uniffiStatus);
+external RustBuffer uniffi_linguaray_runtime_fn_func_echo_text_translation(
+    RustBuffer text_translation, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<RustBuffer Function(RustBuffer, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external RustBuffer
-    uniffi_beyondtranslate_runtime_fn_func_echo_translate_request(
-        RustBuffer request, Pointer<RustCallStatus> uniffiStatus);
+external RustBuffer uniffi_linguaray_runtime_fn_func_echo_translate_request(
+    RustBuffer request, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<RustBuffer Function(RustBuffer, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external RustBuffer
-    uniffi_beyondtranslate_runtime_fn_func_echo_translate_response(
-        RustBuffer response, Pointer<RustCallStatus> uniffiStatus);
+external RustBuffer uniffi_linguaray_runtime_fn_func_echo_translate_response(
+    RustBuffer response, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<RustBuffer Function(RustBuffer, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external RustBuffer uniffi_beyondtranslate_runtime_fn_func_echo_word_definition(
+external RustBuffer uniffi_linguaray_runtime_fn_func_echo_word_definition(
     RustBuffer word_definition, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<RustBuffer Function(RustBuffer, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external RustBuffer uniffi_beyondtranslate_runtime_fn_func_echo_word_etymology(
+external RustBuffer uniffi_linguaray_runtime_fn_func_echo_word_etymology(
     RustBuffer word_etymology, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<RustBuffer Function(RustBuffer, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external RustBuffer uniffi_beyondtranslate_runtime_fn_func_echo_word_image(
+external RustBuffer uniffi_linguaray_runtime_fn_func_echo_word_image(
     RustBuffer word_image, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<RustBuffer Function(RustBuffer, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external RustBuffer uniffi_beyondtranslate_runtime_fn_func_echo_word_phrase(
+external RustBuffer uniffi_linguaray_runtime_fn_func_echo_word_phrase(
     RustBuffer word_phrase, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<RustBuffer Function(RustBuffer, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external RustBuffer
-    uniffi_beyondtranslate_runtime_fn_func_echo_word_pronunciation(
-        RustBuffer word_pronunciation, Pointer<RustCallStatus> uniffiStatus);
+external RustBuffer uniffi_linguaray_runtime_fn_func_echo_word_pronunciation(
+    RustBuffer word_pronunciation, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<RustBuffer Function(RustBuffer, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external RustBuffer uniffi_beyondtranslate_runtime_fn_func_echo_word_sentence(
+external RustBuffer uniffi_linguaray_runtime_fn_func_echo_word_sentence(
     RustBuffer word_sentence, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<RustBuffer Function(RustBuffer, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external RustBuffer uniffi_beyondtranslate_runtime_fn_func_echo_word_synonym(
+external RustBuffer uniffi_linguaray_runtime_fn_func_echo_word_synonym(
     RustBuffer word_synonym, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<RustBuffer Function(RustBuffer, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external RustBuffer uniffi_beyondtranslate_runtime_fn_func_echo_word_tag(
+external RustBuffer uniffi_linguaray_runtime_fn_func_echo_word_tag(
     RustBuffer word_tag, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<RustBuffer Function(RustBuffer, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external RustBuffer uniffi_beyondtranslate_runtime_fn_func_echo_word_tense(
+external RustBuffer uniffi_linguaray_runtime_fn_func_echo_word_tense(
     RustBuffer word_tense, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<RustBuffer Function(Uint64, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external RustBuffer ffi_beyondtranslate_runtime_rustbuffer_alloc(
+external RustBuffer ffi_linguaray_runtime_rustbuffer_alloc(
     int size, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<RustBuffer Function(ForeignBytes, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external RustBuffer ffi_beyondtranslate_runtime_rustbuffer_from_bytes(
+external RustBuffer ffi_linguaray_runtime_rustbuffer_from_bytes(
     ForeignBytes bytes, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<Void Function(RustBuffer, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external void ffi_beyondtranslate_runtime_rustbuffer_free(
+external void ffi_linguaray_runtime_rustbuffer_free(
     RustBuffer buf, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<RustBuffer Function(RustBuffer, Uint64, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external RustBuffer ffi_beyondtranslate_runtime_rustbuffer_reserve(
+external RustBuffer ffi_linguaray_runtime_rustbuffer_reserve(
     RustBuffer buf, int additional, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<
@@ -10398,22 +10321,20 @@ external RustBuffer ffi_beyondtranslate_runtime_rustbuffer_reserve(
         Pointer<Void>,
         Pointer<NativeFunction<UniffiRustFutureContinuationCallback>>,
         Pointer<Void>)>(assetId: _uniffiAssetId)
-external void ffi_beyondtranslate_runtime_rust_future_poll_u8(
+external void ffi_linguaray_runtime_rust_future_poll_u8(
     Pointer<Void> handle,
     Pointer<NativeFunction<UniffiRustFutureContinuationCallback>> callback,
     Pointer<Void> callback_data);
 
 @Native<Void Function(Pointer<Void>)>(assetId: _uniffiAssetId)
-external void ffi_beyondtranslate_runtime_rust_future_cancel_u8(
-    Pointer<Void> handle);
+external void ffi_linguaray_runtime_rust_future_cancel_u8(Pointer<Void> handle);
 
 @Native<Void Function(Pointer<Void>)>(assetId: _uniffiAssetId)
-external void ffi_beyondtranslate_runtime_rust_future_free_u8(
-    Pointer<Void> handle);
+external void ffi_linguaray_runtime_rust_future_free_u8(Pointer<Void> handle);
 
 @Native<Uint8 Function(Pointer<Void>, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external int ffi_beyondtranslate_runtime_rust_future_complete_u8(
+external int ffi_linguaray_runtime_rust_future_complete_u8(
     Pointer<Void> handle, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<
@@ -10421,22 +10342,20 @@ external int ffi_beyondtranslate_runtime_rust_future_complete_u8(
         Pointer<Void>,
         Pointer<NativeFunction<UniffiRustFutureContinuationCallback>>,
         Pointer<Void>)>(assetId: _uniffiAssetId)
-external void ffi_beyondtranslate_runtime_rust_future_poll_i8(
+external void ffi_linguaray_runtime_rust_future_poll_i8(
     Pointer<Void> handle,
     Pointer<NativeFunction<UniffiRustFutureContinuationCallback>> callback,
     Pointer<Void> callback_data);
 
 @Native<Void Function(Pointer<Void>)>(assetId: _uniffiAssetId)
-external void ffi_beyondtranslate_runtime_rust_future_cancel_i8(
-    Pointer<Void> handle);
+external void ffi_linguaray_runtime_rust_future_cancel_i8(Pointer<Void> handle);
 
 @Native<Void Function(Pointer<Void>)>(assetId: _uniffiAssetId)
-external void ffi_beyondtranslate_runtime_rust_future_free_i8(
-    Pointer<Void> handle);
+external void ffi_linguaray_runtime_rust_future_free_i8(Pointer<Void> handle);
 
 @Native<Int8 Function(Pointer<Void>, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external int ffi_beyondtranslate_runtime_rust_future_complete_i8(
+external int ffi_linguaray_runtime_rust_future_complete_i8(
     Pointer<Void> handle, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<
@@ -10444,22 +10363,21 @@ external int ffi_beyondtranslate_runtime_rust_future_complete_i8(
         Pointer<Void>,
         Pointer<NativeFunction<UniffiRustFutureContinuationCallback>>,
         Pointer<Void>)>(assetId: _uniffiAssetId)
-external void ffi_beyondtranslate_runtime_rust_future_poll_u16(
+external void ffi_linguaray_runtime_rust_future_poll_u16(
     Pointer<Void> handle,
     Pointer<NativeFunction<UniffiRustFutureContinuationCallback>> callback,
     Pointer<Void> callback_data);
 
 @Native<Void Function(Pointer<Void>)>(assetId: _uniffiAssetId)
-external void ffi_beyondtranslate_runtime_rust_future_cancel_u16(
+external void ffi_linguaray_runtime_rust_future_cancel_u16(
     Pointer<Void> handle);
 
 @Native<Void Function(Pointer<Void>)>(assetId: _uniffiAssetId)
-external void ffi_beyondtranslate_runtime_rust_future_free_u16(
-    Pointer<Void> handle);
+external void ffi_linguaray_runtime_rust_future_free_u16(Pointer<Void> handle);
 
 @Native<Uint16 Function(Pointer<Void>, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external int ffi_beyondtranslate_runtime_rust_future_complete_u16(
+external int ffi_linguaray_runtime_rust_future_complete_u16(
     Pointer<Void> handle, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<
@@ -10467,22 +10385,21 @@ external int ffi_beyondtranslate_runtime_rust_future_complete_u16(
         Pointer<Void>,
         Pointer<NativeFunction<UniffiRustFutureContinuationCallback>>,
         Pointer<Void>)>(assetId: _uniffiAssetId)
-external void ffi_beyondtranslate_runtime_rust_future_poll_i16(
+external void ffi_linguaray_runtime_rust_future_poll_i16(
     Pointer<Void> handle,
     Pointer<NativeFunction<UniffiRustFutureContinuationCallback>> callback,
     Pointer<Void> callback_data);
 
 @Native<Void Function(Pointer<Void>)>(assetId: _uniffiAssetId)
-external void ffi_beyondtranslate_runtime_rust_future_cancel_i16(
+external void ffi_linguaray_runtime_rust_future_cancel_i16(
     Pointer<Void> handle);
 
 @Native<Void Function(Pointer<Void>)>(assetId: _uniffiAssetId)
-external void ffi_beyondtranslate_runtime_rust_future_free_i16(
-    Pointer<Void> handle);
+external void ffi_linguaray_runtime_rust_future_free_i16(Pointer<Void> handle);
 
 @Native<Int16 Function(Pointer<Void>, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external int ffi_beyondtranslate_runtime_rust_future_complete_i16(
+external int ffi_linguaray_runtime_rust_future_complete_i16(
     Pointer<Void> handle, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<
@@ -10490,22 +10407,21 @@ external int ffi_beyondtranslate_runtime_rust_future_complete_i16(
         Pointer<Void>,
         Pointer<NativeFunction<UniffiRustFutureContinuationCallback>>,
         Pointer<Void>)>(assetId: _uniffiAssetId)
-external void ffi_beyondtranslate_runtime_rust_future_poll_u32(
+external void ffi_linguaray_runtime_rust_future_poll_u32(
     Pointer<Void> handle,
     Pointer<NativeFunction<UniffiRustFutureContinuationCallback>> callback,
     Pointer<Void> callback_data);
 
 @Native<Void Function(Pointer<Void>)>(assetId: _uniffiAssetId)
-external void ffi_beyondtranslate_runtime_rust_future_cancel_u32(
+external void ffi_linguaray_runtime_rust_future_cancel_u32(
     Pointer<Void> handle);
 
 @Native<Void Function(Pointer<Void>)>(assetId: _uniffiAssetId)
-external void ffi_beyondtranslate_runtime_rust_future_free_u32(
-    Pointer<Void> handle);
+external void ffi_linguaray_runtime_rust_future_free_u32(Pointer<Void> handle);
 
 @Native<Uint32 Function(Pointer<Void>, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external int ffi_beyondtranslate_runtime_rust_future_complete_u32(
+external int ffi_linguaray_runtime_rust_future_complete_u32(
     Pointer<Void> handle, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<
@@ -10513,22 +10429,21 @@ external int ffi_beyondtranslate_runtime_rust_future_complete_u32(
         Pointer<Void>,
         Pointer<NativeFunction<UniffiRustFutureContinuationCallback>>,
         Pointer<Void>)>(assetId: _uniffiAssetId)
-external void ffi_beyondtranslate_runtime_rust_future_poll_i32(
+external void ffi_linguaray_runtime_rust_future_poll_i32(
     Pointer<Void> handle,
     Pointer<NativeFunction<UniffiRustFutureContinuationCallback>> callback,
     Pointer<Void> callback_data);
 
 @Native<Void Function(Pointer<Void>)>(assetId: _uniffiAssetId)
-external void ffi_beyondtranslate_runtime_rust_future_cancel_i32(
+external void ffi_linguaray_runtime_rust_future_cancel_i32(
     Pointer<Void> handle);
 
 @Native<Void Function(Pointer<Void>)>(assetId: _uniffiAssetId)
-external void ffi_beyondtranslate_runtime_rust_future_free_i32(
-    Pointer<Void> handle);
+external void ffi_linguaray_runtime_rust_future_free_i32(Pointer<Void> handle);
 
 @Native<Int32 Function(Pointer<Void>, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external int ffi_beyondtranslate_runtime_rust_future_complete_i32(
+external int ffi_linguaray_runtime_rust_future_complete_i32(
     Pointer<Void> handle, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<
@@ -10536,22 +10451,21 @@ external int ffi_beyondtranslate_runtime_rust_future_complete_i32(
         Pointer<Void>,
         Pointer<NativeFunction<UniffiRustFutureContinuationCallback>>,
         Pointer<Void>)>(assetId: _uniffiAssetId)
-external void ffi_beyondtranslate_runtime_rust_future_poll_u64(
+external void ffi_linguaray_runtime_rust_future_poll_u64(
     Pointer<Void> handle,
     Pointer<NativeFunction<UniffiRustFutureContinuationCallback>> callback,
     Pointer<Void> callback_data);
 
 @Native<Void Function(Pointer<Void>)>(assetId: _uniffiAssetId)
-external void ffi_beyondtranslate_runtime_rust_future_cancel_u64(
+external void ffi_linguaray_runtime_rust_future_cancel_u64(
     Pointer<Void> handle);
 
 @Native<Void Function(Pointer<Void>)>(assetId: _uniffiAssetId)
-external void ffi_beyondtranslate_runtime_rust_future_free_u64(
-    Pointer<Void> handle);
+external void ffi_linguaray_runtime_rust_future_free_u64(Pointer<Void> handle);
 
 @Native<Uint64 Function(Pointer<Void>, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external int ffi_beyondtranslate_runtime_rust_future_complete_u64(
+external int ffi_linguaray_runtime_rust_future_complete_u64(
     Pointer<Void> handle, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<
@@ -10559,22 +10473,21 @@ external int ffi_beyondtranslate_runtime_rust_future_complete_u64(
         Pointer<Void>,
         Pointer<NativeFunction<UniffiRustFutureContinuationCallback>>,
         Pointer<Void>)>(assetId: _uniffiAssetId)
-external void ffi_beyondtranslate_runtime_rust_future_poll_i64(
+external void ffi_linguaray_runtime_rust_future_poll_i64(
     Pointer<Void> handle,
     Pointer<NativeFunction<UniffiRustFutureContinuationCallback>> callback,
     Pointer<Void> callback_data);
 
 @Native<Void Function(Pointer<Void>)>(assetId: _uniffiAssetId)
-external void ffi_beyondtranslate_runtime_rust_future_cancel_i64(
+external void ffi_linguaray_runtime_rust_future_cancel_i64(
     Pointer<Void> handle);
 
 @Native<Void Function(Pointer<Void>)>(assetId: _uniffiAssetId)
-external void ffi_beyondtranslate_runtime_rust_future_free_i64(
-    Pointer<Void> handle);
+external void ffi_linguaray_runtime_rust_future_free_i64(Pointer<Void> handle);
 
 @Native<Int64 Function(Pointer<Void>, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external int ffi_beyondtranslate_runtime_rust_future_complete_i64(
+external int ffi_linguaray_runtime_rust_future_complete_i64(
     Pointer<Void> handle, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<
@@ -10582,22 +10495,21 @@ external int ffi_beyondtranslate_runtime_rust_future_complete_i64(
         Pointer<Void>,
         Pointer<NativeFunction<UniffiRustFutureContinuationCallback>>,
         Pointer<Void>)>(assetId: _uniffiAssetId)
-external void ffi_beyondtranslate_runtime_rust_future_poll_f32(
+external void ffi_linguaray_runtime_rust_future_poll_f32(
     Pointer<Void> handle,
     Pointer<NativeFunction<UniffiRustFutureContinuationCallback>> callback,
     Pointer<Void> callback_data);
 
 @Native<Void Function(Pointer<Void>)>(assetId: _uniffiAssetId)
-external void ffi_beyondtranslate_runtime_rust_future_cancel_f32(
+external void ffi_linguaray_runtime_rust_future_cancel_f32(
     Pointer<Void> handle);
 
 @Native<Void Function(Pointer<Void>)>(assetId: _uniffiAssetId)
-external void ffi_beyondtranslate_runtime_rust_future_free_f32(
-    Pointer<Void> handle);
+external void ffi_linguaray_runtime_rust_future_free_f32(Pointer<Void> handle);
 
 @Native<Float Function(Pointer<Void>, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external double ffi_beyondtranslate_runtime_rust_future_complete_f32(
+external double ffi_linguaray_runtime_rust_future_complete_f32(
     Pointer<Void> handle, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<
@@ -10605,22 +10517,21 @@ external double ffi_beyondtranslate_runtime_rust_future_complete_f32(
         Pointer<Void>,
         Pointer<NativeFunction<UniffiRustFutureContinuationCallback>>,
         Pointer<Void>)>(assetId: _uniffiAssetId)
-external void ffi_beyondtranslate_runtime_rust_future_poll_f64(
+external void ffi_linguaray_runtime_rust_future_poll_f64(
     Pointer<Void> handle,
     Pointer<NativeFunction<UniffiRustFutureContinuationCallback>> callback,
     Pointer<Void> callback_data);
 
 @Native<Void Function(Pointer<Void>)>(assetId: _uniffiAssetId)
-external void ffi_beyondtranslate_runtime_rust_future_cancel_f64(
+external void ffi_linguaray_runtime_rust_future_cancel_f64(
     Pointer<Void> handle);
 
 @Native<Void Function(Pointer<Void>)>(assetId: _uniffiAssetId)
-external void ffi_beyondtranslate_runtime_rust_future_free_f64(
-    Pointer<Void> handle);
+external void ffi_linguaray_runtime_rust_future_free_f64(Pointer<Void> handle);
 
 @Native<Double Function(Pointer<Void>, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external double ffi_beyondtranslate_runtime_rust_future_complete_f64(
+external double ffi_linguaray_runtime_rust_future_complete_f64(
     Pointer<Void> handle, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<
@@ -10628,426 +10539,401 @@ external double ffi_beyondtranslate_runtime_rust_future_complete_f64(
         Pointer<Void>,
         Pointer<NativeFunction<UniffiRustFutureContinuationCallback>>,
         Pointer<Void>)>(assetId: _uniffiAssetId)
-external void ffi_beyondtranslate_runtime_rust_future_poll_rust_buffer(
+external void ffi_linguaray_runtime_rust_future_poll_rust_buffer(
     Pointer<Void> handle,
     Pointer<NativeFunction<UniffiRustFutureContinuationCallback>> callback,
     Pointer<Void> callback_data);
 
 @Native<Void Function(Pointer<Void>)>(assetId: _uniffiAssetId)
-external void ffi_beyondtranslate_runtime_rust_future_cancel_rust_buffer(
+external void ffi_linguaray_runtime_rust_future_cancel_rust_buffer(
     Pointer<Void> handle);
 
 @Native<Void Function(Pointer<Void>)>(assetId: _uniffiAssetId)
-external void ffi_beyondtranslate_runtime_rust_future_free_rust_buffer(
+external void ffi_linguaray_runtime_rust_future_free_rust_buffer(
     Pointer<Void> handle);
 
 @Native<RustBuffer Function(Pointer<Void>, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external RustBuffer
-    ffi_beyondtranslate_runtime_rust_future_complete_rust_buffer(
-        Pointer<Void> handle, Pointer<RustCallStatus> uniffiStatus);
+external RustBuffer ffi_linguaray_runtime_rust_future_complete_rust_buffer(
+    Pointer<Void> handle, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<
     Void Function(
         Pointer<Void>,
         Pointer<NativeFunction<UniffiRustFutureContinuationCallback>>,
         Pointer<Void>)>(assetId: _uniffiAssetId)
-external void ffi_beyondtranslate_runtime_rust_future_poll_void(
+external void ffi_linguaray_runtime_rust_future_poll_void(
     Pointer<Void> handle,
     Pointer<NativeFunction<UniffiRustFutureContinuationCallback>> callback,
     Pointer<Void> callback_data);
 
 @Native<Void Function(Pointer<Void>)>(assetId: _uniffiAssetId)
-external void ffi_beyondtranslate_runtime_rust_future_cancel_void(
+external void ffi_linguaray_runtime_rust_future_cancel_void(
     Pointer<Void> handle);
 
 @Native<Void Function(Pointer<Void>)>(assetId: _uniffiAssetId)
-external void ffi_beyondtranslate_runtime_rust_future_free_void(
-    Pointer<Void> handle);
+external void ffi_linguaray_runtime_rust_future_free_void(Pointer<Void> handle);
 
 @Native<Void Function(Pointer<Void>, Pointer<RustCallStatus>)>(
     assetId: _uniffiAssetId)
-external void ffi_beyondtranslate_runtime_rust_future_complete_void(
+external void ffi_linguaray_runtime_rust_future_complete_void(
     Pointer<Void> handle, Pointer<RustCallStatus> uniffiStatus);
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_func_echo_detect_language_request();
+    uniffi_linguaray_runtime_checksum_func_echo_detect_language_request();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_func_echo_detect_language_response();
+    uniffi_linguaray_runtime_checksum_func_echo_detect_language_response();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
-external int uniffi_beyondtranslate_runtime_checksum_func_echo_language_pair();
+external int uniffi_linguaray_runtime_checksum_func_echo_language_pair();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
-external int
-    uniffi_beyondtranslate_runtime_checksum_func_echo_look_up_request();
+external int uniffi_linguaray_runtime_checksum_func_echo_look_up_request();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
-external int
-    uniffi_beyondtranslate_runtime_checksum_func_echo_look_up_response();
+external int uniffi_linguaray_runtime_checksum_func_echo_look_up_response();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_func_echo_recognize_text_request();
+    uniffi_linguaray_runtime_checksum_func_echo_recognize_text_request();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_func_echo_recognize_text_response();
+    uniffi_linguaray_runtime_checksum_func_echo_recognize_text_response();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
-external int
-    uniffi_beyondtranslate_runtime_checksum_func_echo_recognized_rect();
+external int uniffi_linguaray_runtime_checksum_func_echo_recognized_rect();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
-external int uniffi_beyondtranslate_runtime_checksum_func_echo_text_detection();
+external int uniffi_linguaray_runtime_checksum_func_echo_text_detection();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
-external int
-    uniffi_beyondtranslate_runtime_checksum_func_echo_text_recognition();
+external int uniffi_linguaray_runtime_checksum_func_echo_text_recognition();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
-external int
-    uniffi_beyondtranslate_runtime_checksum_func_echo_text_translation();
+external int uniffi_linguaray_runtime_checksum_func_echo_text_translation();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
-external int
-    uniffi_beyondtranslate_runtime_checksum_func_echo_translate_request();
+external int uniffi_linguaray_runtime_checksum_func_echo_translate_request();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
-external int
-    uniffi_beyondtranslate_runtime_checksum_func_echo_translate_response();
+external int uniffi_linguaray_runtime_checksum_func_echo_translate_response();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
-external int
-    uniffi_beyondtranslate_runtime_checksum_func_echo_word_definition();
+external int uniffi_linguaray_runtime_checksum_func_echo_word_definition();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
-external int uniffi_beyondtranslate_runtime_checksum_func_echo_word_etymology();
+external int uniffi_linguaray_runtime_checksum_func_echo_word_etymology();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
-external int uniffi_beyondtranslate_runtime_checksum_func_echo_word_image();
+external int uniffi_linguaray_runtime_checksum_func_echo_word_image();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
-external int uniffi_beyondtranslate_runtime_checksum_func_echo_word_phrase();
+external int uniffi_linguaray_runtime_checksum_func_echo_word_phrase();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
-external int
-    uniffi_beyondtranslate_runtime_checksum_func_echo_word_pronunciation();
+external int uniffi_linguaray_runtime_checksum_func_echo_word_pronunciation();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
-external int uniffi_beyondtranslate_runtime_checksum_func_echo_word_sentence();
+external int uniffi_linguaray_runtime_checksum_func_echo_word_sentence();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
-external int uniffi_beyondtranslate_runtime_checksum_func_echo_word_synonym();
+external int uniffi_linguaray_runtime_checksum_func_echo_word_synonym();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
-external int uniffi_beyondtranslate_runtime_checksum_func_echo_word_tag();
+external int uniffi_linguaray_runtime_checksum_func_echo_word_tag();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
-external int uniffi_beyondtranslate_runtime_checksum_func_echo_word_tense();
+external int uniffi_linguaray_runtime_checksum_func_echo_word_tense();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
-external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimeapiserver_info();
+external int uniffi_linguaray_runtime_checksum_method_runtimeapiserver_info();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
-external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimeapiserver_stop();
+external int uniffi_linguaray_runtime_checksum_method_runtimeapiserver_stop();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
-external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtime_dictionary();
+external int uniffi_linguaray_runtime_checksum_method_runtime_dictionary();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
-external int uniffi_beyondtranslate_runtime_checksum_method_runtime_glossary();
+external int uniffi_linguaray_runtime_checksum_method_runtime_glossary();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
-external int uniffi_beyondtranslate_runtime_checksum_method_runtime_history();
+external int uniffi_linguaray_runtime_checksum_method_runtime_history();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtime_list_app_languages();
+    uniffi_linguaray_runtime_checksum_method_runtime_list_app_languages();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
-external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtime_list_languages();
+external int uniffi_linguaray_runtime_checksum_method_runtime_list_languages();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
-external int uniffi_beyondtranslate_runtime_checksum_method_runtime_llm();
+external int uniffi_linguaray_runtime_checksum_method_runtime_llm();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
-external int uniffi_beyondtranslate_runtime_checksum_method_runtime_ocr();
+external int uniffi_linguaray_runtime_checksum_method_runtime_ocr();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
-external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtime_permission();
+external int uniffi_linguaray_runtime_checksum_method_runtime_permission();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
-external int uniffi_beyondtranslate_runtime_checksum_method_runtime_settings();
+external int uniffi_linguaray_runtime_checksum_method_runtime_settings();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtime_start_api_server();
+    uniffi_linguaray_runtime_checksum_method_runtime_start_api_server();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
-external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtime_text_extractor();
+external int uniffi_linguaray_runtime_checksum_method_runtime_text_extractor();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
-external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtime_translation();
+external int uniffi_linguaray_runtime_checksum_method_runtime_translation();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimedictionary_lookup();
+    uniffi_linguaray_runtime_checksum_method_runtimedictionary_lookup();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
-external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimeglossary_check();
+external int uniffi_linguaray_runtime_checksum_method_runtimeglossary_check();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimeglossary_count_entries();
+    uniffi_linguaray_runtime_checksum_method_runtimeglossary_count_entries();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimeglossary_delete_book();
+    uniffi_linguaray_runtime_checksum_method_runtimeglossary_delete_book();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimeglossary_delete_entry();
+    uniffi_linguaray_runtime_checksum_method_runtimeglossary_delete_entry();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimeglossary_flush_hits();
+    uniffi_linguaray_runtime_checksum_method_runtimeglossary_flush_hits();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimeglossary_get_book();
+    uniffi_linguaray_runtime_checksum_method_runtimeglossary_get_book();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimeglossary_list_books();
+    uniffi_linguaray_runtime_checksum_method_runtimeglossary_list_books();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimeglossary_list_entries();
+    uniffi_linguaray_runtime_checksum_method_runtimeglossary_list_entries();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimeglossary_match_text();
+    uniffi_linguaray_runtime_checksum_method_runtimeglossary_match_text();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimeglossary_upsert_book();
+    uniffi_linguaray_runtime_checksum_method_runtimeglossary_upsert_book();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimeglossary_upsert_entry();
+    uniffi_linguaray_runtime_checksum_method_runtimeglossary_upsert_entry();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
-external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimehistory_counts();
+external int uniffi_linguaray_runtime_checksum_method_runtimehistory_counts();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimehistory_delete_entries();
+    uniffi_linguaray_runtime_checksum_method_runtimehistory_delete_entries();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimehistory_list_entries();
+    uniffi_linguaray_runtime_checksum_method_runtimehistory_list_entries();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimehistory_set_favorite();
+    uniffi_linguaray_runtime_checksum_method_runtimehistory_set_favorite();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimehistory_upsert_entry();
+    uniffi_linguaray_runtime_checksum_method_runtimehistory_upsert_entry();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
-external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimellm_alternatives();
+external int uniffi_linguaray_runtime_checksum_method_runtimellm_alternatives();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
-external int uniffi_beyondtranslate_runtime_checksum_method_runtimellm_chat();
+external int uniffi_linguaray_runtime_checksum_method_runtimellm_chat();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
-external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimellm_explain();
+external int uniffi_linguaray_runtime_checksum_method_runtimellm_explain();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
-external int uniffi_beyondtranslate_runtime_checksum_method_runtimellm_polish();
+external int uniffi_linguaray_runtime_checksum_method_runtimellm_polish();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimellm_translate_stream();
+    uniffi_linguaray_runtime_checksum_method_runtimellm_translate_stream();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimeocr_recognize_text();
+    uniffi_linguaray_runtime_checksum_method_runtimeocr_recognize_text();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimepermission_is_accessibility_permission_granted();
+    uniffi_linguaray_runtime_checksum_method_runtimepermission_is_accessibility_permission_granted();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimepermission_is_screen_recording_permission_granted();
+    uniffi_linguaray_runtime_checksum_method_runtimepermission_is_screen_recording_permission_granted();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimepermission_request_accessibility_permission();
+    uniffi_linguaray_runtime_checksum_method_runtimepermission_request_accessibility_permission();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimepermission_request_screen_recording_permission();
+    uniffi_linguaray_runtime_checksum_method_runtimepermission_request_screen_recording_permission();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_delete_provider();
+    uniffi_linguaray_runtime_checksum_method_runtimesettings_delete_provider();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_delete_service();
+    uniffi_linguaray_runtime_checksum_method_runtimesettings_delete_service();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_generate_provider_id();
+    uniffi_linguaray_runtime_checksum_method_runtimesettings_generate_provider_id();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_get_active_translation_targets();
+    uniffi_linguaray_runtime_checksum_method_runtimesettings_get_active_translation_targets();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_get_advanced();
+    uniffi_linguaray_runtime_checksum_method_runtimesettings_get_advanced();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_get_appearance();
+    uniffi_linguaray_runtime_checksum_method_runtimesettings_get_appearance();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_get_general();
+    uniffi_linguaray_runtime_checksum_method_runtimesettings_get_general();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_get_json();
+    uniffi_linguaray_runtime_checksum_method_runtimesettings_get_json();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_get_provider();
+    uniffi_linguaray_runtime_checksum_method_runtimesettings_get_provider();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_get_service();
+    uniffi_linguaray_runtime_checksum_method_runtimesettings_get_service();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_get_shortcuts();
+    uniffi_linguaray_runtime_checksum_method_runtimesettings_get_shortcuts();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_list_models();
+    uniffi_linguaray_runtime_checksum_method_runtimesettings_list_models();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_list_providers();
+    uniffi_linguaray_runtime_checksum_method_runtimesettings_list_providers();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_list_services();
+    uniffi_linguaray_runtime_checksum_method_runtimesettings_list_services();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_reset_shortcuts();
+    uniffi_linguaray_runtime_checksum_method_runtimesettings_reset_shortcuts();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_set_provider_secrets();
+    uniffi_linguaray_runtime_checksum_method_runtimesettings_set_provider_secrets();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_subscribe();
+    uniffi_linguaray_runtime_checksum_method_runtimesettings_subscribe();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_update_advanced();
+    uniffi_linguaray_runtime_checksum_method_runtimesettings_update_advanced();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_update_appearance();
+    uniffi_linguaray_runtime_checksum_method_runtimesettings_update_appearance();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_update_general();
+    uniffi_linguaray_runtime_checksum_method_runtimesettings_update_general();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_update_provider();
+    uniffi_linguaray_runtime_checksum_method_runtimesettings_update_provider();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_update_service();
+    uniffi_linguaray_runtime_checksum_method_runtimesettings_update_service();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_update_shortcuts();
+    uniffi_linguaray_runtime_checksum_method_runtimesettings_update_shortcuts();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimetextextractor_extract_from_clipboard();
+    uniffi_linguaray_runtime_checksum_method_runtimetextextractor_extract_from_clipboard();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimetextextractor_extract_from_screen_capture();
+    uniffi_linguaray_runtime_checksum_method_runtimetextextractor_extract_from_screen_capture();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimetextextractor_extract_from_screen_selection();
+    uniffi_linguaray_runtime_checksum_method_runtimetextextractor_extract_from_screen_selection();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimetextextractor_extract_from_screen_selection_detailed();
+    uniffi_linguaray_runtime_checksum_method_runtimetextextractor_extract_from_screen_selection_detailed();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimetranslation_detect_language();
+    uniffi_linguaray_runtime_checksum_method_runtimetranslation_detect_language();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_runtimetranslation_translate();
+    uniffi_linguaray_runtime_checksum_method_runtimetranslation_translate();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_settingssubscription_next();
+    uniffi_linguaray_runtime_checksum_method_settingssubscription_next();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
-external int uniffi_beyondtranslate_runtime_checksum_constructor_runtime_new();
+external int uniffi_linguaray_runtime_checksum_constructor_runtime_new();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
-external int
-    uniffi_beyondtranslate_runtime_checksum_method_streamcallback_on_chunk();
+external int uniffi_linguaray_runtime_checksum_method_streamcallback_on_chunk();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
-    uniffi_beyondtranslate_runtime_checksum_method_streamcallback_on_finish();
+    uniffi_linguaray_runtime_checksum_method_streamcallback_on_finish();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
-external int
-    uniffi_beyondtranslate_runtime_checksum_method_streamcallback_on_error();
+external int uniffi_linguaray_runtime_checksum_method_streamcallback_on_error();
 
 @Native<Uint32 Function()>(assetId: _uniffiAssetId)
-external int ffi_beyondtranslate_runtime_uniffi_contract_version();
+external int ffi_linguaray_runtime_uniffi_contract_version();
 
 void _checkApiVersion() {
   final bindingsVersion = 30;
-  final scaffoldingVersion =
-      ffi_beyondtranslate_runtime_uniffi_contract_version();
+  final scaffoldingVersion = ffi_linguaray_runtime_uniffi_contract_version();
   if (bindingsVersion != scaffoldingVersion) {
     throw UniffiInternalError.panicked(
         "UniFFI contract version mismatch: bindings version \$bindingsVersion, scaffolding version \$scaffoldingVersion");
@@ -11055,387 +10941,365 @@ void _checkApiVersion() {
 }
 
 void _checkApiChecksums() {
-  if (uniffi_beyondtranslate_runtime_checksum_func_echo_detect_language_request() !=
-      60740) {
+  if (uniffi_linguaray_runtime_checksum_func_echo_detect_language_request() !=
+      6395) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_func_echo_detect_language_response() !=
-      58261) {
+  if (uniffi_linguaray_runtime_checksum_func_echo_detect_language_response() !=
+      7460) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_func_echo_language_pair() !=
-      17145) {
+  if (uniffi_linguaray_runtime_checksum_func_echo_language_pair() != 61094) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_func_echo_look_up_request() !=
-      38085) {
+  if (uniffi_linguaray_runtime_checksum_func_echo_look_up_request() != 49925) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_func_echo_look_up_response() !=
-      13954) {
+  if (uniffi_linguaray_runtime_checksum_func_echo_look_up_response() != 4792) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_func_echo_recognize_text_request() !=
-      29735) {
+  if (uniffi_linguaray_runtime_checksum_func_echo_recognize_text_request() !=
+      53297) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_func_echo_recognize_text_response() !=
-      47790) {
+  if (uniffi_linguaray_runtime_checksum_func_echo_recognize_text_response() !=
+      20171) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_func_echo_recognized_rect() !=
-      52548) {
+  if (uniffi_linguaray_runtime_checksum_func_echo_recognized_rect() != 16570) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_func_echo_text_detection() !=
-      26624) {
+  if (uniffi_linguaray_runtime_checksum_func_echo_text_detection() != 44916) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_func_echo_text_recognition() !=
-      44304) {
+  if (uniffi_linguaray_runtime_checksum_func_echo_text_recognition() != 32726) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_func_echo_text_translation() !=
-      22433) {
+  if (uniffi_linguaray_runtime_checksum_func_echo_text_translation() != 57788) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_func_echo_translate_request() !=
-      15797) {
+  if (uniffi_linguaray_runtime_checksum_func_echo_translate_request() !=
+      11135) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_func_echo_translate_response() !=
-      60824) {
+  if (uniffi_linguaray_runtime_checksum_func_echo_translate_response() !=
+      40431) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_func_echo_word_definition() !=
-      13074) {
+  if (uniffi_linguaray_runtime_checksum_func_echo_word_definition() != 6951) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_func_echo_word_etymology() !=
-      13993) {
+  if (uniffi_linguaray_runtime_checksum_func_echo_word_etymology() != 11041) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_func_echo_word_image() != 48917) {
+  if (uniffi_linguaray_runtime_checksum_func_echo_word_image() != 30922) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_func_echo_word_phrase() !=
-      25809) {
+  if (uniffi_linguaray_runtime_checksum_func_echo_word_phrase() != 24727) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_func_echo_word_pronunciation() !=
-      34049) {
+  if (uniffi_linguaray_runtime_checksum_func_echo_word_pronunciation() !=
+      11656) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_func_echo_word_sentence() !=
-      37267) {
+  if (uniffi_linguaray_runtime_checksum_func_echo_word_sentence() != 45734) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_func_echo_word_synonym() !=
-      27203) {
+  if (uniffi_linguaray_runtime_checksum_func_echo_word_synonym() != 7204) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_func_echo_word_tag() != 60766) {
+  if (uniffi_linguaray_runtime_checksum_func_echo_word_tag() != 37815) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_func_echo_word_tense() != 28625) {
+  if (uniffi_linguaray_runtime_checksum_func_echo_word_tense() != 26227) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimeapiserver_info() !=
-      36460) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimeapiserver_info() !=
+      8149) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimeapiserver_stop() !=
-      63804) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimeapiserver_stop() !=
+      49630) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtime_dictionary() !=
-      13965) {
+  if (uniffi_linguaray_runtime_checksum_method_runtime_dictionary() != 16423) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtime_glossary() !=
-      33226) {
+  if (uniffi_linguaray_runtime_checksum_method_runtime_glossary() != 14175) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtime_history() !=
-      28095) {
+  if (uniffi_linguaray_runtime_checksum_method_runtime_history() != 14172) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtime_list_app_languages() !=
-      62628) {
+  if (uniffi_linguaray_runtime_checksum_method_runtime_list_app_languages() !=
+      55126) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtime_list_languages() !=
-      58600) {
+  if (uniffi_linguaray_runtime_checksum_method_runtime_list_languages() !=
+      51738) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtime_llm() != 58856) {
+  if (uniffi_linguaray_runtime_checksum_method_runtime_llm() != 14942) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtime_ocr() != 40076) {
+  if (uniffi_linguaray_runtime_checksum_method_runtime_ocr() != 36004) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtime_permission() !=
-      10201) {
+  if (uniffi_linguaray_runtime_checksum_method_runtime_permission() != 38074) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtime_settings() !=
-      37764) {
+  if (uniffi_linguaray_runtime_checksum_method_runtime_settings() != 26512) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtime_start_api_server() !=
-      26599) {
+  if (uniffi_linguaray_runtime_checksum_method_runtime_start_api_server() !=
+      6527) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtime_text_extractor() !=
-      21355) {
+  if (uniffi_linguaray_runtime_checksum_method_runtime_text_extractor() !=
+      60762) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtime_translation() !=
-      36886) {
+  if (uniffi_linguaray_runtime_checksum_method_runtime_translation() != 58975) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimedictionary_lookup() !=
-      64628) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimedictionary_lookup() !=
+      41773) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimeglossary_check() !=
-      63423) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimeglossary_check() !=
+      13948) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimeglossary_count_entries() !=
-      55476) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimeglossary_count_entries() !=
+      44215) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimeglossary_delete_book() !=
-      16544) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimeglossary_delete_book() !=
+      49149) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimeglossary_delete_entry() !=
-      63607) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimeglossary_delete_entry() !=
+      58587) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimeglossary_flush_hits() !=
-      36653) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimeglossary_flush_hits() !=
+      14399) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimeglossary_get_book() !=
-      55021) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimeglossary_get_book() !=
+      17114) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimeglossary_list_books() !=
-      50485) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimeglossary_list_books() !=
+      59735) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimeglossary_list_entries() !=
-      44641) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimeglossary_list_entries() !=
+      54433) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimeglossary_match_text() !=
-      25986) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimeglossary_match_text() !=
+      36972) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimeglossary_upsert_book() !=
-      6404) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimeglossary_upsert_book() !=
+      50056) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimeglossary_upsert_entry() !=
-      60568) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimeglossary_upsert_entry() !=
+      33639) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimehistory_counts() !=
-      11944) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimehistory_counts() !=
+      18206) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimehistory_delete_entries() !=
-      28792) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimehistory_delete_entries() !=
+      6382) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimehistory_list_entries() !=
-      19749) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimehistory_list_entries() !=
+      20079) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimehistory_set_favorite() !=
-      31633) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimehistory_set_favorite() !=
+      39465) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimehistory_upsert_entry() !=
-      15258) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimehistory_upsert_entry() !=
+      38058) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimellm_alternatives() !=
-      63979) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimellm_alternatives() !=
+      8857) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimellm_chat() !=
-      7344) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimellm_chat() != 56944) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimellm_explain() !=
-      52876) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimellm_explain() != 51688) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimellm_polish() !=
-      19556) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimellm_polish() != 54993) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimellm_translate_stream() !=
-      30677) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimellm_translate_stream() !=
+      19511) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimeocr_recognize_text() !=
-      10575) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimeocr_recognize_text() !=
+      38562) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimepermission_is_accessibility_permission_granted() !=
-      49819) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimepermission_is_accessibility_permission_granted() !=
+      13464) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimepermission_is_screen_recording_permission_granted() !=
-      57183) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimepermission_is_screen_recording_permission_granted() !=
+      42396) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimepermission_request_accessibility_permission() !=
-      28036) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimepermission_request_accessibility_permission() !=
+      39655) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimepermission_request_screen_recording_permission() !=
-      9096) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimepermission_request_screen_recording_permission() !=
+      39088) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_delete_provider() !=
-      20557) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimesettings_delete_provider() !=
+      2747) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_delete_service() !=
-      34145) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimesettings_delete_service() !=
+      18787) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_generate_provider_id() !=
-      9759) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimesettings_generate_provider_id() !=
+      32771) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_get_active_translation_targets() !=
-      22616) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimesettings_get_active_translation_targets() !=
+      58548) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_get_advanced() !=
-      3214) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimesettings_get_advanced() !=
+      25561) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_get_appearance() !=
-      54826) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimesettings_get_appearance() !=
+      4650) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_get_general() !=
-      54665) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimesettings_get_general() !=
+      45042) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_get_json() !=
-      31105) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimesettings_get_json() !=
+      8367) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_get_provider() !=
-      21807) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimesettings_get_provider() !=
+      3200) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_get_service() !=
-      11319) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimesettings_get_service() !=
+      34868) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_get_shortcuts() !=
-      44721) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimesettings_get_shortcuts() !=
+      43726) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_list_models() !=
-      22292) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimesettings_list_models() !=
+      63054) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_list_providers() !=
-      34940) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimesettings_list_providers() !=
+      37023) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_list_services() !=
-      5637) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimesettings_list_services() !=
+      22013) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_reset_shortcuts() !=
-      46222) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimesettings_reset_shortcuts() !=
+      5146) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_set_provider_secrets() !=
-      64081) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimesettings_set_provider_secrets() !=
+      37353) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_subscribe() !=
-      44725) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimesettings_subscribe() !=
+      61804) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_update_advanced() !=
-      46849) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimesettings_update_advanced() !=
+      40958) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_update_appearance() !=
-      59073) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimesettings_update_appearance() !=
+      33863) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_update_general() !=
-      47378) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimesettings_update_general() !=
+      40188) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_update_provider() !=
-      46276) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimesettings_update_provider() !=
+      5640) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_update_service() !=
-      22489) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimesettings_update_service() !=
+      45329) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimesettings_update_shortcuts() !=
-      11504) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimesettings_update_shortcuts() !=
+      28763) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimetextextractor_extract_from_clipboard() !=
-      61343) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimetextextractor_extract_from_clipboard() !=
+      12972) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimetextextractor_extract_from_screen_capture() !=
-      38083) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimetextextractor_extract_from_screen_capture() !=
+      15072) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimetextextractor_extract_from_screen_selection() !=
-      57900) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimetextextractor_extract_from_screen_selection() !=
+      5216) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimetextextractor_extract_from_screen_selection_detailed() !=
-      35808) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimetextextractor_extract_from_screen_selection_detailed() !=
+      12534) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimetranslation_detect_language() !=
-      29752) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimetranslation_detect_language() !=
+      17562) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_runtimetranslation_translate() !=
-      61207) {
+  if (uniffi_linguaray_runtime_checksum_method_runtimetranslation_translate() !=
+      55464) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_settingssubscription_next() !=
-      20677) {
+  if (uniffi_linguaray_runtime_checksum_method_settingssubscription_next() !=
+      52040) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_constructor_runtime_new() !=
-      50884) {
+  if (uniffi_linguaray_runtime_checksum_constructor_runtime_new() != 29932) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_streamcallback_on_chunk() !=
-      51178) {
+  if (uniffi_linguaray_runtime_checksum_method_streamcallback_on_chunk() !=
+      12210) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_streamcallback_on_finish() !=
-      14728) {
+  if (uniffi_linguaray_runtime_checksum_method_streamcallback_on_finish() !=
+      26362) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
-  if (uniffi_beyondtranslate_runtime_checksum_method_streamcallback_on_error() !=
-      63263) {
+  if (uniffi_linguaray_runtime_checksum_method_streamcallback_on_error() !=
+      8985) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
 }

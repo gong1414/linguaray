@@ -1,8 +1,8 @@
 import 'dart:async';
 
-import 'package:beyondtranslate_runtime/beyondtranslate_runtime.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' show ThemeMode;
+import 'package:linguaray_runtime/linguaray_runtime.dart';
 import 'package:nativeapi/nativeapi.dart';
 
 import '../theme/app_theme.dart' show DesignThemeFamily;

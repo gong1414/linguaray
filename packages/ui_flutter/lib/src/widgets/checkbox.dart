@@ -1,7 +1,7 @@
-import 'package:beyondtranslate_ui/src/theme/text_styles.dart';
-import 'package:beyondtranslate_ui/src/theme/theme.dart';
-import 'package:beyondtranslate_ui/src/widgets/pressable.dart';
 import 'package:flutter/widgets.dart';
+import 'package:linguaray_ui/src/theme/text_styles.dart';
+import 'package:linguaray_ui/src/theme/theme.dart';
+import 'package:linguaray_ui/src/widgets/pressable.dart';
 
 /// The export dialog's content checklist.
 class Checkbox extends StatelessWidget {

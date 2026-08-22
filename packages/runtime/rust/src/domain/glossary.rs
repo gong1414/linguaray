@@ -990,7 +990,7 @@ mod tests {
             .as_nanos();
         let sequence = NEXT_TEMP_DIR_ID.fetch_add(1, Ordering::Relaxed);
         std::env::temp_dir().join(format!(
-            "beyondtranslate-glossary-{}-{timestamp}-{sequence}",
+            "linguaray-glossary-{}-{timestamp}-{sequence}",
             std::process::id()
         ))
     }

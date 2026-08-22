@@ -1,4 +1,4 @@
-import 'package:beyondtranslate_runtime/beyondtranslate_runtime.dart';
+import 'package:linguaray_runtime/linguaray_runtime.dart';
 
 import 'translation_result_record.dart';
 

@@ -1,7 +1,7 @@
 use std::sync::{mpsc, Arc};
 
 use async_trait::async_trait;
-use beyondtranslate_core::{
+use linguaray_core::{
     ChatRequest, ChatResponse, ChatRole, LlmError, LlmService, LlmStreamReceiver, Provider,
     StreamChunk,
 };
@@ -500,7 +500,7 @@ mod tests {
 
     #[test]
     fn body_includes_response_format_when_set() {
-        use beyondtranslate_core::{ChatMessage, ResponseFormat};
+        use linguaray_core::{ChatMessage, ResponseFormat};
 
         let provider =
             OpenAiCompatibleProvider::new(&specs::OPENAI, config("sk-test", None, "gpt-4o-mini"))

@@ -1,16 +1,16 @@
 [package]
-name = "beyondtranslate_runtime"
+name = "linguaray_runtime"
 version = "0.1.0"
 edition = "2021"
 
 [lib]
-name = "beyondtranslate_runtime"
+name = "linguaray_runtime"
 crate-type = ["lib", "cdylib", "staticlib"]
 
 [dependencies]
-beyondtranslate-core = { path = "../../../crates/core" }
-beyondtranslate-api-core = { path = "../../../crates/api-core" }
-beyondtranslate-engine = { path = "../../../crates/engine" }
+linguaray-core = { path = "../../../crates/core" }
+linguaray-api-core = { path = "../../../crates/api-core" }
+linguaray-engine = { path = "../../../crates/engine" }
 uniffi = { version = "=0.31.2", features = ["cli"] }
 uniffi-dart = { git = "https://github.com/Uniffi-Dart/uniffi-dart.git", branch = "main" }
 aho-corasick.workspace = true

@@ -1,6 +1,6 @@
 /// The LinguaRay design system for Flutter.
 ///
-/// A port of the React `@beyondtranslate/ui` atoms: same tokens, same four
+/// A port of the React `@linguaray/ui` atoms: same tokens, same four
 /// themes, same widgets — under plain, generic names.
 ///
 /// The boundary is the React package's: nothing here knows a LinguaRay
@@ -15,7 +15,7 @@
 /// that uses both should import one of them with a prefix:
 ///
 /// ```dart
-/// import 'package:beyondtranslate_ui/beyondtranslate_ui.dart' as ui;
+/// import 'package:linguaray_ui/linguaray_ui.dart' as ui;
 /// ```
 ///
 /// Wrap the tree in a [DesignThemeProvider] to establish the palette:

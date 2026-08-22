@@ -1,8 +1,8 @@
 import 'dart:math' as math;
 
-import 'package:beyondtranslate_ui/src/theme/text_styles.dart';
-import 'package:beyondtranslate_ui/src/theme/theme.dart';
 import 'package:flutter/widgets.dart';
+import 'package:linguaray_ui/src/theme/text_styles.dart';
+import 'package:linguaray_ui/src/theme/theme.dart';
 
 enum ProgressTone { accent, success, warn, gradient }
 

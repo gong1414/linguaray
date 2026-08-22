@@ -1,6 +1,6 @@
-import 'package:beyondtranslate_desktop/src/services/history_store.dart';
-import 'package:beyondtranslate_runtime/beyondtranslate_runtime.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:linguaray_desktop/src/services/history_store.dart';
+import 'package:linguaray_runtime/linguaray_runtime.dart';
 
 void main() {
   test('loads, filters, updates favorites, and deletes history', () async {

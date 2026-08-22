@@ -10,7 +10,7 @@ import 'package:flutter/services.dart';
 /// the callbacks lives in `app_router.dart`.
 class MacAppPresentation {
   static const MethodChannel _channel = MethodChannel(
-    'beyondtranslate/mac_app_presentation',
+    'linguaray/mac_app_presentation',
   );
 
   static VoidCallback? _onReopen;

@@ -5,11 +5,11 @@
 // macOS runs an AppKit field instead, where the same rules live in
 // `macos/Runner/Plugins/NativeTextFieldPlugin.swift`; these tests drive the
 // Flutter path, so they pin the platform away from it.
-import 'package:beyondtranslate_desktop/src/widgets/text_field.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:linguaray_desktop/src/widgets/text_field.dart';
 
 void main() {
   /// [testWidgets], with the target platform pinned off macOS for the length

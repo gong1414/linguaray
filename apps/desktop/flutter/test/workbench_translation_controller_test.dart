@@ -1,6 +1,6 @@
-import 'package:beyondtranslate_desktop/src/services/workbench_translation_controller.dart';
-import 'package:beyondtranslate_runtime/beyondtranslate_runtime.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:linguaray_desktop/src/services/workbench_translation_controller.dart';
+import 'package:linguaray_runtime/linguaray_runtime.dart';
 
 /// 自动匹配 is the target menu's first item in both windows. The workbench
 /// translates into one language at a time, so the choice it hands to the

@@ -20,11 +20,11 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:beyondtranslate_ui/beyondtranslate_ui.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/services.dart' show FontLoader;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:linguaray_ui/linguaray_ui.dart';
 
 /// Where pub put a dependency, read off the package config rather than the
 /// asset bundle: the bundle's root depends on which directory `flutter test`

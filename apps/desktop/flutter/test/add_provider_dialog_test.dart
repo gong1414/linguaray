@@ -1,12 +1,11 @@
-import 'package:beyondtranslate_desktop/src/i18n/i18n.dart';
-import 'package:beyondtranslate_desktop/src/routes/settings/add_provider_dialog.dart';
-import 'package:beyondtranslate_desktop/src/routes/settings/provider_meta.dart';
-import 'package:beyondtranslate_desktop/src/widgets/ui.dart' as ui
-    show Dialog, DialogFooter, DialogHeader;
-import 'package:beyondtranslate_desktop/src/widgets/ui.dart'
-    show DesignThemeProvider;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:linguaray_desktop/src/i18n/i18n.dart';
+import 'package:linguaray_desktop/src/routes/settings/add_provider_dialog.dart';
+import 'package:linguaray_desktop/src/routes/settings/provider_meta.dart';
+import 'package:linguaray_desktop/src/widgets/ui.dart' as ui
+    show Dialog, DialogFooter, DialogHeader;
+import 'package:linguaray_desktop/src/widgets/ui.dart' show DesignThemeProvider;
 
 /// The type step of 添加提供商 is pure UI — it reads no settings and calls no
 /// runtime, so it can be pumped on its own. Everything past 继续 needs the

@@ -1,6 +1,6 @@
-import 'package:beyondtranslate_ui/src/theme/theme.dart';
-import 'package:beyondtranslate_ui/src/widgets/pressable.dart';
 import 'package:flutter/widgets.dart';
+import 'package:linguaray_ui/src/theme/theme.dart';
+import 'package:linguaray_ui/src/widgets/pressable.dart';
 
 /// The flat 24px chrome button the mini-window toolbars use — pin, capture,
 /// clipboard, settings. AppKit style: no box by default, an accent read when

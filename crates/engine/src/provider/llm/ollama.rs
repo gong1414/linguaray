@@ -1,7 +1,7 @@
 use std::sync::{mpsc, Arc};
 
 use async_trait::async_trait;
-use beyondtranslate_core::{
+use linguaray_core::{
     ChatChoice, ChatMessage, ChatRequest, ChatResponse, ChatRole, LlmError, LlmService,
     LlmStreamReceiver, Provider, ResponseFormat, StreamChunk,
 };

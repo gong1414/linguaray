@@ -1,7 +1,7 @@
-import 'package:beyondtranslate_ui/src/theme/text_styles.dart';
-import 'package:beyondtranslate_ui/src/theme/theme.dart';
-import 'package:beyondtranslate_ui/src/widgets/window_frame.dart';
 import 'package:flutter/widgets.dart';
+import 'package:linguaray_ui/src/theme/text_styles.dart';
+import 'package:linguaray_ui/src/theme/theme.dart';
+import 'package:linguaray_ui/src/widgets/window_frame.dart';
 
 /// A browser window, used to show the extension acting on a real page.
 class BrowserFrame extends StatelessWidget {

@@ -3,14 +3,14 @@ mod engine;
 mod languages;
 mod provider;
 
-pub use beyondtranslate_core::{
-    DictionaryError, DictionaryService, OcrError, OcrService, Provider, TranslationError,
-    TranslationService,
-};
 pub use engine::{
     from_yaml_str, load_from_file, Engine, EngineConfig, EngineError, ProviderConfig, ProviderType,
 };
 pub use languages::{all_languages, app_languages};
+pub use linguaray_core::{
+    DictionaryError, DictionaryService, OcrError, OcrService, Provider, TranslationError,
+    TranslationService,
+};
 
 // LLM providers (primary).
 pub use provider::{

@@ -1,7 +1,7 @@
 #![cfg_attr(not(feature = "caiyun"), allow(dead_code))]
 
 use async_trait::async_trait;
-use beyondtranslate_core::{
+use linguaray_core::{
     LanguagePair, Provider, TextTranslation, TranslateRequest, TranslateResponse, TranslationError,
     TranslationService,
 };

@@ -1,8 +1,8 @@
-// Native-assets build hook for the beyondtranslate_runtime Flutter package.
+// Native-assets build hook for the linguaray_runtime Flutter package.
 //
 // Builds the Rust crate at `rust/` for the current Flutter build target,
 // then registers the produced cdylib as a `CodeAsset` so that
-// `@Native(assetId: "package:beyondtranslate_runtime/uniffi:beyondtranslate_runtime")` annotations
+// `@Native(assetId: "package:linguaray_runtime/uniffi:linguaray_runtime")` annotations
 // in the generated Dart bindings resolve at runtime.
 //
 // Pre-requisites:
@@ -18,7 +18,7 @@ import 'dart:io';
 import 'package:code_assets/code_assets.dart';
 import 'package:hooks/hooks.dart';
 
-const _cdylibBaseName = 'beyondtranslate_runtime';
+const _cdylibBaseName = 'linguaray_runtime';
 const _assetName = 'uniffi:$_cdylibBaseName';
 
 Future<void> main(List<String> args) async {
@@ -28,7 +28,7 @@ Future<void> main(List<String> args) async {
     // code assets have actually been requested.
     if (!input.config.buildCodeAssets) {
       stdout.writeln(
-        '[beyondtranslate_runtime] no code-asset config; skipping cargo',
+        '[linguaray_runtime] no code-asset config; skipping cargo',
       );
       return;
     }
@@ -52,7 +52,7 @@ Future<void> main(List<String> args) async {
       '--lib',
     ];
 
-    stdout.writeln('[beyondtranslate_runtime] cargo ${cargoArgs.join(' ')}');
+    stdout.writeln('[linguaray_runtime] cargo ${cargoArgs.join(' ')}');
     final result = await Process.run(
       'cargo',
       cargoArgs,
@@ -64,14 +64,14 @@ Future<void> main(List<String> args) async {
     stderr.write(result.stderr);
     if (result.exitCode != 0) {
       throw Exception(
-        '[beyondtranslate_runtime] cargo build failed with exit code ${result.exitCode}',
+        '[linguaray_runtime] cargo build failed with exit code ${result.exitCode}',
       );
     }
 
     final cdylibFile = _resolveCdylib(rustDir, triple, targetOS);
     if (!File.fromUri(cdylibFile).existsSync()) {
       throw Exception(
-        '[beyondtranslate_runtime] cdylib not found at ${cdylibFile.toFilePath()} '
+        '[linguaray_runtime] cdylib not found at ${cdylibFile.toFilePath()} '
         'after a successful cargo build',
       );
     }
@@ -135,7 +135,7 @@ Future<String> _xcrun(List<String> args) async {
   final result = await Process.run('xcrun', args, runInShell: true);
   if (result.exitCode != 0) {
     throw Exception(
-      '[beyondtranslate_runtime] xcrun ${args.join(' ')} failed with exit code '
+      '[linguaray_runtime] xcrun ${args.join(' ')} failed with exit code '
       '${result.exitCode}: ${result.stderr}',
     );
   }
@@ -174,14 +174,14 @@ String _rustTriple(CodeConfig code, OS os, Architecture arch) {
     // Flutter's reported target architecture, which may differ.
     final hostArch = _hostArchitecture();
     stdout.writeln(
-      '[beyondtranslate_runtime] Linux host architecture: $hostArch '
+      '[linguaray_runtime] Linux host architecture: $hostArch '
       '(Flutter target: $arch)',
     );
     return switch (hostArch) {
       'x86_64' => 'x86_64-unknown-linux-gnu',
       'aarch64' => 'aarch64-unknown-linux-gnu',
       _ => throw Exception(
-          '[beyondtranslate_runtime] unsupported Linux host architecture: $hostArch',
+          '[linguaray_runtime] unsupported Linux host architecture: $hostArch',
         ),
     };
   }
@@ -199,7 +199,7 @@ String _hostArchitecture() {
   final result = Process.runSync('uname', ['-m']);
   if (result.exitCode != 0) {
     throw Exception(
-      '[beyondtranslate_runtime] failed to detect host architecture: '
+      '[linguaray_runtime] failed to detect host architecture: '
       'uname -m exited with ${result.exitCode}',
     );
   }
@@ -208,7 +208,7 @@ String _hostArchitecture() {
 
 Never _unsupported(OS os, Architecture arch) {
   throw UnsupportedError(
-    '[beyondtranslate_runtime] no Rust target triple mapped for $os/$arch',
+    '[linguaray_runtime] no Rust target triple mapped for $os/$arch',
   );
 }
 

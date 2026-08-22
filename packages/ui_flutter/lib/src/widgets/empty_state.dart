@@ -1,6 +1,6 @@
-import 'package:beyondtranslate_ui/src/theme/text_styles.dart';
-import 'package:beyondtranslate_ui/src/theme/theme.dart';
 import 'package:flutter/widgets.dart';
+import 'package:linguaray_ui/src/theme/text_styles.dart';
+import 'package:linguaray_ui/src/theme/theme.dart';
 
 /// What a pane shows before it has content: one muted line and at most one
 /// action. The surrounding chrome already names the pane, so no label, no

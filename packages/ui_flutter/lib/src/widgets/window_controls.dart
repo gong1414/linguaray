@@ -1,6 +1,6 @@
-import 'package:beyondtranslate_ui/src/theme/theme.dart';
-import 'package:beyondtranslate_ui/src/widgets/pressable.dart';
 import 'package:flutter/widgets.dart';
+import 'package:linguaray_ui/src/theme/theme.dart';
+import 'package:linguaray_ui/src/widgets/pressable.dart';
 
 /// Which OS draws the window. Shape belongs to the platform the way it does on
 /// iOS: the theme keeps its colours everywhere, but Windows clips corners at

@@ -1,5 +1,5 @@
-import 'package:beyondtranslate_ui/src/theme/tokens.dart';
 import 'package:flutter/widgets.dart';
+import 'package:linguaray_ui/src/theme/tokens.dart';
 
 /// `studioLight` is the baseline the widgets were built against; the others
 /// re-skin the same widgets by swapping tokens — including radii, so the Bright

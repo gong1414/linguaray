@@ -2,7 +2,7 @@ import AppKit
 import FlutterMacOS
 
 final class NativeTextFieldPlugin: NSObject {
-  static let viewType = "beyondtranslate/native_text_field"
+  static let viewType = "linguaray/native_text_field"
 
   static func register(with registrar: FlutterPluginRegistrar) {
     registrar.register(
@@ -69,7 +69,7 @@ private final class NativeTextFieldView: NSView, NSTextFieldDelegate, NSTextView
   ) {
     let args = arguments ?? [:]
     channel = FlutterMethodChannel(
-      name: "beyondtranslate/native_text_field/\(viewId)",
+      name: "linguaray/native_text_field/\(viewId)",
       binaryMessenger: messenger
     )
     padding = NativeTextFieldView.decodePadding(args["padding"])

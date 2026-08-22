@@ -1,4 +1,4 @@
-import 'package:beyondtranslate_ui/beyondtranslate_ui.dart';
+import 'package:linguaray_ui/linguaray_ui.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/widgets.dart';
 

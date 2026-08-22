@@ -16,8 +16,11 @@ scripts/                Formatting and code-generation entry points
 docs/                   Maintainer-facing architecture documentation
 ```
 
-Internal package and FFI identifiers are implementation details. User-facing
-names, identifiers, documentation, and assets use `LinguaRay`.
+Internal package and FFI identifiers are implementation details, and they all
+use `linguaray`-prefixed names (`linguaray_runtime`, `linguaray_ui`,
+`linguaray-core`, …). User-facing names, identifiers, documentation, and
+assets use `LinguaRay`. Do not reintroduce the retired prototype name in any
+identifier, file name, channel string, or doc.
 
 The workspace root also holds untracked leftovers from a retired React/Tauri
 prototype (`src-tauri/`, `storybook-static/`, `node_modules/`, `dist/`,

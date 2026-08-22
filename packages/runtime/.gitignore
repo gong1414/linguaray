@@ -9,8 +9,8 @@ build/
 
 # Native build artifacts
 target/
-macos/beyondtranslate_runtime/.build/
-macos/beyondtranslate_runtime/.swiftpm/
+macos/linguaray_runtime/.build/
+macos/linguaray_runtime/.swiftpm/
 *.o
 *.a
 *.so

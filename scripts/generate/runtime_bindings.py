@@ -12,9 +12,9 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 PKG_DIR = REPO_ROOT / "packages/runtime"
 RUST_DIR = PKG_DIR / "rust"
 DART_OUT = PKG_DIR / "lib/src/generated"
-SPM_DIR = PKG_DIR / "macos/beyondtranslate_runtime/Sources"
-SPM_SWIFT_OUT = SPM_DIR / "beyondtranslate_runtime/Generated"
-SPM_FFI_OUT = SPM_DIR / "beyondtranslate_runtimeFFI/include"
+SPM_DIR = PKG_DIR / "macos/linguaray_runtime/Sources"
+SPM_SWIFT_OUT = SPM_DIR / "linguaray_runtime/Generated"
+SPM_FFI_OUT = SPM_DIR / "linguaray_runtimeFFI/include"
 
 
 def main() -> int:
@@ -124,11 +124,11 @@ def cargo_target_dir() -> Path:
 def host_cdylib(target_dir: Path) -> Path | None:
     system = platform.system()
     if system == "Darwin":
-        return target_dir / "release/libbeyondtranslate_runtime.dylib"
+        return target_dir / "release/liblinguaray_runtime.dylib"
     if system == "Linux":
-        return target_dir / "release/libbeyondtranslate_runtime.so"
+        return target_dir / "release/liblinguaray_runtime.so"
     if system == "Windows" or system.startswith(("MSYS", "MINGW", "CYGWIN")):
-        return target_dir / "release/beyondtranslate_runtime.dll"
+        return target_dir / "release/linguaray_runtime.dll"
     return None
 
 
@@ -185,12 +185,12 @@ def deploy_ffi_artifacts() -> None:
     SPM_FFI_OUT.mkdir(parents=True, exist_ok=True)
 
     # Move the C header (uniffi-bindgen puts it alongside the .swift file)
-    h_src = SPM_SWIFT_OUT / "beyondtranslate_runtimeFFI.h"
+    h_src = SPM_SWIFT_OUT / "linguaray_runtimeFFI.h"
     if h_src.exists():
-        shutil.move(str(h_src), SPM_FFI_OUT / "beyondtranslate_runtimeFFI.h")
+        shutil.move(str(h_src), SPM_FFI_OUT / "linguaray_runtimeFFI.h")
 
     # Move and rename the modulemap
-    mmap_src = SPM_SWIFT_OUT / "beyondtranslate_runtimeFFI.modulemap"
+    mmap_src = SPM_SWIFT_OUT / "linguaray_runtimeFFI.modulemap"
     if mmap_src.exists():
         shutil.move(str(mmap_src), SPM_FFI_OUT / "module.modulemap")
 

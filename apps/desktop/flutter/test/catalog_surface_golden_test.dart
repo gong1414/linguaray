@@ -1,12 +1,12 @@
 import 'dart:io';
 
-import 'package:beyondtranslate_desktop/src/theme/app_theme.dart';
-import 'package:beyondtranslate_desktop/src/widgets/ui.dart'
-    show DesignFont, DesignThemeProvider, DesignTokens, DesignTypography;
-import 'package:beyondtranslate_desktop/widgetbook.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:linguaray_desktop/src/theme/app_theme.dart';
+import 'package:linguaray_desktop/src/widgets/ui.dart'
+    show DesignFont, DesignThemeProvider, DesignTokens, DesignTypography;
+import 'package:linguaray_desktop/widgetbook.dart';
 
 import 'support/golden_comparator.dart';
 

@@ -41,7 +41,7 @@ find apps/desktop/flutter/test packages/ui_flutter/test -name "*.png" -type f \
 | --- | --- | --- |
 | P0 | Baseline + CI gap + this doc | CI green; baseline table above |
 | P1 | Remove uniffi demo fns `greet`/`add`/`version`, `main.dart` smoke call, demo test assertions, README demo | cargo + melos gates green |
-| P2 | Full rename `beyondtranslate` → `linguaray` (crates, Dart packages, uniffi namespace/symbols, Swift framework/plugin, method channels, Linux binary/deb names, CI `-p`, scripts, docs, AGENTS.md) | all gates + `flutter build macos --debug`; **`git grep -iE 'beyond[-_]?translate'` returns zero tracked hits**; golden fingerprint unchanged |
+| P2 | Full rename of every internal identifier (crates, Dart packages, uniffi namespace/symbols, Swift framework/plugin, method channels, Linux binary/deb names, CI `-p`, scripts, docs, AGENTS.md) to the `linguaray` brand — the legacy prototype name (visible in git history before this pass) must be gone | all gates + `flutter build macos --debug`; **`git grep -iE 'beyond[-_]?translate'` returns zero tracked hits**; golden fingerprint unchanged |
 | P3 | Delete ~17 unreferenced Flutter files, commented blocks, unused members, `dio`, `negative_vertical_margin`; gate `widget_showcase` behind `kDebugMode`; dedupe `getAppDirectory` | analyze clean without the removed `unused_element` ignore; golden fingerprint unchanged |
 | P4 | Drop unused Rust workspace deps (`bytes`, `mockito`, `wasm-bindgen`, engine `getrandom`) and 11 never-gated engine features | cargo gates green; Cargo.lock diff only shrinks |
 | P5 | `{Key? key}` → `super.key`; deprecated `unfocus()` calls → current API; drop file-wide ignores | analyze --fatal-infos clean with ignores removed; fingerprint unchanged |

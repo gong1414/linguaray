@@ -1,7 +1,7 @@
-import 'package:beyondtranslate_ui/beyondtranslate_ui.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:linguaray_ui/linguaray_ui.dart';
 
 /// The divider's contract, as the React `Sidebar` states it: it walks between
 /// a floor and a ceiling, collapses rather than shrinking past the floor, and

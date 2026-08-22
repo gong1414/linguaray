@@ -3,15 +3,14 @@
 // Neither side reaches for the app's theme on its own: AppKit falls back to
 // the system accent from System Settings, Flutter to Material's blue. Both had
 // to be told, so both are pinned here.
-import 'package:beyondtranslate_desktop/src/widgets/native_text.dart';
-import 'package:beyondtranslate_desktop/src/widgets/native_text_field.dart';
-import 'package:beyondtranslate_desktop/src/widgets/text_field.dart';
-import 'package:beyondtranslate_desktop/src/widgets/translation_text.dart';
-import 'package:beyondtranslate_ui/beyondtranslate_ui.dart'
-    show DesignTheme, DesignThemes;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:linguaray_desktop/src/widgets/native_text.dart';
+import 'package:linguaray_desktop/src/widgets/native_text_field.dart';
+import 'package:linguaray_desktop/src/widgets/text_field.dart';
+import 'package:linguaray_desktop/src/widgets/translation_text.dart';
+import 'package:linguaray_ui/linguaray_ui.dart' show DesignTheme, DesignThemes;
 
 void main() {
   final tokens = DesignThemes.brightLight;

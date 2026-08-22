@@ -1,6 +1,6 @@
-//! UniFFI remote-type mirrors for the shared `beyondtranslate_core` crate.
+//! UniFFI remote-type mirrors for the shared `linguaray_core` crate.
 //!
-//! `beyondtranslate_core` is a plain Rust crate with no uniffi annotations, so
+//! `linguaray_core` is a plain Rust crate with no uniffi annotations, so
 //! its records can be reused by non-uniffi consumers (e.g. the embedded
 //! `crates/api-core` API server). To still expose those records to Dart/Swift
 //! through this crate, we register them here as
@@ -10,19 +10,19 @@
 //! struct field-by-field. The `#[uniffi::remote(Record)]` attribute consumes
 //! that body to emit the FFI scaffolding (`FfiConverter`, metadata, ...) but
 //! *does not* re-emit the struct itself, so the accompanying `type` alias is
-//! what ultimately resolves the name back to `beyondtranslate_core`.
+//! what ultimately resolves the name back to `linguaray_core`.
 //!
 //! Because all of these mirrors live in this crate they end up in this
 //! crate's UniFFI namespace, which is why the generated Swift/Dart/header
-//! files all collapse into a single `beyondtranslate_runtime.{dart,swift,h}`
+//! files all collapse into a single `linguaray_runtime.{dart,swift,h}`
 //! pair.
 //!
-//! When a field is added/removed in `beyondtranslate_core::model`, the
+//! When a field is added/removed in `linguaray_core::model`, the
 //! matching mirror below MUST be updated to keep the FFI metadata in sync,
 //! otherwise the generated bindings will silently corrupt the wire format.
 
-use beyondtranslate_core as core;
-use beyondtranslate_engine as engine;
+use linguaray_core as core;
+use linguaray_engine as engine;
 
 type TranslationTarget = core::TranslationTarget;
 #[uniffi::remote(Record)]
