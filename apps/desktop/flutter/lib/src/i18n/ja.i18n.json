@@ -1,0 +1,565 @@
+{
+  "common": {
+    "ui": {
+      "button": {
+        "ok": "OK",
+        "cancel": "キャンセル",
+        "add": "追加",
+        "delete": "削除",
+        "edit": "編集",
+        "save": "保存",
+        "manage": "管理",
+        "continue": "続行"
+      },
+      "feedback": {
+        "copied": "コピーしました"
+      }
+    },
+    "language": {
+      "ar": "アラビア語",
+      "bn": "ベンガル語",
+      "de": "ドイツ語",
+      "en": "英語",
+      "es": "スペイン語",
+      "fa": "ペルシア語",
+      "fr": "フランス語",
+      "gu": "グジャラート語",
+      "ha": "ハウサ語",
+      "hi": "ヒンディー語",
+      "id": "インドネシア語",
+      "it": "イタリア語",
+      "ja": "日本語",
+      "jv": "ジャワ語",
+      "ko": "韓国語",
+      "ml": "マラヤーラム語",
+      "mr": "マラーティー語",
+      "ms": "マレー語",
+      "nl": "オランダ語",
+      "pa": "パンジャブ語",
+      "pl": "ポーランド語",
+      "pt": "ポルトガル語",
+      "ro": "ルーマニア語",
+      "ru": "ロシア語",
+      "sw": "スワヒリ語",
+      "ta": "タミル語",
+      "te": "テルグ語",
+      "th": "タイ語",
+      "tr": "トルコ語",
+      "uk": "ウクライナ語",
+      "ur": "ウルドゥー語",
+      "vi": "ベトナム語",
+      "yo": "ヨルバ語",
+      "zh_hans": "簡体字中国語",
+      "zh_hant": "繁体字中国語"
+    },
+    "theme_mode": {
+      "light": "ライト",
+      "dark": "ダーク",
+      "system": "システム"
+    },
+    "theme_style": {
+      "studio": "Studio",
+      "bright": "Bright"
+    },
+    "provider": {
+      "anthropic": "Anthropic",
+      "baidu": "Baidu",
+      "caiyun": "Caiyun",
+      "deepl": "DeepL",
+      "google": "Google",
+      "ollama": "Ollama",
+      "openai": "OpenAI",
+      "sogou": "Sogou",
+      "xai": "xAI",
+      "system": "システム",
+      "tencent": "Tencent",
+      "youdao": "Youda"
+    }
+  },
+  "app": {
+    "tray": {
+      "context_menu": {
+        "show_window": "ウィンドウを表示",
+        "dev_tools": {
+          "title": "開発ツール",
+          "open_data_directory": "データディレクトリを開く"
+        },
+        "check_for_updates": "アップデートを確認",
+        "settings": "設定",
+        "quit": "終了"
+      }
+    }
+  },
+  "mini_translator": {
+    "limited_banner": {
+      "permission": {
+        "missing_both": "すべての機能を有効にするには、画面収録とアクセシビリティの許可を付与してください。",
+        "missing_screen_capture": "すべての機能を有効にするには、画面収録の許可を付与してください。",
+        "missing_accessibility": "すべての機能を有効にするには、アクセシビリティの許可を付与してください。"
+      },
+      "instruction": {
+        "app_settings_prefix": "アプリ設定に移動",
+        "follow_guide_prefix": "し、ガイドに従って",
+        "suffix": "をクリックしてください。"
+      },
+      "action": {
+        "app_settings": "アプリ設定",
+        "recheck": "再確認"
+      },
+      "feedback": {
+        "enabled": "画面テキスト抽出が有効です。",
+        "still_missing": "必要な権限がまだ不足しています。\n設定を確認して、もう一度お試しください。"
+      },
+      "tooltip": {
+        "help": "ヘルプを表示"
+      }
+    },
+    "input": {
+      "hint": "ここに単語またはテキストを入力",
+      "extracting_text": "テキストを抽出中...",
+      "hint_translate_to": "単語またはテキストを入力して$languageに翻訳"
+    },
+    "toolbar": {
+      "tooltip": {
+        "extract_text_from_screen_capture": "画面領域をキャプチャしてテキストを認識",
+        "extract_text_from_clipboard": "クリップボードの内容を読み取る",
+        "pin": "ウィンドウを固定",
+        "more_actions": "その他の操作"
+      },
+      "menu": {
+        "extract_from_screen_capture": "画面から取得",
+        "extract_from_clipboard": "クリップボードから取得",
+        "open_main_window": "メインウィンドウを開く",
+        "open_settings": "設定…"
+      }
+    },
+    "button": {
+      "clear": "クリア",
+      "translate": "翻訳",
+      "copy": "コピー",
+      "copied": "コピー済み",
+      "bookmark": "保存",
+      "bookmarked": "保存済み"
+    },
+    "language": {
+      "auto_detect": "自動検出",
+      "auto_match": "自動一致",
+      "switch_config": "ターゲット切替",
+      "more_languages": "その他の言語...",
+      "manage_common_languages": "よく使う言語を管理...",
+      "manage_targets": "翻訳ターゲットを管理...",
+      "add_target": "翻訳ターゲットを追加..."
+    },
+    "message": {
+      "please_enter_word_or_text": "テキストが入力されていないか、テキストが抽出されていません",
+      "capture_screen_area_canceled": "画面領域のキャプチャがキャンセルされました",
+      "ocr_service_not_configured": "デフォルトのテキスト認識サービスが設定されていません。設定で設定してください。",
+      "ocr_recognition_failed": "テキスト認識に失敗しました"
+    },
+    "result": {
+      "translating": "翻訳中…",
+      "stale_requery": "原文が変更されました · $key 再翻訳",
+      "compare_services": "$count 個のサービスを比較",
+      "collapse_compare": "比較を閉じる",
+      "set_preferred": "優先に設定",
+      "retry": "再試行",
+      "no_result": "どのサービスも結果を返しませんでした。ネットワークを確認するか、別のサービスをお試しください。",
+      "no_result_note": "原文は保持され、再試行しても履歴は重複しません。"
+    }
+  },
+  "workbench": {
+    "workspace": "ワークスペース",
+    "translate": "翻訳",
+    "history": "履歴",
+    "history_page": {
+      "all": "すべて",
+      "favorites": "お気に入り",
+      "edited": "編集済み",
+      "search": "検索",
+      "search_placeholder": "原文、訳文、サービスを検索",
+      "search_label": "履歴を検索",
+      "entry_count": "$label · $count 件",
+      "by_time": "時間順",
+      "loading": "履歴を読み込み中…",
+      "load_failed": "履歴を読み込めませんでした",
+      "retry": "再試行",
+      "empty_title": "翻訳履歴はまだありません",
+      "empty_description": "翻訳が完了すると、優先訳がここに保存されます。",
+      "no_results": "「$query」に一致する履歴はありません",
+      "clear_search": "検索をクリア",
+      "select": "複数選択",
+      "selected_count": "$count 件選択中",
+      "exit_select": "選択を終了",
+      "add_to_glossary": "用語集に追加",
+      "favorite": "お気に入り",
+      "unfavorite": "お気に入り解除",
+      "delete_confirm": "選択した $count 件の履歴を削除しますか？元に戻せません。",
+      "no_glossary": "先に用語集を作成してください",
+      "added_to_glossary": "$count 件を用語集に追加しました",
+      "favorite_flag": "お気に入り",
+      "edited_flag": "編集済み",
+      "edit_history_hint": "編集した訳文は履歴に保存されます"
+    },
+    "glossary": "用語集",
+    "recent_languages": "最近の言語",
+    "not_configured": "未設定",
+    "subtitle": {
+      "translate": "ワークベンチ · サービス比較",
+      "settings": "設定"
+    },
+    "placeholder": {
+      "history": "お気に入りと履歴は今後のリリースで提供します",
+      "glossary": "用語集管理は開発中です"
+    },
+    "glossary_page": {
+      "add_entry": "用語を追加",
+      "term": "原文",
+      "translation": "指定訳",
+      "forbidden": "禁止",
+      "hits": "ヒット",
+      "term_placeholder": "teacher forcing",
+      "translation_placeholder": "教師強制",
+      "forbidden_placeholder": "強制教育",
+      "search": "検索",
+      "search_placeholder": "用語または指定訳を検索",
+      "search_label": "用語集を検索",
+      "entry_count": "$name · $count 件",
+      "priority_note": "用語集はどのサービスの出力よりも優先されます",
+      "new_book": "用語集を作成",
+      "new_book_placeholder": "用語集の名前",
+      "rename_book": "名前を変更",
+      "delete_book_confirm": "「$name」と、その $count 件の用語を削除しますか？",
+      "disabled": "無効",
+      "enable": "有効にする",
+      "disable": "無効にする",
+      "empty_title": "この用語集は空です",
+      "empty_description": "用語集はどのサービスの出力よりも優先されます。1 件ずつ追加するか、CSV をドロップして取り込めます。",
+      "no_results_title": "「$query」に一致する用語はありません",
+      "no_results_description": "別のキーワードを試すか、新しく追加してください。",
+      "no_books_title": "用語集がまだありません",
+      "no_books_description": "用語集は、選んだ訳語をすべてのサービスで統一します。まず 1 つ作成して、用語を追加しましょう。",
+      "loading": "読み込み中…"
+    },
+    "translation": {
+      "source": "原文",
+      "target": "訳文",
+      "input_hint": "翻訳するテキストを入力または貼り付け",
+      "button": "翻訳",
+      "auto_detected": "自動検出",
+      "loading_services": "翻訳サービスを読み込み中…",
+      "no_services": "先に設定で翻訳サービスを構成してください",
+      "translating": "翻訳中…",
+      "failed": "翻訳に失敗しました。サービス設定を確認してください。",
+      "empty": "訳文がここに表示されます",
+      "service_compare": "サービス比較",
+      "main_translation": "メイン",
+      "service_unavailable": "サービスを利用できません",
+      "waiting": "翻訳待ち",
+      "copy": "コピー",
+      "favorite_unavailable": "お気に入りは今後のリリースで提供します",
+      "preferred": "優先訳文",
+      "other_services": "他のサービス",
+      "copy_result": "訳文をコピー",
+      "copied": "コピー済み",
+      "favorite": "保存",
+      "terms": "用語ヒット",
+      "terms_hint": "入力すると用語集と照合されます。",
+      "quality": "品質シグナル",
+      "quality_hint": "訳文の生成後に計算されます。",
+      "shortcuts": "ショートカット",
+      "other_services_disabled": "他のサービスは無効です",
+      "input_hint_translate_to": "翻訳するテキストを入力または貼り付け、$languageに翻訳"
+    },
+    "status": {
+      "runtime_ready": "翻訳ランタイム準備完了",
+      "settings_synced": "設定を同期済み",
+      "shortcuts": "⌥Space クイックウィンドウ · ⌥⇧2 キャプチャ"
+    },
+    "version_latest": "最新です",
+    "version_checking": "確認中…",
+    "check_updates": "アップデートを確認"
+  },
+  "settings": {
+    "version": "v{} (Build {})",
+    "general": {
+      "title": "一般",
+      "section": {
+        "permissions": "システム権限",
+        "ocr": "テキスト認識",
+        "directory": "辞書",
+        "translation": "翻訳",
+        "translation_target": "翻訳先",
+        "languages": "言語",
+        "input": "入力設定",
+        "startup": "起動と連携",
+        "ocr_behaviour": "取得の動作",
+        "translation_behaviour": "翻訳の動作"
+      },
+      "row": {
+        "launch_at_login": "ログイン時に起動",
+        "show_in_menu_bar": "メニューバーに表示",
+        "screen_capture_access": "画面収録へのアクセスを許可",
+        "screen_selection_access": "アクセシビリティへのアクセスを許可",
+        "default_ocr_service": "デフォルトのテキスト認識サービス",
+        "auto_copy_detected_text": "検出したテキストを自動コピー",
+        "default_directory_service": "デフォルトの辞書サービス",
+        "default_translation_service": "デフォルトの翻訳サービス",
+        "translation_target_hint": "翻訳で使用する言語ペアを設定します。",
+        "common_languages": "よく使う言語",
+        "common_languages_description": "よく使う言語は言語選択リストの先頭に表示されます。",
+        "common_languages_hint": "よく使う言語を選択してください：",
+        "common_languages_sort": "コードで並べ替え",
+        "common_languages_reset": "デフォルトにリセット",
+        "common_languages_reset_help": "デフォルトのよく使う言語セットにリセット",
+        "common_languages_search": "言語を検索...",
+        "common_languages_all": "すべての言語",
+        "double_click_copy_result": "ダブルクリックで翻訳結果をコピー",
+        "submit_with_enter": "Enterで送信",
+        "submit_with_meta_enter_mac": "⌘ + Enterで送信",
+        "screen_capture_access_hint": "画面からの文字取得には画面内容の読み取りが必要です。",
+        "screen_selection_access_hint": "選択テキストの取得には他アプリの選択内容の読み取りが必要です。",
+        "no_translation_targets": "翻訳ターゲットがありません。既定の翻訳先を決めるには追加してください。"
+      },
+      "button": {
+        "add_provider": "追加...",
+        "add_target": "対象を追加...",
+        "manage_targets": "翻訳ターゲットを管理...",
+        "manage_languages": "よく使う言語を管理...",
+        "grant": "許可"
+      },
+      "option": {
+        "none": "なし",
+        "no_services_available": "利用可能なサービスがありません",
+        "granted": "許可済み",
+        "built_in_ocr": "内蔵OCR",
+        "tesseract": "Tesseract",
+        "youdao_ocr": "Youdao OCR"
+      },
+      "editor": {
+        "add_target_title": "翻訳ターゲットを追加",
+        "edit_target_title": "翻訳ターゲットを編集",
+        "row": {
+          "source_language": "ソース言語",
+          "target_language": "ターゲット言語"
+        },
+        "title_edit": "翻訳ターゲットを編集",
+        "subtitle": "ある元言語を既定でどの言語に翻訳するかを決めます",
+        "same_language": "元言語と翻訳先が同じです。別の翻訳先を選んでください。",
+        "duplicate": "同じ組み合わせのターゲットがすでにあります。",
+        "hint_auto": "他のルールに一致しない場合は{}に翻訳します。",
+        "hint_source": "{}を検出したら{}に翻訳します。"
+      }
+    },
+    "appearance": {
+      "title": "外観",
+      "section": {
+        "app_language": "表示言語",
+        "theme_mode": "テーマモード",
+        "theme_style": "テーマスタイル"
+      },
+      "footer": "変更はウインドウ全体にすぐ適用されます。"
+    },
+    "shortcuts": {
+      "title": "ショートカット",
+      "section": {
+        "text_extraction": "テキスト抽出",
+        "input_assist": "入力補助機能",
+        "submit_mode": "送信方法"
+      },
+      "row": {
+        "toggle_mini_translator": "ウィンドウの表示/非表示",
+        "extract_text_from_screen_selection": "画面選択からテキストを抽出",
+        "extract_text_from_screen_capture": "画面キャプチャからテキストを抽出",
+        "extract_text_from_clipboard": "クリップボードからテキストを抽出",
+        "translate_input": "入力内容を翻訳"
+      },
+      "reset_dialog": {
+        "title": "ショートカットをリセット",
+        "message": "すべてのショートカットをデフォルト値にリセットしますか？",
+        "confirm": "リセット",
+        "cancel": "キャンセル"
+      },
+      "group": {
+        "global": {
+          "title": "グローバルショートカット",
+          "description": "どのアプリでも動作します。"
+        },
+        "in_app": {
+          "title": "アプリ内キー",
+          "description": "このアプリの入力欄でのみ有効です。"
+        }
+      },
+      "reset": "デフォルトに戻す..."
+    },
+    "advanced": {
+      "title": "詳細設定",
+      "api_server": "ローカルAPIサーバー",
+      "api_server_description": "ローカルインテグレーションのために127.0.0.1で翻訳APIを公開します。",
+      "enable": "有効",
+      "port": "ポート",
+      "running_at": "{url} で実行中",
+      "disabled": "無効"
+    },
+    "services": {
+      "title": "サービス",
+      "button": {
+        "add_service": "サービスを追加..."
+      },
+      "section": {
+        "available_services": "利用可能なサービス"
+      },
+      "editor": {
+        "title": "サービスを追加",
+        "subtitle": "設定済みのプロバイダーにサービスを追加します",
+        "row": {
+          "model": "モデル",
+          "system_prompt": "システムプロンプト"
+        },
+        "prompt_placeholder": "空欄にすると、この種類の既定プロンプトを使います",
+        "variant_hint": "{} にはすでに{}サービスがあります。これは並列の別設定として追加されます。",
+        "traditional_note": "{} は従来型のインターフェースで、調整できるモデルやプロンプトはありません。パラメーターはプロバイダー詳細で設定します。"
+      },
+      "detail": {
+        "row": {
+          "id": "サービス ID",
+          "name": "名前",
+          "provider": "プロバイダー",
+          "type": "種類"
+        },
+        "delete_dialog": {
+          "title": "「{}」を削除しますか？",
+          "message": "このサービスはプロバイダーから削除されます。"
+        },
+        "prompt_variables": "利用可能な変数: {{sourceLanguage}}, {{targetLanguage}}, {{text}}"
+      },
+      "make_default": "デフォルトにする",
+      "item": {
+        "none_of_kind": "利用できる{}サービスがまだありません。"
+      }
+    },
+    "providers": {
+      "title": "プロバイダー",
+      "section": {
+        "services": "利用可能なサービス",
+        "services_description": "設定済みプロバイダーで利用できるサービスを確認し、種類ごとに切り替えます。"
+      },
+      "item": {
+        "empty": "プロバイダーが設定されていません。追加して翻訳サービスを有効にしてください。",
+        "loading": "プロバイダーを読み込み中...",
+        "no_services": "利用可能なサービスがありません。"
+      },
+      "button": {
+        "add": "プロバイダーを追加..."
+      },
+      "alert": {
+        "error": "エラー"
+      },
+      "intro": {
+        "body": "アプリで使用するサービスプロバイダーを管理します。",
+        "warning": "接続したプロバイダーは送信したテキストや画像を処理する場合があります。信頼できるサービスのみ有効にしてください。"
+      },
+      "editor": {
+        "row": {
+          "id": "プロバイダーID",
+          "type": "プロバイダーの種類",
+          "default_model": "デフォルトモデル"
+        },
+        "placeholder": {
+          "id": "例: deepl-main"
+        },
+        "type_picker": {
+          "prompt": "追加するプロバイダーの種類を選択してください：",
+          "section_llm": "LLM",
+          "section_traditional": "従来型"
+        },
+        "tooltip": {
+          "help": "ヘルプ"
+        },
+        "step": {
+          "next": "続ける",
+          "back": "前へ"
+        },
+        "add_title": "{} を追加",
+        "capability_note": {
+          "translation": "翻訳候補に加わります",
+          "dictionary": "辞書の語義を提供します",
+          "ocr": "画像内の文字を認識します"
+        },
+        "test": {
+          "run": "接続をテスト",
+          "running": "接続をテスト中 · 経過 {}s",
+          "passed_models": "接続は正常 · {} 個のモデルが利用可能",
+          "passed_service": "接続は正常 · サービスを利用できます",
+          "passed_footer": "接続テストに合格しました",
+          "retest": "再テスト",
+          "tips_title": "試せること",
+          "tips_llm": "· キーが選んだプロバイダーの種類と一致しているか確認\n· Base URL に /v1 が必要か確認\n· プロバイダーのコンソールでそのモデルが有効か確認",
+          "tips_traditional": "· 認証情報が選んだプロバイダーの種類と一致しているか確認\n· プロバイダーのコンソールでサービスが有効か確認",
+          "failed_suffix": "検証に失敗",
+          "passed_suffix": "検証済み"
+        }
+      },
+      "detail": {
+        "tooltip": {
+          "edit": "プロバイダーを編集"
+        },
+        "row": {
+          "id_hint": "作成後は変更できません"
+        },
+        "section": {
+          "configuration": "設定",
+          "models": "モデル"
+        },
+        "models": {
+          "loading": "モデルを読み込み中...",
+          "empty": "モデルが見つかりません。",
+          "retry": "再試行",
+          "refresh": "リストを更新",
+          "default_badge": "デフォルト",
+          "set_default": "デフォルトに設定",
+          "fetch_error": "プロバイダーAPIからモデルを取得できませんでした。"
+        }
+      },
+      "capability": {
+        "translation": "翻訳",
+        "dictionary": "辞書",
+        "ocr": "OCR",
+        "llm": "AI"
+      },
+      "description": {
+        "all": "辞書検索とテキスト翻訳を提供",
+        "dictionary": "辞書検索と単語定義を提供",
+        "translation": "言語間のテキスト翻訳を提供",
+        "fallback": "翻訳サービスを提供"
+      },
+      "delete_dialog": {
+        "title": "\"{}\" を削除しますか？",
+        "message": "この操作は元に戻せません。"
+      }
+    },
+    "layout": {
+      "title": "設定",
+      "empty": {
+        "title": "カテゴリを選択",
+        "message": "サイドバーから設定セクションを選択してください。"
+      },
+      "groups": "設定グループ",
+      "effect_hint": "変更は即時反映",
+      "footer_note": "訳文とキーはこのMacにのみ保存されます",
+      "support": "サポート"
+    },
+    "about": {
+      "title": "情報",
+      "copy_version_info": "バージョン情報をコピー",
+      "up_to_date": "最新の状態です。",
+      "check_again": "再確認",
+      "links": "リンク",
+      "website": "ウェブサイト",
+      "github": "GitHub",
+      "report_issue": "問題を報告",
+      "license": "ライセンス",
+      "open_changelog": "更新履歴を開く",
+      "update": "アップデート"
+    }
+  }
+}

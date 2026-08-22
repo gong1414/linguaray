@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">LinguaRay app icon</title>
+  <desc id="desc">A square, unmasked app icon source for macOS and Windows.</desc>
+  <rect width="1024" height="1024" fill="#13233F"/>
+  <g transform="translate(142 176) scale(2.8)">
+    <path fill="#FFFFFF" d="M44 38 86 88v71c0 8 6 14 14 14h38l20 31H92c-27 0-48-21-48-48V38Z"/>
+    <path fill="#34C0BE" d="M91 38h65c38 0 64 23 64 57 0 25-15 44-39 52l39 57h-24l-49-66v-23h9c14 0 23-5 23-24 0-10-9-16-23-16H91V38Z"/>
+  </g>
+</svg>

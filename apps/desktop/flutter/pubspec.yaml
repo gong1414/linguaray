@@ -1,0 +1,70 @@
+name: beyondtranslate_desktop
+description: A privacy-first desktop translation app built with Flutter and Rust.
+homepage: https://github.com/gong1414/linguaray
+publish_to: "none"
+version: 0.5.0+18
+resolution: workspace
+
+environment:
+  sdk: ">=3.6.0 <4.0.0"
+
+dependencies:
+  beyondtranslate_runtime: ^0.0.1
+  beyondtranslate_ui: ^0.1.0
+
+  collection: ^1.18.0
+  dio: ^5.9.2
+  fluentui_system_icons: ^1.1.255
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  go_router: ^17.2.1
+  intl: ^0.20.2
+  hotkey_manager: 0.2.3
+  nativeapi: 0.1.4
+  package_info_plus: ^9.0.0
+  path: ^1.8.3
+  path_provider: ^2.1.1
+  slang: ^4.13.0
+  slang_flutter: ^4.13.0
+  screen_capturer: 0.2.3
+  widgetbook: 3.25.0
+
+dev_dependencies:
+  build_runner: ^2.10.1
+  dependency_validator: ^5.0.5
+  flutter_lints: ^2.0.0
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+  go_router_builder: ^4.2.1
+  slang_build_runner: ^4.13.0
+
+# dependency_overrides:
+#   cnativeapi:
+#     path: ../../../../../libnativeapi/nativeapi-flutter/packages/cnativeapi
+#   nativeapi:
+#     path: ../../../../../libnativeapi/nativeapi-flutter/packages/nativeapi
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - resources/images/
+    - resources/images/provider_icons/llm/
+    - resources/images/provider_icons/traditional/
+
+  fonts:
+    - family: MiSans
+      fonts:
+        - asset: resources/fonts/MiSans-Regular.ttf
+        - asset: resources/fonts/MiSans-Semibold.ttf
+          weight: 600
+        - asset: resources/fonts/MiSans-Bold.ttf
+          weight: 700
+    - family: Roboto Mono
+      fonts:
+        - asset: resources/fonts/RobotoMono-Regular.ttf
