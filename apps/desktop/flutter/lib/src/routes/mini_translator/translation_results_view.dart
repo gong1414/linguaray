@@ -100,7 +100,7 @@ bool allServicesFailed(
 /// its service attribution below, candidates behind a 对比 N 个服务 toggle.
 class MiniTranslatorTranslation extends StatelessWidget {
   const MiniTranslatorTranslation({
-    Key? key,
+    super.key,
     required this.querySubmitted,
     required this.translationResultList,
     required this.translationServiceIds,
@@ -112,7 +112,7 @@ class MiniTranslatorTranslation extends StatelessWidget {
     required this.onToggleCompare,
     required this.onPreferService,
     required this.onRequery,
-  }) : super(key: key);
+  });
 
   final bool querySubmitted;
   final List<TranslationResult> translationResultList;
@@ -618,9 +618,9 @@ class _CandidateCard extends StatelessWidget {
 
 class MiniTranslatorWordDefinition extends StatelessWidget {
   const MiniTranslatorWordDefinition({
-    Key? key,
+    super.key,
     required this.translationResultList,
-  }) : super(key: key);
+  });
 
   final List<TranslationResult> translationResultList;
 

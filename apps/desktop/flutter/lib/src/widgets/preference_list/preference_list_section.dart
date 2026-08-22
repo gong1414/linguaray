@@ -7,14 +7,14 @@ import '../ui.dart' show DesignThemeContext, DesignTypographyStyles, Label;
 /// separated by the page, not by their own chrome.
 class PreferenceListSection extends StatelessWidget {
   const PreferenceListSection({
-    Key? key,
+    super.key,
     this.leading,
     this.title,
     this.action,
     this.description,
     this.labelInset = 0,
     required this.children,
-  }) : super(key: key);
+  });
 
   final Widget? leading;
   final Widget? title;
