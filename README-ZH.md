@@ -2,71 +2,92 @@
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/brand/linguaray/dist/readme/linguaray-readme-dark.svg">
     <source media="(prefers-color-scheme: light)" srcset="assets/brand/linguaray/dist/readme/linguaray-readme-light.svg">
-    <img alt="LinguaRay" src="assets/brand/linguaray/dist/readme/linguaray-readme-light.svg" width="560">
+    <img alt="LinguaRay" src="assets/brand/linguaray/dist/readme/linguaray-readme-light.svg" width="480">
   </picture>
 
-  <p>隐私优先，随时通过一个快捷键开始翻译。</p>
+  <p><strong>在看到文字的地方，直接完成翻译。</strong></p>
+  <p>一款使用 Flutter 与 Rust 构建、注重隐私的 macOS / Windows 桌面翻译工具。</p>
 
   [![CI](https://github.com/gong1414/linguaray/actions/workflows/ci.yml/badge.svg)](https://github.com/gong1414/linguaray/actions/workflows/ci.yml)
-  [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-  [![Flutter](https://img.shields.io/badge/Flutter-3.47.1-02569B?logo=flutter)](https://flutter.dev/)
-  [![Platforms](https://img.shields.io/badge/platform-macOS%20%7C%20Windows-59636E)](#平台支持)
+  [![License: MIT](https://img.shields.io/badge/license-MIT-0F766E.svg)](LICENSE)
+  [![Flutter](https://img.shields.io/badge/Flutter-3.47.1-02569B?logo=flutter&logoColor=white)](https://flutter.dev/)
+  [![Platforms](https://img.shields.io/badge/platform-macOS%20%7C%20Windows-475569)](#平台支持)
 
   [English](README.md) · **简体中文**
 </div>
 
-## 关于 LinguaRay
-
-LinguaRay 是一款面向 macOS 和 Windows 的开源桌面翻译工具。选择文字、输入或
-粘贴内容，或者框选屏幕区域，即可在当前工作流中完成翻译，无需来回切换浏览器。
+> [!IMPORTANT]
+> LinguaRay 目前处于积极开发的预发布阶段。核心流程和桌面构建已纳入 CI，
+> 但尚未发布经过签名的稳定版本。如需体验，请先从源码运行。
 
 <p align="center">
-  <img src="docs/images/workbench.png" alt="LinguaRay 工作台将英文翻译为中文" width="860">
+  <img src="docs/images/workbench.png" alt="LinguaRay 将英文文本翻译为简体中文" width="900">
 </p>
 
-### 主要特点
+## 为什么选择 LinguaRay？
 
-- **一个快捷键即可使用**：打开快捷翻译窗、翻译当前选区或开始截图。
-- **文字与图片翻译**：在同一套界面中处理划词、剪贴板输入和截图 OCR。
-- **服务商可选**：可使用系统服务或配置兼容的翻译服务，界面不绑定单一厂商。
-- **密钥安全存储**：API 密钥写入操作系统安全存储，不进入普通设置文件。
-- **符合桌面习惯**：支持托盘、权限恢复、多显示器定位和平台化窗口行为。
-- **界面可检查**：关键状态均可在 Widgetbook 中查看，并由 golden 测试覆盖。
+翻译应该出现在你正在使用的工作流里，而不是迫使你切换到另一个浏览器标签页。
+LinguaRay 同时提供完整工作台和紧凑的快捷翻译窗，可从菜单栏或全局快捷键随时打开。
+
+- **文字、划词与截图**：翻译输入或粘贴的文本、其他应用中的选中文字，以及通过
+  OCR 识别的屏幕区域。
+- **符合桌面使用习惯**：支持菜单栏、可配置快捷键、权限恢复、当前显示器定位和
+  DPI 感知窗口。
+- **服务商可选**：可使用系统能力或配置兼容的翻译服务，界面不绑定单一厂商。
+- **隐私优先**：凭据保存在操作系统安全存储中；普通设置与 UI 状态只保存密钥引用。
+- **界面与内核分离**：Flutter 负责用户体验，Rust runtime 负责翻译、OCR、服务商
+  与持久化设置。
+
+## 当前能力
+
+| 能力 | 状态 |
+| --- | --- |
+| 输入与剪贴板翻译 | 已实现并有自动化测试 |
+| 快捷翻译窗与划词翻译 | 已实现；部分平台需要系统权限 |
+| 区域截图与系统 OCR | 已实现 macOS 和 Windows 路径 |
+| 全局快捷键、菜单栏与窗口定位 | 已实现 |
+| 服务商配置与凭据安全存储 | 已实现 |
+| macOS 与 Windows 桌面构建 | 已由 CI 构建和验证 |
+| 签名安装包与稳定版本 | 尚未发布 |
+
+历史记录、词典、TTS、自动更新和 Linux 安装包不在当前版本范围内。尚未达到核心
+功能测试与平台验收标准的能力会保持隐藏，不以半成品入口对外展示。
 
 ## 平台支持
 
-| 平台 | 最低版本 | 状态 |
+| 平台 | 最低版本 | 构建状态 |
 | --- | --- | --- |
-| macOS | 13.0 | 支持 |
-| Windows | Windows 10 | 支持 |
+| macOS | 13.0 | CI 支持 |
+| Windows | Windows 10 | CI 支持 |
 
-Linux 暂不在当前发布矩阵中。
-
-## 下载
-
-构建会发布在 [Releases](https://github.com/gong1414/linguaray/releases)。首个签名
-版本发布前，可以按下方步骤直接从源码运行。
-
-> 如果维护者没有配置平台签名凭据，公开 CI 产生的构建包将不带签名。
+目前不支持 Linux。
 
 ## 从源码运行
 
 ### 环境要求
 
-- [Flutter 3.47.1](https://docs.flutter.dev/install/archive)，内含 Dart 3.13.1
+- [Flutter 3.47.1](https://docs.flutter.dev/install/archive)，包含 Dart 3.13.1
 - 当前 stable [Rust 工具链](https://www.rust-lang.org/tools/install)
-- macOS 需要 Xcode 与 CocoaPods；Windows 需要安装 Visual Studio 的“使用 C++ 的
-  桌面开发”工作负载
+- macOS：Xcode 与 CocoaPods
+- Windows：Visual Studio 的 **使用 C++ 的桌面开发**工作负载
+
+先确认桌面开发环境：
+
+```bash
+flutter doctor
+```
+
+然后克隆并运行 LinguaRay：
 
 ```bash
 git clone https://github.com/gong1414/linguaray.git
 cd linguaray
 dart pub get
 cd apps/desktop/flutter
-flutter run -d macos        # Windows 上使用 windows
+flutter run -d macos        # Windows 使用：flutter run -d windows
 ```
 
-日常界面开发直接使用 Flutter hot reload。组件目录可以独立启动：
+日常界面开发直接使用 Flutter hot reload。Widgetbook 提供独立的组件与状态目录：
 
 ```bash
 cd apps/desktop/flutter
@@ -75,31 +96,58 @@ flutter run -d macos -t lib/widgetbook.dart
 
 ## 架构
 
-LinguaRay 明确分离界面和功能能力：
-
 ```text
-Flutter UI → controller → 平台服务 / UniFFI → Rust runtime
+Flutter 视图
+    ↓ 用户意图 / 不可变状态
+Riverpod view model
+    ↓
+纯 Dart 用例与 port
+    ↓ adapter
+Rust runtime（UniFFI）+ 类型化桌面平台服务
 ```
 
-- `apps/desktop/flutter`：桌面宿主、路由、controller 与平台集成；
-- `packages/ui_flutter`：可复用的 Flutter 设计系统；
-- `packages/runtime`：通过 UniFFI 向 Dart 和 Swift 暴露 Rust runtime；
-- `crates`：翻译、OCR、服务商、设置与共享核心逻辑。
+| 路径 | 职责 |
+| --- | --- |
+| `apps/desktop/flutter` | 桌面宿主、路由、view model、adapter 与平台集成 |
+| `packages/application` | 纯 Dart 用例、模型与 port |
+| `packages/ui_flutter` | LinguaRay 的 Material 3 设计系统与测试工具 |
+| `packages/runtime` | Dart、Rust 与 Swift UniFFI 桥接层 |
+| `crates` | 翻译引擎、OCR、服务商配置与共享核心逻辑 |
 
-更完整的边界和数据流见[架构说明](docs/ARCHITECTURE.md)，开发与测试流程见
-[贡献指南](CONTRIBUTING.md)。
+依赖规则、数据流和存储模型见[架构说明](docs/ARCHITECTURE.md)。
 
-## 安全与隐私
+## 开发与测试
 
-LinguaRay 只会在你主动发起操作时，把内容发送给你选择的服务商。服务商密钥通过
-平台安全存储保存。请勿在公开 issue 中发布密钥、隐私文本或敏感截图。
+仓库是由 Melos 管理的 Dart Pub Workspace。常用检查均从仓库根目录运行：
 
-安全漏洞请按照 [SECURITY.md](SECURITY.md) 中的方式私下报告。
+```bash
+dart run melos run analyze
+dart run melos run test
+dart run melos run dependency_validator
+cargo fmt --all -- --check
+cargo clippy --locked --workspace --all-targets -- -D warnings
+cargo test --locked --workspace
+```
 
-## 参与贡献
+跨层修改应运行完整检查。UI 修改需要补充 Widgetbook 状态并明确更新 golden；桌面行为
+需要在受影响的操作系统上验证。完整流程见[贡献指南](CONTRIBUTING.md)。
 
-欢迎提交 bug、范围清晰的功能建议、文档优化和代码贡献。提交 Pull Request 前请先
-阅读[贡献指南](CONTRIBUTING.md)和[行为准则](CODE_OF_CONDUCT.md)。
+## 隐私与安全
+
+LinguaRay 只在你主动发起翻译时，才会把内容发送给本次操作所选择的服务商。服务商
+密钥通过操作系统安全存储保存。请勿在公开 Issue 中发布 API 密钥、隐私文本或敏感
+截图。
+
+发现安全漏洞时，请按照 [SECURITY.md](SECURITY.md) 私下报告。
+
+## 社区
+
+- 使用 [GitHub Discussions](https://github.com/gong1414/linguaray/discussions)
+  提问或讨论设计。
+- 使用 [Issues](https://github.com/gong1414/linguaray/issues) 提交可复现的 bug
+  和范围明确的功能建议。
+- 提交 Pull Request 前，请阅读[贡献指南](CONTRIBUTING.md)和
+  [行为准则](CODE_OF_CONDUCT.md)。
 
 ## 许可证
 
