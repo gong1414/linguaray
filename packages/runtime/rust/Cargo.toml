@@ -40,7 +40,7 @@ uniffi-dart = { git = "https://github.com/Uniffi-Dart/uniffi-dart.git", branch =
   "bindgen-tests",
 ] }
 uniffi = { version = "=0.31.2", features = ["bindgen-tests"] }
-uniffi_testing = "=0.31.2"
+uniffi_testing = "=0.32.0"
 anyhow = "1"
 
 [[bin]]
