@@ -2,7 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/widgets.dart';
 
-/// BeyondTranslate design tokens — the Dart mirror of `tokens.css`.
+/// LinguaRay design tokens — the Dart mirror of `tokens.css`.
 ///
 /// Every visual decision a widget makes reads from a token, so an
 /// alternative palette (Studio Dark, Bright Light, Bright Dark) is a pure

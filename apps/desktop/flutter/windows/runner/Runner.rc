@@ -93,7 +93,7 @@ BEGIN
             VALUE "FileDescription", "LinguaRay" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "linguaray" "\0"
-            VALUE "LegalCopyright", "LinguaRay and BeyondTranslate contributors. AGPL-3.0." "\0"
+            VALUE "LegalCopyright", "Copyright (c) 2026 gong1414. MIT License." "\0"
             VALUE "OriginalFilename", "linguaray.exe" "\0"
             VALUE "ProductName", "LinguaRay" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"

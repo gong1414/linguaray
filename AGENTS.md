@@ -16,9 +16,8 @@ scripts/                Formatting and code-generation entry points
 docs/                   Maintainer-facing architecture documentation
 ```
 
-Internal packages and FFI symbols may retain `beyondtranslate` names for
-upstream and ABI compatibility. User-facing names, identifiers, documentation,
-and assets use `LinguaRay`.
+Internal package and FFI identifiers are implementation details. User-facing
+names, identifiers, documentation, and assets use `LinguaRay`.
 
 ## Toolchain
 

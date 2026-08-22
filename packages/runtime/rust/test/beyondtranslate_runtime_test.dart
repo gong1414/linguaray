@@ -10,7 +10,7 @@ void main() {
 
   test('greet', () {
     expect(greet(name: 'World'), 'Hello, World!');
-    expect(greet(name: 'BeyondTranslate'), 'Hello, BeyondTranslate!');
+    expect(greet(name: 'LinguaRay'), 'Hello, LinguaRay!');
   });
 
   test('version returns a non-empty semver string', () {

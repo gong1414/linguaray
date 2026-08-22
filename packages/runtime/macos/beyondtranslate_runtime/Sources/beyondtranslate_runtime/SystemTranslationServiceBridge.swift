@@ -19,19 +19,21 @@ private func systemTranslationServiceBridgeRequestObserver(
 /// framework, and broadcasts the result back.
 ///
 /// - Communication: CFNotificationCenter (local, in-process)
-///   * Request notification: `com.beyondtranslate.systemTranslation.request`
+///   * Request notification: `io.github.gong1414.linguaray.systemTranslation.request`
 ///     Payload (CFDictionary):
 ///       - Translate: `requestId`, `operation=translate`, `text`,
 ///         `sourceLanguage`, `targetLanguage`
 ///       - Detect language: `requestId`, `operation=detectLanguage`, `texts`
 ///         where `texts` is a JSON string array
-///   * Response notification: `com.beyondtranslate.systemTranslation.response`
+///   * Response notification: `io.github.gong1414.linguaray.systemTranslation.response`
 ///     Payload (CFDictionary): `requestId`, `operation`, `success`,
 ///       `translatedText`, `detectedSourceLanguage`, `detections`, `error`
 final class SystemTranslationServiceBridge {
 
-  private static let requestName = "com.beyondtranslate.systemTranslation.request" as CFString
-  private static let responseName = "com.beyondtranslate.systemTranslation.response" as CFString
+  private static let requestName =
+    "io.github.gong1414.linguaray.systemTranslation.request" as CFString
+  private static let responseName =
+    "io.github.gong1414.linguaray.systemTranslation.response" as CFString
 
   private init() {}
 
@@ -470,7 +472,7 @@ extension DispatchQueue {
   fileprivate static func once(_ block: @escaping () -> Void) {
     objc_sync_enter(self)
     defer { objc_sync_exit(self) }
-    let key = "com.beyondtranslate.SystemTranslationServiceBridge.start"
+    let key = "io.github.gong1414.linguaray.SystemTranslationServiceBridge.start"
     guard !onceTracker.contains(key) else { return }
     onceTracker.insert(key)
     block()

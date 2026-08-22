@@ -1,5 +1,5 @@
 name: beyondtranslate_runtime
-description: Rust-backed plugin for BeyondTranslate. Dart bindings via uniffi-dart, Swift bindings via uniffi-rs.
+description: Rust-backed plugin for LinguaRay. Dart bindings via uniffi-dart, Swift bindings via uniffi-rs.
 version: 0.0.1
 publish_to: "none"
 resolution: workspace

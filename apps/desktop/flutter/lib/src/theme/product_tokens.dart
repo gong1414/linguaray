@@ -1,4 +1,4 @@
-/// The tokens and type recipes only BeyondTranslate itself has a use for.
+/// The tokens and type recipes only LinguaRay itself has a use for.
 ///
 /// The Flutter twin of `apps/storybook/src/styles/product.css`. The kit stays
 /// domain-free, so anything that encodes a product concept lives here instead:

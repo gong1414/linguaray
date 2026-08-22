@@ -8,7 +8,7 @@
   <p>隐私优先，随时通过一个快捷键开始翻译。</p>
 
   [![CI](https://github.com/gong1414/linguaray/actions/workflows/ci.yml/badge.svg)](https://github.com/gong1414/linguaray/actions/workflows/ci.yml)
-  [![License: AGPL-3.0](https://img.shields.io/github/license/gong1414/linguaray)](LICENSE)
+  [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
   [![Flutter](https://img.shields.io/badge/Flutter-3.47.1-02569B?logo=flutter)](https://flutter.dev/)
   [![Platforms](https://img.shields.io/badge/platform-macOS%20%7C%20Windows-59636E)](#平台支持)
 
@@ -101,11 +101,6 @@ LinguaRay 只会在你主动发起操作时，把内容发送给你选择的服�
 欢迎提交 bug、范围清晰的功能建议、文档优化和代码贡献。提交 Pull Request 前请先
 阅读[贡献指南](CONTRIBUTING.md)和[行为准则](CODE_OF_CONDUCT.md)。
 
-## 上游与许可证
+## 许可证
 
-LinguaRay 基于
-[BeyondTranslate CE](https://github.com/beyondtranslate/beyondtranslate-ce) 开发；为
-保持原生桥接稳定，部分内部包名继续兼容上游。完整声明见
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
-
-本项目采用 [GNU AGPL v3](LICENSE) 许可证。
+LinguaRay 采用 [MIT License](LICENSE)。

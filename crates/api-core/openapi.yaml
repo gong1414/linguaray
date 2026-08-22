@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  title: BeyondTranslate API
+  title: LinguaRay API
   version: 0.1.0
   description: HTTP API for translation and dictionary lookups.
 servers:

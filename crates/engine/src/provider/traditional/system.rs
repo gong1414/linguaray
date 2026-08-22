@@ -245,14 +245,14 @@ mod platform {
     //
     // Communication protocol with Swift (SystemTranslationServiceBridge.swift):
     //
-    //   Rust → Swift: CFNotification "com.beyondtranslate.systemTranslation.request"
+    //   Rust → Swift: CFNotification "io.github.gong1414.linguaray.systemTranslation.request"
     //                 userInfo (NSDictionary):
     //                   - translate: requestId, operation=translate, text,
     //                                sourceLanguage, targetLanguage
     //                   - detectLanguage: requestId, operation=detectLanguage,
     //                                     texts (JSON string array)
     //
-    //   Swift → Rust: CFNotification "com.beyondtranslate.systemTranslation.response"
+    //   Swift → Rust: CFNotification "io.github.gong1414.linguaray.systemTranslation.response"
     //                 userInfo (NSDictionary): requestId, operation, success,
     //                                          translatedText, detectedSourceLanguage,
     //                                          detections (JSON string array), error
@@ -470,7 +470,7 @@ mod platform {
             let center = CFNotificationCenterGetLocalCenter();
             let name = CFStringCreateWithCString(
                 std::ptr::null(),
-                c"com.beyondtranslate.systemTranslation.response".as_ptr(),
+                c"io.github.gong1414.linguaray.systemTranslation.response".as_ptr(),
                 CF_STRING_ENCODING_UTF8,
             );
             CFNotificationCenterAddObserver(
@@ -517,7 +517,7 @@ mod platform {
             let center = CFNotificationCenterGetLocalCenter();
             let name = CFStringCreateWithCString(
                 std::ptr::null(),
-                c"com.beyondtranslate.systemTranslation.request".as_ptr(),
+                c"io.github.gong1414.linguaray.systemTranslation.request".as_ptr(),
                 CF_STRING_ENCODING_UTF8,
             );
             CFNotificationCenterPostNotification(
@@ -552,7 +552,7 @@ mod platform {
             let center = CFNotificationCenterGetLocalCenter();
             let name = CFStringCreateWithCString(
                 std::ptr::null(),
-                c"com.beyondtranslate.systemTranslation.request".as_ptr(),
+                c"io.github.gong1414.linguaray.systemTranslation.request".as_ptr(),
                 CF_STRING_ENCODING_UTF8,
             );
             CFNotificationCenterPostNotification(

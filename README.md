@@ -8,7 +8,7 @@
   <p>A privacy-first translator that stays one shortcut away.</p>
 
   [![CI](https://github.com/gong1414/linguaray/actions/workflows/ci.yml/badge.svg)](https://github.com/gong1414/linguaray/actions/workflows/ci.yml)
-  [![License: AGPL-3.0](https://img.shields.io/github/license/gong1414/linguaray)](LICENSE)
+  [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
   [![Flutter](https://img.shields.io/badge/Flutter-3.47.1-02569B?logo=flutter)](https://flutter.dev/)
   [![Platforms](https://img.shields.io/badge/platform-macOS%20%7C%20Windows-59636E)](#platform-support)
 
@@ -115,12 +115,6 @@ contributions are welcome. Before opening a pull request, read
 [CONTRIBUTING.md](CONTRIBUTING.md) and the
 [Code of Conduct](CODE_OF_CONDUCT.md).
 
-## Attribution and license
+## License
 
-LinguaRay is derived from
-[BeyondTranslate CE](https://github.com/beyondtranslate/beyondtranslate-ce).
-Compatible internal package names are retained where they keep the native
-bridge stable. Upstream and dependency notices are documented in
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
-
-LinguaRay is licensed under the [GNU AGPL v3](LICENSE).
+LinguaRay is licensed under the [MIT License](LICENSE).

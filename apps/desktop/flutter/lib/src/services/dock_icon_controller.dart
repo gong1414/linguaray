@@ -6,7 +6,7 @@ import 'mac_app_presentation.dart';
 /// Single decision point for whether the app shows a Dock icon and the macOS
 /// main menu bar.
 ///
-/// BeyondTranslate ships as a menu bar app (`LSUIElement` in Info.plist), so it
+/// LinguaRay ships as a menu bar app (`LSUIElement` in Info.plist), so it
 /// launches without either. Two situations promote it to a regular app:
 ///
 ///   * **the workbench window is on screen** — it needs a Dock icon to be

@@ -11,7 +11,7 @@ PRODUCT_NAME = LinguaRay
 PRODUCT_BUNDLE_IDENTIFIER = io.github.gong1414.linguaray
 
 // The copyright displayed in application information
-PRODUCT_COPYRIGHT = Copyright © LinguaRay and BeyondTranslate contributors.
+PRODUCT_COPYRIGHT = Copyright © 2026 gong1414. MIT License.
 
 // Native Swift code imports the uniffi-generated beyondtranslate_runtime
 // bindings, whose C symbols are provided by Flutter's native_assets framework.
