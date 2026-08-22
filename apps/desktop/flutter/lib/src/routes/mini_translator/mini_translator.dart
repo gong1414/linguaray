@@ -1,4 +1,4 @@
-// ignore_for_file: deprecated_member_use, unused_element
+// ignore_for_file: deprecated_member_use
 
 import 'dart:async';
 
@@ -21,7 +21,6 @@ import '../../services/app_windows.dart'
         hideMiniTranslatorWindow,
         miniTranslatorPositionNearCursor,
         miniTranslatorWindowController,
-        showMiniTranslatorWindow,
         showWorkbenchWindow,
         showSettingsWindow;
 import '../../services/history_store.dart';
@@ -79,7 +78,6 @@ class _MiniTranslatorPageState extends State<MiniTranslatorPage>
   bool _querySubmitted = false;
   String _text = '';
   String? _detectedLanguage;
-  bool _isTextDetecting = false; // ignore: unused_field
   List<TranslationResult> _translationResultList = [];
   bool _showCompare = false;
 
@@ -273,53 +271,6 @@ class _MiniTranslatorPageState extends State<MiniTranslatorPage>
       nativeapi.WindowManager.instance.off(_windowMovedListenerId!);
       _windowMovedListenerId = null;
     }
-  }
-
-  Future<void> _windowShow() async {
-    final isAlwaysOnTop = _window.isAlwaysOnTop;
-    // final windowSize = _window.size;
-
-    if (kIsLinux) {
-      _window.setPosition(_lastShownPosition.dx, _lastShownPosition.dy);
-    }
-
-    // if (kIsMacOS && isShowBelowTray) {
-    //   final trayIconBounds = _trayIcon?.bounds;
-    //   if (trayIconBounds != null) {
-    //     final trayIconSize = trayIconBounds.size;
-    //     final trayIconPosition = trayIconBounds.topLeft;
-
-    //     Offset newPosition = Offset(
-    //       trayIconPosition.dx - ((windowSize.width - trayIconSize.width) / 2),
-    //       trayIconPosition.dy,
-    //     );
-
-    //     if (!isAlwaysOnTop) {
-    //       _window.setPosition(newPosition.dx, newPosition.dy);
-    //     }
-    //   }
-    // }
-
-    final isVisible = _window.isVisible;
-    if (!isVisible) {
-      // Through the window layer, so the workbench gets out of the way.
-      await showMiniTranslatorWindow();
-    } else {
-      _window.focus();
-    }
-    _scheduleWindowResize(animate: false, settle: true);
-
-    if (kIsLinux && !isAlwaysOnTop) {
-      _window.isAlwaysOnTop = true;
-      await Future.delayed(const Duration(milliseconds: 10));
-      _window.isAlwaysOnTop = false;
-      await Future.delayed(const Duration(milliseconds: 10));
-      _window.focus();
-    }
-  }
-
-  Future<void> _windowHide() async {
-    hideMiniTranslatorWindow();
   }
 
   void _scheduleWindowResize({bool animate = true, bool settle = false}) {
@@ -792,16 +743,11 @@ class _MiniTranslatorPageState extends State<MiniTranslatorPage>
     }
   }
 
-  void _handleExtractTextFromScreenSelection() async {
-    await triggerController.trigger(TriggerAction.translateSelection);
-  }
-
   void _handleExtractTextFromScreenCapture() async {
     _setStateAndScheduleWindowResize(() {
       _querySubmitted = false;
       _text = '';
       _detectedLanguage = null;
-      _isTextDetecting = false;
       _translationResultList = [];
     });
     _textEditingController.clear();
@@ -819,7 +765,6 @@ class _MiniTranslatorPageState extends State<MiniTranslatorPage>
       _querySubmitted = false;
       _text = '';
       _detectedLanguage = null;
-      _isTextDetecting = false;
       _translationResultList = [];
       _resultStale = false;
       _copied = false;
@@ -1026,20 +971,4 @@ class _MiniTranslatorPageState extends State<MiniTranslatorPage>
       ),
     );
   }
-
-  // TODO: Re-implement protocol URL handling when protocol_handler is restored
-  // @override
-  // void onProtocolUrlReceived(String url) async {
-  //   Uri uri = Uri.parse(url);
-  //   if (uri.scheme != 'linguaray') return;
-  //
-  //   if (uri.authority == 'translate') {
-  //     if (_text.isNotEmpty) _handleButtonTappedClear();
-  //     String? text = uri.queryParameters['text'];
-  //     if (text != null && text.isNotEmpty) {
-  //       _handleTextChanged(text, isRequery: true);
-  //     }
-  //   }
-  //   await _windowShow();
-  // }
 }
