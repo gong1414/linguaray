@@ -19,8 +19,6 @@ import 'ui.dart'
 ///
 /// `⏎` confirms and `esc` cancels; the confirming button takes focus on open
 /// because the body has no field to hold it the way the forms do.
-///
-/// Port of `apps/storybook/src/screens/confirm-dialog.tsx`.
 Future<bool> showConfirmDialog(
   BuildContext context, {
   required String title,

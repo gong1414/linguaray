@@ -19,9 +19,6 @@ import '../../widgets/ui.dart'
 /// 关于 — the one settings page you read rather than change, which is why it
 /// sits in its own run of the rail. Three blocks: what this build is, whether
 /// a newer one exists, and where to go for everything else.
-///
-/// Mirrors the React `AboutPage` in `screens/main/settings-view.tsx` and the
-/// macOS `AboutView.swift`.
 class AboutSettingsPage extends StatefulWidget {
   const AboutSettingsPage({super.key});
 

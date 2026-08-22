@@ -159,8 +159,6 @@ String? formatShortcut({
 /// listens, so pressing ⌥⇧ and then wondering which key to add is not done
 /// blind, and a rejected press — a bare letter — flashes the border rather
 /// than beeping.
-///
-/// Port of `packages/ui/src/components/shortcut-recorder.tsx`.
 class ShortcutRecorder extends StatefulWidget {
   const ShortcutRecorder({
     super.key,

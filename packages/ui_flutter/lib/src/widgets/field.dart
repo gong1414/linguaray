@@ -24,10 +24,9 @@ BoxDecoration controlDecoration(
   return BoxDecoration(
     color:
         error ? colors.dangerSurface : (focused ? colors.window : colors.card),
-    // Focus and error change the border's *colour* only — React sets both with
-    // `border-accent` / `border-danger` over the same `border` utility, so the
-    // width stays on the hairline in every state. Thickening it here would
-    // shift the text by half a pixel the moment the field takes focus.
+    // Focus and error change the border's *colour* only, so the width stays on
+    // the hairline in every state. Thickening it here would shift the text by
+    // half a pixel the moment the field takes focus.
     border: Border.all(
       color: error
           ? colors.danger
@@ -57,8 +56,8 @@ const EdgeInsets _kControlPadding = EdgeInsets.symmetric(
 /// button line because of a font's metrics.
 const double _kControlHeight = 28;
 
-/// A textarea is not a single-line control: it keeps the wider `py-2.5` inset
-/// and grows from `min-h-20`.
+/// A textarea is not a single-line control: it keeps a wider vertical inset
+/// and grows from its minimum height.
 const EdgeInsets _kTextAreaPadding = EdgeInsets.symmetric(
   horizontal: 12,
   vertical: 10,
@@ -90,8 +89,8 @@ class Input extends StatefulWidget {
   final bool obscureText;
   final bool enabled;
 
-  /// Takes the caret on mount — React's `autoFocus`, which the sheets use on
-  /// their first field so a dialog can be typed into as soon as it opens.
+  /// Takes the caret on mount; the sheets use it on their first field so a
+  /// dialog can be typed into as soon as it opens.
   final bool autofocus;
   final ValueChanged<String>? onChanged;
   final ValueChanged<String>? onSubmitted;
@@ -206,7 +205,7 @@ class TextArea extends StatefulWidget {
   final bool mono;
   final bool enabled;
 
-  /// `min-h-20` in the React source.
+  /// The minimum height the box keeps.
   final double minHeight;
   final int minLines;
   final int? maxLines;

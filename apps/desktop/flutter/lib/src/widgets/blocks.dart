@@ -147,7 +147,7 @@ class _InteractiveMarkState extends State<_InteractiveMark> {
     _closeTimer = null;
   }
 
-  /// Mirrors the React 160ms grace so the pointer can travel into the popover.
+  /// 160ms grace so the pointer can travel into the popover.
   void _scheduleClose() {
     _cancelClose();
     _closeTimer = Timer(const Duration(milliseconds: 160), _hide);

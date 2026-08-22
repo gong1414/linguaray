@@ -2,16 +2,15 @@ import 'dart:math' as math;
 
 import 'package:flutter/widgets.dart';
 
-/// LinguaRay design tokens — the Dart mirror of `tokens.css`.
+/// LinguaRay design tokens.
 ///
 /// Every visual decision a widget makes reads from a token, so an
 /// alternative palette (Studio Dark, Bright Light, Bright Dark) is a pure
 /// token swap: no widget needs to know which theme is active.
 ///
-/// The default value of every field is the **Studio Light** value. That
-/// mirrors the CSS exactly: `:root` declares the baseline and each
-/// `[data-theme=…]` block only overrides the handful of tokens it changes, so
-/// a theme here is likewise written as "the baseline, plus these overrides".
+/// The default value of every field is the **Studio Light** value, so a theme
+/// is likewise written as "the baseline, plus these overrides" — it names only
+/// the handful of tokens it changes.
 @immutable
 class DesignColors {
   const DesignColors({

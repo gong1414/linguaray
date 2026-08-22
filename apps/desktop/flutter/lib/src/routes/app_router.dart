@@ -32,7 +32,7 @@ import 'workbench/index.dart' as workbench_route;
 
 /// Assembles the main application's route graph from modular route files.
 ///
-/// TanStack Start-inspired organization:
+/// Modular route organization:
 /// - each route lives in its own module/file
 /// - this file is the composition root for router setup
 GoRouter createWorkbenchAppRouter({String? initialLocation}) {

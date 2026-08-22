@@ -11,8 +11,7 @@ enum DesignThemeName {
   brightLight,
   brightDark;
 
-  /// The `data-theme` value the React package uses, so both sides can share a
-  /// theme name over the wire.
+  /// Stable theme id, used by fromId and persisted theme settings.
   String get id => switch (this) {
         DesignThemeName.studioLight => 'studio-light',
         DesignThemeName.studioDark => 'studio-dark',
@@ -70,7 +69,7 @@ const Map<DesignThemeName, DesignThemeMeta> designThemeMeta = {
 };
 
 /// The four token tables. `studioLight` is the baseline; the others are
-/// written as "the baseline, plus these overrides", exactly like the CSS.
+/// written as "the baseline, plus these overrides".
 abstract final class DesignThemes {
   // ------------------------------------------------------------------ //
   // Studio Light — the baseline

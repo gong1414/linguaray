@@ -45,8 +45,7 @@ class _HeadingAction extends SingleChildRenderObjectWidget {
 ///
 /// Flutter rejects any pointer that falls outside a box's own `size`, so a
 /// control overhanging a zero-height slot is invisible to taps however plainly
-/// it is drawn. CSS hit-tests painted geometry and needs no such help, which is
-/// why the React source gets away with a bare `h-0`.
+/// it is drawn.
 class _RenderHeadingAction extends RenderShiftedBox {
   _RenderHeadingAction() : super(null);
 
@@ -264,9 +263,9 @@ class PreferenceGroup extends StatelessWidget {
         ),
         const SizedBox(height: _kHeadingGap),
         for (var i = 0; i < children.length; i++) ...[
-          // A `PreferenceDivider` is pulled up out of the gap above it — the
-          // negative top margin the React source spends, which Flutter has to
-          // spell as a shorter gap because it has no negative insets.
+          // A `PreferenceDivider` is pulled up out of the gap above it, which
+          // Flutter has to spell as a shorter gap because it has no negative
+          // insets.
           if (i > 0)
             SizedBox(
               height: children[i] is PreferenceDivider

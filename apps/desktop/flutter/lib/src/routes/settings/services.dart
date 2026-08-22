@@ -37,9 +37,8 @@ import 'service_prefs.dart';
 /// 服务 — one section per capability, and each section owns that capability
 /// end to end: the services available to it and which one runs by default.
 ///
-/// Mirrors the React `SettingsView`'s 服务 page. Splitting this across 常规 and
-/// 提供商 is what made the old settings ask the user to hold two pages in
-/// their head at once.
+/// The settings 服务 page. Splitting this across 常规 and 提供商 is what made
+/// the old settings ask the user to hold two pages in their head at once.
 class ServicesSettingsPage extends StatefulWidget {
   const ServicesSettingsPage({super.key});
 

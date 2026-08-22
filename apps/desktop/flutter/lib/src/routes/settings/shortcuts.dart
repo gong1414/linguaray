@@ -171,9 +171,9 @@ String _capitalise(String value) =>
 /// group answers to the whole system, the other only inside this app's own
 /// windows. Anything else on this page is a section within one of the two.
 ///
-/// Mirrors the React `SettingsView`'s 快捷键 page. Each row's control is a
-/// recorder: click it, press the keys, done. The source of truth stays the Rust
-/// runtime ([RuntimeSettings.getShortcuts]); the page only writes patches to it.
+/// The settings 快捷键 page. Each row's control is a recorder: click it, press
+/// the keys, done. The source of truth stays the Rust runtime
+/// ([RuntimeSettings.getShortcuts]); the page only writes patches to it.
 class ShortcutsSettingsPage extends StatefulWidget {
   const ShortcutsSettingsPage({super.key});
 

@@ -2,8 +2,8 @@ import 'package:flutter/widgets.dart';
 import 'package:linguaray_ui/src/theme/tokens.dart';
 
 /// CSS distributes leading evenly above and below the text box; Flutter's
-/// default is proportional. Matching CSS is what keeps a `leading-none` chip
-/// the same height in both implementations.
+/// default is proportional. Even distribution is what keeps a height-1 chip
+/// exactly as tall as its text box.
 const TextLeadingDistribution _kEvenLeading = TextLeadingDistribution.even;
 
 TextStyle _style(
@@ -28,7 +28,7 @@ TextStyle _style(
     );
 
 /// Type recipes, one per face. `height` maps to CSS `line-height`; pass `1.0`
-/// wherever the React source says `leading-none`.
+/// where a line-height of one is wanted.
 extension DesignTypographyStyles on DesignTypography {
   TextStyle displayStyle({
     double? fontSize,

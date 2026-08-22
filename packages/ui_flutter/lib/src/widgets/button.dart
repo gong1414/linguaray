@@ -190,8 +190,8 @@ class Button extends StatelessWidget {
           // The hairline rides in the *foreground* decoration rather than the
           // background one: a `BoxDecoration.border` insets the content box by
           // its own width, which would make `secondary` a hairline wider than
-          // the `ghost` next to it. React makes the same point by drawing the
-          // ring as an inset box-shadow instead of a real border.
+          // the `ghost` next to it. The ring has to overlay the box, not be
+          // part of its geometry.
           foregroundDecoration: border == null
               ? null
               : BoxDecoration(border: border, borderRadius: radius),

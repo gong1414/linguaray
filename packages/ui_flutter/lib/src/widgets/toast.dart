@@ -27,10 +27,9 @@ enum ToastTone {
 /// action, and [ToastTone.danger] stays until dismissed. Hovering pauses the
 /// clock.
 ///
-/// Entrance is the toast's own — the React kit's `animate-toast-in`, a 260ms
-/// rise-and-fade played once on mount. There is no exit animation: the host
-/// just removes the node — a desktop notification should not pull attention
-/// back a second time on its way out.
+/// Entrance is the toast's own — a 260ms rise-and-fade played once on mount.
+/// There is no exit animation: the host just removes the node — a desktop
+/// notification should not pull attention back a second time on its way out.
 class Toast extends StatefulWidget {
   const Toast({
     super.key,
@@ -59,7 +58,7 @@ class Toast extends StatefulWidget {
 }
 
 class _ToastState extends State<Toast> with SingleTickerProviderStateMixin {
-  // `--animate-toast-in`, curve overshoot included.
+  // Entrance curve, overshoot included.
   static const _curve = Cubic(0.21, 0.9, 0.35, 1.05);
 
   late final AnimationController _entrance = AnimationController(

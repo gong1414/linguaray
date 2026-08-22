@@ -8,10 +8,9 @@
 /// import '../../widgets/ui.dart' show Button, ButtonVariant;
 /// ```
 ///
-/// The package holds primitives only — the same boundary React draws around
-/// `@linguaray/ui`. The product's own widgets that compose them sit beside
-/// this file (`swap_pair.dart`, `blocks.dart`, `list_tile.dart`, …) and are
-/// imported directly, not through here.
+/// The package holds primitives only. The product's own widgets that compose
+/// them sit beside this file (`swap_pair.dart`, `blocks.dart`,
+/// `list_tile.dart`, …) and are imported directly, not through here.
 ///
 /// Several of the exported names (`Divider`, `Radio`, `Switch`, `Dialog`,
 /// `Badge`, `Checkbox`) collide with Material's. When a file shows one of those

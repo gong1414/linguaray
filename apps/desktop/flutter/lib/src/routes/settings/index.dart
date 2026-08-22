@@ -147,8 +147,7 @@ typedef _SettingsRun = ({String? label, List<_SettingsPage> pages});
 
 /// The settings shell in the deck's layout: the toolbar names the view, and
 /// under it the settings rail sits beside the content column — inside the
-/// workbench that makes three columns (sidebar · rail · content), exactly
-/// like the React SettingsView.
+/// workbench that makes three columns (sidebar · rail · content).
 class SettingsTabsShell extends StatelessWidget {
   const SettingsTabsShell({
     super.key,
