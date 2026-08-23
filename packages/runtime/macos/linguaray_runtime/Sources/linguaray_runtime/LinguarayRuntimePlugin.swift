@@ -17,7 +17,7 @@ import Foundation
 public final class LinguarayRuntimePlugin: NSObject, FlutterPlugin {
   public static func register(with registrar: FlutterPluginRegistrar) {
     loadRustDylibIfNeeded()
-    SystemTranslationServiceBridge.start()
+    SystemTranslationServiceBridge.start(hostView: registrar.view)
   }
 }
 

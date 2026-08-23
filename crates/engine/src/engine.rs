@@ -18,6 +18,7 @@ use crate::provider::traditional::CaiyunProvider;
 use crate::provider::traditional::CaiyunProviderConfig;
 use crate::provider::traditional::DeepLProvider;
 use crate::provider::traditional::DeepLProviderConfig;
+use crate::provider::traditional::EcdictProvider;
 #[cfg(feature = "google")]
 use crate::provider::traditional::GoogleProvider;
 use crate::provider::traditional::GoogleProviderConfig;
@@ -192,6 +193,8 @@ pub enum ProviderType {
     OpenAiCompatible,
     #[serde(rename = "system")]
     System,
+    #[serde(rename = "ecdict")]
+    Ecdict,
     #[serde(rename = "google_web")]
     GoogleWeb,
     #[serde(rename = "bing_web")]
@@ -227,6 +230,7 @@ impl ProviderType {
             Self::Gemini => "gemini",
             Self::OpenAiCompatible => "openai_compatible",
             Self::System => "system",
+            Self::Ecdict => "ecdict",
             Self::GoogleWeb => "google_web",
             Self::BingWeb => "bing_web",
             Self::TencentTransmartWeb => "tencent_transmart_web",
@@ -314,6 +318,7 @@ fn build_provider(
             build_openai_compatible_provider(provider_id, config.decode(provider_id)?)
         }
         ProviderType::System => build_system_provider(provider_id),
+        ProviderType::Ecdict => Ok(Arc::new(EcdictProvider)),
         ProviderType::GoogleWeb => {
             build_google_web_provider(provider_id, config.decode(provider_id)?)
         }

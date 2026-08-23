@@ -46,8 +46,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Apple TranslationSession(installedSource:target:) requires the
-          # macOS 26 SDK even though runtime availability is guarded.
+          # Keep the macOS build on the current Xcode image used for release.
           - os: macos-26
             device: macos
             build: flutter build macos --debug

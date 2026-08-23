@@ -2,7 +2,7 @@ name: linguaray_desktop
 description: A privacy-first desktop translation app built with Flutter and Rust.
 homepage: https://github.com/gong1414/linguaray
 publish_to: "none"
-version: 0.5.0+18
+version: 0.6.0+19
 resolution: workspace
 
 environment:

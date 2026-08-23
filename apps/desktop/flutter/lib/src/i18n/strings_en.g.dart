@@ -2755,6 +2755,10 @@ class TranslationsSettingsProvidersCatalogEn {
   String get system =>
       'Uses the operating system translation, dictionary, and OCR on this Mac.';
 
+  /// en: 'Built-in concise English-Chinese dictionary. Works offline with no API key.'
+  String get ecdict =>
+      'Built-in concise English-Chinese dictionary. Works offline with no API key.';
+
   /// en: 'Translates through Google Translate’s unofficial web interface. No API key. Experimental.'
   String get google_web =>
       'Translates through Google Translate’s unofficial web interface. No API key. Experimental.';
@@ -3942,6 +3946,7 @@ extension on Translations {
           'settings.providers.fields.base_url' => 'Base URL',
           'settings.providers.fields.models_url' => 'Models URL',
           'settings.providers.catalog.system' => 'Uses the operating system translation, dictionary, and OCR on this Mac.',
+          'settings.providers.catalog.ecdict' => 'Built-in concise English-Chinese dictionary. Works offline with no API key.',
           'settings.providers.catalog.google_web' => 'Translates through Google Translate’s unofficial web interface. No API key. Experimental.',
           'settings.providers.catalog.bing_web' => 'Translates through Microsoft’s unofficial Edge translator interface. No API key. Experimental.',
           'settings.providers.catalog.tencent_transmart_web' => 'Translates through Tencent Transmart’s unofficial web interface. Optional login. Experimental.',
@@ -4037,10 +4042,10 @@ extension on Translations {
           'settings.providers.detail.section.models' => 'Models',
           'settings.providers.detail.models.loading' => 'Loading models...',
           'settings.providers.detail.models.empty' => 'No models found.',
-          'settings.providers.detail.models.retry' => 'Retry',
           _ => null,
         } ??
         switch (path) {
+          'settings.providers.detail.models.retry' => 'Retry',
           'settings.providers.detail.models.refresh' => 'Refresh List',
           'settings.providers.detail.models.default_badge' => 'Default',
           'settings.providers.detail.models.set_default' => 'Set as Default',

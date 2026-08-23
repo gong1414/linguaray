@@ -22,6 +22,7 @@ mod platform {
     use objc2_core_graphics::CGImage;
     use std::ffi::{c_char, c_void, CStr, CString};
     use std::ptr::null_mut;
+    use std::time::Duration;
 
     // ── CoreGraphics type stubs with proper objc2 encoding ──────────────
 
@@ -378,6 +379,33 @@ mod platform {
         REG.get_or_init(|| Mutex::new(HashMap::new()))
     }
 
+    const SYSTEM_TRANSLATION_TIMEOUT: Duration = Duration::from_secs(120);
+
+    async fn wait_for_translation_response(
+        request_id: String,
+        receiver: mpsc::Receiver<Result<SystemTranslationResponse, TranslationError>>,
+    ) -> Result<SystemTranslationResponse, TranslationError> {
+        tokio::task::spawn_blocking(move || {
+            match receiver.recv_timeout(SYSTEM_TRANSLATION_TIMEOUT) {
+                Ok(result) => result,
+                Err(mpsc::RecvTimeoutError::Timeout) => {
+                    pending_registry().lock().unwrap().remove(&request_id);
+                    Err(TranslationError::NetworkError(
+                        "system translation timed out after 120 seconds".to_owned(),
+                    ))
+                }
+                Err(mpsc::RecvTimeoutError::Disconnected) => {
+                    pending_registry().lock().unwrap().remove(&request_id);
+                    Err(TranslationError::NetworkError(
+                        "system translation response channel closed unexpectedly".to_owned(),
+                    ))
+                }
+            }
+        })
+        .await
+        .map_err(|_| TranslationError::NetworkError("translation task panicked".to_owned()))?
+    }
+
     // ── Response callback (called by CFNotificationCenter) ──────────────
 
     unsafe extern "C" fn on_translation_response(
@@ -592,17 +620,9 @@ mod platform {
             post_detect_language_request(&request_id, &texts_json);
         }
 
-        let result = std::thread::spawn(move || {
-            rx.recv().unwrap_or_else(|_| {
-                Err(TranslationError::NetworkError(
-                    "translation response channel closed unexpectedly".into(),
-                ))
-            })
-        })
-        .join()
-        .map_err(|_| TranslationError::NetworkError("translation thread panicked".into()))?;
+        let result = wait_for_translation_response(request_id, rx).await?;
 
-        match result? {
+        match result {
             SystemTranslationResponse::LanguageDetection(response) => Ok(response),
             SystemTranslationResponse::Translation(_) => Err(TranslationError::SerializationError(
                 "unexpected translation response for language detection request".to_owned(),
@@ -636,20 +656,9 @@ mod platform {
             );
         }
 
-        // Bridge from sync mpsc to async: spawn a blocking thread.
-        // The CFNotificationCenter callback fires on the main run loop,
-        // so blocking here is safe — no deadlock.
-        let result = std::thread::spawn(move || {
-            rx.recv().unwrap_or_else(|_| {
-                Err(TranslationError::NetworkError(
-                    "translation response channel closed unexpectedly".into(),
-                ))
-            })
-        })
-        .join()
-        .map_err(|_| TranslationError::NetworkError("translation thread panicked".into()))?;
+        let result = wait_for_translation_response(request_id, rx).await?;
 
-        match result? {
+        match result {
             SystemTranslationResponse::Translation(response) => Ok(response),
             SystemTranslationResponse::LanguageDetection(_) => {
                 Err(TranslationError::SerializationError(

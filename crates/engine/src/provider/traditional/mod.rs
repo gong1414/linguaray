@@ -4,6 +4,7 @@ pub mod baidu;
 pub mod bing_web;
 pub mod caiyun;
 pub mod deepl;
+pub mod ecdict;
 pub mod google;
 pub mod google_web;
 pub mod libretranslate;
@@ -21,6 +22,7 @@ pub use bing_web::{BingWebProvider, BingWebProviderConfig};
 pub use caiyun::CaiyunProvider;
 pub use caiyun::CaiyunProviderConfig;
 pub use deepl::{DeepLProvider, DeepLProviderConfig};
+pub use ecdict::EcdictProvider;
 #[cfg(feature = "google")]
 pub use google::GoogleProvider;
 pub use google::GoogleProviderConfig;

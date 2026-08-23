@@ -3,26 +3,50 @@ import 'package:linguaray_application/linguaray_application.dart';
 import '../services/runtime.dart';
 import '../services/settings_store.dart';
 import '../utils/platform_util.dart';
+import '../utils/provider_util.dart';
 
 final class RuntimeDictionaryRepository implements DictionaryRepository {
   @override
   Future<List<String>> listCompatibleServiceIds() async {
-    await settingsStore.reloadServices();
-    return [
+    await Future.wait([
+      settingsStore.reloadGeneral(),
+      settingsStore.reloadServices(),
+    ]);
+    final services = [
       for (final service in settingsStore.services)
         if (service.type == ServiceType.dictionary &&
+            isServiceEnabled(service) &&
             !(kIsWindows && service.providerId == 'system'))
           service.id,
     ];
+    final configured = settingsStore.defaultDirectoryService;
+    final preferred = configured.isNotEmpty ? configured : 'ecdict+dictionary';
+    if (preferred.isNotEmpty && services.remove(preferred)) {
+      services.insert(0, preferred);
+    }
+    return services;
   }
 
   @override
   Future<DictionaryEntry> lookup(DictionaryLookupQuery query) async {
-    await settingsStore.reloadServices();
+    await Future.wait([
+      settingsStore.reloadProviders(),
+      settingsStore.reloadServices(),
+    ]);
     var providerName = query.serviceId ?? '';
     for (final service in settingsStore.services) {
       if (service.id == query.serviceId && service.name.trim().isNotEmpty) {
-        providerName = service.name;
+        final configuredName = service.name.trim();
+        final generatedName =
+            configuredName == service.id ||
+            configuredName == service.providerId ||
+            configuredName.contains('+');
+        final provider = settingsStore.providers
+            .where((item) => item.id == service.providerId)
+            .firstOrNull;
+        providerName = generatedName && provider != null
+            ? providerTypeDisplayName(provider.type)
+            : configuredName;
         break;
       }
     }

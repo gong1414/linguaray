@@ -54,6 +54,7 @@ pub enum ProviderType {
     OpenAiCompatible,
     Youdao,
     System,
+    Ecdict,
     GoogleWeb,
     BingWeb,
     TencentTransmartWeb,

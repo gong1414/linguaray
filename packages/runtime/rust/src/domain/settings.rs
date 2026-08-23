@@ -424,7 +424,30 @@ pub fn apply_catalog_seed_for(settings: &mut Settings, macos: bool) -> bool {
                 });
         }
         settings.general.default_translation_service = seed.default_translation_service;
+        settings.general.default_directory_service = seed.default_dictionary_service;
         settings.general.translation_service_order = seed.translation_service_order;
+    }
+
+    // Revision 2 adds a stable, offline dictionary to every existing install.
+    // Since this provider did not exist in revision 1, inserting it cannot
+    // undo a user's earlier deletion. Once revision 2 is recorded, a later
+    // explicit deletion remains respected.
+    if settings.catalog_seed_revision < 2 {
+        let preset =
+            linguaray_engine::catalog::preset_by_id("ecdict").expect("ecdict catalog preset");
+        settings
+            .providers
+            .entry("ecdict".to_owned())
+            .or_insert_with(|| ProviderConfigEntry {
+                id: "ecdict".to_owned(),
+                r#type: preset.engine_type,
+                fields: HashMap::new(),
+                created_at: None,
+                preset_id: Some(preset.id.to_owned()),
+            });
+        if settings.general.default_directory_service.is_empty() {
+            settings.general.default_directory_service = "ecdict+dictionary".to_owned();
+        }
     }
 
     settings.catalog_seed_revision = linguaray_engine::catalog::CATALOG_SEED_REVISION;
@@ -984,7 +1007,8 @@ mod tests {
     fn macos_seed_uses_google_web_and_keeps_system_available() {
         let mut settings = Settings::default();
         assert!(apply_catalog_seed_for(&mut settings, true));
-        assert_eq!(settings.catalog_seed_revision, 1);
+        assert_eq!(settings.catalog_seed_revision, 2);
+        assert!(settings.providers.contains_key("ecdict"));
         assert!(settings.providers.contains_key("system"));
         assert!(settings.providers.contains_key("google-web"));
         assert_eq!(
@@ -994,6 +1018,10 @@ mod tests {
         assert_eq!(
             settings.general.default_translation_service,
             "google-web+translation"
+        );
+        assert_eq!(
+            settings.general.default_directory_service,
+            "ecdict+dictionary"
         );
         assert_eq!(
             settings.services["google-web+translation"]
@@ -1022,6 +1050,7 @@ mod tests {
         let mut settings = Settings::default();
         assert!(apply_catalog_seed_for(&mut settings, false));
         assert!(!settings.providers.contains_key("system"));
+        assert!(settings.providers.contains_key("ecdict"));
         assert_eq!(
             settings.general.default_translation_service,
             "google-web+translation"
@@ -1050,13 +1079,49 @@ mod tests {
         );
         settings.general.default_translation_service = "deepl-main+translation".to_owned();
         assert!(apply_catalog_seed_for(&mut settings, true));
-        assert_eq!(settings.catalog_seed_revision, 1);
-        assert_eq!(settings.providers.len(), 1);
+        assert_eq!(settings.catalog_seed_revision, 2);
+        assert_eq!(settings.providers.len(), 2);
         assert_eq!(
             settings.general.default_translation_service,
             "deepl-main+translation"
         );
         assert!(!settings.providers.contains_key("google-web"));
+        assert!(settings.providers.contains_key("ecdict"));
+    }
+
+    #[test]
+    fn revision_two_adds_offline_dictionary_without_replacing_user_defaults() {
+        let mut settings = Settings {
+            catalog_seed_revision: 1,
+            ..Settings::default()
+        };
+        settings.providers.insert(
+            "deepl-main".to_owned(),
+            ProviderConfigEntry {
+                id: "deepl-main".to_owned(),
+                r#type: ProviderType::DeepL,
+                fields: HashMap::new(),
+                created_at: None,
+                preset_id: Some("deepl-pro".to_owned()),
+            },
+        );
+        settings.general.default_translation_service = "deepl-main+translation".to_owned();
+
+        assert!(apply_catalog_seed_for(&mut settings, true));
+        assert_eq!(settings.catalog_seed_revision, 2);
+        assert!(settings.providers.contains_key("ecdict"));
+        assert_eq!(
+            settings.general.default_translation_service,
+            "deepl-main+translation"
+        );
+        assert_eq!(
+            settings.general.default_directory_service,
+            "ecdict+dictionary"
+        );
+
+        settings.providers.remove("ecdict");
+        assert!(!apply_catalog_seed_for(&mut settings, true));
+        assert!(!settings.providers.contains_key("ecdict"));
     }
 
     #[test]
@@ -1136,7 +1201,8 @@ mod tests {
         settings.general.translation_service_order.clear();
         settings.general.default_translation_service.clear();
         assert!(!apply_catalog_seed_for(&mut settings, false));
-        assert!(settings.providers.is_empty());
+        assert!(!settings.providers.contains_key("google-web"));
+        assert!(settings.providers.contains_key("ecdict"));
         assert!(settings.services.is_empty());
     }
 

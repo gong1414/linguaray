@@ -1,5 +1,7 @@
+import AppKit
 import Foundation
 import NaturalLanguage
+import SwiftUI
 import Translation
 
 private func systemTranslationServiceBridgeRequestObserver(
@@ -41,7 +43,7 @@ final class SystemTranslationServiceBridge {
 
   /// Start listening for translation requests. Safe to call multiple times;
   /// the underlying CFNotificationCenter observer is registered only once.
-  static func start() {
+  static func start(hostView: NSView?) {
     DispatchQueue.once {
       let center = CFNotificationCenterGetLocalCenter()
 
@@ -55,6 +57,12 @@ final class SystemTranslationServiceBridge {
       )
 
       NSLog("[SystemTranslationServiceBridge] System translation service bridge started")
+    }
+
+    if #available(macOS 15, *), let hostView {
+      Task { @MainActor in
+        SystemTranslationTaskRunner.shared.install(in: hostView)
+      }
     }
   }
 
@@ -92,8 +100,8 @@ final class SystemTranslationServiceBridge {
       let resultPayload: [String: String]
 
       do {
-        guard #available(macOS 26, *) else {
-          throw TranslationError.translationUnavailable
+        guard #available(macOS 15, *) else {
+          throw BridgeTranslationError.translationUnavailable
         }
 
         let tgtLocale = Locale.Language(identifier: targetLang)
@@ -109,7 +117,7 @@ final class SystemTranslationServiceBridge {
             resolved = await fallbackSourceLanguage(for: text, target: tgtLocale)
           }
           guard let resolved else {
-            throw TranslationError.detectionFailed
+            throw BridgeTranslationError.detectionFailed
           }
           sourceLanguage = resolved
         }
@@ -118,34 +126,31 @@ final class SystemTranslationServiceBridge {
 
         let availability = LanguageAvailability()
         let status = await availability.status(from: srcLocale, to: tgtLocale)
+        let translatedText: String
         switch status {
-        case .installed:
-          break
-        case .supported:
-          throw TranslationError.languagePairNotInstalled(
-            source: sourceLanguage!,
-            target: targetLang
+        case .installed, .supported:
+          translatedText = try await SystemTranslationTaskRunner.shared.translate(
+            text: text,
+            source: srcLocale,
+            target: tgtLocale
           )
         case .unsupported:
-          throw TranslationError.unsupportedLanguagePair(
+          throw BridgeTranslationError.unsupportedLanguagePair(
             source: sourceLanguage!,
             target: targetLang
           )
         @unknown default:
-          throw TranslationError.unsupportedLanguagePair(
+          throw BridgeTranslationError.unsupportedLanguagePair(
             source: sourceLanguage!,
             target: targetLang
           )
         }
 
-        let session = TranslationSession(installedSource: srcLocale, target: tgtLocale)
-        let response = try await session.translate(text)
-
         resultPayload = [
           "requestId": requestId,
           "operation": "translate",
           "success": "true",
-          "translatedText": response.targetText,
+          "translatedText": translatedText,
           "detectedSourceLanguage": sourceLanguage!,
         ]
       } catch {
@@ -196,7 +201,7 @@ final class SystemTranslationServiceBridge {
 
         let data = try JSONSerialization.data(withJSONObject: detections)
         guard let detectionsJson = String(data: data, encoding: .utf8) else {
-          throw TranslationError.serializationFailed
+          throw BridgeTranslationError.serializationFailed
         }
 
         postResponse([
@@ -253,7 +258,7 @@ final class SystemTranslationServiceBridge {
     // 1. Apple's own identifier gets to veto.
     do {
       _ = try await LanguageAvailability().status(for: trimmed, to: nil)
-    } catch  where Translation.TranslationError.unableToIdentifyLanguage ~= error {
+    } catch  where TranslationError.unableToIdentifyLanguage ~= error {
       return nil
     } catch {
       // Any other failure (pairing, availability, internal) says nothing
@@ -276,7 +281,7 @@ final class SystemTranslationServiceBridge {
 
   /// Detection path for macOS < 15, where `LanguageAvailability` — and with
   /// it Apple's refusal signal and the translatable-language list — does not
-  /// exist. System translation itself requires macOS 26, so this only ever
+  /// exist. System translation itself requires macOS 15, so this only ever
   /// serves standalone detection requests. Best effort: require both real
   /// evidence and real confidence before committing.
   private static func legacyDetectLanguage(_ text: String) -> String? {
@@ -313,7 +318,7 @@ final class SystemTranslationServiceBridge {
   /// * Otherwise return the top candidate anyway, so the availability check
   ///   downstream can report a precise, actionable
   ///   "Russian to Chinese is not installed" rather than a shrug.
-  @available(macOS 26, *)
+  @available(macOS 15, *)
   private static func fallbackSourceLanguage(
     for text: String,
     target: Locale.Language
@@ -416,7 +421,7 @@ final class SystemTranslationServiceBridge {
     guard let data = json.data(using: .utf8),
       let texts = try JSONSerialization.jsonObject(with: data) as? [String]
     else {
-      throw TranslationError.invalidDetectLanguagePayload
+      throw BridgeTranslationError.invalidDetectLanguagePayload
     }
     return texts
   }
@@ -433,9 +438,142 @@ final class SystemTranslationServiceBridge {
   }
 }
 
+// MARK: - SwiftUI translation task host
+
+/// Apple's public API can create a headless session only after both language
+/// packs are installed. First use must run through a SwiftUI
+/// `translationTask`, because that session is allowed to present the system
+/// download-consent sheet. This invisible view lives inside Flutter's one
+/// stable native host window, so LinguaRay stays tray-first and never creates a
+/// second app window just to prepare translation resources.
+@available(macOS 15, *)
+@MainActor
+private final class SystemTranslationTaskRunner: ObservableObject {
+  static let shared = SystemTranslationTaskRunner()
+
+  private struct Request {
+    let id = UUID()
+    let text: String
+    let source: Locale.Language
+    let target: Locale.Language
+    let continuation: CheckedContinuation<String, any Error>
+  }
+
+  @Published fileprivate var configuration: TranslationSession.Configuration?
+
+  private var hostingView: NSView?
+  private var pending: [Request] = []
+  private var activeRequestID: UUID?
+
+  func install(in hostView: NSView) {
+    guard hostingView == nil else { return }
+
+    let view = NSHostingView(rootView: SystemTranslationTaskHost(runner: self))
+    view.frame = NSRect(x: 0, y: 0, width: 1, height: 1)
+    view.alphaValue = 0
+    hostView.addSubview(view)
+    hostingView = view
+  }
+
+  func translate(
+    text: String,
+    source: Locale.Language,
+    target: Locale.Language
+  ) async throws -> String {
+    try await withCheckedThrowingContinuation { continuation in
+      pending.append(
+        Request(
+          text: text,
+          source: source,
+          target: target,
+          continuation: continuation
+        )
+      )
+      armNextConfigurationIfNeeded()
+    }
+  }
+
+  fileprivate func run(session: TranslationSession) async {
+    guard let activeConfiguration = configuration else { return }
+
+    do {
+      try await session.prepareTranslation()
+    } catch {
+      failPending(
+        source: activeConfiguration.source,
+        target: activeConfiguration.target,
+        error: error
+      )
+      finishConfiguration()
+      return
+    }
+
+    while let index = pending.firstIndex(where: {
+      $0.source == activeConfiguration.source && $0.target == activeConfiguration.target
+    }) {
+      let request = pending.remove(at: index)
+      activeRequestID = request.id
+      do {
+        let response = try await session.translate(request.text)
+        request.continuation.resume(returning: response.targetText)
+      } catch {
+        request.continuation.resume(throwing: error)
+      }
+      activeRequestID = nil
+    }
+
+    finishConfiguration()
+  }
+
+  private func failPending(
+    source: Locale.Language?,
+    target: Locale.Language?,
+    error: any Error
+  ) {
+    while let index = pending.firstIndex(where: {
+      $0.source == source && $0.target == target
+    }) {
+      pending.remove(at: index).continuation.resume(throwing: error)
+    }
+  }
+
+  private func armNextConfigurationIfNeeded() {
+    guard configuration == nil, activeRequestID == nil, let request = pending.first else {
+      return
+    }
+    var next = TranslationSession.Configuration(
+      source: request.source,
+      target: request.target
+    )
+    next.invalidate()
+    configuration = next
+  }
+
+  private func finishConfiguration() {
+    configuration = nil
+    Task { @MainActor [weak self] in
+      await Task.yield()
+      self?.armNextConfigurationIfNeeded()
+    }
+  }
+}
+
+@available(macOS 15, *)
+private struct SystemTranslationTaskHost: View {
+  @ObservedObject var runner: SystemTranslationTaskRunner
+
+  var body: some View {
+    Color.clear
+      .frame(width: 1, height: 1)
+      .translationTask(runner.configuration) { session in
+        await runner.run(session: session)
+      }
+  }
+}
+
 // MARK: - Local error
 
-private enum TranslationError: LocalizedError {
+private enum BridgeTranslationError: LocalizedError {
   case detectionFailed
   case invalidDetectLanguagePayload
   case serializationFailed
@@ -452,7 +590,7 @@ private enum TranslationError: LocalizedError {
     case .serializationFailed:
       return "Unable to serialize language detection response"
     case .translationUnavailable:
-      return "System translation requires macOS 26 or later"
+      return "System translation requires macOS 15 or later"
     case .languagePairNotInstalled(let source, let target):
       return
         "System translation language files are not installed for \(source) to \(target). Install the languages in System Settings > General > Language & Region > Translation Languages, then try again."

@@ -7611,6 +7611,7 @@ public enum ProviderType: Equatable, Hashable {
   case openAiCompatible
   case youdao
   case system
+  case ecdict
   case googleWeb
   case bingWeb
   case tencentTransmartWeb
@@ -7671,15 +7672,17 @@ public struct FfiConverterTypeProviderType: FfiConverterRustBuffer {
 
     case 19: return .system
 
-    case 20: return .googleWeb
+    case 20: return .ecdict
 
-    case 21: return .bingWeb
+    case 21: return .googleWeb
 
-    case 22: return .tencentTransmartWeb
+    case 22: return .bingWeb
 
-    case 23: return .libreTranslate
+    case 23: return .tencentTransmartWeb
 
-    case 24: return .mTranServer
+    case 24: return .libreTranslate
+
+    case 25: return .mTranServer
 
     default: throw UniffiInternalError.unexpectedEnumCase
     }
@@ -7745,20 +7748,23 @@ public struct FfiConverterTypeProviderType: FfiConverterRustBuffer {
     case .system:
       writeInt(&buf, Int32(19))
 
-    case .googleWeb:
+    case .ecdict:
       writeInt(&buf, Int32(20))
 
-    case .bingWeb:
+    case .googleWeb:
       writeInt(&buf, Int32(21))
 
-    case .tencentTransmartWeb:
+    case .bingWeb:
       writeInt(&buf, Int32(22))
 
-    case .libreTranslate:
+    case .tencentTransmartWeb:
       writeInt(&buf, Int32(23))
 
-    case .mTranServer:
+    case .libreTranslate:
       writeInt(&buf, Int32(24))
+
+    case .mTranServer:
+      writeInt(&buf, Int32(25))
 
     }
   }

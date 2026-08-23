@@ -134,6 +134,7 @@ String catalogDescription(ProviderTypeOption option) {
   final catalog = t.settings.providers.catalog;
   return switch (option.id) {
     'system' => catalog.system,
+    'ecdict' => catalog.ecdict,
     'google-web' => catalog.google_web,
     'bing-web' => catalog.bing_web,
     'tencent-transmart-web' => catalog.tencent_transmart_web,
