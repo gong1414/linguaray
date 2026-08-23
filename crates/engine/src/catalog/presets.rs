@@ -1,6 +1,6 @@
 use super::models::{
     field, AuthScheme, NetworkPolicy, ProviderCategory, ProviderPreset, Stability, BOTH_DESKTOPS,
-    DICTIONARY_ONLY, LLM_TRANSLATION, MACOS_ONLY, SYSTEM_CAPABILITIES, TRANSLATION_ONLY,
+    DICTIONARY_ONLY, LLM_TRANSLATION, SYSTEM_CAPABILITIES, TRANSLATION_ONLY,
 };
 use crate::engine::ProviderType;
 
@@ -108,7 +108,7 @@ pub const PRESETS: &[ProviderPreset] = &[
         fields: &[],
         capabilities: SYSTEM_CAPABILITIES,
         auth_scheme: AuthScheme::None,
-        supported_platforms: MACOS_ONLY,
+        supported_platforms: BOTH_DESKTOPS,
         network_policy: NetworkPolicy::LocalOnly,
         stability: Stability::Stable,
     },

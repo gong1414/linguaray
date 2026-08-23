@@ -425,6 +425,7 @@ pub fn apply_catalog_seed_for(settings: &mut Settings, macos: bool) -> bool {
         }
         settings.general.default_translation_service = seed.default_translation_service;
         settings.general.default_directory_service = seed.default_dictionary_service;
+        settings.general.default_ocr_service = seed.default_ocr_service;
         settings.general.translation_service_order = seed.translation_service_order;
     }
 
@@ -447,6 +448,32 @@ pub fn apply_catalog_seed_for(settings: &mut Settings, macos: bool) -> bool {
             });
         if settings.general.default_directory_service.is_empty() {
             settings.general.default_directory_service = "ecdict+dictionary".to_owned();
+        }
+    }
+
+    // Revision 3 exposes the existing Windows system OCR implementation.
+    // macOS already had the system provider; do not recreate it there after
+    // an explicit user deletion. Windows builds before revision 3 never
+    // seeded it, so adding it cannot override a prior Windows preference.
+    if settings.catalog_seed_revision < 3 {
+        if !macos {
+            let preset =
+                linguaray_engine::catalog::preset_by_id("system").expect("system catalog preset");
+            settings
+                .providers
+                .entry("system".to_owned())
+                .or_insert_with(|| ProviderConfigEntry {
+                    id: "system".to_owned(),
+                    r#type: preset.engine_type,
+                    fields: HashMap::new(),
+                    created_at: None,
+                    preset_id: Some(preset.id.to_owned()),
+                });
+        }
+        if settings.providers.contains_key("system")
+            && settings.general.default_ocr_service.is_empty()
+        {
+            settings.general.default_ocr_service = "system+ocr".to_owned();
         }
     }
 
@@ -1007,7 +1034,7 @@ mod tests {
     fn macos_seed_uses_google_web_and_keeps_system_available() {
         let mut settings = Settings::default();
         assert!(apply_catalog_seed_for(&mut settings, true));
-        assert_eq!(settings.catalog_seed_revision, 2);
+        assert_eq!(settings.catalog_seed_revision, 3);
         assert!(settings.providers.contains_key("ecdict"));
         assert!(settings.providers.contains_key("system"));
         assert!(settings.providers.contains_key("google-web"));
@@ -1023,6 +1050,7 @@ mod tests {
             settings.general.default_directory_service,
             "ecdict+dictionary"
         );
+        assert_eq!(settings.general.default_ocr_service, "system+ocr");
         assert_eq!(
             settings.services["google-web+translation"]
                 .fields
@@ -1046,10 +1074,11 @@ mod tests {
     }
 
     #[test]
-    fn windows_seed_skips_system_and_enables_google_web() {
+    fn windows_seed_keeps_system_ocr_and_enables_google_web() {
         let mut settings = Settings::default();
         assert!(apply_catalog_seed_for(&mut settings, false));
-        assert!(!settings.providers.contains_key("system"));
+        assert_eq!(settings.catalog_seed_revision, 3);
+        assert!(settings.providers.contains_key("system"));
         assert!(settings.providers.contains_key("ecdict"));
         assert_eq!(
             settings.general.default_translation_service,
@@ -1061,6 +1090,8 @@ mod tests {
                 .get("enabled"),
             Some(&"true".to_owned())
         );
+        assert_eq!(settings.general.default_ocr_service, "system+ocr");
+        assert!(!settings.services.contains_key("system+translation"));
         assert!(!settings.providers.contains_key("bing-web"));
     }
 
@@ -1079,7 +1110,7 @@ mod tests {
         );
         settings.general.default_translation_service = "deepl-main+translation".to_owned();
         assert!(apply_catalog_seed_for(&mut settings, true));
-        assert_eq!(settings.catalog_seed_revision, 2);
+        assert_eq!(settings.catalog_seed_revision, 3);
         assert_eq!(settings.providers.len(), 2);
         assert_eq!(
             settings.general.default_translation_service,
@@ -1108,7 +1139,7 @@ mod tests {
         settings.general.default_translation_service = "deepl-main+translation".to_owned();
 
         assert!(apply_catalog_seed_for(&mut settings, true));
-        assert_eq!(settings.catalog_seed_revision, 2);
+        assert_eq!(settings.catalog_seed_revision, 3);
         assert!(settings.providers.contains_key("ecdict"));
         assert_eq!(
             settings.general.default_translation_service,
@@ -1170,7 +1201,7 @@ mod tests {
     }
 
     #[test]
-    fn windows_seed_removes_the_previous_unsupported_system_default() {
+    fn windows_seed_reuses_the_previous_system_provider_for_ocr() {
         let mut settings = Settings::default();
         settings.providers.insert(
             "system".to_owned(),
@@ -1184,12 +1215,14 @@ mod tests {
         );
 
         assert!(apply_catalog_seed_for(&mut settings, false));
-        assert!(!settings.providers.contains_key("system"));
+        assert!(settings.providers.contains_key("system"));
         assert!(settings.providers.contains_key("google-web"));
         assert_eq!(
             settings.general.default_translation_service,
             "google-web+translation"
         );
+        assert_eq!(settings.general.default_ocr_service, "system+ocr");
+        assert!(!settings.services.contains_key("system+translation"));
     }
 
     #[test]

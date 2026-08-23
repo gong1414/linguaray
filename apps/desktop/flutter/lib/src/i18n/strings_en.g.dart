@@ -2751,9 +2751,9 @@ class TranslationsSettingsProvidersCatalogEn {
 
   // Translations
 
-  /// en: 'Uses the operating system translation, dictionary, and OCR on this Mac.'
+  /// en: 'Uses Apple translation and dictionary on macOS, plus built-in OCR on macOS and Windows.'
   String get system =>
-      'Uses the operating system translation, dictionary, and OCR on this Mac.';
+      'Uses Apple translation and dictionary on macOS, plus built-in OCR on macOS and Windows.';
 
   /// en: 'Built-in concise English-Chinese dictionary. Works offline with no API key.'
   String get ecdict =>
@@ -3945,7 +3945,7 @@ extension on Translations {
           'settings.providers.fields.default_model' => 'Model',
           'settings.providers.fields.base_url' => 'Base URL',
           'settings.providers.fields.models_url' => 'Models URL',
-          'settings.providers.catalog.system' => 'Uses the operating system translation, dictionary, and OCR on this Mac.',
+          'settings.providers.catalog.system' => 'Uses Apple translation and dictionary on macOS, plus built-in OCR on macOS and Windows.',
           'settings.providers.catalog.ecdict' => 'Built-in concise English-Chinese dictionary. Works offline with no API key.',
           'settings.providers.catalog.google_web' => 'Translates through Google Translate’s unofficial web interface. No API key. Experimental.',
           'settings.providers.catalog.bing_web' => 'Translates through Microsoft’s unofficial Edge translator interface. No API key. Experimental.',
