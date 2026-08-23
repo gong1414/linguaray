@@ -246,7 +246,7 @@ providers:
 }
 
 #[test]
-fn system_provider_advertises_dictionary() {
+fn system_provider_advertises_platform_capabilities() {
     let registry = from_yaml_str(
         r#"
 providers:
@@ -258,9 +258,19 @@ providers:
 
     let provider = registry.require("system").expect("system provider");
 
-    assert!(provider.translation().is_some());
     assert!(provider.ocr().is_some());
-    assert!(provider.dictionary().is_some());
+
+    #[cfg(target_os = "macos")]
+    {
+        assert!(provider.translation().is_some());
+        assert!(provider.dictionary().is_some());
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        assert!(provider.translation().is_none());
+        assert!(provider.dictionary().is_none());
+    }
 }
 
 #[cfg(not(feature = "baidu"))]
