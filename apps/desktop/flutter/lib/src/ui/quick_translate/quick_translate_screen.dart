@@ -189,9 +189,9 @@ class _QuickTranslateScreenState extends ConsumerState<QuickTranslateScreen>
       final toolbar = _renderHeight(_toolbarKey);
       final content = _renderHeight(_contentKey);
       final height = (toolbar + content + 24.0).clamp(180.0, 800.0);
-      final size = _window.size;
+      final size = _window.contentSize;
       if ((size.height - height).abs() < 1) return;
-      _window.setSize(size.width, height, animate: true);
+      _window.setContentSize(size.width, height);
     } catch (_) {}
   }
 
