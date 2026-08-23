@@ -112,6 +112,7 @@ final class ServicesSettingsLabels {
     required this.empty,
     required this.loading,
     required this.translation,
+    required this.dictionary,
     required this.ocr,
     required this.enabled,
     required this.makeDefault,
@@ -128,6 +129,7 @@ final class ServicesSettingsLabels {
   final String empty;
   final String loading;
   final String translation;
+  final String dictionary;
   final String ocr;
   final String enabled;
   final String makeDefault;

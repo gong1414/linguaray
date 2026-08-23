@@ -187,6 +187,7 @@ mod tests {
             ids,
             vec![
                 "system",
+                "ecdict",
                 "google-web",
                 "bing-web",
                 "tencent-transmart-web",
@@ -232,8 +233,10 @@ mod tests {
             .expect("presets array");
         assert_eq!(presets.len(), PRESETS.len());
         assert_eq!(presets[0]["id"], "system");
-        assert_eq!(presets[1]["network_policy"], "unofficialWeb");
-        assert_eq!(presets[1]["stability"], "experimental");
+        assert_eq!(presets[1]["network_policy"], "localOnly");
+        assert_eq!(presets[1]["stability"], "stable");
+        assert_eq!(presets[2]["network_policy"], "unofficialWeb");
+        assert_eq!(presets[2]["stability"], "experimental");
         let parsed: serde_json::Value = serde_json::from_str(&json.to_string()).expect("parse");
         assert_eq!(parsed["presets"].as_array().unwrap().len(), PRESETS.len());
     }

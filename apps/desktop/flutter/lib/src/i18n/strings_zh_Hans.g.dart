@@ -2394,6 +2394,8 @@ class _TranslationsSettingsProvidersCatalogZhHans
   @override
   String get system => '使用这台 Mac 的系统翻译、词典和 OCR。';
   @override
+  String get ecdict => '内置简明英汉词典，无需密钥，可离线使用。';
+  @override
   String get google_web => '通过 Google 翻译的非官方网页接口翻译。无需密钥。实验性。';
   @override
   String get bing_web => '通过微软 Edge 翻译的非官方网页接口翻译。无需密钥。实验性。';
@@ -3507,6 +3509,7 @@ extension on TranslationsZhHans {
           'settings.providers.fields.base_url' => 'Base URL',
           'settings.providers.fields.models_url' => 'Models URL',
           'settings.providers.catalog.system' => '使用这台 Mac 的系统翻译、词典和 OCR。',
+          'settings.providers.catalog.ecdict' => '内置简明英汉词典，无需密钥，可离线使用。',
           'settings.providers.catalog.google_web' =>
             '通过 Google 翻译的非官方网页接口翻译。无需密钥。实验性。',
           'settings.providers.catalog.bing_web' =>
@@ -3586,10 +3589,10 @@ extension on TranslationsZhHans {
           'settings.providers.detail.section.models' => '模型',
           'settings.providers.detail.models.loading' => '正在加载模型...',
           'settings.providers.detail.models.empty' => '未找到模型。',
-          'settings.providers.detail.models.retry' => '重试',
           _ => null,
         } ??
         switch (path) {
+          'settings.providers.detail.models.retry' => '重试',
           'settings.providers.detail.models.refresh' => '刷新列表',
           'settings.providers.detail.models.default_badge' => '默认',
           'settings.providers.detail.models.set_default' => '设为默认',

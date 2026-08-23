@@ -826,13 +826,14 @@ fn first_launch_seeds_catalog_once() {
         let value = serde_json::from_str::<serde_json::Value>(&json).expect("parse");
         assert_eq!(
             value.get("catalogSeedRevision").and_then(|v| v.as_u64()),
-            Some(1)
+            Some(2)
         );
         let providers = settings.list_providers().await.expect("providers");
         let ids: Vec<_> = providers
             .iter()
             .map(|provider| provider.id.as_str())
             .collect();
+        assert!(ids.contains(&"ecdict"));
         if cfg!(target_os = "macos") {
             assert!(ids.contains(&"system"));
             assert!(ids.contains(&"google-web"));
@@ -845,7 +846,11 @@ fn first_launch_seeds_catalog_once() {
             general.default_translation_service,
             "google-web+translation"
         );
+        assert_eq!(general.default_directory_service, "ecdict+dictionary");
         let services = settings.list_services().await.expect("services");
+        assert!(services
+            .iter()
+            .any(|service| service.id == "ecdict+dictionary"));
         let google = services
             .iter()
             .find(|service| service.id == "google-web+translation")
@@ -870,7 +875,7 @@ fn deleting_seeded_provider_does_not_recreate_it() {
         let providers = settings.list_providers().await.expect("providers");
         assert!(!providers.iter().any(|provider| provider.id == "google-web"));
         let json = settings.get_json().await.expect("json");
-        assert!(json.contains("\"catalogSeedRevision\": 1"));
+        assert!(json.contains("\"catalogSeedRevision\": 2"));
         assert!(!json.contains("google-web"));
     });
 }

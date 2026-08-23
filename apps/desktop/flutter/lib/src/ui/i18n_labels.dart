@@ -157,6 +157,7 @@ ServicesSettingsLabels servicesSettingsLabels() => ServicesSettingsLabels(
   empty: t.settings.providers.item.empty,
   loading: t.settings.providers.item.loading,
   translation: t.settings.providers.capability.translation,
+  dictionary: t.settings.providers.capability.dictionary,
   ocr: t.settings.providers.capability.ocr,
   enabled: t.settings.advanced.enable,
   makeDefault: t.settings.services.make_default,

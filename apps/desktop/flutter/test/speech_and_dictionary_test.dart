@@ -63,8 +63,8 @@ void main() {
             lookup: Future.value(
               const DictionaryEntry(
                 word: 'apple',
-                providerName: 'System Dictionary',
-                serviceId: 'system+dictionary',
+                providerName: 'ECDICT',
+                serviceId: 'ecdict+dictionary',
                 translations: ['苹果'],
                 pronunciations: [
                   DictionaryPronunciation(text: '/ˈæpəl/', accent: 'US'),

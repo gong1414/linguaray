@@ -104,6 +104,13 @@ pub const TRANSLATION_ONLY: ProviderCapabilities = ProviderCapabilities {
     llm: false,
 };
 
+pub const DICTIONARY_ONLY: ProviderCapabilities = ProviderCapabilities {
+    translation: false,
+    dictionary: true,
+    ocr: false,
+    llm: false,
+};
+
 pub const LLM_TRANSLATION: ProviderCapabilities = ProviderCapabilities {
     translation: true,
     dictionary: false,

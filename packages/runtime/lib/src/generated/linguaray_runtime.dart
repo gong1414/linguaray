@@ -5888,6 +5888,7 @@ enum ProviderType {
   openAiCompatible,
   youdao,
   system,
+  ecdict,
   googleWeb,
   bingWeb,
   tencentTransmartWeb,
@@ -5938,14 +5939,16 @@ class FfiConverterProviderType {
       case 19:
         return LiftRetVal(ProviderType.system, 4);
       case 20:
-        return LiftRetVal(ProviderType.googleWeb, 4);
+        return LiftRetVal(ProviderType.ecdict, 4);
       case 21:
-        return LiftRetVal(ProviderType.bingWeb, 4);
+        return LiftRetVal(ProviderType.googleWeb, 4);
       case 22:
-        return LiftRetVal(ProviderType.tencentTransmartWeb, 4);
+        return LiftRetVal(ProviderType.bingWeb, 4);
       case 23:
-        return LiftRetVal(ProviderType.libreTranslate, 4);
+        return LiftRetVal(ProviderType.tencentTransmartWeb, 4);
       case 24:
+        return LiftRetVal(ProviderType.libreTranslate, 4);
+      case 25:
         return LiftRetVal(ProviderType.mTranServer, 4);
       default:
         throw UniffiInternalError(

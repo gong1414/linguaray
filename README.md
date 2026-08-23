@@ -50,7 +50,7 @@ tray menu and global shortcuts; Preferences is the only persistent window.
 | Global shortcuts, tray access, and window placement | Implemented |
 | Provider configuration and secure credential storage | Implemented |
 | Translation history, favourites, glossaries, and vocabulary | Implemented |
-| Dictionary lookup and text-to-speech | Implemented where the selected service or OS supports them |
+| Dictionary lookup and text-to-speech | Offline ECDICT is built in; Apple system translation and platform speech are available on supported macOS versions |
 | Configurable input behaviour and common-language ordering | Implemented |
 | Local API integration and verified update checks | Implemented |
 | macOS and Windows desktop builds | Built and exercised by CI |
@@ -167,3 +167,5 @@ Please report vulnerabilities privately by following
 ## License
 
 LinguaRay is available under the [MIT License](LICENSE).
+Bundled data and dependencies are documented in
+[Third-party notices](THIRD_PARTY_NOTICES.md).

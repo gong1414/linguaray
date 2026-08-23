@@ -42,6 +42,9 @@ class ServicesSettingsView extends StatelessWidget {
     final visible = services
         .where((service) => service.kind == serviceKind)
         .toList();
+    final dictionaries = serviceKind == 'translation'
+        ? services.where((service) => service.kind == 'dictionary').toList()
+        : const <ServiceRecord>[];
     final cardColor = theme.colorScheme.surfaceContainerLowest;
     final cardShape = RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(12),
@@ -150,6 +153,36 @@ class ServicesSettingsView extends StatelessWidget {
                     ),
                   ),
           ),
+        if (!loading && dictionaries.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          Text(
+            labels.dictionary,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Material(
+            color: cardColor,
+            shape: cardShape,
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              children: [
+                for (final (index, service) in dictionaries.indexed) ...[
+                  if (index > 0) const Divider(height: 1, indent: 12),
+                  _ServiceTile(
+                    key: ValueKey(service.id),
+                    labels: labels,
+                    service: service,
+                    onEnabledChanged: onEnabledChanged,
+                    onMakeDefault: onMakeDefault,
+                    onDelete: onDelete,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -175,8 +208,16 @@ class _ServiceTile extends StatelessWidget {
 
   String get _displayName {
     final name = service.name.trim();
-    if (name.isEmpty || name == service.id || name.contains('+')) {
-      return service.providerName;
+    if (name.isEmpty ||
+        name == service.id ||
+        name == service.providerId ||
+        name.contains('+')) {
+      final kind = switch (service.kind) {
+        'dictionary' => labels.dictionary,
+        'ocr' => labels.ocr,
+        _ => labels.translation,
+      };
+      return '${service.providerName} $kind';
     }
     return name;
   }
@@ -224,7 +265,7 @@ class _ServiceTile extends StatelessWidget {
               onPressed: () => onMakeDefault(service.id),
               icon: const Icon(Icons.star_outline_rounded, size: 19),
             ),
-          if (onDelete != null)
+          if (onDelete != null && !service.synthesized)
             IconButton(
               tooltip: labels.delete,
               onPressed: () => onDelete!(service.id),

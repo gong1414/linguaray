@@ -1,6 +1,6 @@
 use super::models::{
     field, AuthScheme, NetworkPolicy, ProviderCategory, ProviderPreset, Stability, BOTH_DESKTOPS,
-    LLM_TRANSLATION, MACOS_ONLY, SYSTEM_CAPABILITIES, TRANSLATION_ONLY,
+    DICTIONARY_ONLY, LLM_TRANSLATION, MACOS_ONLY, SYSTEM_CAPABILITIES, TRANSLATION_ONLY,
 };
 use crate::engine::ProviderType;
 
@@ -109,6 +109,24 @@ pub const PRESETS: &[ProviderPreset] = &[
         capabilities: SYSTEM_CAPABILITIES,
         auth_scheme: AuthScheme::None,
         supported_platforms: MACOS_ONLY,
+        network_policy: NetworkPolicy::LocalOnly,
+        stability: Stability::Stable,
+    },
+    ProviderPreset {
+        id: "ecdict",
+        engine_type: ProviderType::Ecdict,
+        protocol: "ecdict",
+        category: ProviderCategory::BuiltIn,
+        name: "ECDICT",
+        description_key: "settings.providers.catalog.ecdict",
+        homepage_url: Some("https://github.com/skywind3000/ECDICT"),
+        api_key_url: None,
+        base_url: "",
+        models_url: "",
+        fields: &[],
+        capabilities: DICTIONARY_ONLY,
+        auth_scheme: AuthScheme::None,
+        supported_platforms: BOTH_DESKTOPS,
         network_policy: NetworkPolicy::LocalOnly,
         stability: Stability::Stable,
     },

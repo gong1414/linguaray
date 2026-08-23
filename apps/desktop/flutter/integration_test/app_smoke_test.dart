@@ -12,11 +12,16 @@ import 'package:linguaray_desktop/src/platform/permission_controller.dart';
 import 'package:linguaray_desktop/src/platform/platform_types.dart';
 import 'package:linguaray_desktop/src/platform/trigger_controller.dart';
 import 'package:linguaray_desktop/src/services/app_windows.dart';
+import 'package:linguaray_desktop/src/services/runtime.dart';
 import 'package:linguaray_desktop/src/services/shortcut_service/shortcut_service.dart';
 import 'package:linguaray_desktop/src/ui/quick_translate/quick_translate_screen.dart';
 import 'package:linguaray_desktop/src/ui/settings/library_settings_screens.dart';
 import 'package:linguaray_desktop/src/ui/settings/settings_screens.dart';
 import 'package:linguaray_desktop/src/ui/settings/settings_shell_view.dart';
+
+const _testSystemServices = bool.fromEnvironment(
+  'LINGUARAY_SYSTEM_SERVICES_SMOKE',
+);
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -82,22 +87,54 @@ void main() {
     }
     debugPrint('[smoke] speech completed');
 
+    final builtInServices = await runtime.settings().listServices();
+    expect(
+      builtInServices.map((service) => service.id),
+      contains('ecdict+dictionary'),
+    );
+
+    final dictionary = providerContainer.read(dictionaryRepositoryProvider);
+    final services = await dictionary.listCompatibleServiceIds();
+    debugPrint('[smoke] dictionary catalog loaded');
+    expect(services, contains('ecdict+dictionary'));
+    final entry = await dictionary.lookup(
+      const DictionaryLookupQuery(
+        word: 'apple',
+        sourceLanguage: 'en',
+        targetLanguage: 'zh-Hans',
+        serviceId: 'ecdict+dictionary',
+      ),
+    );
+    debugPrint('[smoke] built-in ECDICT lookup completed');
+    expect(entry.word.toLowerCase(), 'apple');
+    expect(entry.providerName, 'ECDICT');
+    expect(entry.isEmpty, isFalse);
+    expect(entry.translations.join('\n'), contains('苹果'));
+
     if (Platform.isMacOS) {
-      final dictionary = providerContainer.read(dictionaryRepositoryProvider);
-      final services = await dictionary.listCompatibleServiceIds();
-      debugPrint('[smoke] dictionary catalog loaded');
-      expect(services, contains('system+dictionary'));
-      final entry = await dictionary.lookup(
-        const DictionaryLookupQuery(
-          word: 'apple',
-          sourceLanguage: 'en',
-          targetLanguage: 'zh-Hans',
-          serviceId: 'system+dictionary',
-        ),
+      expect(
+        builtInServices.map((service) => service.id),
+        containsAll(['system+translation', 'system+dictionary']),
       );
-      debugPrint('[smoke] dictionary lookup completed');
-      expect(entry.word.toLowerCase(), 'apple');
-      expect(entry.isEmpty, isFalse);
+
+      if (_testSystemServices) {
+        final response = await runtime
+            .translation(providerId: 'system+translation')
+            .translate(
+              request: TranslateRequest(
+                sourceLanguage: 'en',
+                targetLanguage: 'zh-Hans',
+                text: 'Hello, this is a LinguaRay system translation test.',
+              ),
+            )
+            .timeout(const Duration(seconds: 125));
+        expect(response.translations, isNotEmpty);
+        expect(response.translations.first.text.trim(), isNotEmpty);
+        debugPrint(
+          '[smoke] system translation completed: '
+          '${response.translations.first.text}',
+        );
+      }
     }
 
     final showQuickWindow = triggerController.trigger(

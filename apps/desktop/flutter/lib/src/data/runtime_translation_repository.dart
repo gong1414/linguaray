@@ -188,6 +188,7 @@ final class RuntimeTranslationRepository implements TranslationRepository {
       ProviderType.deepL ||
       ProviderType.google ||
       ProviderType.system ||
+      ProviderType.ecdict ||
       ProviderType.tencent ||
       ProviderType.youdao ||
       ProviderType.googleWeb ||

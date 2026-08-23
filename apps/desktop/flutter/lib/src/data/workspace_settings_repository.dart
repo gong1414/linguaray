@@ -228,7 +228,11 @@ final class RuntimeWorkspaceSettingsRepository
 
   @override
   Future<List<ServiceRecord>> listServices() async {
-    await Future.wait([_store.reloadServices(), _store.reloadProviders()]);
+    await Future.wait([
+      _store.reloadGeneral(),
+      _store.reloadServices(),
+      _store.reloadProviders(),
+    ]);
     final providers = {for (final item in _store.providers) item.id: item};
     final defaultTranslation = _store.defaultTranslationService;
     final defaultOcr = _store.defaultOcrService;

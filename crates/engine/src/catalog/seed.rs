@@ -2,7 +2,7 @@ use crate::engine::ProviderType;
 
 use super::presets::preset_by_id;
 
-pub const CATALOG_SEED_REVISION: u32 = 1;
+pub const CATALOG_SEED_REVISION: u32 = 2;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SeedProvider {
@@ -24,6 +24,7 @@ pub struct CatalogSeed {
     pub providers: Vec<SeedProvider>,
     pub services: Vec<SeedService>,
     pub default_translation_service: String,
+    pub default_dictionary_service: String,
     pub translation_service_order: Vec<String>,
 }
 
@@ -33,6 +34,13 @@ pub fn default_seed(macos: bool) -> CatalogSeed {
     let mut providers = Vec::new();
     let mut services = Vec::new();
     let mut order = Vec::new();
+
+    let ecdict = preset_by_id("ecdict").expect("ecdict preset");
+    providers.push(SeedProvider {
+        id: "ecdict".to_owned(),
+        provider_type: ecdict.engine_type,
+        preset_id: ecdict.id.to_owned(),
+    });
 
     if macos {
         let system = preset_by_id("system").expect("system preset");
@@ -65,12 +73,14 @@ pub fn default_seed(macos: bool) -> CatalogSeed {
     }
 
     let default_translation_service = "google-web+translation".to_owned();
+    let default_dictionary_service = "ecdict+dictionary".to_owned();
 
     CatalogSeed {
         revision: CATALOG_SEED_REVISION,
         providers,
         services,
         default_translation_service,
+        default_dictionary_service,
         translation_service_order: order,
     }
 }
@@ -86,14 +96,15 @@ mod tests {
     #[test]
     fn macos_seed_uses_google_web_and_keeps_system_available() {
         let seed = default_seed(true);
-        assert_eq!(seed.revision, 1);
+        assert_eq!(seed.revision, 2);
         assert_eq!(
             seed.providers
                 .iter()
                 .map(|provider| provider.id.as_str())
                 .collect::<Vec<_>>(),
-            vec!["system", "google-web"]
+            vec!["ecdict", "system", "google-web"]
         );
+        assert_eq!(seed.default_dictionary_service, "ecdict+dictionary");
         assert_eq!(seed.default_translation_service, "google-web+translation");
         let google = seed
             .services
@@ -131,6 +142,11 @@ mod tests {
             .providers
             .iter()
             .any(|provider| provider.id == "system"));
+        assert!(seed
+            .providers
+            .iter()
+            .any(|provider| provider.id == "ecdict"));
+        assert_eq!(seed.default_dictionary_service, "ecdict+dictionary");
         assert_eq!(seed.default_translation_service, "google-web+translation");
         let google = seed
             .services
