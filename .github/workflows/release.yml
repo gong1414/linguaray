@@ -61,7 +61,7 @@ jobs:
             echo "macOS signing secrets are not configured; packaging an unsigned development artifact."
             mkdir -p dist
             ditto -c -k --sequesterRsrc --keepParent "$APP" dist/LinguaRay-macos-unsigned.zip
-            shasum -a 256 dist/LinguaRay-macos-unsigned.zip > dist/SHA256SUMS-macos.txt
+            (cd dist && shasum -a 256 LinguaRay-macos-unsigned.zip > SHA256SUMS-macos.txt)
             exit 0
           fi
           CERT_PATH="$(mktemp).p12"
@@ -81,7 +81,7 @@ jobs:
           fi
           mkdir -p dist
           ditto -c -k --sequesterRsrc --keepParent "$APP" dist/LinguaRay-macos.zip
-          shasum -a 256 dist/LinguaRay-macos.zip > dist/SHA256SUMS-macos.txt
+          (cd dist && shasum -a 256 LinguaRay-macos.zip > SHA256SUMS-macos.txt)
           rm -f "$CERT_PATH"
       - name: Package Windows build
         if: runner.os == 'Windows'
@@ -103,10 +103,16 @@ jobs:
             Write-Host "Windows Authenticode secrets are not configured; packaging an unsigned development artifact."
             Compress-Archive -Path "$payload\*" -DestinationPath dist/LinguaRay-windows-x64-unsigned.zip
           }
-          Get-ChildItem dist/*.zip | ForEach-Object {
+          $lines = @(Get-ChildItem dist/*.zip | ForEach-Object {
             $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
-            "$hash  $($_.Name)" | Add-Content dist/SHA256SUMS-windows.txt
-          }
+            "$hash  $($_.Name)"
+          })
+          $checksumPath = Join-Path (Get-Location) "dist/SHA256SUMS-windows.txt"
+          [IO.File]::WriteAllText(
+            $checksumPath,
+            ($lines -join "`n") + "`n",
+            [Text.UTF8Encoding]::new($false)
+          )
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: release-${{ matrix.device }}
