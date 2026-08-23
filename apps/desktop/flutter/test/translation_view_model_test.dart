@@ -2,7 +2,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:linguaray_application/linguaray_application.dart';
 import 'package:linguaray_desktop/src/config/dependencies.dart';
-import 'package:linguaray_desktop/src/ui/quick_translate/view_models/quick_translate_view_model.dart';
 import 'package:linguaray_desktop/src/ui/translation/view_models/translation_view_model.dart';
 
 void main() {
@@ -69,7 +68,7 @@ void main() {
     expect(state.selectedResult?.status, TranslationResultStatus.completed);
   });
 
-  test('separate workbench requests keep separate history rows', () async {
+  test('separate translation requests keep separate history rows', () async {
     final history = _FakeHistoryRepository();
     final container = ProviderContainer(
       overrides: [
@@ -109,20 +108,21 @@ void main() {
           _FakeTranslationRepository(),
         ),
         historyRepositoryProvider.overrideWithValue(history),
+        glossaryRepositoryProvider.overrideWithValue(_FakeGlossaryRepository()),
       ],
     );
     addTearDown(container.dispose);
     final subscription = container.listen(
-      quickTranslateViewModelProvider,
+      translationViewModelProvider,
       (_, _) {},
       fireImmediately: true,
     );
     addTearDown(subscription.close);
     await _waitFor(
-      () => !container.read(quickTranslateViewModelProvider).loadingCatalog,
+      () => !container.read(translationViewModelProvider).loadingCatalog,
     );
 
-    final viewModel = container.read(quickTranslateViewModelProvider.notifier);
+    final viewModel = container.read(translationViewModelProvider.notifier);
     viewModel.setSourceText('Hello');
     await viewModel.submit();
     await _waitFor(() => history.entries.length == 1);

@@ -177,6 +177,8 @@ class TranslationsSettingsEn {
   /// en: 'v{} (Build {})'
   String get version => 'v{} (Build {})';
 
+  late final TranslationsSettingsNavigationEn navigation =
+      TranslationsSettingsNavigationEn.internal(_root);
   late final TranslationsSettingsGeneralEn general =
       TranslationsSettingsGeneralEn.internal(_root);
   late final TranslationsSettingsAppearanceEn appearance =
@@ -1131,6 +1133,45 @@ class TranslationsWorkbenchStatusEn {
   String get shortcuts => '⌥Space Quick window · ⌥⇧2 Capture';
 }
 
+// Path: settings.navigation
+class TranslationsSettingsNavigationEn {
+  TranslationsSettingsNavigationEn.internal(this._root);
+
+  final Translations _root; // ignore: unused_field
+
+  // Translations
+
+  /// en: 'Translation'
+  String get translation_group => 'Translation';
+
+  /// en: 'Translation Settings'
+  String get translation_settings => 'Translation Settings';
+
+  /// en: 'Services'
+  String get translation_services => 'Services';
+
+  /// en: 'Favorites'
+  String get favorites => 'Favorites';
+
+  /// en: 'History'
+  String get history => 'History';
+
+  /// en: 'OCR'
+  String get ocr_group => 'OCR';
+
+  /// en: 'OCR Settings'
+  String get ocr_settings => 'OCR Settings';
+
+  /// en: 'Services'
+  String get ocr_services => 'Services';
+
+  /// en: 'General'
+  String get general_group => 'General';
+
+  /// en: 'General Settings'
+  String get general_settings => 'General Settings';
+}
+
 // Path: settings.general
 class TranslationsSettingsGeneralEn {
   TranslationsSettingsGeneralEn.internal(this._root);
@@ -1187,6 +1228,8 @@ class TranslationsSettingsShortcutsEn {
       TranslationsSettingsShortcutsSectionEn.internal(_root);
   late final TranslationsSettingsShortcutsRowEn row =
       TranslationsSettingsShortcutsRowEn.internal(_root);
+  late final TranslationsSettingsShortcutsDescriptionEn description =
+      TranslationsSettingsShortcutsDescriptionEn.internal(_root);
   late final TranslationsSettingsShortcutsResetDialogEn reset_dialog =
       TranslationsSettingsShortcutsResetDialogEn.internal(_root);
   late final TranslationsSettingsShortcutsGroupEn group =
@@ -1995,6 +2038,30 @@ class TranslationsAppTrayContextMenuEn {
   /// en: 'Show Window'
   String get show_window => 'Show Window';
 
+  /// en: 'Selection Translation'
+  String get selection_translation => 'Selection Translation';
+
+  /// en: 'Screenshot Translation'
+  String get capture_translation => 'Screenshot Translation';
+
+  /// en: 'Input Translation'
+  String get input_translation => 'Input Translation';
+
+  /// en: 'Clipboard Translation'
+  String get clipboard_translation => 'Clipboard Translation';
+
+  /// en: 'Show Translation Window'
+  String get show_translation_window => 'Show Translation Window';
+
+  /// en: 'Screenshot OCR'
+  String get capture_ocr => 'Screenshot OCR';
+
+  /// en: 'Preferences...'
+  String get preferences => 'Preferences...';
+
+  /// en: 'About LinguaRay'
+  String get about => 'About LinguaRay';
+
   late final TranslationsAppTrayContextMenuDevToolsEn dev_tools =
       TranslationsAppTrayContextMenuDevToolsEn.internal(_root);
 
@@ -2390,22 +2457,54 @@ class TranslationsSettingsShortcutsRowEn {
 
   // Translations
 
-  /// en: 'Show/Hide Window'
-  String get toggle_mini_translator => 'Show/Hide Window';
+  /// en: 'Show Translation Window'
+  String get toggle_mini_translator => 'Show Translation Window';
 
-  /// en: 'Extract text from screen selection'
-  String get extract_text_from_screen_selection =>
-      'Extract text from screen selection';
+  /// en: 'Selection Translation'
+  String get extract_text_from_screen_selection => 'Selection Translation';
 
-  /// en: 'Extract text from screen capture'
-  String get extract_text_from_screen_capture =>
-      'Extract text from screen capture';
+  /// en: 'Screenshot Translation'
+  String get extract_text_from_screen_capture => 'Screenshot Translation';
 
-  /// en: 'Extract text from clipboard'
-  String get extract_text_from_clipboard => 'Extract text from clipboard';
+  /// en: 'Screenshot OCR'
+  String get capture_ocr => 'Screenshot OCR';
 
-  /// en: 'Translate input content'
-  String get translate_input => 'Translate input content';
+  /// en: 'Clipboard Translation'
+  String get extract_text_from_clipboard => 'Clipboard Translation';
+
+  /// en: 'Input Translation'
+  String get translate_input => 'Input Translation';
+}
+
+// Path: settings.shortcuts.description
+class TranslationsSettingsShortcutsDescriptionEn {
+  TranslationsSettingsShortcutsDescriptionEn.internal(this._root);
+
+  final Translations _root; // ignore: unused_field
+
+  // Translations
+
+  /// en: 'Show the translation window without clearing its previous content.'
+  String get toggle_mini_translator =>
+      'Show the translation window without clearing its previous content.';
+
+  /// en: 'Translate selected text from any app.'
+  String get selection => 'Translate selected text from any app.';
+
+  /// en: 'Clear the translation window and open it for manual input.'
+  String get input =>
+      'Clear the translation window and open it for manual input.';
+
+  /// en: 'Select a screen region, recognize its text, and translate it.'
+  String get capture =>
+      'Select a screen region, recognize its text, and translate it.';
+
+  /// en: 'Select a screen region and show only the recognized text.'
+  String get capture_ocr =>
+      'Select a screen region and show only the recognized text.';
+
+  /// en: 'Translate text currently stored in the clipboard.'
+  String get clipboard => 'Translate text currently stored in the clipboard.';
 }
 
 // Path: settings.shortcuts.reset_dialog
@@ -2453,6 +2552,9 @@ class TranslationsSettingsServicesButtonEn {
 
   /// en: 'Add Service...'
   String get add_service => 'Add Service...';
+
+  /// en: 'Manage Providers...'
+  String get manage_providers => 'Manage Providers...';
 }
 
 // Path: settings.services.section
@@ -3318,6 +3420,18 @@ extension on Translations {
           'common.provider.tencent' => 'Tencent',
           'common.provider.youdao' => 'Youda',
           'app.tray.context_menu.show_window' => 'Show Window',
+          'app.tray.context_menu.selection_translation' =>
+            'Selection Translation',
+          'app.tray.context_menu.capture_translation' =>
+            'Screenshot Translation',
+          'app.tray.context_menu.input_translation' => 'Input Translation',
+          'app.tray.context_menu.clipboard_translation' =>
+            'Clipboard Translation',
+          'app.tray.context_menu.show_translation_window' =>
+            'Show Translation Window',
+          'app.tray.context_menu.capture_ocr' => 'Screenshot OCR',
+          'app.tray.context_menu.preferences' => 'Preferences...',
+          'app.tray.context_menu.about' => 'About LinguaRay',
           'app.tray.context_menu.dev_tools.title' => 'Dev Tools',
           'app.tray.context_menu.dev_tools.open_data_directory' =>
             'Open Data Directory',
@@ -3612,6 +3726,16 @@ extension on Translations {
           'workbench.version_checking' => 'Checking…',
           'workbench.check_updates' => 'Check for updates',
           'settings.version' => 'v{} (Build {})',
+          'settings.navigation.translation_group' => 'Translation',
+          'settings.navigation.translation_settings' => 'Translation Settings',
+          'settings.navigation.translation_services' => 'Services',
+          'settings.navigation.favorites' => 'Favorites',
+          'settings.navigation.history' => 'History',
+          'settings.navigation.ocr_group' => 'OCR',
+          'settings.navigation.ocr_settings' => 'OCR Settings',
+          'settings.navigation.ocr_services' => 'Services',
+          'settings.navigation.general_group' => 'General',
+          'settings.navigation.general_settings' => 'General Settings',
           'settings.general.title' => 'General',
           'settings.general.section.permissions' => 'System Permissions',
           'settings.general.section.ocr' => 'Text Recognition',
@@ -3702,14 +3826,27 @@ extension on Translations {
           'settings.shortcuts.section.text_extraction' => 'Text Extraction',
           'settings.shortcuts.section.input_assist' => 'Input Assist Function',
           'settings.shortcuts.section.submit_mode' => 'Submit With',
-          'settings.shortcuts.row.toggle_mini_translator' => 'Show/Hide Window',
+          'settings.shortcuts.row.toggle_mini_translator' =>
+            'Show Translation Window',
           'settings.shortcuts.row.extract_text_from_screen_selection' =>
-            'Extract text from screen selection',
+            'Selection Translation',
           'settings.shortcuts.row.extract_text_from_screen_capture' =>
-            'Extract text from screen capture',
+            'Screenshot Translation',
+          'settings.shortcuts.row.capture_ocr' => 'Screenshot OCR',
           'settings.shortcuts.row.extract_text_from_clipboard' =>
-            'Extract text from clipboard',
-          'settings.shortcuts.row.translate_input' => 'Translate input content',
+            'Clipboard Translation',
+          'settings.shortcuts.row.translate_input' => 'Input Translation',
+          'settings.shortcuts.description.toggle_mini_translator' => 'Show the translation window without clearing its previous content.',
+          'settings.shortcuts.description.selection' =>
+            'Translate selected text from any app.',
+          'settings.shortcuts.description.input' =>
+            'Clear the translation window and open it for manual input.',
+          'settings.shortcuts.description.capture' =>
+            'Select a screen region, recognize its text, and translate it.',
+          'settings.shortcuts.description.capture_ocr' =>
+            'Select a screen region and show only the recognized text.',
+          'settings.shortcuts.description.clipboard' =>
+            'Translate text currently stored in the clipboard.',
           'settings.shortcuts.reset_dialog.title' => 'Reset Shortcuts',
           'settings.shortcuts.reset_dialog.message' => 'Are you sure you want to reset all shortcuts to their default values?',
           'settings.shortcuts.reset_dialog.confirm' => 'Reset',
@@ -3736,6 +3873,7 @@ extension on Translations {
           'settings.advanced.disabled' => 'Disabled',
           'settings.services.title' => 'Services',
           'settings.services.button.add_service' => 'Add Service...',
+          'settings.services.button.manage_providers' => 'Manage Providers...',
           'settings.services.section.available_services' =>
             'Available Services',
           'settings.services.editor.title' => 'Add Service',
@@ -3900,6 +4038,9 @@ extension on Translations {
           'settings.providers.detail.models.loading' => 'Loading models...',
           'settings.providers.detail.models.empty' => 'No models found.',
           'settings.providers.detail.models.retry' => 'Retry',
+          _ => null,
+        } ??
+        switch (path) {
           'settings.providers.detail.models.refresh' => 'Refresh List',
           'settings.providers.detail.models.default_badge' => 'Default',
           'settings.providers.detail.models.set_default' => 'Set as Default',
@@ -3934,9 +4075,6 @@ extension on Translations {
           'settings.about.up_to_date' => 'You\'re up to date.',
           'settings.about.check_again' => 'Check Again',
           'settings.about.links' => 'Links',
-          _ => null,
-        } ??
-        switch (path) {
           'settings.about.website' => 'Website',
           'settings.about.github' => 'GitHub',
           'settings.about.report_issue' => 'Report an Issue',

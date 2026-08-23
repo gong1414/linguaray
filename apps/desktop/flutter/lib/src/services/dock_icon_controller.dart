@@ -9,7 +9,7 @@ import 'mac_app_presentation.dart';
 /// LinguaRay ships as a menu bar app (`LSUIElement` in Info.plist), so it
 /// launches without either. Two situations promote it to a regular app:
 ///
-///   * **the workbench window is on screen** — it needs a Dock icon to be
+///   * **the settings window is on screen** — it needs a Dock icon to be
 ///     reachable through ⌘-Tab, Mission Control and the Dock, and it needs the
 ///     menu bar for ⌘, ⌘W and ⌘Q;
 ///   * **the tray icon is turned off** — otherwise the app would have no
@@ -29,25 +29,20 @@ class DockIconController {
 
   static final DockIconController instance = DockIconController._();
 
-  /// Seeded to the state the app actually launches in: `RootView` opens the
-  /// workbench on startup, and Info.plist deliberately omits `LSUIElement` so
-  /// the process begins as `regular`. Starting from `false` here would make the
-  /// first update demote and then immediately re-promote, which is the race
-  /// that used to leave the launch window under another app's menu bar.
-  bool _isWorkbenchWindowVisible = true;
+  /// LinguaRay launches as a menu-bar accessory with no visible window.
+  bool _isSettingsWindowVisible = false;
   bool _isTrayIconVisible = true;
 
   /// Last value pushed to AppKit, so repeated state changes that do not move
-  /// the outcome never touch the activation policy. Seeded to match the launch
-  /// policy for the same reason.
-  bool? _appliedDockIconVisible = true;
+  /// the outcome never touch the activation policy. Seeded to match LSUIElement.
+  bool? _appliedDockIconVisible = false;
 
   bool get shouldShowDockIcon =>
-      _isWorkbenchWindowVisible || !_isTrayIconVisible;
+      _isSettingsWindowVisible || !_isTrayIconVisible;
 
-  void setWorkbenchWindowVisible(bool value) {
-    if (_isWorkbenchWindowVisible == value) return;
-    _isWorkbenchWindowVisible = value;
+  void setSettingsWindowVisible(bool value) {
+    if (_isSettingsWindowVisible == value) return;
+    _isSettingsWindowVisible = value;
     _apply();
   }
 

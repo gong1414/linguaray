@@ -38,9 +38,16 @@ dependency direction:
 view → view model → use case → port ← runtime/platform adapter
 ```
 
-The quick translator is a dynamically sized utility window. The workbench is
-the persistent surface for input translation and settings. Startup guidance is
-a route inside the workbench rather than a separate native onboarding window.
+LinguaRay launches with no visible window. The native tray menu and global
+shortcuts are the primary entry points. The quick translator is a dynamically
+sized utility surface that is mounted only for translation actions; Preferences
+is the only persistent window. There is no main workbench, chat home, or
+separate onboarding window.
+
+Settings expose translation/OCR shortcuts and services, history, favourites,
+glossaries, vocabulary, permissions, update checks, and local API integration.
+The quick translator consumes those capabilities through controllers and
+application ports; it does not own provider or persistence logic.
 
 ### Design system
 
@@ -69,7 +76,8 @@ binding paths observe the same state.
 
 ## Data flow
 
-1. A shortcut, tray action, or view produces a typed user intent.
+1. A shortcut, tray action, or settings/quick-translation view produces a typed
+   user intent.
 2. A Riverpod view model invokes an application use case.
 3. The use case coordinates one or more abstract ports using pure models.
 4. A desktop adapter maps those requests to the Rust runtime or a platform

@@ -2,7 +2,7 @@
 ///
 /// LinguaRay intentionally stays on Flutter stable rather than relying on the
 /// experimental multi-window API from the main channel, so the
-/// workbench and quick translator are mutually-exclusive Flutter surfaces in
+/// settings and quick translator are mutually-exclusive Flutter surfaces in
 /// one native host window. `nativeapi` owns all native sizing, positioning,
 /// focus, tray and display behavior.
 library;
@@ -11,37 +11,34 @@ import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 import 'package:nativeapi/nativeapi.dart';
 
-import '../platform/onboarding_controller.dart';
 import '../utils/platform_util.dart';
 import 'dock_icon_controller.dart';
 
-const kWorkbenchWindowTitle = 'LinguaRay';
+const kSettingsWindowTitle = 'LinguaRay';
 const kMiniTranslatorWindowTitle = 'LinguaRay Quick Translate';
-const _kWorkbenchWindowSize = Size(840, 560);
-const _kWorkbenchWindowMinimumSize = Size(840, 560);
+const _kSettingsWindowSize = Size(1000, 700);
+const _kSettingsWindowMinimumSize = Size(780, 520);
 const _kMiniTranslatorInitialSize = Size(396, 420);
 const _kMiniTranslatorMinimumSize = Size(396, 180);
 const _kMiniTranslatorTrayGap = 10.0;
 const _kMiniTranslatorCursorGap = 12.0;
 
-GoRouter? _workbenchRouter;
-String _pendingWorkbenchLocation = '/translate';
-bool _workbenchWindowConfigured = false;
+GoRouter? _settingsRouter;
+String _pendingSettingsLocation = '/settings/translation';
+bool _settingsWindowConfigured = false;
 int _surfaceSwitchGeneration = 0;
 
-enum AppSurface { workbench, miniTranslator }
+enum AppSurface { settings, miniTranslator }
 
-AppSurface _requestedSurface = AppSurface.workbench;
+AppSurface _requestedSurface = AppSurface.settings;
 
 /// Exactly one surface is mounted at a time, which prevents duplicate title
-/// frames and stacked workbench/quick-window layers.
-final ValueNotifier<AppSurface> appSurface = ValueNotifier(
-  AppSurface.workbench,
-);
+/// frames and stacked settings/quick-window layers.
+final ValueNotifier<AppSurface> appSurface = ValueNotifier(AppSurface.settings);
 
 /// Whether the mounted quick translator still owns native window sizing.
 ///
-/// A workbench transition deliberately keeps the compact Flutter surface
+/// A settings transition deliberately keeps the compact Flutter surface
 /// mounted until the native host has expanded. Its delayed content-measurement
 /// callbacks must not be allowed to shrink that host back to 396 px while the
 /// transition is in flight.
@@ -64,58 +61,51 @@ class AppWindowController {
   }
 }
 
-const workbenchWindowController = AppWindowController();
+const settingsWindowController = AppWindowController();
 const miniTranslatorWindowController = AppWindowController();
 
-/// Text handed from the quick translator to the workbench translation page.
-final ValueNotifier<String?> workbenchTextHandoff = ValueNotifier(null);
-
-enum WorkbenchDestination {
-  welcome('/welcome'),
-  translate('/translate'),
-  history('/history'),
-  glossary('/glossary'),
-  vocabulary('/vocabulary'),
+enum SettingsDestination {
+  settingsTranslation('/settings/translation'),
+  settingsTranslationServices('/settings/services/translation'),
+  settingsFavorites('/settings/favorites'),
+  settingsHistory('/settings/history'),
+  settingsGlossary('/settings/glossary'),
+  settingsVocabulary('/settings/vocabulary'),
+  settingsOcr('/settings/ocr'),
+  settingsOcrServices('/settings/services/ocr'),
   settingsGeneral('/settings/general'),
-  settingsServices('/settings/services'),
-  settingsShortcuts('/settings/shortcuts'),
-  settingsProviders('/settings/providers'),
-  settingsAdvanced('/settings/advanced'),
+  settingsPermissions('/settings/permissions'),
+  settingsIntegration('/settings/integration'),
   settingsUpdates('/settings/updates'),
   settingsAbout('/settings/about');
 
-  const WorkbenchDestination(this.location);
+  const SettingsDestination(this.location);
 
   final String location;
 }
 
-void attachWorkbenchRouter(GoRouter router) {
-  _workbenchRouter = router;
+void attachSettingsRouter(GoRouter router) {
+  _settingsRouter = router;
 }
 
-void detachWorkbenchRouter(GoRouter router) {
-  if (_workbenchRouter == router) _workbenchRouter = null;
+void detachSettingsRouter(GoRouter router) {
+  if (_settingsRouter == router) _settingsRouter = null;
 }
 
-String get pendingWorkbenchLocation => _pendingWorkbenchLocation;
+String get pendingSettingsLocation => _pendingSettingsLocation;
 
-void showWorkbenchWindow({WorkbenchDestination? destination, String? text}) {
-  final target =
-      destination ??
-      (onboardingController.isComplete
-          ? WorkbenchDestination.translate
-          : WorkbenchDestination.welcome);
-  _pendingWorkbenchLocation = target.location;
-  if (text != null) workbenchTextHandoff.value = text;
-  _workbenchRouter?.go(_pendingWorkbenchLocation);
-  focusWorkbenchWindow();
+void showSettingsWindow({SettingsDestination? destination}) {
+  final target = destination ?? SettingsDestination.settingsTranslation;
+  _pendingSettingsLocation = target.location;
+  _settingsRouter?.go(_pendingSettingsLocation);
+  focusSettingsWindow();
 }
 
-void focusWorkbenchWindow() {
-  final window = workbenchWindowController.window;
-  final switchedSurface = appSurface.value != AppSurface.workbench;
+void focusSettingsWindow() {
+  final window = settingsWindowController.window;
+  final switchedSurface = appSurface.value != AppSurface.settings;
   final switchGeneration = ++_surfaceSwitchGeneration;
-  _requestedSurface = AppSurface.workbench;
+  _requestedSurface = AppSurface.settings;
 
   // Keep the native host alive while it expands so Flutter continues to
   // produce frames. A hidden macOS window can stop scheduling frames, leaving
@@ -126,28 +116,28 @@ void focusWorkbenchWindow() {
     if (!window.isVisible) window.showInactive();
   }
 
-  window.title = kWorkbenchWindowTitle;
-  window.titleBarStyle = TitleBarStyle.hidden;
+  window.title = kSettingsWindowTitle;
+  window.titleBarStyle = kIsMacOS ? TitleBarStyle.normal : TitleBarStyle.hidden;
   window.windowControlButtonsVisible = kIsMacOS;
   window.isResizable = true;
   window.setMinimumSize(
-    _kWorkbenchWindowMinimumSize.width,
-    _kWorkbenchWindowMinimumSize.height,
+    _kSettingsWindowMinimumSize.width,
+    _kSettingsWindowMinimumSize.height,
   );
-  if (switchedSurface || window.size != _kWorkbenchWindowSize) {
-    window.setSize(_kWorkbenchWindowSize.width, _kWorkbenchWindowSize.height);
+  if (switchedSurface || window.size != _kSettingsWindowSize) {
+    window.setSize(_kSettingsWindowSize.width, _kSettingsWindowSize.height);
   }
-  if (!_workbenchWindowConfigured) {
-    _workbenchWindowConfigured = true;
+  if (!_settingsWindowConfigured) {
+    _settingsWindowConfigured = true;
     window.center();
   }
-  dockIconController.setWorkbenchWindowVisible(true);
+  dockIconController.setSettingsWindowVisible(true);
   if (window.isMinimized) window.restore();
 
   if (switchedSurface) {
-    // Resize first, then mount the workbench while the host is transparent.
+    // Resize first, then mount settings while the host is transparent.
     // The post-frame callback reveals only the fully laid-out surface.
-    appSurface.value = AppSurface.workbench;
+    appSurface.value = AppSurface.settings;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (switchGeneration != _surfaceSwitchGeneration) return;
       window.opacity = 1;
@@ -162,28 +152,33 @@ void focusWorkbenchWindow() {
   }
 }
 
-bool get isWorkbenchWindowOpen {
-  final window = workbenchWindowController.window;
-  return appSurface.value == AppSurface.workbench &&
+bool get isSettingsWindowOpen {
+  final window = settingsWindowController.window;
+  return appSurface.value == AppSurface.settings &&
       (window.isVisible || window.isMinimized);
 }
 
-Future<void> handleTrayIconClick({Rect? trayBounds}) async {
-  if (isWorkbenchWindowOpen) {
-    focusWorkbenchWindow();
-  } else {
-    await showMiniTranslatorWindow(trayBounds: trayBounds);
-  }
+/// Configures LinguaRay as a tray-resident app without presenting a window.
+void initializeResidentApp() {
+  final window = settingsWindowController.window;
+  _requestedSurface = AppSurface.settings;
+  appSurface.value = AppSurface.settings;
+  window.title = kSettingsWindowTitle;
+  window.titleBarStyle = kIsMacOS ? TitleBarStyle.normal : TitleBarStyle.hidden;
+  window.windowControlButtonsVisible = kIsMacOS;
+  window.isResizable = true;
+  window.setMinimumSize(
+    _kSettingsWindowMinimumSize.width,
+    _kSettingsWindowMinimumSize.height,
+  );
+  window.hide();
+  dockIconController.setSettingsWindowVisible(false);
 }
 
-void showSettingsWindow() {
-  showWorkbenchWindow(destination: WorkbenchDestination.settingsGeneral);
-}
-
-void hideWorkbenchWindow() {
-  if (appSurface.value != AppSurface.workbench) return;
-  workbenchWindowController.window.hide();
-  dockIconController.setWorkbenchWindowVisible(false);
+void hideSettingsWindow() {
+  if (appSurface.value != AppSurface.settings) return;
+  settingsWindowController.window.hide();
+  dockIconController.setSettingsWindowVisible(false);
 }
 
 Future<void> showMiniTranslatorWindow({
@@ -193,10 +188,15 @@ Future<void> showMiniTranslatorWindow({
   final window = miniTranslatorWindowController.window;
   _surfaceSwitchGeneration++;
   _requestedSurface = AppSurface.miniTranslator;
-  window.opacity = 1;
   final switchedSurface = appSurface.value != AppSurface.miniTranslator;
   if (switchedSurface) {
+    // A fully hidden macOS window may stop producing Flutter frames. Mount the
+    // compact surface while the native host is transparent, then reveal it
+    // only after the new frame has completed.
+    window.opacity = 0;
+    if (!window.isVisible) window.showInactive();
     appSurface.value = AppSurface.miniTranslator;
+    WidgetsBinding.instance.scheduleFrame();
     await WidgetsBinding.instance.endOfFrame;
   }
 
@@ -223,9 +223,10 @@ Future<void> showMiniTranslatorWindow({
   if (newPosition != null) {
     window.setPosition(newPosition.dx, newPosition.dy);
   }
+  window.opacity = 1;
   window.show();
   window.focus();
-  dockIconController.setWorkbenchWindowVisible(false);
+  dockIconController.setSettingsWindowVisible(false);
 }
 
 void hideMiniTranslatorWindow() {

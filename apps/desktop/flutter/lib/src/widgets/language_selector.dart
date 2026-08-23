@@ -73,7 +73,7 @@ void populateLanguageMenu(
 
 /// The language capsule that anchors a translation view — the design system's
 /// SwapPair with both ends wired as menu triggers, so it is the one language
-/// control the mini translator and the workbench share.
+/// control used by translation surfaces.
 ///
 /// The start end opens 自动检测 plus the language list; the end opens the
 /// target list, prefixed with 自动匹配 where [allowAutoTarget] is set. The

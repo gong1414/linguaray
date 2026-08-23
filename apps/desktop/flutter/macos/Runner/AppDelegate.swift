@@ -29,7 +29,6 @@ class AppDelegate: FlutterAppDelegate {
 
   override func applicationDidFinishLaunching(_ notification: Notification) {
     super.applicationDidFinishLaunching(notification)
-    observeWindows()
     connectPreferencesMenuItem()
   }
 
@@ -58,28 +57,4 @@ class AppDelegate: FlutterAppDelegate {
     MacAppPresentationPlugin.shared?.notifyOpenSettings()
   }
 
-  /// Attach the dummy toolbar to the stable Flutter host window.
-  private func observeWindows() {
-    for name in [NSWindow.didUpdateNotification, NSWindow.didBecomeKeyNotification] {
-      NotificationCenter.default.addObserver(
-        self,
-        selector: #selector(installDummyToolbar(_:)),
-        name: name,
-        object: nil
-      )
-    }
-  }
-
-  /// An empty toolbar moves the traffic light buttons down into the toolbar row.
-  @objc private func installDummyToolbar(_ notification: Notification) {
-    guard
-      let window = notification.object as? NSWindow,
-      window.styleMask.contains(.titled),
-      window.toolbar == nil
-    else {
-      return
-    }
-
-    window.toolbar = NSToolbar(identifier: "DummyToolbar")
-  }
 }

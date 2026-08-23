@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:linguaray_desktop/src/ui/chrome/workbench_shell_view.dart';
+import 'package:linguaray_desktop/src/ui/settings/settings_labels.dart';
 import 'package:linguaray_desktop/widgetbook.dart';
 import 'package:linguaray_ui/linguaray_ui.dart' show LinguaRayMaterialTheme;
 
@@ -16,14 +16,8 @@ void main() {
     for (final child in const [
       HistoryCatalogPreview(empty: true),
       HistoryCatalogPreview(empty: false),
-      GlossaryCatalogPreview(empty: true),
-      VocabularyCatalogPreview(empty: true),
       UpdatesCatalogPreview(),
-      CatalogShellPreview(
-        chrome: WindowChromeKind.windows,
-        destination: WorkbenchDestinationId.history,
-        child: HistoryCatalogPreview(empty: false),
-      ),
+      SettingsCatalogPreview(section: SettingsSection.translation),
     ]) {
       await tester.pumpWidget(
         MaterialApp(theme: LinguaRayMaterialTheme.light(), home: child),

@@ -57,6 +57,7 @@ class HistoryView extends StatelessWidget {
     required this.onRetry,
     required this.onToggleSelected,
     super.key,
+    this.showFilter = true,
   });
 
   final HistoryViewLabels labels;
@@ -70,6 +71,7 @@ class HistoryView extends StatelessWidget {
   final VoidCallback onClear;
   final VoidCallback onRetry;
   final ValueChanged<String> onToggleSelected;
+  final bool showFilter;
 
   @override
   Widget build(BuildContext context) {
@@ -100,23 +102,27 @@ class HistoryView extends StatelessWidget {
                     onChanged: onQueryChanged,
                   ),
                 ),
-                const SizedBox(width: 12),
-                SegmentedButton<HistoryFilter>(
-                  segments: [
-                    ButtonSegment(
-                      value: HistoryFilter.all,
-                      label: Text(labels.all),
-                    ),
-                    ButtonSegment(
-                      value: HistoryFilter.favorites,
-                      label: Text(labels.favorites),
-                    ),
-                  ],
-                  selected: {snapshot.filter},
-                  onSelectionChanged: (selection) {
-                    if (selection.isNotEmpty) onFilterChanged(selection.first);
-                  },
-                ),
+                if (showFilter) ...[
+                  const SizedBox(width: 12),
+                  SegmentedButton<HistoryFilter>(
+                    segments: [
+                      ButtonSegment(
+                        value: HistoryFilter.all,
+                        label: Text(labels.all),
+                      ),
+                      ButtonSegment(
+                        value: HistoryFilter.favorites,
+                        label: Text(labels.favorites),
+                      ),
+                    ],
+                    selected: {snapshot.filter},
+                    onSelectionChanged: (selection) {
+                      if (selection.isNotEmpty) {
+                        onFilterChanged(selection.first);
+                      }
+                    },
+                  ),
+                ],
               ],
             ),
           ),

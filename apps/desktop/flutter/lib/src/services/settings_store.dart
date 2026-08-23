@@ -60,6 +60,7 @@ class SettingsStore extends ChangeNotifier {
     toggleMiniTranslator: '',
     extractTextFromScreenSelection: '',
     extractTextFromScreenCapture: '',
+    captureOcr: '',
     extractTextFromClipboard: '',
     translateInputContent: '',
   );

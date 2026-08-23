@@ -23,6 +23,11 @@ class MainFlutterWindow: NSWindow {
     )
 
     super.awakeFromNib()
+
+    // The product is menu-bar resident. Dart presents this stable host only
+    // for Settings or a transient translation panel.
+    isReleasedWhenClosed = false
+    orderOut(nil)
   }
 
   override func performClose(_ sender: Any?) {

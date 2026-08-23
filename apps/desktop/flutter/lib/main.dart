@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:linguaray_runtime/linguaray_runtime.dart' as linguaray_runtime;
 
 import 'src/i18n/i18n.dart';
-import 'src/platform/onboarding_controller.dart';
 import 'src/platform/secret_store.dart';
 import 'src/routes/app_router.dart';
 import 'src/services/runtime.dart' show initRuntime;
@@ -21,7 +20,6 @@ Future<void> _ensureInitialized() async {
 
   await initEnv();
   debugPrint('[LinguaRay] Environment initialized.');
-  initOnboardingController();
   initProviderCredentialsController();
   try {
     await providerCredentialsController.hydrateAll();

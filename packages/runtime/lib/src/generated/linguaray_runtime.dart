@@ -2795,12 +2795,14 @@ class ShortcutSettings {
   final String toggleMiniTranslator;
   final String extractTextFromScreenSelection;
   final String extractTextFromScreenCapture;
+  final String captureOcr;
   final String extractTextFromClipboard;
   final String translateInputContent;
   ShortcutSettings({
     required this.toggleMiniTranslator,
     required this.extractTextFromScreenSelection,
     required this.extractTextFromScreenCapture,
+    required this.captureOcr,
     required this.extractTextFromClipboard,
     required this.translateInputContent,
   });
@@ -2830,6 +2832,11 @@ class FfiConverterShortcutSettings {
     final extractTextFromScreenCapture =
         extractTextFromScreenCapture_lifted.value;
     new_offset += extractTextFromScreenCapture_lifted.bytesRead;
+    final captureOcr_lifted = FfiConverterString.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final captureOcr = captureOcr_lifted.value;
+    new_offset += captureOcr_lifted.bytesRead;
     final extractTextFromClipboard_lifted = FfiConverterString.read(
       Uint8List.view(buf.buffer, new_offset),
     );
@@ -2845,6 +2852,7 @@ class FfiConverterShortcutSettings {
         toggleMiniTranslator: toggleMiniTranslator,
         extractTextFromScreenSelection: extractTextFromScreenSelection,
         extractTextFromScreenCapture: extractTextFromScreenCapture,
+        captureOcr: captureOcr,
         extractTextFromClipboard: extractTextFromClipboard,
         translateInputContent: translateInputContent,
       ),
@@ -2859,6 +2867,7 @@ class FfiConverterShortcutSettings {
           value.extractTextFromScreenSelection,
         ) +
         FfiConverterString.allocationSize(value.extractTextFromScreenCapture) +
+        FfiConverterString.allocationSize(value.captureOcr) +
         FfiConverterString.allocationSize(value.extractTextFromClipboard) +
         FfiConverterString.allocationSize(value.translateInputContent) +
         0;
@@ -2882,6 +2891,10 @@ class FfiConverterShortcutSettings {
       Uint8List.view(buf.buffer, new_offset),
     );
     new_offset += FfiConverterString.write(
+      value.captureOcr,
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    new_offset += FfiConverterString.write(
       value.extractTextFromClipboard,
       Uint8List.view(buf.buffer, new_offset),
     );
@@ -2898,6 +2911,7 @@ class FfiConverterShortcutSettings {
           value.extractTextFromScreenSelection,
         ) +
         FfiConverterString.allocationSize(value.extractTextFromScreenCapture) +
+        FfiConverterString.allocationSize(value.captureOcr) +
         FfiConverterString.allocationSize(value.extractTextFromClipboard) +
         FfiConverterString.allocationSize(value.translateInputContent) +
         0;
@@ -2908,12 +2922,14 @@ class ShortcutSettingsPatch {
   final String? toggleMiniTranslator;
   final String? extractTextFromScreenSelection;
   final String? extractTextFromScreenCapture;
+  final String? captureOcr;
   final String? extractTextFromClipboard;
   final String? translateInputContent;
   ShortcutSettingsPatch({
     this.toggleMiniTranslator,
     this.extractTextFromScreenSelection,
     this.extractTextFromScreenCapture,
+    this.captureOcr,
     this.extractTextFromClipboard,
     this.translateInputContent,
   });
@@ -2942,6 +2958,11 @@ class FfiConverterShortcutSettingsPatch {
     final extractTextFromScreenCapture =
         extractTextFromScreenCapture_lifted.value;
     new_offset += extractTextFromScreenCapture_lifted.bytesRead;
+    final captureOcr_lifted = FfiConverterOptionalString.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final captureOcr = captureOcr_lifted.value;
+    new_offset += captureOcr_lifted.bytesRead;
     final extractTextFromClipboard_lifted = FfiConverterOptionalString.read(
       Uint8List.view(buf.buffer, new_offset),
     );
@@ -2957,6 +2978,7 @@ class FfiConverterShortcutSettingsPatch {
         toggleMiniTranslator: toggleMiniTranslator,
         extractTextFromScreenSelection: extractTextFromScreenSelection,
         extractTextFromScreenCapture: extractTextFromScreenCapture,
+        captureOcr: captureOcr,
         extractTextFromClipboard: extractTextFromClipboard,
         translateInputContent: translateInputContent,
       ),
@@ -2973,6 +2995,7 @@ class FfiConverterShortcutSettingsPatch {
         FfiConverterOptionalString.allocationSize(
           value.extractTextFromScreenCapture,
         ) +
+        FfiConverterOptionalString.allocationSize(value.captureOcr) +
         FfiConverterOptionalString.allocationSize(
           value.extractTextFromClipboard,
         ) +
@@ -2998,6 +3021,10 @@ class FfiConverterShortcutSettingsPatch {
       Uint8List.view(buf.buffer, new_offset),
     );
     new_offset += FfiConverterOptionalString.write(
+      value.captureOcr,
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    new_offset += FfiConverterOptionalString.write(
       value.extractTextFromClipboard,
       Uint8List.view(buf.buffer, new_offset),
     );
@@ -3018,6 +3045,7 @@ class FfiConverterShortcutSettingsPatch {
         FfiConverterOptionalString.allocationSize(
           value.extractTextFromScreenCapture,
         ) +
+        FfiConverterOptionalString.allocationSize(value.captureOcr) +
         FfiConverterOptionalString.allocationSize(
           value.extractTextFromClipboard,
         ) +

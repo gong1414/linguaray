@@ -37,23 +37,34 @@ class SettingsHostScreen extends StatelessWidget {
   final Widget child;
 
   SettingsSection get _section {
-    if (location.startsWith('/settings/services')) {
-      return SettingsSection.services;
+    if (location == '/settings/translation') {
+      return SettingsSection.translation;
     }
-    if (location.startsWith('/settings/providers')) {
-      return SettingsSection.providers;
+    if (location == '/settings/services/translation') {
+      return SettingsSection.translationServices;
     }
-    if (location.startsWith('/settings/shortcuts')) {
-      return SettingsSection.shortcuts;
+    if (location == '/settings/favorites') {
+      return SettingsSection.favorites;
+    }
+    if (location == '/settings/history') {
+      return SettingsSection.history;
+    }
+    if (location == '/settings/glossary') return SettingsSection.glossary;
+    if (location == '/settings/vocabulary') return SettingsSection.vocabulary;
+    if (location == '/settings/ocr') {
+      return SettingsSection.ocr;
+    }
+    if (location == '/settings/services/ocr') {
+      return SettingsSection.ocrServices;
     }
     if (location.startsWith('/settings/permissions')) {
       return SettingsSection.permissions;
     }
+    if (location.startsWith('/settings/integration')) {
+      return SettingsSection.integration;
+    }
     if (location.startsWith('/settings/about')) {
       return SettingsSection.about;
-    }
-    if (location.startsWith('/settings/advanced')) {
-      return SettingsSection.advanced;
     }
     if (location.startsWith('/settings/updates')) {
       return SettingsSection.updates;
@@ -67,12 +78,17 @@ class SettingsHostScreen extends StatelessWidget {
       labels: settingsShellLabels(),
       section: _section,
       onSectionSelected: (section) => context.go(switch (section) {
+        SettingsSection.translation => '/settings/translation',
+        SettingsSection.translationServices => '/settings/services/translation',
+        SettingsSection.favorites => '/settings/favorites',
+        SettingsSection.history => '/settings/history',
+        SettingsSection.glossary => '/settings/glossary',
+        SettingsSection.vocabulary => '/settings/vocabulary',
+        SettingsSection.ocr => '/settings/ocr',
+        SettingsSection.ocrServices => '/settings/services/ocr',
         SettingsSection.general => '/settings/general',
-        SettingsSection.services => '/settings/services',
-        SettingsSection.providers => '/settings/providers',
-        SettingsSection.shortcuts => '/settings/shortcuts',
         SettingsSection.permissions => '/settings/permissions',
-        SettingsSection.advanced => '/settings/advanced',
+        SettingsSection.integration => '/settings/integration',
         SettingsSection.updates => '/settings/updates',
         SettingsSection.about => '/settings/about',
       }),
@@ -138,6 +154,7 @@ class _GeneralSettingsScreenState extends ConsumerState<GeneralSettingsScreen> {
     if (generalSettingsIntentController.hasPending) _scheduleIntent();
     return GeneralSettingsView(
       labels: generalSettingsLabels(),
+      pageTitle: t.settings.navigation.general_settings,
       preferences: preferences,
       languages: state.languages,
       translationLanguages: state.translationLanguages,
@@ -184,6 +201,7 @@ class _GeneralSettingsScreenState extends ConsumerState<GeneralSettingsScreen> {
       onManageTranslationTargets: () => unawaited(
         _manageTranslationTargets(ref.read(generalSettingsViewModelProvider)),
       ),
+      showTranslationSections: false,
     );
   }
 
@@ -492,14 +510,20 @@ class _GeneralSettingsScreenState extends ConsumerState<GeneralSettingsScreen> {
 }
 
 class ServicesSettingsScreen extends ConsumerWidget {
-  const ServicesSettingsScreen({super.key});
+  const ServicesSettingsScreen({required this.serviceKind, super.key});
+
+  final String serviceKind;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(servicesSettingsViewModelProvider);
     return ServicesSettingsView(
       labels: servicesSettingsLabels(),
+      pageTitle: serviceKind == 'ocr'
+          ? t.settings.navigation.ocr_services
+          : t.settings.navigation.translation_services,
       services: state.services,
+      serviceKind: serviceKind,
       loading: state.loading,
       onEnabledChanged: (id, enabled) => unawaited(
         ref
@@ -509,13 +533,14 @@ class ServicesSettingsScreen extends ConsumerWidget {
       onMakeDefault: (id) => unawaited(
         ref.read(servicesSettingsViewModelProvider.notifier).makeDefault(id),
       ),
+      onDelete: (id) => unawaited(_confirmDeleteService(context, ref, id)),
       onReorderTranslation: (oldIndex, newIndex) => unawaited(
         ref
             .read(servicesSettingsViewModelProvider.notifier)
             .reorderTranslation(oldIndex, newIndex),
       ),
-      onConfigureProviders: () => context.go('/settings/providers'),
-      onAdd: () => unawaited(_addService(context, ref)),
+      onConfigureProviders: () => unawaited(_showProviderManager(context)),
+      onAdd: () => unawaited(_addService(context, ref, serviceKind)),
       errorCode: state.operationErrorCode,
       onRetry: () => unawaited(
         ref.read(servicesSettingsViewModelProvider.notifier).reload(),
@@ -524,13 +549,52 @@ class ServicesSettingsScreen extends ConsumerWidget {
   }
 }
 
-Future<void> _addService(BuildContext context, WidgetRef ref) async {
-  final providers = await ref
+Future<void> _confirmDeleteService(
+  BuildContext context,
+  WidgetRef ref,
+  String id,
+) async {
+  final labels = servicesSettingsLabels();
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: Text(labels.delete),
+      content: Text(labels.deleteConfirm),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext, false),
+          child: Text(t.common.ui.button.cancel),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(dialogContext, true),
+          child: Text(labels.delete),
+        ),
+      ],
+    ),
+  );
+  if (confirmed == true) {
+    await ref
+        .read(servicesSettingsViewModelProvider.notifier)
+        .deleteService(id);
+  }
+}
+
+Future<void> _addService(
+  BuildContext context,
+  WidgetRef ref,
+  String serviceKind,
+) async {
+  var providers = await ref
       .read(workspaceSettingsRepositoryProvider)
       .listProviders();
+  if (providers.isEmpty && context.mounted) {
+    await _showProviderManager(context);
+    providers = await ref
+        .read(workspaceSettingsRepositoryProvider)
+        .listProviders();
+  }
   if (providers.isEmpty || !context.mounted) return;
   var providerId = providers.first.id;
-  var kind = 'translation';
   final name = TextEditingController();
   final saved = await showDialog<bool>(
     context: context,
@@ -555,24 +619,6 @@ Future<void> _addService(BuildContext context, WidgetRef ref) async {
                   ],
                   onChanged: (value) {
                     if (value != null) setState(() => providerId = value);
-                  },
-                ),
-                DropdownButton<String>(
-                  value: kind,
-                  isExpanded: true,
-                  items: const [
-                    DropdownMenuItem(
-                      value: 'translation',
-                      child: Text('translation'),
-                    ),
-                    DropdownMenuItem(value: 'ocr', child: Text('ocr')),
-                    DropdownMenuItem(
-                      value: 'dictionary',
-                      child: Text('dictionary'),
-                    ),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) setState(() => kind = value);
                   },
                 ),
                 TextField(
@@ -602,12 +648,32 @@ Future<void> _addService(BuildContext context, WidgetRef ref) async {
       .addService(
         ServiceDraft(
           providerId: providerId,
-          kind: kind,
+          kind: serviceKind,
           name: name.text.trim().isEmpty
-              ? '$providerId $kind'
+              ? '$providerId $serviceKind'
               : name.text.trim(),
         ),
       );
+}
+
+Future<void> _showProviderManager(BuildContext context) {
+  return showDialog<void>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      contentPadding: EdgeInsets.zero,
+      content: const SizedBox(
+        width: 720,
+        height: 520,
+        child: ProvidersSettingsScreen(),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext),
+          child: Text(t.ui.shell.close),
+        ),
+      ],
+    ),
+  );
 }
 
 class ProvidersSettingsScreen extends ConsumerWidget {
@@ -820,16 +886,54 @@ class _ProviderEditorDialogState extends ConsumerState<_ProviderEditorDialog> {
   }
 }
 
-class ShortcutsSettingsScreen extends ConsumerStatefulWidget {
-  const ShortcutsSettingsScreen({super.key});
+class TranslationSettingsScreen extends StatelessWidget {
+  const TranslationSettingsScreen({super.key});
 
   @override
-  ConsumerState<ShortcutsSettingsScreen> createState() =>
+  Widget build(BuildContext context) => _ShortcutsSettingsScreen(
+    title: t.settings.navigation.translation_settings,
+    actionIds: const {
+      'toggleQuickWindow',
+      'translateSelection',
+      'captureAndTranslate',
+      'openInputWindow',
+      'translateInput',
+    },
+    preferenceKind: _PreferenceKind.translation,
+  );
+}
+
+class OcrSettingsScreen extends StatelessWidget {
+  const OcrSettingsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) => _ShortcutsSettingsScreen(
+    title: t.settings.navigation.ocr_settings,
+    actionIds: const {'captureOcr'},
+    preferenceKind: _PreferenceKind.ocr,
+  );
+}
+
+enum _PreferenceKind { translation, ocr }
+
+class _ShortcutsSettingsScreen extends ConsumerStatefulWidget {
+  const _ShortcutsSettingsScreen({
+    this.title,
+    this.actionIds,
+    this.preferenceKind,
+  });
+
+  final String? title;
+  final Set<String>? actionIds;
+  final _PreferenceKind? preferenceKind;
+
+  @override
+  ConsumerState<_ShortcutsSettingsScreen> createState() =>
       _ShortcutsSettingsScreenState();
 }
 
 class _ShortcutsSettingsScreenState
-    extends ConsumerState<ShortcutsSettingsScreen> {
+    extends ConsumerState<_ShortcutsSettingsScreen> {
   final FocusNode _focusNode = FocusNode(debugLabel: 'shortcut-recorder');
 
   @override
@@ -841,6 +945,7 @@ class _ShortcutsSettingsScreenState
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(shortcutsViewModelProvider);
+    final generalState = ref.watch(generalSettingsViewModelProvider);
     final labels = shortcutsSettingsLabels();
     return Focus(
       focusNode: _focusNode,
@@ -867,17 +972,21 @@ class _ShortcutsSettingsScreenState
       },
       child: ShortcutsSettingsView(
         labels: labels,
+        title: widget.title,
         shortcuts: [
           for (final item in state.shortcuts)
-            ShortcutRecord(
-              actionId: item.actionId,
-              labelKey: shortcutActionLabel(item.actionId),
-              accelerator: item.accelerator,
-              status: item.status,
-              conflictReason: item.conflictReason,
-            ),
+            if (widget.actionIds?.contains(item.actionId) ?? true)
+              ShortcutRecord(
+                actionId: item.actionId,
+                labelKey: shortcutActionLabel(item.actionId),
+                accelerator: item.accelerator,
+                status: item.status,
+                conflictReason: item.conflictReason,
+              ),
         ],
         recordingActionId: state.recordingActionId,
+        descriptionBuilder: shortcutActionDescription,
+        additionalChildren: _preferenceChildren(context, generalState),
         onStartRecording: (id) {
           unawaited(
             ref.read(shortcutsViewModelProvider.notifier).startRecording(id),
@@ -893,6 +1002,329 @@ class _ShortcutsSettingsScreenState
         onClear: (id) =>
             unawaited(ref.read(shortcutsViewModelProvider.notifier).clear(id)),
         onReset: () => unawaited(_confirmReset(context, ref)),
+      ),
+    );
+  }
+
+  List<Widget> _preferenceChildren(
+    BuildContext context,
+    GeneralSettingsViewState state,
+  ) {
+    final preferences = state.preferences;
+    if (widget.preferenceKind == null) return const [];
+    if (preferences == null || state.loading) {
+      return const [
+        SizedBox(height: 28),
+        Center(child: CircularProgressIndicator()),
+      ];
+    }
+    if (widget.preferenceKind == _PreferenceKind.ocr) {
+      return [
+        const SizedBox(height: 28),
+        _PreferenceHeading(t.settings.general.section.ocr_behaviour),
+        const SizedBox(height: 8),
+        _PreferenceCard(
+          children: [
+            SwitchListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+              title: Text(t.settings.general.row.auto_copy_detected_text),
+              value: preferences.autoCopyDetectedText,
+              onChanged: (value) => unawaited(
+                ref
+                    .read(generalSettingsViewModelProvider.notifier)
+                    .setAutoCopyDetectedText(value),
+              ),
+            ),
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+              title: Text(t.settings.permissions.title),
+              subtitle: Text(t.settings.general.row.screen_capture_access_hint),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => context.go('/settings/permissions'),
+            ),
+          ],
+        ),
+      ];
+    }
+
+    return [
+      const SizedBox(height: 28),
+      _PreferenceHeading(t.settings.general.section.languages),
+      const SizedBox(height: 8),
+      _PreferenceCard(
+        children: [
+          ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+            title: Text(t.settings.general.section.translation_target),
+            subtitle: Text(
+              preferences.translationTargets.isEmpty
+                  ? t.settings.general.row.no_translation_targets
+                  : preferences.translationTargets
+                        .map((rule) => '${rule.source} → ${rule.target}')
+                        .join(' · '),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            trailing: TextButton(
+              onPressed: () =>
+                  unawaited(_editTranslationTargets(context, state)),
+              child: Text(t.common.ui.button.manage),
+            ),
+          ),
+          ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+            title: Text(t.settings.general.row.common_languages),
+            subtitle: Text(
+              state.translationLanguages
+                  .where(
+                    (language) =>
+                        preferences.commonLanguages.contains(language.code),
+                  )
+                  .map((language) => language.name)
+                  .join(' · '),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            trailing: TextButton(
+              onPressed: () => unawaited(_editCommonLanguages(context, state)),
+              child: Text(t.common.ui.button.manage),
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 24),
+      _PreferenceHeading(t.settings.general.section.translation_behaviour),
+      const SizedBox(height: 8),
+      _PreferenceCard(
+        children: [
+          SwitchListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+            title: Text(t.settings.general.row.submit_with_enter),
+            value: preferences.inputSubmitMode == InputSubmitMode.enter,
+            onChanged: (value) => unawaited(
+              ref
+                  .read(generalSettingsViewModelProvider.notifier)
+                  .setInputSubmitMode(
+                    value
+                        ? InputSubmitMode.enter
+                        : InputSubmitMode.commandEnter,
+                  ),
+            ),
+          ),
+          SwitchListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+            title: Text(t.settings.general.row.double_click_copy_result),
+            value: preferences.doubleClickCopyResult,
+            onChanged: (value) => unawaited(
+              ref
+                  .read(generalSettingsViewModelProvider.notifier)
+                  .setDoubleClickCopyResult(value),
+            ),
+          ),
+        ],
+      ),
+    ];
+  }
+
+  Future<void> _editTranslationTargets(
+    BuildContext context,
+    GeneralSettingsViewState state,
+  ) async {
+    final preferences = state.preferences;
+    if (preferences == null || state.translationLanguages.isEmpty) return;
+    final targets = [...preferences.translationTargets];
+    final result = await showDialog<List<TranslationTargetRule>>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(t.settings.general.button.manage_targets),
+          content: SizedBox(
+            width: 500,
+            height: 340,
+            child: targets.isEmpty
+                ? Center(
+                    child: Text(t.settings.general.row.no_translation_targets),
+                  )
+                : ListView.builder(
+                    itemCount: targets.length,
+                    itemBuilder: (context, index) {
+                      final target = targets[index];
+                      return SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text('${target.source} → ${target.target}'),
+                        value: target.enabled,
+                        onChanged: (value) => setDialogState(() {
+                          targets[index] = TranslationTargetRule(
+                            source: target.source,
+                            target: target.target,
+                            enabled: value,
+                          );
+                        }),
+                        secondary: IconButton(
+                          icon: const Icon(Icons.delete_outline_rounded),
+                          onPressed: () =>
+                              setDialogState(() => targets.removeAt(index)),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+          actions: [
+            TextButton.icon(
+              onPressed: () async {
+                final added = await _addTranslationTargetDialog(
+                  context,
+                  state.translationLanguages,
+                );
+                if (added != null && context.mounted) {
+                  setDialogState(() => targets.add(added));
+                }
+              },
+              icon: const Icon(Icons.add_rounded),
+              label: Text(t.common.ui.button.add),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(t.common.ui.button.cancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, targets),
+              child: Text(t.common.ui.button.save),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (result == null || !mounted) return;
+    await ref
+        .read(generalSettingsViewModelProvider.notifier)
+        .setTranslationTargets(result);
+  }
+
+  Future<void> _editCommonLanguages(
+    BuildContext context,
+    GeneralSettingsViewState state,
+  ) async {
+    final preferences = state.preferences;
+    if (preferences == null) return;
+    final selected = {...preferences.commonLanguages};
+    final result = await showDialog<List<String>>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(t.settings.general.button.manage_languages),
+          content: SizedBox(
+            width: 440,
+            height: 430,
+            child: ListView(
+              children: [
+                for (final language in state.translationLanguages)
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(language.name),
+                    value: selected.contains(language.code),
+                    onChanged: (value) => setDialogState(() {
+                      value ?? false
+                          ? selected.add(language.code)
+                          : selected.remove(language.code);
+                    }),
+                  ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(t.common.ui.button.cancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, selected.toList()),
+              child: Text(t.common.ui.button.save),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (result == null || !mounted) return;
+    await ref
+        .read(generalSettingsViewModelProvider.notifier)
+        .setCommonLanguages(result);
+  }
+
+  Future<TranslationTargetRule?> _addTranslationTargetDialog(
+    BuildContext context,
+    List<LanguageChoice> languages,
+  ) {
+    var source = 'auto';
+    var target = languages.first.code;
+    return showDialog<TranslationTargetRule>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(t.settings.general.button.add_target),
+          content: SizedBox(
+            width: 420,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  initialValue: source,
+                  decoration: InputDecoration(
+                    labelText: t.settings.general.editor.row.source_language,
+                  ),
+                  items: [
+                    DropdownMenuItem(
+                      value: 'auto',
+                      child: Text(t.mini_translator.language.auto_detect),
+                    ),
+                    for (final language in languages)
+                      DropdownMenuItem(
+                        value: language.code,
+                        child: Text(language.name),
+                      ),
+                  ],
+                  onChanged: (value) =>
+                      setDialogState(() => source = value ?? source),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: target,
+                  decoration: InputDecoration(
+                    labelText: t.settings.general.editor.row.target_language,
+                  ),
+                  items: [
+                    for (final language in languages)
+                      DropdownMenuItem(
+                        value: language.code,
+                        child: Text(language.name),
+                      ),
+                  ],
+                  onChanged: (value) =>
+                      setDialogState(() => target = value ?? target),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(t.common.ui.button.cancel),
+            ),
+            FilledButton(
+              onPressed: source == target
+                  ? null
+                  : () => Navigator.pop(
+                      dialogContext,
+                      TranslationTargetRule(
+                        source: source,
+                        target: target,
+                        enabled: true,
+                      ),
+                    ),
+              child: Text(t.common.ui.button.add),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -919,6 +1351,52 @@ class _ShortcutsSettingsScreenState
     if (confirmed == true) {
       await ref.read(shortcutsViewModelProvider.notifier).reset();
     }
+  }
+}
+
+class _PreferenceHeading extends StatelessWidget {
+  const _PreferenceHeading(this.label);
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Text(
+    label,
+    style: Theme.of(context).textTheme.titleMedium
+        ?.copyWith(fontWeight: FontWeight.w600),
+  );
+}
+
+class _PreferenceCard extends StatelessWidget {
+  const _PreferenceCard({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: theme.colorScheme.surfaceContainerLowest,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: theme.colorScheme.outlineVariant),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          for (final (index, child) in children.indexed) ...[
+            if (index > 0)
+              Divider(
+                height: 1,
+                indent: 12,
+                endIndent: 12,
+                color: theme.dividerColor.withValues(alpha: 0.5),
+              ),
+            child,
+          ],
+        ],
+      ),
+    );
   }
 }
 

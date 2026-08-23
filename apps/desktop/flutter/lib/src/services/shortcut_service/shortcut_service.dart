@@ -80,9 +80,9 @@ class ShortcutService extends ChangeNotifier {
       TriggerAction.translateSelection:
           shortcuts.extractTextFromScreenSelection,
       TriggerAction.captureAndTranslate: shortcuts.extractTextFromScreenCapture,
-      // The old "extract clipboard" binding is the first-release input
-      // translation trigger. Input replacement remains out of scope.
+      TriggerAction.captureOcr: shortcuts.captureOcr,
       TriggerAction.translateInput: shortcuts.extractTextFromClipboard,
+      TriggerAction.openInputWindow: shortcuts.translateInputContent,
     };
     final duplicateCounts = <String, int>{};
     for (final accelerator in requested.values) {

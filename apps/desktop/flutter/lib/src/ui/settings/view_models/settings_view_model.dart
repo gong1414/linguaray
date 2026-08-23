@@ -239,6 +239,19 @@ final class ServicesSettingsViewModel
       );
     }
   }
+
+  Future<void> deleteService(String id) async {
+    try {
+      await ref.read(workspaceSettingsRepositoryProvider).deleteService(id);
+      await reload();
+    } catch (_) {
+      state = ServicesSettingsViewState(
+        services: state.services,
+        loading: false,
+        operationErrorCode: AppErrorCode.unknown.wireName,
+      );
+    }
+  }
 }
 
 final providersSettingsViewModelProvider =

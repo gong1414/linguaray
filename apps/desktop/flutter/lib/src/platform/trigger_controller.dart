@@ -1,11 +1,25 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:nativeapi/nativeapi.dart';
 
 import '../services/app_windows.dart';
+import '../services/settings_store.dart';
 import 'capture_controller.dart';
 import 'permission_controller.dart';
 import 'platform_types.dart';
 import 'selection_controller.dart';
+
+class QuickWindowRequest {
+  const QuickWindowRequest({
+    this.text,
+    this.submit = false,
+    this.clearExisting = false,
+  });
+
+  final String? text;
+  final bool submit;
+  final bool clearExisting;
+}
 
 class TriggerController {
   TriggerController({
@@ -20,10 +34,21 @@ class TriggerController {
   final CaptureController _capture;
   final PermissionController _permissions;
 
-  final ValueNotifier<String?> quickWindowText = ValueNotifier(null);
+  final ValueNotifier<QuickWindowRequest?> quickWindowRequest = ValueNotifier(
+    null,
+  );
   final ValueNotifier<PlatformOperationException?> lastError = ValueNotifier(
     null,
   );
+
+  Future<void> openInputWindow({Rect? trayBounds}) async {
+    quickWindowRequest.value = const QuickWindowRequest(clearExisting: true);
+    await showMiniTranslatorWindow(trayBounds: trayBounds);
+  }
+
+  Future<void> showTranslationWindow({Rect? trayBounds}) {
+    return showMiniTranslatorWindow(trayBounds: trayBounds);
+  }
 
   Future<void> trigger(TriggerAction action) async {
     lastError.value = null;
@@ -55,51 +80,50 @@ class TriggerController {
               message: 'Clipboard restoration failed.',
             );
           }
-          quickWindowText.value = result.text;
+          quickWindowRequest.value = QuickWindowRequest(
+            text: result.text,
+            submit: true,
+            clearExisting: true,
+          );
           await showMiniTranslatorWindow(
             position: miniTranslatorPositionNearPoint(result.triggerPosition),
           );
           break;
+        case TriggerAction.openInputWindow:
+          await openInputWindow();
+          break;
         case TriggerAction.translateInput:
           final position = DisplayManager.instance.getCursorPosition();
           final text = await _selection.readClipboard();
-          if (text == null) {
+          if (text == null || text.trim().isEmpty) {
             throw const PlatformOperationException(
               action: TriggerAction.translateInput,
               code: 'clipboard_unavailable',
               message: 'The clipboard could not be read.',
             );
           }
-          if (text.trim().isNotEmpty) quickWindowText.value = text;
+          quickWindowRequest.value = QuickWindowRequest(
+            text: text,
+            submit: true,
+            clearExisting: true,
+          );
           await showMiniTranslatorWindow(
             position: miniTranslatorPositionNearPoint(position),
           );
           break;
         case TriggerAction.captureAndTranslate:
-          final position = DisplayManager.instance.getCursorPosition();
-          final wasWorkbenchVisible = isWorkbenchWindowOpen;
-          final wasMiniVisible = isMiniTranslatorWindowVisible;
-          hideMiniTranslatorWindow();
-          hideWorkbenchWindow();
-          final capture = await _capture.captureRegion();
-          if (capture.cancelled) {
-            if (wasWorkbenchVisible) {
-              focusWorkbenchWindow();
-            } else if (wasMiniVisible) {
-              await showMiniTranslatorWindow(position: position);
-            }
-            return;
-          }
-          final text = await _capture.recognize(capture);
-          quickWindowText.value = text;
-          await showMiniTranslatorWindow(
-            position: miniTranslatorPositionNearPoint(position),
-          );
+          await _captureAndOpen(autoSubmit: true);
+          break;
+        case TriggerAction.captureOcr:
+          await _captureAndOpen(autoSubmit: false);
           break;
       }
     } on PlatformOperationException catch (error) {
       lastError.value = error;
-      if (action != TriggerAction.captureAndTranslate ||
+      final captureAction =
+          action == TriggerAction.captureAndTranslate ||
+          action == TriggerAction.captureOcr;
+      if (!captureAction ||
           error.code != 'capture_cancelled' && error.code != 'cancelled') {
         await showMiniTranslatorWindow(
           position: miniTranslatorPositionNearCursor(),
@@ -117,6 +141,46 @@ class TriggerController {
     } finally {
       await _permissions.refresh();
     }
+  }
+
+  Future<void> _captureAndOpen({required bool autoSubmit}) async {
+    final position = DisplayManager.instance.getCursorPosition();
+    final wasSettingsVisible = isSettingsWindowOpen;
+    final wasMiniVisible = isMiniTranslatorWindowVisible;
+    hideMiniTranslatorWindow();
+    hideSettingsWindow();
+    final capture = await _capture.captureRegion();
+    if (capture.cancelled) {
+      if (wasSettingsVisible) {
+        focusSettingsWindow();
+      } else if (wasMiniVisible) {
+        await showMiniTranslatorWindow(position: position);
+      }
+      return;
+    }
+    final action = autoSubmit
+        ? TriggerAction.captureAndTranslate
+        : TriggerAction.captureOcr;
+    final text = await _capture.recognize(capture, action: action);
+    quickWindowRequest.value = QuickWindowRequest(
+      text: text,
+      submit: autoSubmit,
+      clearExisting: true,
+    );
+    if (!autoSubmit && settingsStore.autoCopyDetectedText) {
+      try {
+        await Clipboard.setData(ClipboardData(text: text));
+      } catch (_) {
+        throw PlatformOperationException(
+          action: action,
+          code: 'clipboard_unavailable',
+          message: 'Recognized text could not be copied to the clipboard.',
+        );
+      }
+    }
+    await showMiniTranslatorWindow(
+      position: miniTranslatorPositionNearPoint(position),
+    );
   }
 }
 

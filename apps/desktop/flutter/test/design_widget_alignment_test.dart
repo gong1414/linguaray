@@ -7,7 +7,6 @@ import 'package:linguaray_desktop/src/widgets/language_selector.dart';
 import 'package:linguaray_desktop/src/widgets/navigation_item.dart';
 import 'package:linguaray_desktop/src/widgets/swap_pair.dart';
 import 'package:linguaray_desktop/src/widgets/ui.dart';
-import 'package:linguaray_desktop/src/widgets/workbench.dart';
 
 void main() {
   Widget specimen(Widget child) {
@@ -17,28 +16,6 @@ void main() {
       ),
     );
   }
-
-  testWidgets('workbench supplies WindowBody with a Flex parent', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      specimen(
-        const Workbench(
-          sidebar: [
-            NavigationItem(
-              label: '翻译',
-              icon: FluentIcons.translate_20_regular,
-              selected: true,
-            ),
-          ],
-          child: SizedBox.expand(),
-        ),
-      ),
-    );
-
-    expect(tester.takeException(), isNull);
-    expect(tester.getSize(find.byType(Sidebar)).width, 172);
-  });
 
   testWidgets('toolbar icon adapter keeps the 24 point widget metric', (
     tester,
@@ -104,30 +81,6 @@ void main() {
     // Both ends are menu triggers, so both carry a disclosure chevron.
     expect(find.byIcon(FluentIcons.chevron_down_20_regular), findsNWidgets(2));
     expect(find.byIcon(FluentIcons.arrow_swap_20_regular), findsOneWidget);
-  });
-
-  testWidgets('aside gives its trailing SidebarCard the remaining space', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      specimen(
-        const Align(
-          alignment: Alignment.topLeft,
-          child: SizedBox(
-            height: 300,
-            child: Aside(
-              children: [
-                SizedBox(height: 20),
-                SidebarCard(children: [Text('快捷键')]),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-
-    expect(tester.takeException(), isNull);
-    expect(tester.getBottomRight(find.byType(SidebarCard)).dy, 282);
   });
 
   testWidgets('the highlight rule fences the block on the requested edge', (

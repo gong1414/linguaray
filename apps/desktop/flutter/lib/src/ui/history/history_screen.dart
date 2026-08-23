@@ -2,13 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:linguaray_application/linguaray_application.dart';
 
 import '../../config/dependencies.dart';
 import '../../i18n/i18n.dart';
+import '../../platform/trigger_controller.dart';
+import '../../services/app_windows.dart';
 import '../i18n_labels.dart';
-import '../translation/view_models/translation_view_model.dart';
 import 'history_view.dart';
 
 final historyViewModelProvider =
@@ -78,11 +78,33 @@ final class HistoryViewModel extends Notifier<HistorySnapshot> {
   }
 }
 
-class HistoryScreen extends ConsumerWidget {
-  const HistoryScreen({super.key});
+class HistoryScreen extends ConsumerStatefulWidget {
+  const HistoryScreen({
+    required this.initialFilter,
+    super.key,
+    this.lockFilter = false,
+  });
+
+  final HistoryFilter initialFilter;
+  final bool lockFilter;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HistoryScreen> createState() => _HistoryScreenState();
+}
+
+class _HistoryScreenState extends ConsumerState<HistoryScreen> {
+  @override
+  void initState() {
+    super.initState();
+    scheduleMicrotask(
+      () => ref
+          .read(historyViewModelProvider.notifier)
+          .setFilter(widget.initialFilter),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final snapshot = ref.watch(historyViewModelProvider);
     final page = t.workbench.history_page;
     return HistoryView(
@@ -107,6 +129,7 @@ class HistoryScreen extends ConsumerWidget {
       ),
       snapshot: snapshot,
       selectedIds: ref.read(historyViewModelProvider.notifier).selectedIds,
+      showFilter: !widget.lockFilter,
       onQueryChanged: (value) => unawaited(
         ref.read(historyViewModelProvider.notifier).setQuery(value),
       ),
@@ -114,11 +137,12 @@ class HistoryScreen extends ConsumerWidget {
         ref.read(historyViewModelProvider.notifier).setFilter(value),
       ),
       onOpen: (entry) {
-        ref.read(translationViewModelProvider.notifier)
-          ..setSourceText(entry.source)
-          ..setSourceLanguage(entry.sourceLanguage)
-          ..setTargetLanguage(entry.targetLanguage);
-        context.go('/translate');
+        triggerController.quickWindowRequest.value = QuickWindowRequest(
+          text: entry.source,
+          submit: true,
+          clearExisting: true,
+        );
+        unawaited(showMiniTranslatorWindow());
       },
       onFavorite: (entry, favorite) => unawaited(
         ref

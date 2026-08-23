@@ -54,10 +54,13 @@ class CaptureController {
     }
   }
 
-  Future<String> recognize(CaptureResult capture) async {
+  Future<String> recognize(
+    CaptureResult capture, {
+    TriggerAction action = TriggerAction.captureAndTranslate,
+  }) async {
     if (!capture.succeeded) {
       throw PlatformOperationException(
-        action: TriggerAction.captureAndTranslate,
+        action: action,
         code: capture.cancelled ? 'capture_cancelled' : 'capture_failed',
         message: capture.failureReason ?? 'Screen capture was cancelled.',
       );
@@ -74,8 +77,8 @@ class CaptureController {
       }
       final serviceId = configured.isNotEmpty ? configured : fallback;
       if (serviceId == null || serviceId.isEmpty) {
-        throw const PlatformOperationException(
-          action: TriggerAction.captureAndTranslate,
+        throw PlatformOperationException(
+          action: action,
           code: 'ocr_not_configured',
           message: 'No OCR service is configured.',
         );
@@ -87,8 +90,8 @@ class CaptureController {
             request: RecognizeTextRequest(imagePath: capture.imagePath),
           );
       if (response.text.trim().isEmpty) {
-        throw const PlatformOperationException(
-          action: TriggerAction.captureAndTranslate,
+        throw PlatformOperationException(
+          action: action,
           code: 'ocr_empty',
           message: 'No text was found in the selected region.',
         );

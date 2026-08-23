@@ -80,6 +80,14 @@
     "tray": {
       "context_menu": {
         "show_window": "显示窗口",
+        "selection_translation": "划词翻译",
+        "capture_translation": "截图翻译",
+        "input_translation": "输入翻译",
+        "clipboard_translation": "剪贴板翻译",
+        "show_translation_window": "显示翻译窗口",
+        "capture_ocr": "截图 OCR",
+        "preferences": "偏好设置…",
+        "about": "关于 LinguaRay",
         "dev_tools": {
           "title": "开发工具",
           "open_data_directory": "打开数据目录"
@@ -335,6 +343,18 @@
   },
   "settings": {
     "version": "v{} (Build {})",
+    "navigation": {
+      "translation_group": "翻译",
+      "translation_settings": "翻译设置",
+      "translation_services": "服务",
+      "favorites": "收藏夹",
+      "history": "历史记录",
+      "ocr_group": "OCR",
+      "ocr_settings": "OCR 设置",
+      "ocr_services": "服务",
+      "general_group": "通用",
+      "general_settings": "通用设置"
+    },
     "general": {
       "title": "常规",
       "section": {
@@ -421,11 +441,20 @@
         "submit_mode": "提交方式"
       },
       "row": {
-        "toggle_mini_translator": "显示/隐藏窗口",
-        "extract_text_from_screen_selection": "从屏幕选区提取文字",
-        "extract_text_from_screen_capture": "从屏幕截图提取文字",
-        "extract_text_from_clipboard": "从剪贴板提取文字",
-        "translate_input": "翻译输入内容"
+        "toggle_mini_translator": "显示翻译窗口",
+        "extract_text_from_screen_selection": "划词翻译",
+        "extract_text_from_screen_capture": "截图翻译",
+        "capture_ocr": "截图 OCR",
+        "extract_text_from_clipboard": "剪贴板翻译",
+        "translate_input": "输入翻译"
+      },
+      "description": {
+        "toggle_mini_translator": "直接显示翻译窗口，不会清空之前的内容。",
+        "selection": "在任意应用中选中文本后直接翻译。",
+        "input": "清空内容并显示翻译窗口，用于手动输入需要翻译的文本。",
+        "capture": "选择屏幕区域，识别其中的文字并翻译。",
+        "capture_ocr": "选择屏幕区域，只显示识别出的文字，不自动翻译。",
+        "clipboard": "翻译当前剪贴板中的文本。"
       },
       "reset_dialog": {
         "title": "重置快捷键",
@@ -461,7 +490,8 @@
     "services": {
       "title": "服务",
       "button": {
-        "add_service": "添加服务..."
+        "add_service": "添加服务...",
+        "manage_providers": "管理供应商..."
       },
       "section": {
         "available_services": "可用服务"

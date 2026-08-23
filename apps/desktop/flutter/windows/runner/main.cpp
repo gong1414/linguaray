@@ -55,7 +55,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
 
   // Flutter creates top-level windows after the engine starts. Apply the DWM
   // square-corner preference whenever this process's host window is created or
-  // shown. The workbench and quick translator share that stable host window.
+  // presented. Settings and the quick translator share that stable host.
   const auto corner_hook = ::SetWinEventHook(
       EVENT_OBJECT_CREATE, EVENT_OBJECT_SHOW, nullptr,
       HandleWindowCreatedOrShown, ::GetCurrentProcessId(), 0,

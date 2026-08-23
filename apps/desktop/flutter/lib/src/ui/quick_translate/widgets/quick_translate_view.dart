@@ -17,7 +17,6 @@ final class QuickTranslateLabels {
     required this.unpin,
     required this.capture,
     required this.clipboard,
-    required this.openWorkbench,
     required this.openSettings,
     required this.autoDetect,
     required this.autoMatch,
@@ -39,6 +38,14 @@ final class QuickTranslateLabels {
     this.clipboardUnavailable = '',
     this.clipboardRestoreFailed = '',
     this.recheck = '',
+    this.speakSource = '',
+    this.speakResult = '',
+    this.stopSpeaking = '',
+    this.lookup = '',
+    this.saveVocabulary = '',
+    this.vocabularySaved = '',
+    this.glossaryMatches = '',
+    this.glossaryWarnings = '',
   });
 
   final String title;
@@ -51,7 +58,6 @@ final class QuickTranslateLabels {
   final String unpin;
   final String capture;
   final String clipboard;
-  final String openWorkbench;
   final String openSettings;
   final String autoDetect;
   final String autoMatch;
@@ -73,6 +79,14 @@ final class QuickTranslateLabels {
   final String clipboardUnavailable;
   final String clipboardRestoreFailed;
   final String recheck;
+  final String speakSource;
+  final String speakResult;
+  final String stopSpeaking;
+  final String lookup;
+  final String saveVocabulary;
+  final String vocabularySaved;
+  final String glossaryMatches;
+  final String glossaryWarnings;
 }
 
 enum QuickTranslateNotice {
@@ -107,7 +121,6 @@ class QuickTranslateView extends StatefulWidget {
     required this.onTogglePin,
     required this.onCapture,
     required this.onClipboard,
-    required this.onOpenWorkbench,
     required this.onOpenSettings,
     required this.onConfigureServices,
     required this.onRecheckPermissions,
@@ -122,6 +135,20 @@ class QuickTranslateView extends StatefulWidget {
     this.toolbarKey,
     this.contentKey,
     this.onConfigureOcr,
+    this.submitWithModifier = false,
+    this.copyResultOnDoubleClick = false,
+    this.glossaryMatches = const [],
+    this.glossaryWarnings = const [],
+    this.speechAvailable = false,
+    this.dictionaryAvailable = false,
+    this.speakingKind,
+    this.savingVocabulary = false,
+    this.vocabularySaved = false,
+    this.onSpeakSource,
+    this.onSpeakResult,
+    this.onStopSpeech,
+    this.onLookup,
+    this.onSaveVocabulary,
   });
 
   final QuickTranslateLabels labels;
@@ -151,11 +178,24 @@ class QuickTranslateView extends StatefulWidget {
   final VoidCallback onTogglePin;
   final VoidCallback onCapture;
   final VoidCallback onClipboard;
-  final VoidCallback onOpenWorkbench;
   final VoidCallback onOpenSettings;
   final VoidCallback onConfigureServices;
   final VoidCallback onRecheckPermissions;
   final VoidCallback? onConfigureOcr;
+  final bool submitWithModifier;
+  final bool copyResultOnDoubleClick;
+  final List<GlossaryMatchHit> glossaryMatches;
+  final List<GlossaryComplianceWarning> glossaryWarnings;
+  final bool speechAvailable;
+  final bool dictionaryAvailable;
+  final SpeechUtteranceKind? speakingKind;
+  final bool savingVocabulary;
+  final bool vocabularySaved;
+  final VoidCallback? onSpeakSource;
+  final VoidCallback? onSpeakResult;
+  final VoidCallback? onStopSpeech;
+  final ValueChanged<String>? onLookup;
+  final VoidCallback? onSaveVocabulary;
 
   @override
   State<QuickTranslateView> createState() => _QuickTranslateViewState();
@@ -165,6 +205,7 @@ class _QuickTranslateViewState extends State<QuickTranslateView> {
   late final TextEditingController _controller = TextEditingController(
     text: widget.sourceText,
   );
+  String _selectedResultText = '';
 
   @override
   void didUpdateWidget(covariant QuickTranslateView oldWidget) {
@@ -173,6 +214,9 @@ class _QuickTranslateViewState extends State<QuickTranslateView> {
       _controller
         ..text = widget.sourceText
         ..selection = TextSelection.collapsed(offset: widget.sourceText.length);
+    }
+    if (widget.selectedResult?.text != oldWidget.selectedResult?.text) {
+      _selectedResultText = '';
     }
   }
 
@@ -193,15 +237,23 @@ class _QuickTranslateViewState extends State<QuickTranslateView> {
         widget.services.isNotEmpty &&
         !widget.submitting;
 
+    final submitBindings = !widget.submitWithModifier
+        ? <ShortcutActivator, VoidCallback>{
+            const SingleActivator(LogicalKeyboardKey.enter): () {
+              if (canTranslate) widget.onTranslate();
+            },
+          }
+        : <ShortcutActivator, VoidCallback>{
+            const SingleActivator(LogicalKeyboardKey.enter, meta: true): () {
+              if (canTranslate) widget.onTranslate();
+            },
+            const SingleActivator(LogicalKeyboardKey.enter, control: true): () {
+              if (canTranslate) widget.onTranslate();
+            },
+          };
+
     return CallbackShortcuts(
-      bindings: {
-        const SingleActivator(LogicalKeyboardKey.enter, meta: true): () {
-          if (canTranslate) widget.onTranslate();
-        },
-        const SingleActivator(LogicalKeyboardKey.enter): () {
-          if (canTranslate) widget.onTranslate();
-        },
-      },
+      bindings: submitBindings,
       child: Material(
         color: theme.colorScheme.surface,
         child: Padding(
@@ -221,7 +273,6 @@ class _QuickTranslateViewState extends State<QuickTranslateView> {
                   onTogglePin: widget.onTogglePin,
                   onCapture: widget.onCapture,
                   onClipboard: widget.onClipboard,
-                  onOpenWorkbench: widget.onOpenWorkbench,
                   onOpenSettings: widget.onOpenSettings,
                   onSourceLanguageChanged: widget.onSourceLanguageChanged,
                   onTargetLanguageChanged: widget.onTargetLanguageChanged,
@@ -241,26 +292,59 @@ class _QuickTranslateViewState extends State<QuickTranslateView> {
                       autofocus: true,
                       minLines: 1,
                       maxLines: 4,
-                      textInputAction: TextInputAction.go,
-                      onSubmitted: (_) {
-                        if (canTranslate) widget.onTranslate();
-                      },
+                      textInputAction: widget.submitWithModifier
+                          ? TextInputAction.newline
+                          : TextInputAction.go,
                       onChanged: widget.onSourceTextChanged,
                       decoration: InputDecoration(
                         hintText: widget.labels.inputHint,
-                        suffixIcon: IconButton(
-                          tooltip: widget.submitting
-                              ? widget.labels.translating
-                              : widget.labels.translate,
-                          onPressed: canTranslate ? widget.onTranslate : null,
-                          icon: widget.submitting
-                              ? const SizedBox.square(
-                                  dimension: 14,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Icon(Icons.arrow_forward_rounded),
+                        suffixIcon: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (widget.sourceText.isNotEmpty)
+                              IconButton(
+                                tooltip: widget.labels.clear,
+                                onPressed: widget.onClear,
+                                icon: const Icon(Icons.close_rounded, size: 18),
+                              ),
+                            if (widget.speechAvailable &&
+                                widget.onSpeakSource != null)
+                              IconButton(
+                                tooltip:
+                                    widget.speakingKind ==
+                                        SpeechUtteranceKind.source
+                                    ? widget.labels.stopSpeaking
+                                    : widget.labels.speakSource,
+                                onPressed:
+                                    widget.speakingKind ==
+                                        SpeechUtteranceKind.source
+                                    ? widget.onStopSpeech
+                                    : widget.onSpeakSource,
+                                icon: Icon(
+                                  widget.speakingKind ==
+                                          SpeechUtteranceKind.source
+                                      ? Icons.stop_circle_outlined
+                                      : Icons.volume_up_outlined,
+                                  size: 18,
+                                ),
+                              ),
+                            IconButton(
+                              tooltip: widget.submitting
+                                  ? widget.labels.translating
+                                  : widget.labels.translate,
+                              onPressed: canTranslate
+                                  ? widget.onTranslate
+                                  : null,
+                              icon: widget.submitting
+                                  ? const SizedBox.square(
+                                      dimension: 14,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Icon(Icons.arrow_forward_rounded),
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -303,28 +387,137 @@ class _QuickTranslateViewState extends State<QuickTranslateView> {
                       ConstrainedBox(
                         constraints: const BoxConstraints(maxHeight: 240),
                         child: SingleChildScrollView(
-                          child: SelectableText(
-                            resultText,
-                            key: const ValueKey('quick-result'),
-                            style: theme.textTheme.bodyLarge,
+                          child: GestureDetector(
+                            onDoubleTap: widget.copyResultOnDoubleClick
+                                ? () => widget.onCopy(resultText)
+                                : null,
+                            child: SelectableText(
+                              resultText,
+                              key: const ValueKey('quick-result'),
+                              style: theme.textTheme.bodyLarge,
+                              onSelectionChanged: (selection, _) {
+                                if (selection.isCollapsed) {
+                                  _selectedResultText = '';
+                                  return;
+                                }
+                                final start = selection.start.clamp(
+                                  0,
+                                  resultText.length,
+                                );
+                                final end = selection.end.clamp(
+                                  0,
+                                  resultText.length,
+                                );
+                                _selectedResultText = resultText.substring(
+                                  start,
+                                  end,
+                                );
+                              },
+                            ),
                           ),
                         ),
                       ),
+                      if (widget.glossaryMatches.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: _GlossaryMatches(
+                            label: widget.labels.glossaryMatches,
+                            matches: widget.glossaryMatches,
+                          ),
+                        ),
+                      if (widget.glossaryWarnings.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: StatusMessage(
+                            kind: StatusKind.warning,
+                            title: widget.labels.glossaryWarnings,
+                            body: widget.glossaryWarnings
+                                .map(
+                                  (warning) =>
+                                      '${warning.term} → ${warning.expected}',
+                                )
+                                .join('\n'),
+                          ),
+                        ),
                       Align(
                         alignment: Alignment.centerRight,
-                        child: TextButton.icon(
-                          onPressed: () => widget.onCopy(resultText),
-                          icon: Icon(
-                            widget.copied
-                                ? Icons.check_rounded
-                                : Icons.copy_rounded,
-                            size: 16,
-                          ),
-                          label: Text(
-                            widget.copied
-                                ? widget.labels.copied
-                                : widget.labels.copy,
-                          ),
+                        child: Wrap(
+                          spacing: 2,
+                          children: [
+                            if (widget.dictionaryAvailable &&
+                                widget.onLookup != null)
+                              IconButton(
+                                tooltip: widget.labels.lookup,
+                                onPressed: () => widget.onLookup!(
+                                  _selectedResultText.trim().isEmpty
+                                      ? resultText
+                                      : _selectedResultText,
+                                ),
+                                icon: const Icon(
+                                  Icons.menu_book_outlined,
+                                  size: 18,
+                                ),
+                              ),
+                            if (widget.onSaveVocabulary != null)
+                              IconButton(
+                                tooltip: widget.vocabularySaved
+                                    ? widget.labels.vocabularySaved
+                                    : widget.labels.saveVocabulary,
+                                onPressed:
+                                    widget.savingVocabulary ||
+                                        widget.vocabularySaved
+                                    ? null
+                                    : widget.onSaveVocabulary,
+                                icon: widget.savingVocabulary
+                                    ? const SizedBox.square(
+                                        dimension: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : Icon(
+                                        widget.vocabularySaved
+                                            ? Icons.bookmark_added_rounded
+                                            : Icons.bookmark_add_outlined,
+                                        size: 18,
+                                      ),
+                              ),
+                            if (widget.speechAvailable &&
+                                widget.onSpeakResult != null)
+                              IconButton(
+                                tooltip:
+                                    widget.speakingKind ==
+                                        SpeechUtteranceKind.translation
+                                    ? widget.labels.stopSpeaking
+                                    : widget.labels.speakResult,
+                                onPressed:
+                                    widget.speakingKind ==
+                                        SpeechUtteranceKind.translation
+                                    ? widget.onStopSpeech
+                                    : widget.onSpeakResult,
+                                icon: Icon(
+                                  widget.speakingKind ==
+                                          SpeechUtteranceKind.translation
+                                      ? Icons.stop_circle_outlined
+                                      : Icons.volume_up_outlined,
+                                  size: 18,
+                                ),
+                              ),
+                            TextButton.icon(
+                              onPressed: () => widget.onCopy(resultText),
+                              icon: Icon(
+                                widget.copied
+                                    ? Icons.check_rounded
+                                    : Icons.copy_rounded,
+                                size: 16,
+                              ),
+                              label: Text(
+                                widget.copied
+                                    ? widget.labels.copied
+                                    : widget.labels.copy,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ] else if (failed)
@@ -370,6 +563,31 @@ class _QuickTranslateViewState extends State<QuickTranslateView> {
   }
 }
 
+class _GlossaryMatches extends StatelessWidget {
+  const _GlossaryMatches({required this.label, required this.matches});
+
+  final String label;
+  final List<GlossaryMatchHit> matches;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 6,
+      runSpacing: 4,
+      children: [
+        if (label.isNotEmpty)
+          Text(label, style: Theme.of(context).textTheme.labelMedium),
+        for (final match in matches)
+          Chip(
+            visualDensity: VisualDensity.compact,
+            label: Text('${match.term} → ${match.translation}'),
+          ),
+      ],
+    );
+  }
+}
+
 class _CommandHeader extends StatelessWidget {
   const _CommandHeader({
     required this.labels,
@@ -380,7 +598,6 @@ class _CommandHeader extends StatelessWidget {
     required this.onTogglePin,
     required this.onCapture,
     required this.onClipboard,
-    required this.onOpenWorkbench,
     required this.onOpenSettings,
     required this.onSourceLanguageChanged,
     required this.onTargetLanguageChanged,
@@ -395,7 +612,6 @@ class _CommandHeader extends StatelessWidget {
   final VoidCallback onTogglePin;
   final VoidCallback onCapture;
   final VoidCallback onClipboard;
-  final VoidCallback onOpenWorkbench;
   final VoidCallback onOpenSettings;
   final ValueChanged<String> onSourceLanguageChanged;
   final ValueChanged<String> onTargetLanguageChanged;
@@ -444,17 +660,11 @@ class _CommandHeader extends StatelessWidget {
               tooltip: labels.openSettings,
               onSelected: (value) {
                 switch (value) {
-                  case 'workbench':
-                    onOpenWorkbench();
                   case 'settings':
                     onOpenSettings();
                 }
               },
               itemBuilder: (context) => [
-                PopupMenuItem(
-                  value: 'workbench',
-                  child: Text(labels.openWorkbench),
-                ),
                 PopupMenuItem(
                   value: 'settings',
                   child: Text(labels.openSettings),

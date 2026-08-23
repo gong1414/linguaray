@@ -1,34 +1,53 @@
 final class SettingsShellLabels {
   const SettingsShellLabels({
-    required this.title,
+    required this.translationGroup,
+    required this.translationSettings,
+    required this.translationServices,
+    required this.favorites,
+    required this.history,
+    required this.ocrGroup,
+    required this.ocrSettings,
+    required this.ocrServices,
+    required this.generalGroup,
     required this.general,
-    required this.services,
-    required this.providers,
-    required this.shortcuts,
     required this.permissions,
     required this.about,
-    this.advanced = '',
     this.updates = '',
+    this.glossary = '',
+    this.vocabulary = '',
+    this.integration = '',
   });
 
-  final String title;
+  final String translationGroup;
+  final String translationSettings;
+  final String translationServices;
+  final String favorites;
+  final String history;
+  final String ocrGroup;
+  final String ocrSettings;
+  final String ocrServices;
+  final String generalGroup;
   final String general;
-  final String services;
-  final String providers;
-  final String shortcuts;
   final String permissions;
   final String about;
-  final String advanced;
   final String updates;
+  final String glossary;
+  final String vocabulary;
+  final String integration;
 }
 
 enum SettingsSection {
+  translation,
+  translationServices,
+  favorites,
+  history,
+  glossary,
+  vocabulary,
+  ocr,
+  ocrServices,
   general,
-  services,
-  providers,
-  shortcuts,
   permissions,
-  advanced,
+  integration,
   updates,
   about,
 }
@@ -100,6 +119,8 @@ final class ServicesSettingsLabels {
     required this.configureProviders,
     required this.commonLanguages,
     required this.defaultService,
+    this.delete = '',
+    this.deleteConfirm = '',
     this.errorMessage,
   });
 
@@ -114,6 +135,8 @@ final class ServicesSettingsLabels {
   final String configureProviders;
   final String commonLanguages;
   final String defaultService;
+  final String delete;
+  final String deleteConfirm;
   final String Function(String? code)? errorMessage;
 }
 
