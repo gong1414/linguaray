@@ -30,6 +30,8 @@ pub struct ShortcutSettings {
         alias = "extractFromScreenCapture"
     )]
     pub extract_text_from_screen_capture: String,
+    #[serde(default = "default_capture_ocr_shortcut", rename = "captureOcr")]
+    pub capture_ocr: String,
     #[serde(
         default = "default_extract_text_from_clipboard_shortcut",
         rename = "extractTextFromClipboard",
@@ -50,6 +52,7 @@ impl Default for ShortcutSettings {
             extract_text_from_screen_selection: default_extract_text_from_screen_selection_shortcut(
             ),
             extract_text_from_screen_capture: default_extract_text_from_screen_capture_shortcut(),
+            capture_ocr: default_capture_ocr_shortcut(),
             extract_text_from_clipboard: default_extract_text_from_clipboard_shortcut(),
             translate_input_content: default_translate_input_content_shortcut(),
         }
@@ -66,6 +69,10 @@ fn default_extract_text_from_screen_selection_shortcut() -> String {
 
 fn default_extract_text_from_screen_capture_shortcut() -> String {
     "Option+W".to_owned()
+}
+
+fn default_capture_ocr_shortcut() -> String {
+    "Option+Shift+W".to_owned()
 }
 
 fn default_extract_text_from_clipboard_shortcut() -> String {
@@ -702,6 +709,7 @@ mod tests {
     "toggleMiniTranslator": "Command+Shift+Space",
     "extractTextFromScreenSelection": "Command+Shift+1",
     "extractTextFromScreenCapture": "Command+Shift+2",
+    "captureOcr": "Command+Shift+4",
     "extractTextFromClipboard": "Command+Shift+3",
     "translateInputContent": "Option+Z"
   },
@@ -739,6 +747,7 @@ mod tests {
             settings.shortcuts.extract_text_from_screen_capture,
             "Command+Shift+2"
         );
+        assert_eq!(settings.shortcuts.capture_ocr, "Command+Shift+4");
         assert_eq!(
             settings.shortcuts.extract_text_from_clipboard,
             "Command+Shift+3"
@@ -868,6 +877,7 @@ mod tests {
             settings.shortcuts.extract_text_from_screen_capture,
             "Option+W"
         );
+        assert_eq!(settings.shortcuts.capture_ocr, "Option+Shift+W");
         assert_eq!(settings.shortcuts.extract_text_from_clipboard, "Option+E");
         assert_eq!(settings.shortcuts.translate_input_content, "Option+Z");
     }

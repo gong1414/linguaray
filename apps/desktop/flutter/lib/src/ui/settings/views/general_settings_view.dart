@@ -21,6 +21,8 @@ class GeneralSettingsView extends StatelessWidget {
     this.onAutoCopyChanged,
     this.onDoubleClickCopyChanged,
     this.onManageTranslationTargets,
+    this.showTranslationSections = true,
+    this.pageTitle,
   });
 
   final GeneralSettingsLabels labels;
@@ -38,46 +40,88 @@ class GeneralSettingsView extends StatelessWidget {
   final ValueChanged<bool>? onAutoCopyChanged;
   final ValueChanged<bool>? onDoubleClickCopyChanged;
   final VoidCallback? onManageTranslationTargets;
+  final bool showTranslationSections;
+  final String? pageTitle;
 
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 16, 24, 24),
+      padding: const EdgeInsets.fromLTRB(30, 48, 30, 36),
       children: [
+        if (pageTitle != null) ...[
+          Text(pageTitle!, style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 22),
+        ],
         Text(labels.startup, style: Theme.of(context).textTheme.titleMedium),
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: Text(labels.launchAtLogin),
-          value: preferences.launchAtLogin,
-          onChanged: onLaunchAtLoginChanged,
+        const SizedBox(height: 8),
+        _GeneralCard(
+          children: [
+            SwitchListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+              title: Text(labels.launchAtLogin),
+              value: preferences.launchAtLogin,
+              onChanged: onLaunchAtLoginChanged,
+            ),
+            SwitchListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+              title: Text(labels.showInMenuBar),
+              value: preferences.showInMenuBar,
+              onChanged: onShowInMenuBarChanged,
+            ),
+          ],
         ),
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: Text(labels.showInMenuBar),
-          value: preferences.showInMenuBar,
-          onChanged: onShowInMenuBarChanged,
-        ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 24),
         Text(labels.appearance, style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 8),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          title: Text(labels.language),
-          trailing: DropdownButton<String>(
-            value: languages.any((item) => item.code == preferences.language)
-                ? preferences.language
-                : (languages.isEmpty ? null : languages.first.code),
-            onChanged: (value) {
-              if (value != null) onLanguageChanged(value);
-            },
-            items: [
-              for (final language in languages)
-                DropdownMenuItem(
-                  value: language.code,
-                  child: Text(language.name),
-                ),
-            ],
-          ),
+        _GeneralCard(
+          children: [
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+              title: Text(labels.language),
+              trailing: DropdownButton<String>(
+                value:
+                    languages.any((item) => item.code == preferences.language)
+                    ? preferences.language
+                    : (languages.isEmpty ? null : languages.first.code),
+                onChanged: (value) {
+                  if (value != null) onLanguageChanged(value);
+                },
+                items: [
+                  for (final language in languages)
+                    DropdownMenuItem(
+                      value: language.code,
+                      child: Text(language.name),
+                    ),
+                ],
+              ),
+            ),
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+              title: Text(labels.theme),
+              trailing: SegmentedButton<ThemePreference>(
+                segments: [
+                  ButtonSegment(
+                    value: ThemePreference.light,
+                    label: Text(labels.light),
+                  ),
+                  ButtonSegment(
+                    value: ThemePreference.dark,
+                    label: Text(labels.dark),
+                  ),
+                  ButtonSegment(
+                    value: ThemePreference.system,
+                    label: Text(labels.system),
+                  ),
+                ],
+                selected: {preferences.themeMode},
+                onSelectionChanged: (selection) {
+                  if (selection.isNotEmpty) {
+                    onThemeModeChanged(selection.first);
+                  }
+                },
+              ),
+            ),
+          ],
         ),
         if (errorCode != null)
           Padding(
@@ -93,31 +137,7 @@ class GeneralSettingsView extends StatelessWidget {
                   : TextButton(onPressed: onRetry, child: Text(labels.retry)),
             ),
           ),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          title: Text(labels.theme),
-          trailing: SegmentedButton<ThemePreference>(
-            segments: [
-              ButtonSegment(
-                value: ThemePreference.light,
-                label: Text(labels.light),
-              ),
-              ButtonSegment(
-                value: ThemePreference.dark,
-                label: Text(labels.dark),
-              ),
-              ButtonSegment(
-                value: ThemePreference.system,
-                label: Text(labels.system),
-              ),
-            ],
-            selected: {preferences.themeMode},
-            onSelectionChanged: (selection) {
-              if (selection.isNotEmpty) onThemeModeChanged(selection.first);
-            },
-          ),
-        ),
-        if (labels.input.isNotEmpty) ...[
+        if (showTranslationSections && labels.input.isNotEmpty) ...[
           const SizedBox(height: 16),
           Text(labels.input, style: Theme.of(context).textTheme.titleMedium),
           SwitchListTile(
@@ -133,7 +153,8 @@ class GeneralSettingsView extends StatelessWidget {
                   ),
           ),
         ],
-        if (labels.translationBehaviour.isNotEmpty) ...[
+        if (showTranslationSections &&
+            labels.translationBehaviour.isNotEmpty) ...[
           const SizedBox(height: 16),
           Text(
             labels.translationBehaviour,
@@ -152,7 +173,8 @@ class GeneralSettingsView extends StatelessWidget {
             onChanged: onDoubleClickCopyChanged,
           ),
         ],
-        if (labels.translationTargets.isNotEmpty) ...[
+        if (showTranslationSections &&
+            labels.translationTargets.isNotEmpty) ...[
           const SizedBox(height: 16),
           Row(
             children: [
@@ -195,7 +217,8 @@ class GeneralSettingsView extends StatelessWidget {
                 ),
               ),
         ],
-        if (labels.commonLanguages.isNotEmpty &&
+        if (showTranslationSections &&
+            labels.commonLanguages.isNotEmpty &&
             translationLanguages.isNotEmpty) ...[
           const SizedBox(height: 16),
           Text(
@@ -236,5 +259,38 @@ class GeneralSettingsView extends StatelessWidget {
       if (language.code == code) return language.name;
     }
     return code;
+  }
+}
+
+class _GeneralCard extends StatelessWidget {
+  const _GeneralCard({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: theme.colorScheme.surfaceContainerLowest,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: theme.colorScheme.outlineVariant),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          for (final (index, child) in children.indexed) ...[
+            if (index > 0)
+              Divider(
+                height: 1,
+                indent: 12,
+                endIndent: 12,
+                color: theme.dividerColor.withValues(alpha: 0.5),
+              ),
+            child,
+          ],
+        ],
+      ),
+    );
   }
 }

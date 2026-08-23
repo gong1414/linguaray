@@ -8,7 +8,9 @@ import '../services/shortcut_service/shortcut_service.dart';
 
 const kShortcutToggle = 'toggleQuickWindow';
 const kShortcutSelection = 'translateSelection';
+const kShortcutInput = 'openInputWindow';
 const kShortcutCapture = 'captureAndTranslate';
+const kShortcutCaptureOcr = 'captureOcr';
 const kShortcutClipboard = 'translateInput';
 
 final class RuntimeShortcutRepository implements ShortcutRepository {
@@ -33,11 +35,6 @@ final class RuntimeShortcutRepository implements ShortcutRepository {
     };
     return [
       _record(
-        kShortcutToggle,
-        _store.shortcuts.toggleMiniTranslator,
-        byAction[TriggerAction.toggleQuickWindow],
-      ),
-      _record(
         kShortcutSelection,
         _store.shortcuts.extractTextFromScreenSelection,
         byAction[TriggerAction.translateSelection],
@@ -48,9 +45,24 @@ final class RuntimeShortcutRepository implements ShortcutRepository {
         byAction[TriggerAction.captureAndTranslate],
       ),
       _record(
+        kShortcutInput,
+        _store.shortcuts.translateInputContent,
+        byAction[TriggerAction.openInputWindow],
+      ),
+      _record(
+        kShortcutToggle,
+        _store.shortcuts.toggleMiniTranslator,
+        byAction[TriggerAction.toggleQuickWindow],
+      ),
+      _record(
         kShortcutClipboard,
         _store.shortcuts.extractTextFromClipboard,
         byAction[TriggerAction.translateInput],
+      ),
+      _record(
+        kShortcutCaptureOcr,
+        _store.shortcuts.captureOcr,
+        byAction[TriggerAction.captureOcr],
       ),
     ];
   }
@@ -104,7 +116,14 @@ final class RuntimeShortcutRepository implements ShortcutRepository {
       kShortcutCapture => ShortcutSettingsPatch(
         extractTextFromScreenCapture: accelerator,
       ),
-      _ => ShortcutSettingsPatch(extractTextFromClipboard: accelerator),
+      kShortcutCaptureOcr => ShortcutSettingsPatch(captureOcr: accelerator),
+      kShortcutClipboard => ShortcutSettingsPatch(
+        extractTextFromClipboard: accelerator,
+      ),
+      kShortcutInput => ShortcutSettingsPatch(
+        translateInputContent: accelerator,
+      ),
+      _ => throw ArgumentError.value(actionId, 'actionId'),
     };
   }
 }

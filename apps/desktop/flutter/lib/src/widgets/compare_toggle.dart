@@ -5,9 +5,7 @@ import 'ui.dart';
 
 /// The 对比 N 个服务 / 收起对比 pill — accent-tinted with a rotating chevron.
 ///
-/// Shared by the workbench translation page and the mini translator; the two
-/// sites differ only in box metrics, which each call site passes so the
-/// rendered result matches what the former private copies drew.
+/// Kept as a design-system specimen for multi-provider comparison states.
 class CompareToggle extends StatelessWidget {
   const CompareToggle({
     super.key,

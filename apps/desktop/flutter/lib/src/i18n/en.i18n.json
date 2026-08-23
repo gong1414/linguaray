@@ -80,6 +80,14 @@
     "tray": {
       "context_menu": {
         "show_window": "Show Window",
+        "selection_translation": "Selection Translation",
+        "capture_translation": "Screenshot Translation",
+        "input_translation": "Input Translation",
+        "clipboard_translation": "Clipboard Translation",
+        "show_translation_window": "Show Translation Window",
+        "capture_ocr": "Screenshot OCR",
+        "preferences": "Preferences...",
+        "about": "About LinguaRay",
         "dev_tools": {
           "title": "Dev Tools",
           "open_data_directory": "Open Data Directory"
@@ -335,6 +343,18 @@
   },
   "settings": {
     "version": "v{} (Build {})",
+    "navigation": {
+      "translation_group": "Translation",
+      "translation_settings": "Translation Settings",
+      "translation_services": "Services",
+      "favorites": "Favorites",
+      "history": "History",
+      "ocr_group": "OCR",
+      "ocr_settings": "OCR Settings",
+      "ocr_services": "Services",
+      "general_group": "General",
+      "general_settings": "General Settings"
+    },
     "general": {
       "title": "General",
       "section": {
@@ -421,11 +441,20 @@
         "submit_mode": "Submit With"
       },
       "row": {
-        "toggle_mini_translator": "Show/Hide Window",
-        "extract_text_from_screen_selection": "Extract text from screen selection",
-        "extract_text_from_screen_capture": "Extract text from screen capture",
-        "extract_text_from_clipboard": "Extract text from clipboard",
-        "translate_input": "Translate input content"
+        "toggle_mini_translator": "Show Translation Window",
+        "extract_text_from_screen_selection": "Selection Translation",
+        "extract_text_from_screen_capture": "Screenshot Translation",
+        "capture_ocr": "Screenshot OCR",
+        "extract_text_from_clipboard": "Clipboard Translation",
+        "translate_input": "Input Translation"
+      },
+      "description": {
+        "toggle_mini_translator": "Show the translation window without clearing its previous content.",
+        "selection": "Translate selected text from any app.",
+        "input": "Clear the translation window and open it for manual input.",
+        "capture": "Select a screen region, recognize its text, and translate it.",
+        "capture_ocr": "Select a screen region and show only the recognized text.",
+        "clipboard": "Translate text currently stored in the clipboard."
       },
       "reset_dialog": {
         "title": "Reset Shortcuts",
@@ -461,7 +490,8 @@
     "services": {
       "title": "Services",
       "button": {
-        "add_service": "Add Service..."
+        "add_service": "Add Service...",
+        "manage_providers": "Manage Providers..."
       },
       "section": {
         "available_services": "Available Services"

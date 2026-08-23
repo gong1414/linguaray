@@ -28,6 +28,10 @@ class _TolerantGoldenFileComparator extends LocalFileComparator {
 
   @override
   Future<bool> compare(Uint8List imageBytes, Uri golden) async {
+    if (autoUpdateGoldenFiles) {
+      await update(golden, imageBytes);
+      return true;
+    }
     final result = await GoldenFileComparator.compareLists(
       imageBytes,
       await getGoldenBytes(golden),

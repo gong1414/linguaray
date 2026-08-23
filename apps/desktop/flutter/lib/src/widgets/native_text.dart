@@ -235,7 +235,7 @@ class _NativeTextState extends State<NativeText> {
 /// Sizes the platform view to the text inside it.
 ///
 /// A `LayoutBuilder` would be the obvious way to learn the available width, but
-/// it cannot answer intrinsic queries, and 译文 sits under the workbench's
+/// it cannot answer intrinsic queries, and translated text can sit under an
 /// `IntrinsicHeight`. A layout delegate can: `RenderCustomSingleChildLayoutBox`
 /// routes every intrinsic and dry-layout question straight to [getSize].
 class _NativeTextLayout extends SingleChildLayoutDelegate {

@@ -8,8 +8,9 @@ import 'package:linguaray_ui/linguaray_ui.dart' show LinguaRayMaterialTheme;
 import 'package:nativeapi/nativeapi.dart';
 
 import '../i18n/i18n.dart';
-import '../platform/onboarding_controller.dart';
+import '../platform/menu_accelerator.dart';
 import '../platform/permission_controller.dart';
+import '../platform/platform_types.dart';
 import '../platform/protocol_controller.dart';
 import '../platform/trigger_controller.dart';
 import '../services/app_windows.dart';
@@ -19,19 +20,19 @@ import '../services/runtime.dart' show runtimeDataDirectory;
 import '../services/settings_store.dart';
 import '../services/shortcut_service/shortcut_service.dart';
 import '../ui/quick_translate/quick_translate_screen.dart';
+import '../utils/env.dart';
 import '../utils/language_util.dart';
 import '../widgets/toast_host.dart';
 import '__root.dart';
 import 'debug/runtime.dart' as debug_runtime_route;
-import 'debug/widget_showcase.dart' as widget_showcase_route;
-import 'workbench/index.dart' as workbench_route;
+import 'settings/index.dart' as settings_route;
 
 const _debugInitialRoute = String.fromEnvironment('LINGUARAY_INITIAL_ROUTE');
 
-WorkbenchDestination? get _debugInitialDestination {
+SettingsDestination? get _debugInitialDestination {
   if (!kDebugMode || _debugInitialRoute.trim().isEmpty) return null;
   final route = _debugInitialRoute.trim();
-  for (final destination in WorkbenchDestination.values) {
+  for (final destination in SettingsDestination.values) {
     if (destination.location == route) return destination;
   }
   return null;
@@ -46,19 +47,14 @@ WorkbenchDestination? get _debugInitialDestination {
 /// Modular route organization:
 /// - each route lives in its own module/file
 /// - this file is the composition root for router setup
-GoRouter createWorkbenchAppRouter({String? initialLocation}) {
+GoRouter createSettingsAppRouter({String? initialLocation}) {
   return GoRouter(
     routes: <RouteBase>[
       ...$appRoutes,
       ...debug_runtime_route.$appRoutes,
-      if (kDebugMode) ...widget_showcase_route.$appRoutes,
-      ...workbench_route.$appRoutes,
+      ...settings_route.$appRoutes,
     ],
-    initialLocation:
-        initialLocation ??
-        (onboardingController.isComplete
-            ? pendingWorkbenchLocation
-            : '/welcome'),
+    initialLocation: initialLocation ?? pendingSettingsLocation,
     debugLogDiagnostics: false,
   );
 }
@@ -80,15 +76,15 @@ GoRouter createMiniTranslatorAppRouter() {
 // App widgets
 // ──────────────────────────────────────────────────────────────────────────────
 
-class WorkbenchApp extends StatefulWidget {
-  const WorkbenchApp({super.key});
+class SettingsApp extends StatefulWidget {
+  const SettingsApp({super.key});
 
   @override
-  State<WorkbenchApp> createState() => _WorkbenchAppState();
+  State<SettingsApp> createState() => _SettingsAppState();
 }
 
-class _WorkbenchAppState extends State<WorkbenchApp> {
-  late final GoRouter _router = createWorkbenchAppRouter(
+class _SettingsAppState extends State<SettingsApp> {
+  late final GoRouter _router = createSettingsAppRouter(
     initialLocation: kDebugMode && _debugInitialRoute.trim().isNotEmpty
         ? _debugInitialRoute.trim()
         : null,
@@ -97,13 +93,13 @@ class _WorkbenchAppState extends State<WorkbenchApp> {
   @override
   void initState() {
     super.initState();
-    attachWorkbenchRouter(_router);
+    attachSettingsRouter(_router);
     settingsStore.addListener(_onSettingsChanged);
   }
 
   @override
   void dispose() {
-    detachWorkbenchRouter(_router);
+    detachSettingsRouter(_router);
     settingsStore.removeListener(_onSettingsChanged);
     super.dispose();
   }
@@ -116,7 +112,7 @@ class _WorkbenchAppState extends State<WorkbenchApp> {
   Widget build(BuildContext context) {
     return MaterialApp.router(
       debugShowCheckedModeBanner: false,
-      title: kWorkbenchWindowTitle,
+      title: kSettingsWindowTitle,
       theme: LinguaRayMaterialTheme.light(),
       darkTheme: LinguaRayMaterialTheme.dark(),
       themeMode: settingsStore.themeMode,
@@ -178,7 +174,7 @@ class RootView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // The scope sits above the window manager so one language switch reaches
-    // every window — both the workbench and the mini translator hang off it.
+    // every window — both settings and the mini translator hang off it.
     return TranslationProvider(
       child: const LocaleRebuildScope(child: _RootBodyView()),
     );
@@ -205,24 +201,31 @@ class _RootBodyViewState extends State<_RootBodyView>
     settingsStore.addListener(_handleChanged);
     _setupTrayIcon();
     MacAppPresentation.setHandlers(
-      // The Dock icon only exists while the app is promoted, and the workbench
-      // is the only window worth restoring from it — the mini translator is
-      // tray/shortcut driven and closes on blur. Focus rather than show: a
-      // Dock click brings the window back on whatever page it was on.
-      onReopen: focusWorkbenchWindow,
+      onReopen: showSettingsWindow,
       onOpenSettings: showSettingsWindow,
     );
     unawaited(
       ShortcutService.instance.start(onAction: triggerController.trigger),
     );
     protocolController.onTranslate = (text) {
-      triggerController.quickWindowText.value = text;
+      triggerController.quickWindowRequest.value = QuickWindowRequest(
+        text: text,
+        submit: true,
+        clearExisting: true,
+      );
+      unawaited(
+        showMiniTranslatorWindow(position: miniTranslatorPositionNearCursor()),
+      );
     };
     protocolController.onOpenSettings = showSettingsWindow;
     protocolController.start();
     unawaited(permissionController.refresh());
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      showWorkbenchWindow(destination: _debugInitialDestination);
+      if (_debugInitialDestination == null) {
+        initializeResidentApp();
+      } else {
+        showSettingsWindow(destination: _debugInitialDestination);
+      }
     });
   }
 
@@ -248,7 +251,6 @@ class _RootBodyViewState extends State<_RootBodyView>
     final newLocale = languageToLocale(settingsStore.appLanguage);
     if (newLocale != oldLocale) {
       await context.setLocale(newLocale);
-      _trayIcon.contextMenu = _buildContextMenu();
     }
 
     // Handle show in menu bar toggle
@@ -260,6 +262,10 @@ class _RootBodyViewState extends State<_RootBodyView>
       // point, so the Dock icon takes over.
       dockIconController.setTrayIconVisible(newShowInMenuBar);
     }
+
+    // Rebuild so shortcut edits immediately update the native accelerator
+    // column as well as the registered global shortcuts.
+    _trayIcon.contextMenu = _buildContextMenu();
   }
 
   // ────────────────────────────────────────────────────────────────────────────
@@ -273,71 +279,123 @@ class _RootBodyViewState extends State<_RootBodyView>
     _trayIcon.isVisible = _showInMenuBar;
     dockIconController.setTrayIconVisible(_showInMenuBar);
     _trayIcon.contextMenu = _buildContextMenu();
-    _trayIcon.contextMenuTrigger = ContextMenuTrigger.rightClicked;
-    _trayIcon.on<TrayIconClickedEvent>((event) {
-      handleTrayIconClick(trayBounds: _trayIcon.bounds);
-    });
+    _trayIcon.contextMenuTrigger = ContextMenuTrigger.none;
+    _trayIcon.on<TrayIconClickedEvent>((_) => _openTrayMenuAfterEvent());
+    _trayIcon.on<TrayIconRightClickedEvent>((_) => _openTrayMenuAfterEvent());
+  }
+
+  void _openTrayMenuAfterEvent() {
+    scheduleMicrotask(_trayIcon.openContextMenu);
   }
 
   Menu _buildContextMenu() {
     final menu = Menu();
+    final labels = t.app.tray.context_menu;
+    final shortcuts = settingsStore.shortcuts;
 
-    // ── 显示窗口 ──
-    menu.addItem(
-      MenuItem(t.app.tray.context_menu.show_window)
-        ..on<MenuItemClickedEvent>((_) {
-          // 显示窗口 keeps whatever page the workbench was on.
-          focusWorkbenchWindow();
-        }),
+    _addTrayAction(
+      menu,
+      labels.selection_translation,
+      () => triggerController.trigger(TriggerAction.translateSelection),
+      shortcut: shortcuts.extractTextFromScreenSelection,
+    );
+    _addTrayAction(
+      menu,
+      labels.capture_translation,
+      () => triggerController.trigger(TriggerAction.captureAndTranslate),
+      shortcut: shortcuts.extractTextFromScreenCapture,
+    );
+    _addTrayAction(
+      menu,
+      labels.input_translation,
+      () => triggerController.openInputWindow(trayBounds: _trayIcon.bounds),
+      shortcut: shortcuts.translateInputContent,
+    );
+    _addTrayAction(
+      menu,
+      labels.clipboard_translation,
+      () => triggerController.trigger(TriggerAction.translateInput),
+      shortcut: shortcuts.extractTextFromClipboard,
+    );
+    _addTrayAction(
+      menu,
+      labels.show_translation_window,
+      () =>
+          triggerController.showTranslationWindow(trayBounds: _trayIcon.bounds),
+      shortcut: shortcuts.toggleMiniTranslator,
     );
 
     menu.addSeparator();
+    _addTrayAction(
+      menu,
+      labels.capture_ocr,
+      () => triggerController.trigger(TriggerAction.captureOcr),
+      shortcut: shortcuts.captureOcr,
+    );
 
-    // ── 🔧 开发工具 (仅 Debug 模式可见) ──
+    menu.addSeparator();
+    _addTrayAction(
+      menu,
+      labels.preferences,
+      () async => showSettingsWindow(),
+      shortcut: Platform.isMacOS ? 'Command+,' : 'Ctrl+,',
+    );
+    _addTrayAction(
+      menu,
+      labels.about,
+      () async =>
+          showSettingsWindow(destination: SettingsDestination.settingsAbout),
+    );
+    menu.addItem(
+      MenuItem(
+        'LinguaRay ${Env.instance.appVersion} '
+        '[${Env.instance.appBuildNumber}]',
+      )..enabled = false,
+    );
+
     if (kDebugMode) {
       final devToolsSubmenu = Menu();
-
-      // 打开数据目录
       devToolsSubmenu.addItem(
-        MenuItem(t.app.tray.context_menu.dev_tools.open_data_directory)
+        MenuItem(labels.dev_tools.open_data_directory)
           ..on<MenuItemClickedEvent>((_) async {
             UrlOpener.instance.open('file://${runtimeDataDirectory.path}');
           }),
       );
 
       final devToolsItem = MenuItem(
-        t.app.tray.context_menu.dev_tools.title,
+        labels.dev_tools.title,
         MenuItemType.submenu,
       );
       devToolsItem.submenu = devToolsSubmenu;
       menu.addItem(devToolsItem);
     }
 
-    menu.addItem(
-      MenuItem(
-        t.app.tray.context_menu.check_for_updates,
-      )..on<MenuItemClickedEvent>((_) {
-        showWorkbenchWindow(destination: WorkbenchDestination.settingsUpdates);
-      }),
-    );
-
-    // ── 设置 ──
-    menu.addItem(
-      MenuItem(t.app.tray.context_menu.settings)..on<MenuItemClickedEvent>((_) {
-        showSettingsWindow();
-      }),
-    );
-
     menu.addSeparator();
-
-    // ── 退出 ──
-    menu.addItem(
-      MenuItem(t.app.tray.context_menu.quit)..on<MenuItemClickedEvent>((_) {
+    final quitItem = MenuItem(labels.quit)
+      ..on<MenuItemClickedEvent>((_) {
         exit(0);
-      }),
+      });
+    setNativeMenuAccelerator(
+      quitItem,
+      Platform.isMacOS ? 'Command+Q' : 'Alt+F4',
     );
+    menu.addItem(quitItem);
 
     return menu;
+  }
+
+  void _addTrayAction(
+    Menu menu,
+    String label,
+    Future<void> Function() action, {
+    String? shortcut,
+  }) {
+    final item = MenuItem(label)
+      ..on<MenuItemClickedEvent>((_) => unawaited(action()));
+    if (shortcut != null && shortcut.trim().isNotEmpty) {
+      setNativeMenuAccelerator(item, shortcut);
+    }
+    menu.addItem(item);
   }
 
   @override
@@ -345,8 +403,8 @@ class _RootBodyViewState extends State<_RootBodyView>
     return ValueListenableBuilder<AppSurface>(
       valueListenable: appSurface,
       builder: (context, surface, _) => switch (surface) {
-        AppSurface.workbench => const WorkbenchApp(
-          key: ValueKey(AppSurface.workbench),
+        AppSurface.settings => const SettingsApp(
+          key: ValueKey(AppSurface.settings),
         ),
         AppSurface.miniTranslator => const MiniTranslatorApp(
           key: ValueKey(AppSurface.miniTranslator),

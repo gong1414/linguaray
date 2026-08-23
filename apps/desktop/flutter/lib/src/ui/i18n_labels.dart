@@ -1,98 +1,8 @@
 import 'package:linguaray_application/linguaray_application.dart';
 
 import '../i18n/i18n.dart';
-import 'chrome/workbench_shell_view.dart';
-import 'first_run/first_run_view.dart';
 import 'quick_translate/widgets/quick_translate_view.dart';
 import 'settings/settings_labels.dart';
-import 'translation/widgets/translation_workspace_view.dart';
-
-WorkbenchShellLabels workbenchShellLabels() => WorkbenchShellLabels(
-  appName: t.ui.shell.app_name,
-  translate: t.ui.shell.translate,
-  history: t.workbench.history,
-  glossary: t.workbench.glossary,
-  vocabulary: t.ui.shell.vocabulary,
-  settings: t.ui.shell.settings,
-  minimize: t.ui.shell.minimize,
-  maximize: t.ui.shell.maximize,
-  close: t.ui.shell.close,
-);
-
-FirstRunLabels firstRunLabels() {
-  final ui = t.ui.first_run;
-  return FirstRunLabels(
-    title: ui.title,
-    subtitle: ui.subtitle,
-    permissionsTitle: ui.permissions_title,
-    permissionsBody: ui.permissions_body,
-    accessibility: ui.accessibility,
-    screenRecording: ui.screen_recording,
-    shortcutsTitle: ui.shortcuts_title,
-    shortcutsBody: ui.shortcuts_body,
-    servicesTitle: ui.services_title,
-    servicesBody: ui.services_body,
-    granted: ui.granted,
-    denied: ui.denied,
-    notRequired: ui.not_required,
-    unknown: ui.unknown,
-    checking: ui.checking,
-    conflict: ui.conflict,
-    noProvider: ui.no_provider,
-    ready: ui.ready,
-    grant: ui.grant,
-    recheck: ui.recheck,
-    configureServices: ui.configure_services,
-    start: ui.start,
-    skip: ui.skip,
-  );
-}
-
-TranslationWorkspaceLabels translationWorkspaceLabels() {
-  final translation = t.workbench.translation;
-  return TranslationWorkspaceLabels(
-    title: t.workbench.translate,
-    subtitle: t.workbench.subtitle.translate,
-    source: translation.source,
-    target: translation.target,
-    autoDetect: t.mini_translator.language.auto_detect,
-    autoMatch: t.mini_translator.language.auto_match,
-    inputHint: translation.input_hint,
-    translate: translation.button,
-    clear: translation.clear,
-    swapLanguages: translation.swap_languages,
-    loadingServices: translation.loading_services,
-    noServices: translation.no_services,
-    translating: translation.translating,
-    failed: translation.failed,
-    empty: translation.empty,
-    services: translation.services,
-    copy: translation.copy_result,
-    copied: translation.copied,
-    configureServices: translation.configure_services,
-    retry: translation.retry,
-    characterCount: (count) => translation.character_count(count: count),
-    failureMessage: translationFailureMessage,
-    partialFailure: (count) => translation.partial_failure(count: count),
-    streaming: translation.streaming,
-    speakSource: t.ui.speech.speak_source,
-    speakResult: t.ui.speech.speak_result,
-    stopSpeech: t.ui.speech.stop,
-    lookup: t.ui.dictionary.lookup,
-    saveWord: t.ui.vocabulary.add,
-    savedWord: t.ui.vocabulary.saved,
-    glossaryHits: translation.terms,
-    glossaryEmpty: translation.terms_hint,
-    glossaryWarning: translation.quality,
-    recoveryRecheck: t.ui.recovery.recheck_permission,
-    recoveryPermissions: t.ui.recovery.open_permission_settings,
-    recoveryConfigureOcr: t.ui.recovery.configure_ocr,
-    recoveryConfigureProvider: t.ui.recovery.configure_translation_provider,
-    recoveryEditInput: t.ui.recovery.edit_input,
-    recoveryChooseLanguage: t.ui.recovery.choose_language,
-    recoverySwitchToGoogleWeb: t.ui.recovery.switch_to_google_web,
-  );
-}
 
 String translationFailureMessage(String? code) {
   final translation = t.workbench.translation;
@@ -164,7 +74,6 @@ QuickTranslateLabels quickTranslateLabels() {
     unpin: t.ui.quick.unpin,
     capture: t.mini_translator.toolbar.tooltip.extract_text_from_screen_capture,
     clipboard: t.mini_translator.toolbar.tooltip.extract_text_from_clipboard,
-    openWorkbench: t.mini_translator.toolbar.menu.open_main_window,
     openSettings: t.mini_translator.toolbar.menu.open_settings,
     autoDetect: t.mini_translator.language.auto_detect,
     autoMatch: t.mini_translator.language.auto_match,
@@ -179,18 +88,40 @@ QuickTranslateLabels quickTranslateLabels() {
     serviceError: t.workbench.translation.failed,
     noServices: t.workbench.translation.no_services,
     failureMessage: translationFailureMessage,
+    captureFailed: t.ui.quick.capture_failed,
+    ocrNotConfigured: t.ui.quick.ocr_not_configured,
+    ocrEmpty: t.ui.quick.ocr_empty,
+    emptySelection: t.ui.quick.empty_selection,
+    clipboardUnavailable: t.ui.quick.clipboard_unavailable,
+    clipboardRestoreFailed: t.ui.quick.clipboard_restore_failed,
+    recheck: t.ui.quick.recheck,
+    speakSource: t.ui.speech.speak_source,
+    speakResult: t.ui.speech.speak_result,
+    stopSpeaking: t.ui.speech.stop,
+    lookup: t.ui.dictionary.lookup,
+    saveVocabulary: t.ui.vocabulary.add,
+    vocabularySaved: t.ui.vocabulary.saved,
+    glossaryMatches: t.workbench.translation.terms,
+    glossaryWarnings: t.workbench.translation.quality,
   );
 }
 
 SettingsShellLabels settingsShellLabels() => SettingsShellLabels(
-  title: t.settings.layout.title,
-  general: t.settings.general.title,
-  services: t.settings.services.title,
-  providers: t.settings.providers.title,
-  shortcuts: t.settings.shortcuts.title,
+  translationGroup: t.settings.navigation.translation_group,
+  translationSettings: t.settings.navigation.translation_settings,
+  translationServices: t.settings.navigation.translation_services,
+  favorites: t.settings.navigation.favorites,
+  history: t.settings.navigation.history,
+  glossary: t.ui.shell.glossary,
+  vocabulary: t.ui.shell.vocabulary,
+  ocrGroup: t.settings.navigation.ocr_group,
+  ocrSettings: t.settings.navigation.ocr_settings,
+  ocrServices: t.settings.navigation.ocr_services,
+  generalGroup: t.settings.navigation.general_group,
+  general: t.settings.navigation.general_settings,
   permissions: t.settings.permissions.title,
+  integration: t.settings.advanced.title,
   about: t.settings.about.title,
-  advanced: t.settings.advanced.title,
   updates: t.ui.updates.title,
 );
 
@@ -230,9 +161,11 @@ ServicesSettingsLabels servicesSettingsLabels() => ServicesSettingsLabels(
   enabled: t.settings.advanced.enable,
   makeDefault: t.settings.services.make_default,
   isDefault: t.settings.providers.detail.models.default_badge,
-  configureProviders: t.settings.providers.button.add,
+  configureProviders: t.settings.services.button.manage_providers,
   commonLanguages: t.settings.general.row.common_languages,
   defaultService: t.settings.general.row.default_translation_service,
+  delete: t.common.ui.button.delete,
+  deleteConfirm: t.settings.providers.delete_dialog.message,
   errorMessage: appErrorMessage,
 );
 
@@ -306,8 +239,21 @@ String shortcutActionLabel(String actionId) => switch (actionId) {
   'toggleQuickWindow' => t.settings.shortcuts.row.toggle_mini_translator,
   'translateSelection' =>
     t.settings.shortcuts.row.extract_text_from_screen_selection,
+  'openInputWindow' => t.settings.shortcuts.row.translate_input,
   'captureAndTranslate' =>
     t.settings.shortcuts.row.extract_text_from_screen_capture,
+  'captureOcr' => t.settings.shortcuts.row.capture_ocr,
   'translateInput' => t.settings.shortcuts.row.extract_text_from_clipboard,
   _ => actionId,
+};
+
+String shortcutActionDescription(String actionId) => switch (actionId) {
+  'toggleQuickWindow' =>
+    t.settings.shortcuts.description.toggle_mini_translator,
+  'translateSelection' => t.settings.shortcuts.description.selection,
+  'openInputWindow' => t.settings.shortcuts.description.input,
+  'captureAndTranslate' => t.settings.shortcuts.description.capture,
+  'captureOcr' => t.settings.shortcuts.description.capture_ocr,
+  'translateInput' => t.settings.shortcuts.description.clipboard,
+  _ => '',
 };

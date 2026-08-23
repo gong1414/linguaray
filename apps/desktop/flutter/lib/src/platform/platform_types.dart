@@ -7,8 +7,10 @@ enum PermissionState { granted, denied, notRequired, unknown }
 enum TriggerAction {
   toggleQuickWindow,
   translateSelection,
+  openInputWindow,
   translateInput,
   captureAndTranslate,
+  captureOcr,
 }
 
 enum ShortcutRegistrationState { unregistered, registered, conflict, invalid }

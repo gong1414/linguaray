@@ -9,6 +9,7 @@ abstract final class LinguaRayPalette {
   static const Color navy = Color(0xFF13233F);
   static const Color graphite = Color(0xFF172033);
   static const Color paper = Color(0xFFF7F9FC);
+  static const Color white = Color(0xFFFFFFFF);
 }
 
 @immutable
@@ -22,7 +23,7 @@ final class LinguaRayBrandColors extends ThemeExtension<LinguaRayBrandColors> {
   });
 
   static const light = LinguaRayBrandColors(
-    navy: LinguaRayPalette.navy,
+    navy: LinguaRayPalette.graphite,
     ray: LinguaRayPalette.rayTeal,
     canvas: LinguaRayPalette.paper,
     ink: LinguaRayPalette.graphite,
@@ -32,8 +33,8 @@ final class LinguaRayBrandColors extends ThemeExtension<LinguaRayBrandColors> {
   static const dark = LinguaRayBrandColors(
     navy: LinguaRayPalette.navy,
     ray: LinguaRayPalette.rayTealDark,
-    canvas: LinguaRayPalette.navy,
-    ink: Color(0xFFE8EEF7),
+    canvas: Color(0xFF101827),
+    ink: Color(0xFFF0F4FA),
     resultRule: LinguaRayPalette.rayTealDark,
   );
 
@@ -174,33 +175,33 @@ abstract final class LinguaRayMaterialTheme {
       brightness: Brightness.light,
       primary: LinguaRayPalette.linguaBlue,
       onPrimary: Color(0xFFFFFFFF),
-      primaryContainer: Color(0xFFD9E4FF),
-      onPrimaryContainer: Color(0xFF0B1F66),
+      primaryContainer: Color(0xFFE4EAFC),
+      onPrimaryContainer: Color(0xFF19336F),
       secondary: LinguaRayPalette.rayTeal,
-      onSecondary: Color(0xFFFFFFFF),
-      secondaryContainer: Color(0xFFD3F1F1),
-      onSecondaryContainer: Color(0xFF043838),
-      tertiary: LinguaRayPalette.navy,
+      onSecondary: Color(0xFF062E2F),
+      secondaryContainer: Color(0xFFDDF4F3),
+      onSecondaryContainer: Color(0xFF0C5557),
+      tertiary: Color(0xFF59677D),
       onTertiary: Color(0xFFFFFFFF),
-      tertiaryContainer: Color(0xFFD5DCEA),
-      onTertiaryContainer: LinguaRayPalette.navy,
-      error: Color(0xFFB3261E),
+      tertiaryContainer: Color(0xFFE7ECF3),
+      onTertiaryContainer: Color(0xFF334056),
+      error: Color(0xFFBA1A1A),
       onError: Color(0xFFFFFFFF),
-      errorContainer: Color(0xFFF9DEDC),
-      onErrorContainer: Color(0xFF410E0B),
+      errorContainer: Color(0xFFFFDAD6),
+      onErrorContainer: Color(0xFF410002),
       surface: LinguaRayPalette.paper,
       onSurface: LinguaRayPalette.graphite,
       surfaceContainerLowest: Color(0xFFFFFFFF),
-      surfaceContainerLow: Color(0xFFEFF3F8),
-      surfaceContainer: Color(0xFFE7EDF5),
-      surfaceContainerHigh: Color(0xFFDFE6F0),
-      surfaceContainerHighest: Color(0xFFD6DEEA),
-      onSurfaceVariant: Color(0xFF445060),
-      outline: Color(0xFF6B7686),
-      outlineVariant: Color(0xFFC5CDD8),
+      surfaceContainerLow: Color(0xFFF0F4F8),
+      surfaceContainer: Color(0xFFEAF0F6),
+      surfaceContainerHigh: Color(0xFFE3EAF2),
+      surfaceContainerHighest: Color(0xFFDAE3ED),
+      onSurfaceVariant: Color(0xFF5B6575),
+      outline: Color(0xFF7C8798),
+      outlineVariant: Color(0xFFD5DEE8),
       inverseSurface: LinguaRayPalette.navy,
-      onInverseSurface: Color(0xFFE8EEF7),
-      inversePrimary: Color(0xFFADC2FF),
+      onInverseSurface: LinguaRayPalette.paper,
+      inversePrimary: Color(0xFFB7C7F8),
       scrim: Color(0xFF000000),
       shadow: Color(0xFF000000),
       surfaceTint: Colors.transparent,
@@ -210,34 +211,34 @@ abstract final class LinguaRayMaterialTheme {
   static ColorScheme _darkScheme() {
     return const ColorScheme(
       brightness: Brightness.dark,
-      primary: Color(0xFF9BB3FF),
-      onPrimary: Color(0xFF0A1A4A),
-      primaryContainer: LinguaRayPalette.linguaBlue,
-      onPrimaryContainer: Color(0xFFFFFFFF),
+      primary: Color(0xFFAFC2FF),
+      onPrimary: Color(0xFF10275F),
+      primaryContainer: Color(0xFF25459C),
+      onPrimaryContainer: Color(0xFFE1E8FF),
       secondary: LinguaRayPalette.rayTealDark,
-      onSecondary: Color(0xFF042424),
-      secondaryContainer: Color(0xFF0E5C5C),
-      onSecondaryContainer: Color(0xFFC8F4F3),
-      tertiary: Color(0xFFC5D0E3),
-      onTertiary: LinguaRayPalette.navy,
-      tertiaryContainer: Color(0xFF243552),
-      onTertiaryContainer: Color(0xFFD7E0EE),
+      onSecondary: Color(0xFF003737),
+      secondaryContainer: Color(0xFF134E50),
+      onSecondaryContainer: Color(0xFFB2F3F0),
+      tertiary: Color(0xFFB8C4D8),
+      onTertiary: Color(0xFF263246),
+      tertiaryContainer: Color(0xFF354258),
+      onTertiaryContainer: Color(0xFFDCE5F5),
       error: Color(0xFFFFB4AB),
       onError: Color(0xFF690005),
       errorContainer: Color(0xFF93000A),
       onErrorContainer: Color(0xFFFFDAD6),
-      surface: LinguaRayPalette.navy,
-      onSurface: Color(0xFFE8EEF7),
-      surfaceContainerLowest: Color(0xFF0D182C),
-      surfaceContainerLow: Color(0xFF18253C),
-      surfaceContainer: Color(0xFF1C2A44),
-      surfaceContainerHigh: Color(0xFF23324E),
-      surfaceContainerHighest: Color(0xFF2B3B59),
-      onSurfaceVariant: Color(0xFFB7C2D4),
-      outline: Color(0xFF8A96A8),
-      outlineVariant: Color(0xFF3A4860),
-      inverseSurface: Color(0xFFE8EEF7),
-      onInverseSurface: LinguaRayPalette.navy,
+      surface: Color(0xFF101827),
+      onSurface: Color(0xFFF0F4FA),
+      surfaceContainerLowest: Color(0xFF0B111D),
+      surfaceContainerLow: Color(0xFF151E2D),
+      surfaceContainer: Color(0xFF1A2536),
+      surfaceContainerHigh: Color(0xFF202D40),
+      surfaceContainerHighest: Color(0xFF29384D),
+      onSurfaceVariant: Color(0xFFAAB6C7),
+      outline: Color(0xFF7E8999),
+      outlineVariant: Color(0xFF35445A),
+      inverseSurface: Color(0xFFEEF3FA),
+      onInverseSurface: LinguaRayPalette.graphite,
       inversePrimary: LinguaRayPalette.linguaBlue,
       scrim: Color(0xFF000000),
       shadow: Color(0xFF000000),
@@ -260,8 +261,8 @@ abstract final class LinguaRayMaterialTheme {
       visualDensity: VisualDensity.compact,
       splashFactory: InkRipple.splashFactory,
       platform: resolvedPlatform,
+      fontFamily: 'MiSans',
       fontFamilyFallback: const [
-        'MiSans',
         '.AppleSystemUIFont',
         'Segoe UI',
         'PingFang SC',
@@ -305,7 +306,7 @@ abstract final class LinguaRayMaterialTheme {
       ),
     );
 
-    const radius = 8.0;
+    const radius = 9.0;
     final outline = OutlineInputBorder(
       borderRadius: BorderRadius.circular(radius),
       borderSide: BorderSide(color: scheme.outlineVariant),
@@ -459,7 +460,7 @@ abstract final class LinguaRayMaterialTheme {
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: isDark
-            ? const Color(0xFF243552)
+            ? scheme.surfaceContainerHighest
             : LinguaRayPalette.navy,
         contentTextStyle: textTheme.bodyMedium?.copyWith(color: Colors.white),
       ),
@@ -492,6 +493,17 @@ abstract final class LinguaRayMaterialTheme {
       ),
       focusColor: scheme.primary.withValues(alpha: 0.16),
       hoverColor: scheme.primary.withValues(alpha: 0.06),
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) return scheme.onPrimary;
+          return scheme.onSurfaceVariant;
+        }),
+        trackColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) return scheme.primary;
+          return scheme.surfaceContainerHighest;
+        }),
+        trackOutlineColor: WidgetStatePropertyAll(scheme.outlineVariant),
+      ),
       extensions: <ThemeExtension<dynamic>>[brand, LinguaRayMetrics.standard],
     );
   }

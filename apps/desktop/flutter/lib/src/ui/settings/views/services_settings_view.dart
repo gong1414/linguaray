@@ -7,23 +7,29 @@ import '../settings_labels.dart';
 class ServicesSettingsView extends StatelessWidget {
   const ServicesSettingsView({
     required this.labels,
+    required this.pageTitle,
     required this.services,
+    required this.serviceKind,
     required this.loading,
     required this.onEnabledChanged,
     required this.onMakeDefault,
     required this.onConfigureProviders,
     super.key,
     this.onAdd,
+    this.onDelete,
     this.onReorderTranslation,
     this.errorCode,
     this.onRetry,
   });
 
   final ServicesSettingsLabels labels;
+  final String pageTitle;
   final List<ServiceRecord> services;
+  final String serviceKind;
   final bool loading;
   final void Function(String id, bool enabled) onEnabledChanged;
   final ValueChanged<String> onMakeDefault;
+  final ValueChanged<String>? onDelete;
   final VoidCallback onConfigureProviders;
   final VoidCallback? onAdd;
   final void Function(int oldIndex, int newIndex)? onReorderTranslation;
@@ -32,50 +38,34 @@ class ServicesSettingsView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (loading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    final translation = services
-        .where((service) => service.kind == 'translation')
+    final theme = Theme.of(context);
+    final visible = services
+        .where((service) => service.kind == serviceKind)
         .toList();
-    final ocr = services.where((service) => service.kind == 'ocr').toList();
-
-    if (services.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.all(24),
-        child: StatusMessage(
-          kind: StatusKind.warning,
-          title: labels.empty,
-          action: OutlinedButton(
-            onPressed: onConfigureProviders,
-            child: Text(labels.configureProviders),
-          ),
-        ),
-      );
-    }
+    final cardColor = theme.colorScheme.surfaceContainerLowest;
+    final cardShape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(12),
+      side: BorderSide(color: theme.colorScheme.outlineVariant),
+    );
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 16, 24, 24),
+      padding: const EdgeInsets.fromLTRB(30, 48, 30, 36),
       children: [
-        if (errorCode != null)
-          StatusMessage(
-            kind: StatusKind.error,
-            title: labels.errorMessage?.call(errorCode) ?? labels.loading,
-            action: onRetry == null
-                ? null
-                : OutlinedButton(
-                    onPressed: onRetry,
-                    child: Text(labels.loading),
-                  ),
-          ),
+        Text(pageTitle, style: theme.textTheme.titleLarge),
+        const SizedBox(height: 22),
         Row(
           children: [
             Expanded(
               child: Text(
-                labels.translation,
-                style: Theme.of(context).textTheme.titleMedium,
+                serviceKind == 'ocr' ? labels.ocr : labels.translation,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
               ),
+            ),
+            TextButton(
+              onPressed: onConfigureProviders,
+              child: Text(labels.configureProviders),
             ),
             if (onAdd != null)
               IconButton(
@@ -86,43 +76,80 @@ class ServicesSettingsView extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 8),
-        if (onReorderTranslation == null)
-          for (final service in translation)
-            _ServiceTile(
-              key: ValueKey(service.id),
-              labels: labels,
-              service: service,
-              onEnabledChanged: onEnabledChanged,
-              onMakeDefault: onMakeDefault,
-            )
-        else
-          ReorderableListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            buildDefaultDragHandles: false,
-            itemCount: translation.length,
-            onReorderItem: onReorderTranslation!,
-            itemBuilder: (context, index) => _ServiceTile(
-              key: ValueKey(translation[index].id),
-              labels: labels,
-              service: translation[index],
-              reorderIndex: index,
-              onEnabledChanged: onEnabledChanged,
-              onMakeDefault: onMakeDefault,
+        if (errorCode != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: StatusMessage(
+              kind: StatusKind.error,
+              title: labels.errorMessage?.call(errorCode) ?? labels.loading,
+              action: onRetry == null
+                  ? null
+                  : OutlinedButton(
+                      onPressed: onRetry,
+                      child: Text(labels.loading),
+                    ),
             ),
           ),
-        if (ocr.isNotEmpty) ...[
-          const SizedBox(height: 20),
-          Text(labels.ocr, style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 8),
-          for (final service in ocr)
-            _ServiceTile(
-              labels: labels,
-              service: service,
-              onEnabledChanged: onEnabledChanged,
-              onMakeDefault: onMakeDefault,
+        if (loading)
+          const SizedBox(
+            height: 180,
+            child: Center(child: CircularProgressIndicator()),
+          )
+        else if (visible.isEmpty)
+          Material(
+            color: cardColor,
+            shape: cardShape,
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: StatusMessage(
+                kind: StatusKind.info,
+                title: labels.empty,
+                action: FilledButton.icon(
+                  onPressed: onAdd ?? onConfigureProviders,
+                  icon: const Icon(Icons.add_rounded),
+                  label: Text(labels.title),
+                ),
+              ),
             ),
-        ],
+          )
+        else
+          Material(
+            color: cardColor,
+            shape: cardShape,
+            clipBehavior: Clip.antiAlias,
+            child: onReorderTranslation == null || serviceKind != 'translation'
+                ? Column(
+                    children: [
+                      for (final (index, service) in visible.indexed) ...[
+                        if (index > 0) const Divider(height: 1, indent: 12),
+                        _ServiceTile(
+                          key: ValueKey(service.id),
+                          labels: labels,
+                          service: service,
+                          onEnabledChanged: onEnabledChanged,
+                          onMakeDefault: onMakeDefault,
+                          onDelete: onDelete,
+                        ),
+                      ],
+                    ],
+                  )
+                : ReorderableListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    buildDefaultDragHandles: false,
+                    itemCount: visible.length,
+                    onReorderItem: onReorderTranslation!,
+                    itemBuilder: (context, index) => _ServiceTile(
+                      key: ValueKey(visible[index].id),
+                      labels: labels,
+                      service: visible[index],
+                      reorderIndex: index,
+                      onEnabledChanged: onEnabledChanged,
+                      onMakeDefault: onMakeDefault,
+                      onDelete: onDelete,
+                    ),
+                  ),
+          ),
       ],
     );
   }
@@ -135,6 +162,7 @@ class _ServiceTile extends StatelessWidget {
     required this.service,
     required this.onEnabledChanged,
     required this.onMakeDefault,
+    this.onDelete,
     this.reorderIndex,
   });
 
@@ -142,39 +170,72 @@ class _ServiceTile extends StatelessWidget {
   final ServiceRecord service;
   final void Function(String id, bool enabled) onEnabledChanged;
   final ValueChanged<String> onMakeDefault;
+  final ValueChanged<String>? onDelete;
   final int? reorderIndex;
+
+  String get _displayName {
+    final name = service.name.trim();
+    if (name.isEmpty || name == service.id || name.contains('+')) {
+      return service.providerName;
+    }
+    return name;
+  }
 
   @override
   Widget build(BuildContext context) {
-    return SwitchListTile(
-      contentPadding: EdgeInsets.zero,
-      title: Row(
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 5, 10, 5),
+      child: Row(
         children: [
-          Expanded(child: Text(service.name)),
+          if (reorderIndex != null)
+            ReorderableDragStartListener(
+              index: reorderIndex!,
+              child: const Padding(
+                padding: EdgeInsets.all(8),
+                child: Icon(Icons.drag_indicator_rounded, size: 19),
+              ),
+            )
+          else
+            const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _displayName,
+                  style: Theme.of(context).textTheme.bodyMedium
+                      ?.copyWith(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  service.isDefault
+                      ? '${service.providerName} · ${labels.isDefault}'
+                      : service.providerName,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
           if (!service.isDefault)
             IconButton(
               tooltip: labels.makeDefault,
               onPressed: () => onMakeDefault(service.id),
-              icon: const Icon(Icons.star_outline_rounded),
+              icon: const Icon(Icons.star_outline_rounded, size: 19),
             ),
+          if (onDelete != null)
+            IconButton(
+              tooltip: labels.delete,
+              onPressed: () => onDelete!(service.id),
+              icon: const Icon(Icons.remove_circle_outline_rounded, size: 18),
+            ),
+          Switch(
+            value: service.enabled,
+            onChanged: (value) => onEnabledChanged(service.id, value),
+          ),
         ],
       ),
-      subtitle: Text(
-        service.isDefault
-            ? '${service.providerName} · ${labels.isDefault}'
-            : service.providerName,
-      ),
-      value: service.enabled,
-      onChanged: (value) => onEnabledChanged(service.id, value),
-      secondary: reorderIndex == null
-          ? null
-          : ReorderableDragStartListener(
-              index: reorderIndex!,
-              child: const Padding(
-                padding: EdgeInsets.all(12),
-                child: Icon(Icons.drag_indicator_rounded),
-              ),
-            ),
     );
   }
 }

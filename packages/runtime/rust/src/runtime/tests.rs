@@ -85,6 +85,7 @@ fn update_shortcuts_persists_all_fields_to_settings_file() {
                     extract_text_from_screen_capture: Some("Command+Shift+2".to_owned()),
                     extract_text_from_clipboard: Some("Command+Shift+3".to_owned()),
                     translate_input_content: Some("Option+Z".to_owned()),
+                    capture_ocr: Some("Command+Shift+4".to_owned()),
                 })
                 .await
                 .expect("failed to update shortcuts");
@@ -113,6 +114,10 @@ fn update_shortcuts_persists_all_fields_to_settings_file() {
     assert_eq!(
         json.pointer("/shortcuts/translateInputContent").cloned(),
         Some(serde_json::Value::String("Option+Z".to_owned()))
+    );
+    assert_eq!(
+        json.pointer("/shortcuts/captureOcr").cloned(),
+        Some(serde_json::Value::String("Command+Shift+4".to_owned()))
     );
 }
 
@@ -223,6 +228,7 @@ fn reset_shortcuts_persists_rust_defaults_to_settings_file() {
                     extract_text_from_screen_capture: Some("Command+Shift+2".to_owned()),
                     extract_text_from_clipboard: Some("Command+Shift+3".to_owned()),
                     translate_input_content: Some("Command+Shift+4".to_owned()),
+                    capture_ocr: Some("Command+Shift+5".to_owned()),
                 })
                 .await
                 .expect("failed to update shortcuts");
@@ -263,10 +269,8 @@ fn service_provider_id_suffixes_are_accepted_for_compatibility() {
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 #[test]
 fn system_ocr_recognizes_fixed_catalog_image() {
-    let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(
-        "../../../apps/desktop/flutter/test/goldens/catalog/\
-         workbench_success_light_macos.png",
-    );
+    let fixture =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("test/fixtures/system_ocr_stable.png");
     assert!(fixture.is_file(), "OCR fixture is missing: {fixture:?}");
 
     let runtime = create_runtime();
@@ -462,6 +466,7 @@ fn subscribe_receives_change_for_each_section() {
                     extract_text_from_screen_capture: None,
                     extract_text_from_clipboard: None,
                     translate_input_content: None,
+                    capture_ocr: None,
                 })
                 .await
                 .expect("update_shortcuts failed");

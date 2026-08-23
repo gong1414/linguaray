@@ -20,9 +20,9 @@ void showToast(
 }
 
 /// The window-level surface toasts land on — one per `MaterialApp`, mounted in
-/// its `builder` so both the workbench and the mini translator get their own
+/// its `builder` so both settings and the mini translator get their own
 /// stack (each window is its own tree; a global singleton would put a
-/// workbench receipt over the mini window).
+/// settings receipt over the mini window).
 class ToastHost extends StatefulWidget {
   const ToastHost({
     super.key,

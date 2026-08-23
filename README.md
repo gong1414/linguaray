@@ -21,22 +21,20 @@
 > desktop builds are tested in CI, but there is no signed stable release yet.
 > For evaluation, run the application from source.
 
-<p align="center">
-  <img src="docs/images/workbench.png" alt="LinguaRay translating English text into Simplified Chinese" width="900">
-</p>
-
 ## Why LinguaRay?
 
 Translation should be available inside the workflow you already have—not in
-another browser tab. LinguaRay combines a focused workbench with a compact
-translator that can be opened from the menu bar or a global shortcut.
+another browser tab. LinguaRay starts as a resident menu-bar application: it
+does not open a main window at launch. Translation actions live in the native
+tray menu and global shortcuts; Preferences is the only persistent window.
 
 - **Text, selection, and screenshots** — translate typed or pasted text,
   selected text from another app, or a captured screen region with OCR.
 - **Native desktop behavior** — menu-bar access, configurable shortcuts,
   permission recovery, active-display placement, and DPI-aware windows.
-- **Provider choice** — use system capabilities or configure compatible
-  translation providers without coupling the interface to one vendor.
+- **Useful immediately, configurable later** — built-in web services work
+  without an API key, while a provider catalog covers traditional APIs,
+  OpenAI-compatible endpoints, local servers, and model discovery.
 - **Private by design** — credentials remain in operating-system secure
   storage; normal settings and UI state contain only secret references.
 - **UI and runtime are separate** — Flutter renders the experience while the
@@ -51,12 +49,17 @@ translator that can be opened from the menu bar or a global shortcut.
 | Screenshot capture and system OCR | Implemented for macOS and Windows |
 | Global shortcuts, tray access, and window placement | Implemented |
 | Provider configuration and secure credential storage | Implemented |
+| Translation history, favourites, glossaries, and vocabulary | Implemented |
+| Dictionary lookup and text-to-speech | Implemented where the selected service or OS supports them |
+| Configurable input behaviour and common-language ordering | Implemented |
+| Local API integration and verified update checks | Implemented |
 | macOS and Windows desktop builds | Built and exercised by CI |
 | Signed installers and stable releases | Not published yet |
 
-History, dictionaries, TTS, auto-update, and Linux packages are outside the
-current release scope. Half-finished features stay hidden until they meet the
-same test and platform requirements as the core workflows.
+Linux packages, migration from the retired Tauri prototype, and automatic
+replacement of selected source text are intentionally outside the current
+scope. Half-finished entry points stay hidden until they meet the same test and
+platform requirements as the core workflows.
 
 ## Platform support
 

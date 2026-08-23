@@ -68,6 +68,8 @@ final class TranslationViewModel extends Notifier<TranslationViewState> {
 
   void selectService(String serviceId) {
     state = state.copyWith(selectedServiceId: serviceId);
+    final run = state.run;
+    if (run != null && run.complete) unawaited(_refreshGlossary(run));
   }
 
   void swapLanguages() {

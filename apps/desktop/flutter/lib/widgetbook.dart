@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:linguaray_desktop/src/ui/catalog/catalog.dart';
-import 'package:linguaray_desktop/src/ui/chrome/workbench_shell_view.dart';
 import 'package:linguaray_desktop/src/ui/settings/settings_labels.dart';
 import 'package:linguaray_ui/linguaray_ui.dart' show LinguaRayMaterialTheme;
 import 'package:widgetbook/widgetbook.dart';
@@ -25,21 +24,21 @@ void main() {
         ),
         ViewportAddon(const [
           ViewportData(
-            name: 'Workbench · macOS',
+            name: 'Settings · macOS',
             width: 1000,
             height: 700,
             pixelRatio: 2,
             platform: TargetPlatform.macOS,
           ),
           ViewportData(
-            name: 'Workbench · Windows',
+            name: 'Settings · Windows',
             width: 1000,
             height: 700,
             pixelRatio: 1,
             platform: TargetPlatform.windows,
           ),
           ViewportData(
-            name: 'Workbench min · 840×560',
+            name: 'Settings min · 840×560',
             width: 840,
             height: 560,
             pixelRatio: 1,
@@ -69,43 +68,7 @@ final _catalog = WidgetbookCategory(
   name: 'LinguaRay',
   children: [
     WidgetbookComponent(
-      name: 'Workbench shell',
-      useCases: [
-        WidgetbookUseCase(
-          name: 'macOS · 翻译',
-          builder: (_) => const CatalogShellPreview(
-            chrome: WindowChromeKind.macos,
-            destination: WorkbenchDestinationId.translate,
-            child: TranslationCatalogPreview(
-              scenario: CatalogTranslationScenario.success,
-              showHeader: false,
-            ),
-          ),
-        ),
-        WidgetbookUseCase(
-          name: 'Windows · 设置',
-          builder: (_) => const CatalogShellPreview(
-            chrome: WindowChromeKind.windows,
-            destination: WorkbenchDestinationId.settings,
-            child: SettingsCatalogPreview(section: SettingsSection.general),
-          ),
-        ),
-        WidgetbookUseCase(
-          name: 'English · Translate',
-          builder: (_) => const CatalogShellPreview(
-            chrome: WindowChromeKind.macos,
-            destination: WorkbenchDestinationId.translate,
-            english: true,
-            child: TranslationCatalogPreview(
-              scenario: CatalogTranslationScenario.emptyEn,
-              showHeader: false,
-            ),
-          ),
-        ),
-      ],
-    ),
-    WidgetbookComponent(
-      name: 'History / glossary / vocabulary',
+      name: 'History and updates',
       useCases: [
         WidgetbookUseCase(
           name: 'History · empty',
@@ -116,27 +79,9 @@ final _catalog = WidgetbookCategory(
           builder: (_) => const HistoryCatalogPreview(empty: false),
         ),
         WidgetbookUseCase(
-          name: 'Glossary · empty',
-          builder: (_) => const GlossaryCatalogPreview(empty: true),
-        ),
-        WidgetbookUseCase(
-          name: 'Vocabulary · empty',
-          builder: (_) => const VocabularyCatalogPreview(empty: true),
-        ),
-        WidgetbookUseCase(
           name: 'Updates · available',
           builder: (_) => const UpdatesCatalogPreview(),
         ),
-      ],
-    ),
-    WidgetbookComponent(
-      name: 'Input translation',
-      useCases: [
-        for (final scenario in CatalogTranslationScenario.values)
-          WidgetbookUseCase(
-            name: scenario.label,
-            builder: (_) => TranslationCatalogPreview(scenario: scenario),
-          ),
       ],
     ),
     WidgetbookComponent(
@@ -150,16 +95,6 @@ final _catalog = WidgetbookCategory(
       ],
     ),
     WidgetbookComponent(
-      name: 'First run',
-      useCases: [
-        for (final scenario in CatalogFirstRunScenario.values)
-          WidgetbookUseCase(
-            name: scenario.name,
-            builder: (_) => FirstRunCatalogPreview(scenario: scenario),
-          ),
-      ],
-    ),
-    WidgetbookComponent(
       name: 'Settings',
       useCases: [
         for (final section in SettingsSection.values)
@@ -168,23 +103,23 @@ final _catalog = WidgetbookCategory(
             builder: (_) => SettingsCatalogPreview(section: section),
           ),
         WidgetbookUseCase(
-          name: 'Providers empty',
+          name: 'Translation services empty',
           builder: (_) => const SettingsCatalogPreview(
-            section: SettingsSection.providers,
-            providersEmpty: true,
+            section: SettingsSection.translationServices,
+            servicesEmpty: true,
           ),
         ),
         WidgetbookUseCase(
           name: 'Services empty',
           builder: (_) => const SettingsCatalogPreview(
-            section: SettingsSection.services,
+            section: SettingsSection.ocrServices,
             servicesEmpty: true,
           ),
         ),
         WidgetbookUseCase(
           name: 'Shortcut conflict',
           builder: (_) => const SettingsCatalogPreview(
-            section: SettingsSection.shortcuts,
+            section: SettingsSection.translation,
             shortcutConflict: true,
           ),
         ),

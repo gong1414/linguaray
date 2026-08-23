@@ -7,7 +7,7 @@ enum GeneralSettingsIntent {
 }
 
 /// Carries a one-shot settings action while the app switches from the quick
-/// translator surface to the workbench surface.
+/// translator surface to the settings surface.
 final class GeneralSettingsIntentController extends ChangeNotifier {
   GeneralSettingsIntent? _pending;
 

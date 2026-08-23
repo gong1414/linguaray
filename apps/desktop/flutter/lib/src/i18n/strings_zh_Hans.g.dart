@@ -211,6 +211,9 @@ class _TranslationsSettingsZhHans extends TranslationsSettingsEn {
   @override
   String get version => 'v{} (Build {})';
   @override
+  late final _TranslationsSettingsNavigationZhHans navigation =
+      _TranslationsSettingsNavigationZhHans._(_root);
+  @override
   late final _TranslationsSettingsGeneralZhHans general =
       _TranslationsSettingsGeneralZhHans._(_root);
   @override
@@ -994,6 +997,38 @@ class _TranslationsWorkbenchStatusZhHans extends TranslationsWorkbenchStatusEn {
   String get shortcuts => '⌥Space 小窗 · ⌥⇧2 截图';
 }
 
+// Path: settings.navigation
+class _TranslationsSettingsNavigationZhHans
+    extends TranslationsSettingsNavigationEn {
+  _TranslationsSettingsNavigationZhHans._(TranslationsZhHans root)
+    : this._root = root,
+      super.internal(root);
+
+  final TranslationsZhHans _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get translation_group => '翻译';
+  @override
+  String get translation_settings => '翻译设置';
+  @override
+  String get translation_services => '服务';
+  @override
+  String get favorites => '收藏夹';
+  @override
+  String get history => '历史记录';
+  @override
+  String get ocr_group => 'OCR';
+  @override
+  String get ocr_settings => 'OCR 设置';
+  @override
+  String get ocr_services => '服务';
+  @override
+  String get general_group => '通用';
+  @override
+  String get general_settings => '通用设置';
+}
+
 // Path: settings.general
 class _TranslationsSettingsGeneralZhHans extends TranslationsSettingsGeneralEn {
   _TranslationsSettingsGeneralZhHans._(TranslationsZhHans root)
@@ -1059,6 +1094,9 @@ class _TranslationsSettingsShortcutsZhHans
   @override
   late final _TranslationsSettingsShortcutsRowZhHans row =
       _TranslationsSettingsShortcutsRowZhHans._(_root);
+  @override
+  late final _TranslationsSettingsShortcutsDescriptionZhHans description =
+      _TranslationsSettingsShortcutsDescriptionZhHans._(_root);
   @override
   late final _TranslationsSettingsShortcutsResetDialogZhHans reset_dialog =
       _TranslationsSettingsShortcutsResetDialogZhHans._(_root);
@@ -1709,6 +1747,22 @@ class _TranslationsAppTrayContextMenuZhHans
   @override
   String get show_window => '显示窗口';
   @override
+  String get selection_translation => '划词翻译';
+  @override
+  String get capture_translation => '截图翻译';
+  @override
+  String get input_translation => '输入翻译';
+  @override
+  String get clipboard_translation => '剪贴板翻译';
+  @override
+  String get show_translation_window => '显示翻译窗口';
+  @override
+  String get capture_ocr => '截图 OCR';
+  @override
+  String get preferences => '偏好设置…';
+  @override
+  String get about => '关于 LinguaRay';
+  @override
   late final _TranslationsAppTrayContextMenuDevToolsZhHans dev_tools =
       _TranslationsAppTrayContextMenuDevToolsZhHans._(_root);
   @override
@@ -2060,15 +2114,41 @@ class _TranslationsSettingsShortcutsRowZhHans
 
   // Translations
   @override
-  String get toggle_mini_translator => '显示/隐藏窗口';
+  String get toggle_mini_translator => '显示翻译窗口';
   @override
-  String get extract_text_from_screen_selection => '从屏幕选区提取文字';
+  String get extract_text_from_screen_selection => '划词翻译';
   @override
-  String get extract_text_from_screen_capture => '从屏幕截图提取文字';
+  String get extract_text_from_screen_capture => '截图翻译';
   @override
-  String get extract_text_from_clipboard => '从剪贴板提取文字';
+  String get capture_ocr => '截图 OCR';
   @override
-  String get translate_input => '翻译输入内容';
+  String get extract_text_from_clipboard => '剪贴板翻译';
+  @override
+  String get translate_input => '输入翻译';
+}
+
+// Path: settings.shortcuts.description
+class _TranslationsSettingsShortcutsDescriptionZhHans
+    extends TranslationsSettingsShortcutsDescriptionEn {
+  _TranslationsSettingsShortcutsDescriptionZhHans._(TranslationsZhHans root)
+    : this._root = root,
+      super.internal(root);
+
+  final TranslationsZhHans _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get toggle_mini_translator => '直接显示翻译窗口，不会清空之前的内容。';
+  @override
+  String get selection => '在任意应用中选中文本后直接翻译。';
+  @override
+  String get input => '清空内容并显示翻译窗口，用于手动输入需要翻译的文本。';
+  @override
+  String get capture => '选择屏幕区域，识别其中的文字并翻译。';
+  @override
+  String get capture_ocr => '选择屏幕区域，只显示识别出的文字，不自动翻译。';
+  @override
+  String get clipboard => '翻译当前剪贴板中的文本。';
 }
 
 // Path: settings.shortcuts.reset_dialog
@@ -2121,6 +2201,8 @@ class _TranslationsSettingsServicesButtonZhHans
   // Translations
   @override
   String get add_service => '添加服务...';
+  @override
+  String get manage_providers => '管理供应商...';
 }
 
 // Path: settings.services.section
@@ -2966,6 +3048,14 @@ extension on TranslationsZhHans {
           'common.provider.tencent' => '腾讯',
           'common.provider.youdao' => '有道',
           'app.tray.context_menu.show_window' => '显示窗口',
+          'app.tray.context_menu.selection_translation' => '划词翻译',
+          'app.tray.context_menu.capture_translation' => '截图翻译',
+          'app.tray.context_menu.input_translation' => '输入翻译',
+          'app.tray.context_menu.clipboard_translation' => '剪贴板翻译',
+          'app.tray.context_menu.show_translation_window' => '显示翻译窗口',
+          'app.tray.context_menu.capture_ocr' => '截图 OCR',
+          'app.tray.context_menu.preferences' => '偏好设置…',
+          'app.tray.context_menu.about' => '关于 LinguaRay',
           'app.tray.context_menu.dev_tools.title' => '开发工具',
           'app.tray.context_menu.dev_tools.open_data_directory' => '打开数据目录',
           'app.tray.context_menu.check_for_updates' => '检查更新',
@@ -3238,6 +3328,16 @@ extension on TranslationsZhHans {
           'workbench.version_checking' => '正在检查…',
           'workbench.check_updates' => '检查更新',
           'settings.version' => 'v{} (Build {})',
+          'settings.navigation.translation_group' => '翻译',
+          'settings.navigation.translation_settings' => '翻译设置',
+          'settings.navigation.translation_services' => '服务',
+          'settings.navigation.favorites' => '收藏夹',
+          'settings.navigation.history' => '历史记录',
+          'settings.navigation.ocr_group' => 'OCR',
+          'settings.navigation.ocr_settings' => 'OCR 设置',
+          'settings.navigation.ocr_services' => '服务',
+          'settings.navigation.general_group' => '通用',
+          'settings.navigation.general_settings' => '通用设置',
           'settings.general.title' => '常规',
           'settings.general.section.permissions' => '系统权限',
           'settings.general.section.ocr' => '文字识别',
@@ -3304,13 +3404,21 @@ extension on TranslationsZhHans {
           'settings.shortcuts.section.text_extraction' => '文字提取',
           'settings.shortcuts.section.input_assist' => '输入辅助功能',
           'settings.shortcuts.section.submit_mode' => '提交方式',
-          'settings.shortcuts.row.toggle_mini_translator' => '显示/隐藏窗口',
-          'settings.shortcuts.row.extract_text_from_screen_selection' =>
-            '从屏幕选区提取文字',
-          'settings.shortcuts.row.extract_text_from_screen_capture' =>
-            '从屏幕截图提取文字',
-          'settings.shortcuts.row.extract_text_from_clipboard' => '从剪贴板提取文字',
-          'settings.shortcuts.row.translate_input' => '翻译输入内容',
+          'settings.shortcuts.row.toggle_mini_translator' => '显示翻译窗口',
+          'settings.shortcuts.row.extract_text_from_screen_selection' => '划词翻译',
+          'settings.shortcuts.row.extract_text_from_screen_capture' => '截图翻译',
+          'settings.shortcuts.row.capture_ocr' => '截图 OCR',
+          'settings.shortcuts.row.extract_text_from_clipboard' => '剪贴板翻译',
+          'settings.shortcuts.row.translate_input' => '输入翻译',
+          'settings.shortcuts.description.toggle_mini_translator' =>
+            '直接显示翻译窗口，不会清空之前的内容。',
+          'settings.shortcuts.description.selection' => '在任意应用中选中文本后直接翻译。',
+          'settings.shortcuts.description.input' =>
+            '清空内容并显示翻译窗口，用于手动输入需要翻译的文本。',
+          'settings.shortcuts.description.capture' => '选择屏幕区域，识别其中的文字并翻译。',
+          'settings.shortcuts.description.capture_ocr' =>
+            '选择屏幕区域，只显示识别出的文字，不自动翻译。',
+          'settings.shortcuts.description.clipboard' => '翻译当前剪贴板中的文本。',
           'settings.shortcuts.reset_dialog.title' => '重置快捷键',
           'settings.shortcuts.reset_dialog.message' => '确定要重置所有快捷键为默认值吗？',
           'settings.shortcuts.reset_dialog.confirm' => '重置',
@@ -3336,6 +3444,7 @@ extension on TranslationsZhHans {
           'settings.advanced.disabled' => '已关闭',
           'settings.services.title' => '服务',
           'settings.services.button.add_service' => '添加服务...',
+          'settings.services.button.manage_providers' => '管理供应商...',
           'settings.services.section.available_services' => '可用服务',
           'settings.services.editor.title' => '添加服务',
           'settings.services.editor.subtitle' => '为已配置的提供商新增一项服务',
@@ -3478,6 +3587,9 @@ extension on TranslationsZhHans {
           'settings.providers.detail.models.loading' => '正在加载模型...',
           'settings.providers.detail.models.empty' => '未找到模型。',
           'settings.providers.detail.models.retry' => '重试',
+          _ => null,
+        } ??
+        switch (path) {
           'settings.providers.detail.models.refresh' => '刷新列表',
           'settings.providers.detail.models.default_badge' => '默认',
           'settings.providers.detail.models.set_default' => '设为默认',
@@ -3504,9 +3616,6 @@ extension on TranslationsZhHans {
           'settings.about.up_to_date' => '已是最新版本。',
           'settings.about.check_again' => '重新检查',
           'settings.about.links' => '链接',
-          _ => null,
-        } ??
-        switch (path) {
           'settings.about.website' => '网站',
           'settings.about.github' => 'GitHub',
           'settings.about.report_issue' => '提交问题',
