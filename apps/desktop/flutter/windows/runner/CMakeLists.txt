@@ -27,8 +27,11 @@ target_compile_definitions(${BINARY_NAME} PRIVATE "FLUTTER_VERSION_MINOR=${FLUTT
 target_compile_definitions(${BINARY_NAME} PRIVATE "FLUTTER_VERSION_PATCH=${FLUTTER_VERSION_PATCH}")
 target_compile_definitions(${BINARY_NAME} PRIVATE "FLUTTER_VERSION_BUILD=${FLUTTER_VERSION_BUILD}")
 
-# Disable Windows macros that collide with C++ standard library functions.
-target_compile_definitions(${BINARY_NAME} PRIVATE "NOMINMAX")
+# Disable Windows macros that collide with C++ standard library functions and
+# suppress deprecation warnings emitted by the Windows SDK's SAPI helper
+# headers. Runner sources still compile with Flutter's warnings-as-errors
+# policy; only the SDK's legacy compatibility declarations are exempted.
+target_compile_definitions(${BINARY_NAME} PRIVATE "NOMINMAX" "_CRT_SECURE_NO_WARNINGS")
 
 # Add dependency libraries and include directories. Add any application-specific
 # dependencies here.

@@ -38,6 +38,13 @@ void main() {
     expect(find.byType(ErrorWidget), findsNothing);
     expect(settingsWindowController.window.isVisible, isFalse);
 
+    await tester.runAsync(() async {
+      final deadline = DateTime.now().add(const Duration(seconds: 10));
+      while (ShortcutService.instance.bindings.length != 6 &&
+          DateTime.now().isBefore(deadline)) {
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      }
+    });
     expect(ShortcutService.instance.bindings, hasLength(6));
     expect(
       ShortcutService.instance.bindings.every(
