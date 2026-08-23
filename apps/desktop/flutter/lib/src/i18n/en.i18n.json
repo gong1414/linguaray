@@ -574,7 +574,7 @@
         "models_url": "Models URL"
       },
       "catalog": {
-        "system": "Uses the operating system translation, dictionary, and OCR on this Mac.",
+        "system": "Uses Apple translation and dictionary on macOS, plus built-in OCR on macOS and Windows.",
         "ecdict": "Built-in concise English-Chinese dictionary. Works offline with no API key.",
         "google_web": "Translates through Google Translate’s unofficial web interface. No API key. Experimental.",
         "bing_web": "Translates through Microsoft’s unofficial Edge translator interface. No API key. Experimental.",

@@ -310,9 +310,9 @@ mod tests {
     }
 
     #[test]
-    fn system_is_macos_only() {
+    fn system_is_available_on_both_supported_desktops() {
         let system = preset_by_id("system").unwrap();
         assert!(system.available_on(true));
-        assert!(!system.available_on(false));
+        assert!(system.available_on(false));
     }
 }

@@ -574,7 +574,7 @@
         "models_url": "Models URL"
       },
       "catalog": {
-        "system": "使用这台 Mac 的系统翻译、词典和 OCR。",
+        "system": "在 macOS 上使用 Apple 系统翻译和词典，并在 macOS 与 Windows 上使用系统 OCR。",
         "ecdict": "内置简明英汉词典，无需密钥，可离线使用。",
         "google_web": "通过 Google 翻译的非官方网页接口翻译。无需密钥。实验性。",
         "bing_web": "通过微软 Edge 翻译的非官方网页接口翻译。无需密钥。实验性。",

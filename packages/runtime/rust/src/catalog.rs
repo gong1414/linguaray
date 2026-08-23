@@ -68,7 +68,8 @@ pub struct CatalogModelChoice {
     pub name: String,
 }
 
-fn map_preset(preset: &ProviderPreset) -> CatalogProviderPreset {
+fn map_preset(preset: &ProviderPreset, macos: bool) -> CatalogProviderPreset {
+    let system_capability_available = preset.id != "system" || macos;
     CatalogProviderPreset {
         id: preset.id.to_owned(),
         engine_type: preset.engine_type.as_str().to_owned(),
@@ -99,8 +100,8 @@ fn map_preset(preset: &ProviderPreset) -> CatalogProviderPreset {
                 default_value: field.default_value.map(str::to_owned),
             })
             .collect(),
-        translation: preset.capabilities.translation,
-        dictionary: preset.capabilities.dictionary,
+        translation: preset.capabilities.translation && system_capability_available,
+        dictionary: preset.capabilities.dictionary && system_capability_available,
         ocr: preset.capabilities.ocr,
         llm: preset.capabilities.llm,
         supported_macos: preset.available_on(true),
@@ -130,7 +131,7 @@ pub fn list_provider_catalog() -> Vec<CatalogProviderPreset> {
     let macos = cfg!(target_os = "macos");
     presets_for_platform(macos)
         .into_iter()
-        .map(map_preset)
+        .map(|preset| map_preset(preset, macos))
         .collect()
 }
 
@@ -140,4 +141,26 @@ pub fn list_catalog_snapshot_models(preset_id: String) -> Vec<CatalogModelChoice
         .into_iter()
         .map(map_model)
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use linguaray_engine::catalog::preset_by_id;
+
+    #[test]
+    fn system_catalog_exposes_only_ocr_on_windows() {
+        let system = preset_by_id("system").expect("system preset");
+        let windows = map_preset(system, false);
+        assert!(!windows.translation);
+        assert!(!windows.dictionary);
+        assert!(windows.ocr);
+        assert!(windows.supported_windows);
+
+        let macos = map_preset(system, true);
+        assert!(macos.translation);
+        assert!(macos.dictionary);
+        assert!(macos.ocr);
+        assert!(macos.supported_macos);
+    }
 }

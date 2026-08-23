@@ -2392,7 +2392,8 @@ class _TranslationsSettingsProvidersCatalogZhHans
 
   // Translations
   @override
-  String get system => '使用这台 Mac 的系统翻译、词典和 OCR。';
+  String get system =>
+      '在 macOS 上使用 Apple 系统翻译和词典，并在 macOS 与 Windows 上使用系统 OCR。';
   @override
   String get ecdict => '内置简明英汉词典，无需密钥，可离线使用。';
   @override
@@ -3508,7 +3509,8 @@ extension on TranslationsZhHans {
           'settings.providers.fields.default_model' => '模型',
           'settings.providers.fields.base_url' => 'Base URL',
           'settings.providers.fields.models_url' => 'Models URL',
-          'settings.providers.catalog.system' => '使用这台 Mac 的系统翻译、词典和 OCR。',
+          'settings.providers.catalog.system' =>
+            '在 macOS 上使用 Apple 系统翻译和词典，并在 macOS 与 Windows 上使用系统 OCR。',
           'settings.providers.catalog.ecdict' => '内置简明英汉词典，无需密钥，可离线使用。',
           'settings.providers.catalog.google_web' =>
             '通过 Google 翻译的非官方网页接口翻译。无需密钥。实验性。',

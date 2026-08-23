@@ -2,7 +2,7 @@ use crate::engine::ProviderType;
 
 use super::presets::preset_by_id;
 
-pub const CATALOG_SEED_REVISION: u32 = 2;
+pub const CATALOG_SEED_REVISION: u32 = 3;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SeedProvider {
@@ -25,6 +25,7 @@ pub struct CatalogSeed {
     pub services: Vec<SeedService>,
     pub default_translation_service: String,
     pub default_dictionary_service: String,
+    pub default_ocr_service: String,
     pub translation_service_order: Vec<String>,
 }
 
@@ -42,13 +43,13 @@ pub fn default_seed(macos: bool) -> CatalogSeed {
         preset_id: ecdict.id.to_owned(),
     });
 
+    let system = preset_by_id("system").expect("system preset");
+    providers.push(SeedProvider {
+        id: "system".to_owned(),
+        provider_type: system.engine_type,
+        preset_id: system.id.to_owned(),
+    });
     if macos {
-        let system = preset_by_id("system").expect("system preset");
-        providers.push(SeedProvider {
-            id: "system".to_owned(),
-            provider_type: system.engine_type,
-            preset_id: system.id.to_owned(),
-        });
         services.push(SeedService {
             id: "system+translation".to_owned(),
             provider_id: "system".to_owned(),
@@ -74,6 +75,7 @@ pub fn default_seed(macos: bool) -> CatalogSeed {
 
     let default_translation_service = "google-web+translation".to_owned();
     let default_dictionary_service = "ecdict+dictionary".to_owned();
+    let default_ocr_service = "system+ocr".to_owned();
 
     CatalogSeed {
         revision: CATALOG_SEED_REVISION,
@@ -81,6 +83,7 @@ pub fn default_seed(macos: bool) -> CatalogSeed {
         services,
         default_translation_service,
         default_dictionary_service,
+        default_ocr_service,
         translation_service_order: order,
     }
 }
@@ -96,7 +99,7 @@ mod tests {
     #[test]
     fn macos_seed_uses_google_web_and_keeps_system_available() {
         let seed = default_seed(true);
-        assert_eq!(seed.revision, 2);
+        assert_eq!(seed.revision, 3);
         assert_eq!(
             seed.providers
                 .iter()
@@ -105,6 +108,7 @@ mod tests {
             vec!["ecdict", "system", "google-web"]
         );
         assert_eq!(seed.default_dictionary_service, "ecdict+dictionary");
+        assert_eq!(seed.default_ocr_service, "system+ocr");
         assert_eq!(seed.default_translation_service, "google-web+translation");
         let google = seed
             .services
@@ -136,9 +140,9 @@ mod tests {
     }
 
     #[test]
-    fn windows_seed_uses_google_web_and_skips_system() {
+    fn windows_seed_uses_google_web_and_keeps_system_ocr_available() {
         let seed = default_seed(false);
-        assert!(!seed
+        assert!(seed
             .providers
             .iter()
             .any(|provider| provider.id == "system"));
@@ -147,6 +151,7 @@ mod tests {
             .iter()
             .any(|provider| provider.id == "ecdict"));
         assert_eq!(seed.default_dictionary_service, "ecdict+dictionary");
+        assert_eq!(seed.default_ocr_service, "system+ocr");
         assert_eq!(seed.default_translation_service, "google-web+translation");
         let google = seed
             .services
@@ -158,5 +163,9 @@ mod tests {
             seed.translation_service_order,
             vec!["google-web+translation".to_owned()]
         );
+        assert!(!seed
+            .services
+            .iter()
+            .any(|service| service.id == "system+translation"));
     }
 }
