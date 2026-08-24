@@ -11,6 +11,17 @@
 
 namespace {
 
+HWND FindLinguaRayWindow() {
+  for (int attempt = 0; attempt < 40; ++attempt) {
+    if (HWND window =
+            ::FindWindowW(L"LINGUARAY_DESKTOP_WINDOW", nullptr)) {
+      return window;
+    }
+    ::Sleep(50);
+  }
+  return nullptr;
+}
+
 void DisableRoundedCorners(HWND window) {
   DWORD process_id = 0;
   ::GetWindowThreadProcessId(window, &process_id);
@@ -77,7 +88,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   }
   if (already_running) {
     if (!protocol_url.empty()) {
-      HWND existing = ::FindWindowW(L"FLUTTER_RUNNER_WIN32_WINDOW", L"LinguaRay");
+      HWND existing = FindLinguaRayWindow();
       if (existing != nullptr) {
         COPYDATASTRUCT data{};
         data.dwData = 0x4C5259;  // LRY

@@ -1,8 +1,9 @@
 # Integrations
 
 LinguaRay exposes one typed action table through its `linguaray://` URL scheme
-and an optional loopback HTTP server. The macOS and Windows apps must already
-be running. Actions never replace selected text.
+and an optional loopback HTTP server. URL actions launch LinguaRay when needed;
+the loopback API requires the app to be running. Actions never replace selected
+text.
 
 ## URL scheme
 
@@ -55,3 +56,13 @@ HTTP port or require the local API to be enabled.
 - PopClip passes its already percent-encoded selected text to the URL scheme.
 - SnipDo percent-encodes `PLAIN_TEXT` before starting the registered URL.
 - Raycast offers selection, clipboard, input, and screenshot OCR commands.
+
+Each release publishes `LinguaRay-PopClip.popclipext.zip`,
+`LinguaRay-SnipDo.zip`, and `LinguaRay-Raycast-source.zip`. The PopClip archive
+can be unzipped and opened directly. SnipDo imports the JSON and PowerShell
+action from its extracted folder. The Raycast archive is source for local
+development until the extension is accepted into the Raycast Store.
+
+The signed Windows installer registers `linguaray://` for the current user and
+removes it on uninstall. macOS registers the same scheme from the signed app
+bundle.

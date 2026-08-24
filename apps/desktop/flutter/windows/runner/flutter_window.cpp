@@ -14,8 +14,6 @@
 #include "flutter/generated_plugin_registrant.h"
 #include "utils.h"
 
-#pragma comment(lib, "wininet.lib")
-
 namespace {
 constexpr char kSpeechChannel[] = "linguaray/speech";
 constexpr char kProtocolChannel[] = "linguaray/protocol";

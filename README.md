@@ -55,7 +55,7 @@ tray menu and global shortcuts; Preferences is the only persistent window.
 | Local API, URL-scheme, PopClip, SnipDo, and Raycast integration | Implemented |
 | Local backup/restore, proxy modes, and verified update checks | Implemented |
 | macOS and Windows desktop builds | Built and exercised by CI |
-| Signed installers and stable releases | Not published yet |
+| Signed installers and stable releases | Signed draft workflow is ready; no stable release published yet |
 
 Migration from the retired Tauri prototype and automatic replacement of
 selected source text are intentionally outside the current scope. Half-finished
@@ -124,6 +124,7 @@ Rust runtime (UniFFI) + typed desktop platform services
 
 Read [the architecture guide](docs/ARCHITECTURE.md) for the dependency rules,
 data flow, and storage model.
+Release maintainers should also read [the release guide](docs/RELEASING.md).
 
 ## Development and testing
 

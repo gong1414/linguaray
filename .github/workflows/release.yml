@@ -11,20 +11,33 @@ env:
   FLUTTER_VERSION: 3.47.1
 
 jobs:
-  build:
-    name: build-${{ matrix.device }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: macos-26
-            device: macos
-            build: flutter build macos --release
-          - os: windows-2022
-            device: windows
-            build: flutter build windows --release
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
+  verify:
+    name: verify-tag
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
+        with:
+          components: rustfmt, clippy
+      - run: dart pub get
+      - run: dart run melos run analyze
+      - run: dart run melos run test
+      - run: dart run melos run dependency_validator
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --locked --workspace --all-targets -- -D warnings
+      - run: cargo test --locked --workspace
+
+  macos:
+    name: signed-macos
+    needs: verify
+    runs-on: macos-26
+    timeout-minutes: 75
     defaults:
       run:
         working-directory: apps/desktop/flutter
@@ -36,19 +49,19 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
       - uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
-      - name: Install macOS Rust targets
-        if: runner.os == 'macOS'
-        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
-      - name: Install CocoaPods
-        if: runner.os == 'macOS'
-        run: command -v pod >/dev/null 2>&1 || brew install cocoapods
+        with:
+          components: rustfmt, clippy
+      - run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+      - run: command -v pod >/dev/null 2>&1 || brew install cocoapods
       - name: Resolve workspace dependencies
         working-directory: .
         run: dart pub get
-      - run: flutter test
-      - run: ${{ matrix.build }}
-      - name: Sign and notarize macOS app
-        if: runner.os == 'macOS'
+      - name: Build release app
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          grep -q "^version: ${VERSION}+" pubspec.yaml
+          flutter build macos --release --build-name "$VERSION" --build-number "$GITHUB_RUN_NUMBER"
+      - name: Sign, notarize, and package DMG
         env:
           MACOS_SIGNING_CERTIFICATE_BASE64: ${{ secrets.MACOS_SIGNING_CERTIFICATE_BASE64 }}
           MACOS_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_SIGNING_CERTIFICATE_PASSWORD }}
@@ -56,88 +69,181 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
         run: |
+          set -euo pipefail
+          : "${MACOS_SIGNING_CERTIFICATE_BASE64:?missing macOS signing certificate}"
+          : "${MACOS_SIGNING_CERTIFICATE_PASSWORD:?missing macOS certificate password}"
+          : "${APPLE_TEAM_ID:?missing Apple team ID}"
+          : "${APPLE_ID:?missing Apple ID}"
+          : "${APPLE_APP_SPECIFIC_PASSWORD:?missing Apple app-specific password}"
+
           APP="build/macos/Build/Products/Release/LinguaRay.app"
-          if [ -z "${MACOS_SIGNING_CERTIFICATE_BASE64:-}" ]; then
-            echo "macOS signing secrets are not configured; packaging an unsigned development artifact."
-            mkdir -p dist
-            ditto -c -k --sequesterRsrc --keepParent "$APP" dist/LinguaRay-macos-unsigned.zip
-            (cd dist && shasum -a 256 LinguaRay-macos-unsigned.zip > SHA256SUMS-macos.txt)
-            exit 0
-          fi
-          CERT_PATH="$(mktemp).p12"
-          KEYCHAIN="linguaray-signing.keychain-db"
+          DIST="$PWD/dist"
+          DMG="$DIST/LinguaRay-macos.dmg"
+          CERT_PATH="$RUNNER_TEMP/linguaray-signing.p12"
+          KEYCHAIN="$RUNNER_TEMP/linguaray-signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -hex 24)"
+          cleanup() {
+            security delete-keychain "$KEYCHAIN" >/dev/null 2>&1 || true
+            rm -f "$CERT_PATH"
+          }
+          trap cleanup EXIT
+
           echo "$MACOS_SIGNING_CERTIFICATE_BASE64" | base64 --decode > "$CERT_PATH"
-          security create-keychain -p temporary "$KEYCHAIN"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
           security set-keychain-settings -lut 21600 "$KEYCHAIN"
-          security unlock-keychain -p temporary "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
           security import "$CERT_PATH" -k "$KEYCHAIN" -P "$MACOS_SIGNING_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
-          security set-key-partition-list -S apple-tool:,apple: -s -k temporary "$KEYCHAIN"
-          IDENTITY="$(security find-identity -v -p codesigning "$KEYCHAIN" | awk -F'\"' '/Developer ID Application/{print $2; exit}')"
-          codesign --force --deep --options runtime --sign "$IDENTITY" "$APP"
-          if [ -n "${APPLE_ID:-}" ] && [ -n "${APPLE_APP_SPECIFIC_PASSWORD:-}" ] && [ -n "${APPLE_TEAM_ID:-}" ]; then
-            ditto -c -k --keepParent "$APP" /tmp/LinguaRay-notarize.zip
-            xcrun notarytool submit /tmp/LinguaRay-notarize.zip --apple-id "$APPLE_ID" --password "$APPLE_APP_SPECIFIC_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait
-            xcrun stapler staple "$APP"
-          fi
-          mkdir -p dist
-          ditto -c -k --sequesterRsrc --keepParent "$APP" dist/LinguaRay-macos.zip
-          (cd dist && shasum -a 256 LinguaRay-macos.zip > SHA256SUMS-macos.txt)
-          rm -f "$CERT_PATH"
-      - name: Package Windows build
-        if: runner.os == 'Windows'
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          IDENTITY="$(security find-identity -v -p codesigning "$KEYCHAIN" | awk -F'"' '/Developer ID Application/{print $2; exit}')"
+          test -n "$IDENTITY"
+
+          codesign --force --deep --options runtime --timestamp \
+            --entitlements macos/Runner/Release.entitlements \
+            --keychain "$KEYCHAIN" \
+            --sign "$IDENTITY" "$APP"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+
+          rm -rf "$RUNNER_TEMP/linguaray-dmg-root"
+          mkdir -p "$RUNNER_TEMP/linguaray-dmg-root" "$DIST"
+          ditto "$APP" "$RUNNER_TEMP/linguaray-dmg-root/LinguaRay.app"
+          ln -s /Applications "$RUNNER_TEMP/linguaray-dmg-root/Applications"
+          hdiutil create -volname LinguaRay -srcfolder "$RUNNER_TEMP/linguaray-dmg-root" \
+            -ov -format UDZO "$DMG"
+          codesign --force --timestamp --keychain "$KEYCHAIN" --sign "$IDENTITY" "$DMG"
+          codesign --verify --strict --verbose=2 "$DMG"
+
+          xcrun notarytool submit "$DMG" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+          xcrun stapler staple "$DMG"
+          xcrun stapler validate "$DMG"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-macos
+          path: apps/desktop/flutter/dist/LinguaRay-macos.dmg
+          if-no-files-found: error
+
+  windows:
+    name: signed-windows
+    needs: verify
+    runs-on: windows-2022
+    timeout-minutes: 75
+    defaults:
+      run:
+        working-directory: apps/desktop/flutter
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
+        with:
+          components: rustfmt, clippy
+      - name: Resolve workspace dependencies
+        working-directory: .
+        run: dart pub get
+      - name: Build release app
+        shell: pwsh
+        run: |
+          $version = $env:GITHUB_REF_NAME -replace '^v', ''
+          if (-not (Select-String -Path pubspec.yaml -Pattern "^version: $([regex]::Escape($version))\+")) {
+            throw "Tag version does not match apps/desktop/flutter/pubspec.yaml"
+          }
+          flutter build windows --release --build-name $version --build-number $env:GITHUB_RUN_NUMBER
+      - name: Install pinned Inno Setup
+        shell: pwsh
+        run: choco install innosetup --version=6.7.1 --yes --no-progress
+      - name: Sign payload and build installer
+        shell: pwsh
         env:
           WINDOWS_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
           WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
-        shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force dist | Out-Null
-          $payload = "build/windows/x64/runner/Release"
-          if ($env:WINDOWS_CERTIFICATE_BASE64) {
-            $certPath = Join-Path $env:RUNNER_TEMP "linguaray.pfx"
-            [IO.File]::WriteAllBytes($certPath, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE_BASE64))
-            Get-ChildItem $payload -Recurse -Include *.exe,*.dll | ForEach-Object {
-              & signtool sign /fd SHA256 /f $certPath /p $env:WINDOWS_CERTIFICATE_PASSWORD $_.FullName
-            }
-            Compress-Archive -Path "$payload\*" -DestinationPath dist/LinguaRay-windows-x64.zip
-          } else {
-            Write-Host "Windows Authenticode secrets are not configured; packaging an unsigned development artifact."
-            Compress-Archive -Path "$payload\*" -DestinationPath dist/LinguaRay-windows-x64-unsigned.zip
-          }
-          $lines = @(Get-ChildItem dist/*.zip | ForEach-Object {
-            $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
-            "$hash  $($_.Name)"
-          })
-          $checksumPath = Join-Path (Get-Location) "dist/SHA256SUMS-windows.txt"
-          [IO.File]::WriteAllText(
-            $checksumPath,
-            ($lines -join "`n") + "`n",
-            [Text.UTF8Encoding]::new($false)
+          $ErrorActionPreference = 'Stop'
+          if (-not $env:WINDOWS_CERTIFICATE_BASE64) { throw 'Missing Windows signing certificate' }
+          if (-not $env:WINDOWS_CERTIFICATE_PASSWORD) { throw 'Missing Windows certificate password' }
+
+          $payload = (Resolve-Path 'build/windows/x64/runner/Release').Path
+          $dist = Join-Path $PWD 'dist'
+          New-Item -ItemType Directory -Force $dist | Out-Null
+          $certificate = Join-Path $env:RUNNER_TEMP 'linguaray-signing.pfx'
+          [IO.File]::WriteAllBytes(
+            $certificate,
+            [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE_BASE64)
           )
+          $signTool = (Get-Command signtool.exe -ErrorAction Stop).Source
+          $sign = {
+            param([string]$Path)
+            & $signTool sign /fd SHA256 /td SHA256 /tr https://timestamp.digicert.com `
+              /f $certificate /p $env:WINDOWS_CERTIFICATE_PASSWORD $Path
+            if ($LASTEXITCODE -ne 0) { throw "Signing failed: $Path" }
+          }
+
+          Get-ChildItem $payload -Recurse -File |
+            Where-Object { $_.Extension -in '.exe', '.dll' } |
+            ForEach-Object { & $sign $_.FullName }
+
+          $version = $env:GITHUB_REF_NAME -replace '^v', ''
+          $script = (Resolve-Path 'windows/packaging/exe/LinguaRay.iss').Path
+          $compiler = (Get-Command ISCC.exe -ErrorAction Stop).Source
+          & $compiler "/DSourceDir=$payload" "/DAppVersion=$version" "/O$dist" $script
+          if ($LASTEXITCODE -ne 0) { throw 'Inno Setup compilation failed' }
+
+          $installer = Join-Path $dist 'LinguaRay-windows-x64.exe'
+          & $sign $installer
+          foreach ($file in @((Join-Path $payload 'linguaray.exe'), $installer)) {
+            $signature = Get-AuthenticodeSignature -LiteralPath $file
+            if ($signature.Status -ne 'Valid') {
+              throw "Authenticode verification failed: $file ($($signature.Status))"
+            }
+          }
+          Remove-Item -Force $certificate
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: release-${{ matrix.device }}
-          path: apps/desktop/flutter/dist/*
+          name: release-windows
+          path: apps/desktop/flutter/dist/LinguaRay-windows-x64.exe
           if-no-files-found: error
 
   publish-draft:
     name: publish-draft
-    needs: build
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+    needs: [macos, windows]
+    runs-on: macos-26
+    timeout-minutes: 15
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           pattern: release-*
           path: release-assets
           merge-multiple: true
+      - name: Package integration templates
+        run: python3 scripts/package_integrations.py --output release-assets
+      - name: Create unified checksums
+        run: |
+          test -f release-assets/LinguaRay-macos.dmg
+          test -f release-assets/LinguaRay-windows-x64.exe
+          (cd release-assets && for file in *; do shasum -a 256 "$file"; done > SHA256SUMS.txt)
       - name: Create draft release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: >-
-          gh release create "$GITHUB_REF_NAME" release-assets/*
-          --repo "$GITHUB_REPOSITORY"
-          --draft
-          --generate-notes
-          --title "LinguaRay $GITHUB_REF_NAME"
+        run: |
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" release-assets/* \
+              --repo "$GITHUB_REPOSITORY" --clobber
+            if [ "$(gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)" = "true" ]; then
+              gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+                --draft --title "LinguaRay $GITHUB_REF_NAME"
+            fi
+          else
+            gh release create "$GITHUB_REF_NAME" release-assets/* \
+              --repo "$GITHUB_REPOSITORY" \
+              --draft \
+              --generate-notes \
+              --title "LinguaRay $GITHUB_REF_NAME"
+          fi
