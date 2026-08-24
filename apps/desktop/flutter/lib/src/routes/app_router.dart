@@ -8,6 +8,7 @@ import 'package:linguaray_ui/linguaray_ui.dart' show LinguaRayMaterialTheme;
 import 'package:nativeapi/nativeapi.dart';
 
 import '../i18n/i18n.dart';
+import '../platform/external_action_controller.dart';
 import '../platform/menu_accelerator.dart';
 import '../platform/permission_controller.dart';
 import '../platform/platform_types.dart';
@@ -246,18 +247,9 @@ class _RootBodyViewState extends State<_RootBodyView>
     unawaited(
       ShortcutService.instance.start(onAction: triggerController.trigger),
     );
-    protocolController.onTranslate = (text) {
-      triggerController.quickWindowRequest.value = QuickWindowRequest(
-        text: text,
-        submit: true,
-        clearExisting: true,
-      );
-      unawaited(
-        showMiniTranslatorWindow(position: miniTranslatorPositionNearCursor()),
-      );
-    };
-    protocolController.onOpenSettings = showSettingsWindow;
+    protocolController.onCommand = externalActionController.dispatchProtocol;
     protocolController.start();
+    externalActionController.start();
     unawaited(permissionController.refresh());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_debugInitialDestination == null) {

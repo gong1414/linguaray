@@ -17,6 +17,7 @@ class ProtocolController {
   final ValueNotifier<ProtocolCommand?> lastCommand = ValueNotifier(null);
   void Function(String text)? onTranslate;
   void Function()? onOpenSettings;
+  Future<void> Function(ProtocolCommand command)? onCommand;
 
   void start() {
     _channel.setMethodCallHandler(_handle);
@@ -25,6 +26,11 @@ class ProtocolController {
   Future<void> handleRaw(String raw) async {
     final command = parse(raw);
     lastCommand.value = command;
+    final commandHandler = onCommand;
+    if (commandHandler != null && command.action != ProtocolAction.ignored) {
+      await commandHandler(command);
+      return;
+    }
     switch (command.action) {
       case ProtocolAction.translate:
         final text = command.text;
@@ -44,6 +50,15 @@ class ProtocolController {
             showSettingsWindow();
           } catch (_) {}
         }
+      case ProtocolAction.translateSelection ||
+          ProtocolAction.translateInput ||
+          ProtocolAction.translateClipboard ||
+          ProtocolAction.captureTranslate ||
+          ProtocolAction.captureOcr ||
+          ProtocolAction.clipboardOcr ||
+          ProtocolAction.showTranslationWindow ||
+          ProtocolAction.showOcrWindow:
+        break;
       case ProtocolAction.ignored:
         break;
     }

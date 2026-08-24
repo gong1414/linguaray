@@ -1,0 +1,53 @@
+{
+  "$schema": "https://www.raycast.com/schemas/extension.json",
+  "name": "linguaray",
+  "title": "LinguaRay",
+  "description": "Trigger LinguaRay translation and OCR actions.",
+  "icon": "icon.png",
+  "author": "gong1414",
+  "platforms": ["macOS", "Windows"],
+  "categories": ["Productivity"],
+  "license": "MIT",
+  "commands": [
+    {
+      "name": "translate-selection",
+      "title": "Translate Selection",
+      "description": "Translate text selected in the frontmost app",
+      "mode": "no-view"
+    },
+    {
+      "name": "translate-clipboard",
+      "title": "Translate Clipboard",
+      "description": "Translate clipboard text",
+      "mode": "no-view"
+    },
+    {
+      "name": "input-translate",
+      "title": "Input Translation",
+      "description": "Open LinguaRay's input translation window",
+      "mode": "no-view"
+    },
+    {
+      "name": "capture-ocr",
+      "title": "Screenshot OCR",
+      "description": "Capture a region and recognize its text",
+      "mode": "no-view"
+    }
+  ],
+  "scripts": {
+    "build": "ray build -e dist",
+    "dev": "ray develop",
+    "lint": "ray lint"
+  },
+  "dependencies": {
+    "@raycast/api": "^1.104.16"
+  },
+  "devDependencies": {
+    "@raycast/eslint-config": "^2.0.4",
+    "@types/node": "22.18.0",
+    "@types/react": "19.1.12",
+    "eslint": "^9.35.0",
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.2"
+  }
+}

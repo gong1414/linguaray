@@ -76,6 +76,28 @@ pub enum SettingsChange {
     Vocabulary,
 }
 
+/// A UI action requested by a loopback API client. The runtime transports
+/// intent only; Flutter remains responsible for windows and platform input.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, uniffi::Enum)]
+pub enum ExternalActionKind {
+    TranslateText,
+    TranslateSelection,
+    TranslateInput,
+    TranslateClipboard,
+    CaptureTranslate,
+    CaptureOcr,
+    ClipboardOcr,
+    ShowTranslationWindow,
+    ShowOcrWindow,
+    OpenSettings,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, uniffi::Record)]
+pub struct ExternalActionRequest {
+    pub kind: ExternalActionKind,
+    pub text: Option<String>,
+}
+
 /// Callback invoked by the Rust runtime as LLM streaming chunks arrive.
 ///
 /// Dart/Swift implement this trait and pass it to
@@ -144,6 +166,9 @@ struct RuntimeInner {
     /// see [`broadcast::error::RecvError::Closed`] once the runtime itself
     /// is dropped (i.e. process shutdown).
     events: broadcast::Sender<SettingsChange>,
+    /// Loopback API actions are independent from settings notifications so a
+    /// slow settings observer cannot delay a user-visible command.
+    action_events: broadcast::Sender<ExternalActionRequest>,
 }
 
 /// Process-wide registry mapping a canonical `data_dir` path to the
@@ -244,6 +269,11 @@ pub struct SettingsSubscription {
     receiver: AsyncMutex<broadcast::Receiver<SettingsChange>>,
 }
 
+#[derive(uniffi::Object)]
+pub struct ExternalActionSubscription {
+    receiver: AsyncMutex<broadcast::Receiver<ExternalActionRequest>>,
+}
+
 impl Runtime {
     fn new_impl(data_dir: String) -> Result<Self, String> {
         let key = canonical_data_dir(&data_dir);
@@ -268,6 +298,7 @@ impl Runtime {
         let history = HistoryStore::load(&key);
         let vocabulary = VocabularyStore::load(&key);
         let (events, _) = broadcast::channel(EVENT_CHANNEL_CAPACITY);
+        let (action_events, _) = broadcast::channel(EVENT_CHANNEL_CAPACITY);
         let inner = Arc::new(RuntimeInner {
             settings_file_path: Arc::from(settings_file_path.to_string_lossy().into_owned()),
             state: RwLock::new(state),
@@ -275,6 +306,7 @@ impl Runtime {
             history: RwLock::new(history),
             vocabulary: RwLock::new(vocabulary),
             events,
+            action_events,
         });
         registry.insert(key, inner.clone());
         Ok(Self { inner })
@@ -372,6 +404,12 @@ impl Runtime {
         RuntimeApiServer::start((*self).clone(), host, port)
     }
 
+    pub fn subscribe_actions(&self) -> Arc<ExternalActionSubscription> {
+        Arc::new(ExternalActionSubscription {
+            receiver: AsyncMutex::new(self.inner.action_events.subscribe()),
+        })
+    }
+
     /// Returns the curated language list supported by the app.
     pub fn list_languages(&self) -> Vec<LanguageInfo> {
         linguaray_engine::all_languages()
@@ -384,6 +422,12 @@ impl Runtime {
 }
 
 impl Runtime {
+    pub(crate) fn emit_external_action(&self, request: ExternalActionRequest) {
+        // No receiver means the UI is still starting or already shutting
+        // down. The API request remains safe and does not retain user text.
+        let _ = self.inner.action_events.send(request);
+    }
+
     pub(crate) async fn api_translate(
         &self,
         provider_id: String,
@@ -1378,6 +1422,20 @@ impl SettingsSubscription {
         loop {
             match rx.recv().await {
                 Ok(change) => return Ok(Some(change)),
+                Err(broadcast::error::RecvError::Closed) => return Ok(None),
+                Err(broadcast::error::RecvError::Lagged(_)) => continue,
+            }
+        }
+    }
+}
+
+#[uniffi::export(async_runtime = "tokio")]
+impl ExternalActionSubscription {
+    pub async fn next(&self) -> Result<Option<ExternalActionRequest>, RuntimeError> {
+        let mut receiver = self.receiver.lock().await;
+        loop {
+            match receiver.recv().await {
+                Ok(request) => return Ok(Some(request)),
                 Err(broadcast::error::RecvError::Closed) => return Ok(None),
                 Err(broadcast::error::RecvError::Lagged(_)) => continue,
             }

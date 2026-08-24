@@ -24,6 +24,24 @@ final class ParseProtocolLink {
     switch (action) {
       case 'settings':
         return const ProtocolCommand.settings();
+      case 'selection-translate':
+        return const ProtocolCommand.action(ProtocolAction.translateSelection);
+      case 'input-translate':
+        return const ProtocolCommand.action(ProtocolAction.translateInput);
+      case 'clipboard-translate':
+        return const ProtocolCommand.action(ProtocolAction.translateClipboard);
+      case 'capture-translate':
+        return const ProtocolCommand.action(ProtocolAction.captureTranslate);
+      case 'capture-ocr':
+        return const ProtocolCommand.action(ProtocolAction.captureOcr);
+      case 'clipboard-ocr':
+        return const ProtocolCommand.action(ProtocolAction.clipboardOcr);
+      case 'show-translation':
+        return const ProtocolCommand.action(
+          ProtocolAction.showTranslationWindow,
+        );
+      case 'show-ocr':
+        return const ProtocolCommand.action(ProtocolAction.showOcrWindow);
       case 'translate':
         final text = uri.queryParameters['text'] ?? '';
         if (text.isEmpty) {

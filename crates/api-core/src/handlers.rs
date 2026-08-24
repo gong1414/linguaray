@@ -161,6 +161,8 @@ mod tests {
         let paths = document["paths"].as_object().expect("paths object");
 
         assert!(paths.contains_key("/health"));
+        assert!(paths.contains_key("/actions/translate"));
+        assert!(paths.contains_key("/actions/capture-ocr"));
         assert!(paths.contains_key("/dictionaries/{provider}/lookup"));
         assert!(paths.contains_key("/translations/{provider}/translate"));
         assert!(paths.contains_key("/translations/{provider}/detect-language"));
