@@ -1,3 +1,5 @@
+export '../../models/settings_navigation.dart' show SettingsSection;
+
 final class SettingsShellLabels {
   const SettingsShellLabels({
     required this.translationGroup,
@@ -36,23 +38,6 @@ final class SettingsShellLabels {
   final String vocabulary;
   final String integration;
   final String dataTransfer;
-}
-
-enum SettingsSection {
-  translation,
-  translationServices,
-  favorites,
-  history,
-  glossary,
-  vocabulary,
-  ocr,
-  ocrServices,
-  general,
-  permissions,
-  integration,
-  dataTransfer,
-  updates,
-  about,
 }
 
 final class GeneralSettingsLabels {

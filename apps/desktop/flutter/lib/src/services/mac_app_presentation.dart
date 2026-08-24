@@ -7,7 +7,7 @@ import 'package:flutter/services.dart';
 /// Carries the Dock icon / menu bar decision down to AppKit, and the two events
 /// only AppKit can see — a Dock icon click and the app menu's Preferences… item
 /// — back up. The policy itself lives in [DockIconController]; the routing of
-/// the callbacks lives in `app_router.dart`.
+/// the callbacks lives in `app_host.dart`.
 class MacAppPresentation {
   static const MethodChannel _channel = MethodChannel(
     'linguaray/mac_app_presentation',

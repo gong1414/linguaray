@@ -7,6 +7,7 @@ import 'package:linguaray_runtime/linguaray_runtime.dart'
 import '../services/llm_stream.dart';
 import '../services/runtime.dart';
 import '../services/settings_store.dart';
+import '../utils/provider_util.dart';
 
 final class RuntimeTranslationRepository implements TranslationRepository {
   final Map<String, ProviderType> _providerTypesById = {};
@@ -33,7 +34,7 @@ final class RuntimeTranslationRepository implements TranslationRepository {
     final translationServices = services
         .where((service) {
           if (service.type != ServiceType.translation) return false;
-          if (service.fields[_serviceEnabledField] == 'false') return false;
+          if (!isServiceEnabled(service)) return false;
           final providerType = _providerTypesById[service.providerId];
           if (providerType == ProviderType.system &&
               !const PlatformCapabilities.windows().systemTranslation &&
@@ -42,18 +43,17 @@ final class RuntimeTranslationRepository implements TranslationRepository {
           }
           return true;
         })
-        .map(
-          (service) => TranslationServiceOption(
+        .map((service) {
+          final capabilities = providerCapabilitiesForType(
+            _providerTypesById[service.providerId],
+          );
+          return TranslationServiceOption(
             id: service.id,
             name: service.name.trim().isEmpty ? service.id : service.name,
-            isStreaming: _isStreamingProvider(
-              _providerTypesById[service.providerId],
-            ),
-            omitsSourceLanguage: _isStreamingProvider(
-              _providerTypesById[service.providerId],
-            ),
-          ),
-        )
+            isStreaming: capabilities.streamingTranslation,
+            omitsSourceLanguage: capabilities.omitsSourceLanguage,
+          );
+        })
         .toList(growable: false);
 
     final configuredTargets = settingsStore.general.translationTargets
@@ -169,37 +169,6 @@ final class RuntimeTranslationRepository implements TranslationRepository {
     return languages.isEmpty ? 'en' : languages.first.code;
   }
 
-  bool _isStreamingProvider(ProviderType? type) {
-    return switch (type) {
-      ProviderType.anthropic ||
-      ProviderType.deepSeek ||
-      ProviderType.doubao ||
-      ProviderType.gemini ||
-      ProviderType.groq ||
-      ProviderType.moonshot ||
-      ProviderType.openAi ||
-      ProviderType.openAiCompatible ||
-      ProviderType.ollama ||
-      ProviderType.qwen ||
-      ProviderType.xAi ||
-      ProviderType.zhipu => true,
-      ProviderType.baidu ||
-      ProviderType.caiyun ||
-      ProviderType.deepL ||
-      ProviderType.google ||
-      ProviderType.system ||
-      ProviderType.ecdict ||
-      ProviderType.tencent ||
-      ProviderType.youdao ||
-      ProviderType.googleWeb ||
-      ProviderType.bingWeb ||
-      ProviderType.tencentTransmartWeb ||
-      ProviderType.libreTranslate ||
-      ProviderType.mTranServer => false,
-      null => false,
-    };
-  }
-
   TranslationFailure _translationFailure(Object error) {
     final message = switch (error) {
       ErrorExceptionRuntimeException(:final msg) => msg,
@@ -229,5 +198,3 @@ final class RuntimeTranslationRepository implements TranslationRepository {
 }
 
 bool get _isWindows => Platform.isWindows;
-
-const String _serviceEnabledField = 'enabled';

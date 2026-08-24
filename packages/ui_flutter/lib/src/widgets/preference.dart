@@ -101,7 +101,7 @@ class _RenderHeadingAction extends RenderShiftedBox {
 }
 
 /// A labelled run of preference rows — the counterpart of the app's
-/// `PreferenceListSection`, minus the `List`: that one sits inside a list
+/// A preference-list section, minus the `List`: that one sits inside a list
 /// widget, and here a section sits directly in the page's own column.
 ///
 /// The rows sit closer to their heading than to the section below, which is

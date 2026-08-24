@@ -44,7 +44,6 @@ dev_dependencies:
     sdk: flutter
   integration_test:
     sdk: flutter
-  go_router_builder: ^4.2.1
   slang_build_runner: ^4.13.0
 
 flutter:

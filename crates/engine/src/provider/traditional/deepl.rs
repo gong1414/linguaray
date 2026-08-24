@@ -20,8 +20,6 @@ pub struct DeepLProviderConfig {
 }
 
 pub struct DeepLProvider {
-    #[allow(dead_code)]
-    config: DeepLProviderConfig,
     translation_service: DeepLTranslationService,
 }
 
@@ -36,7 +34,6 @@ impl DeepLProvider {
             return Err("api_key must not be empty".to_owned());
         }
         Ok(Self {
-            config: config.clone(),
             translation_service: DeepLTranslationService {
                 api_key: config.api_key,
                 http: HttpClient::proxy_aware(

@@ -20,8 +20,6 @@ pub struct CaiyunProviderConfig {
 }
 
 pub struct CaiyunProvider {
-    #[allow(dead_code)]
-    config: CaiyunProviderConfig,
     translation_service: CaiyunTranslationService,
 }
 
@@ -40,7 +38,6 @@ impl CaiyunProvider {
             return Err("request_id must not be empty".to_owned());
         }
         Ok(Self {
-            config: config.clone(),
             translation_service: CaiyunTranslationService {
                 token: config.token,
                 request_id: config.request_id,

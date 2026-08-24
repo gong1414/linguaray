@@ -8,6 +8,8 @@ use linguaray_core::{
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use super::configured_default_model;
+
 // ── Spec ──────────────────────────────────────────────────────────────────────
 
 /// Static description of an OpenAI-compatible endpoint. One shared
@@ -138,14 +140,6 @@ pub struct OpenAiCompatibleProviderConfig {
     pub default_model: String,
     #[serde(rename = "modelsUrl", alias = "models_url", default)]
     pub models_url: Option<String>,
-}
-
-fn configured_default_model(default_model: &str) -> Result<String, String> {
-    let default_model = default_model.trim().to_string();
-    if default_model.is_empty() {
-        return Err("default_model must be configured".to_owned());
-    }
-    Ok(default_model)
 }
 
 // ── Provider ──────────────────────────────────────────────────────────────────

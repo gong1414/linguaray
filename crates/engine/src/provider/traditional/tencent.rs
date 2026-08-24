@@ -29,8 +29,6 @@ pub struct TencentProviderConfig {
 }
 
 pub struct TencentProvider {
-    #[allow(dead_code)]
-    config: TencentProviderConfig,
     translation_service: TencentTranslationService,
 }
 
@@ -49,7 +47,6 @@ impl TencentProvider {
             return Err("secret_key must not be empty".to_owned());
         }
         Ok(Self {
-            config: config.clone(),
             translation_service: TencentTranslationService {
                 secret_id: config.secret_id,
                 secret_key: config.secret_key,

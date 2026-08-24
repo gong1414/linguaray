@@ -1,23 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:linguaray_application/linguaray_application.dart';
-import 'package:linguaray_desktop/src/ui/settings/settings_intent_controller.dart';
 import 'package:linguaray_desktop/src/ui/settings/settings_labels.dart';
 import 'package:linguaray_desktop/src/ui/settings/views/general_settings_view.dart';
 
 void main() {
-  test('settings intents are consumed exactly once', () {
-    final controller = GeneralSettingsIntentController();
-    controller.request(GeneralSettingsIntent.addTranslationTarget);
-    expect(controller.hasPending, isTrue);
-    expect(
-      controller.takePending(),
-      GeneralSettingsIntent.addTranslationTarget,
-    );
-    expect(controller.takePending(), isNull);
-    expect(controller.hasPending, isFalse);
-  });
-
   testWidgets('current general view exposes configured translation targets', (
     tester,
   ) async {

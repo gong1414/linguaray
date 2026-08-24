@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 
+import 'proxy_bypass.dart';
+
 class SystemProxySnapshot {
   const SystemProxySnapshot({this.http, this.https, this.bypass = const []});
 
@@ -10,27 +12,9 @@ class SystemProxySnapshot {
   final List<String> bypass;
 
   String resolve(Uri uri) {
-    if (_bypasses(uri.host)) return 'DIRECT';
+    if (bypassesProxy(uri.host, bypass)) return 'DIRECT';
     final proxy = uri.scheme == 'https' ? https ?? http : http;
     return proxy == null || proxy.isEmpty ? 'DIRECT' : 'PROXY $proxy; DIRECT';
-  }
-
-  bool _bypasses(String host) {
-    final normalizedHost = host.toLowerCase();
-    for (final rawRule in bypass) {
-      final rule = rawRule.trim().toLowerCase();
-      if (rule.isEmpty) continue;
-      if (rule == '<local>' && !normalizedHost.contains('.')) return true;
-      if (rule == '*') return true;
-      final withoutWildcard = rule.startsWith('*.') ? rule.substring(2) : rule;
-      final domain = withoutWildcard.startsWith('.')
-          ? withoutWildcard.substring(1)
-          : withoutWildcard;
-      if (normalizedHost == domain || normalizedHost.endsWith('.$domain')) {
-        return true;
-      }
-    }
-    return false;
   }
 }
 

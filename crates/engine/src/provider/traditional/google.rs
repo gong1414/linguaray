@@ -19,8 +19,6 @@ pub struct GoogleProviderConfig {
 }
 
 pub struct GoogleProvider {
-    #[allow(dead_code)]
-    config: GoogleProviderConfig,
     translation_service: GoogleTranslationService,
 }
 
@@ -35,7 +33,6 @@ impl GoogleProvider {
             return Err("api_key must not be empty".to_owned());
         }
         Ok(Self {
-            config: config.clone(),
             translation_service: GoogleTranslationService {
                 api_key: config.api_key,
                 http: HttpClient::proxy_aware(

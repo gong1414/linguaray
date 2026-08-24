@@ -19,8 +19,8 @@ import 'mac_app_presentation.dart';
 /// The mini translator deliberately does *not* promote. It is a popover
 /// anchored under the tray icon that closes as soon as it loses focus, and
 /// flashing a Dock icon on every quick translation is worse than going without
-/// a menu bar for the seconds it is open — its text fields handle the editing
-/// shortcuts themselves (see `NativeTextFieldPlugin.performKeyEquivalent`).
+/// a menu bar for the seconds it is open. Flutter handles its editing
+/// shortcuts while the transient surface has focus.
 ///
 /// Only macOS distinguishes the two policies, so everything here is a no-op
 /// elsewhere.

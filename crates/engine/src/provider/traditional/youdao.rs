@@ -28,8 +28,6 @@ pub struct YoudaoProviderConfig {
 }
 
 pub struct YoudaoProvider {
-    #[allow(dead_code)]
-    config: YoudaoProviderConfig,
     dictionary_service: YoudaoDictionaryService,
     ocr_service: YoudaoOcrService,
     translation_service: YoudaoTranslationService,
@@ -69,7 +67,6 @@ impl YoudaoProvider {
             .unwrap_or_else(|| "https://openapi.youdao.com".to_owned());
 
         Ok(Self {
-            config: config.clone(),
             dictionary_service: YoudaoDictionaryService {
                 app_key: config.app_key.clone(),
                 app_secret: config.app_secret.clone(),

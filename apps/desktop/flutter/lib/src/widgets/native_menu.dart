@@ -68,7 +68,7 @@ enum NativeMenuAlign { start, end }
 /// the keyboard behaviour subtly wrong, and it clips at the window edge where
 /// AppKit's would flip. The trigger stays ours — it has to sit in a row of the
 /// kit's own buttons — and only the open state is native, the same split
-/// [NativeSelect] draws.
+/// a native select control draws.
 ///
 /// The kit's `Menu` stays what the gallery renders, and what a test can drive.
 class NativeMenu extends StatefulWidget {

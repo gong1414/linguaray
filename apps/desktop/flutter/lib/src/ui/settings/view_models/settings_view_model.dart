@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:linguaray_application/linguaray_application.dart';
 
 import '../../../config/dependencies.dart';
+import '../../../data/provider_draft_validation.dart';
 
 final generalSettingsViewModelProvider =
     NotifierProvider<GeneralSettingsViewModel, GeneralSettingsViewState>(
@@ -385,7 +386,6 @@ final class ProvidersSettingsViewModel
   }
 
   String? _validationError(ProviderDraft draft) {
-    if (draft.id.trim().isEmpty) return 'validation_missing';
     final type =
         state.types.where((item) => item.id == draft.presetId).firstOrNull ??
         state.types
@@ -398,14 +398,11 @@ final class ProvidersSettingsViewModel
     final existing = state.providers
         .where((item) => item.id == draft.id)
         .firstOrNull;
-    for (final field in type.fields.where((item) => item.requiredField)) {
-      final value = draft.fields[field.key]?.trim() ?? '';
-      final keepsStoredSecret =
-          field.secret &&
-          existing?.storedSecretKeys.contains(field.key) == true;
-      if (value.isEmpty && !keepsStoredSecret) return 'validation_missing';
-    }
-    return null;
+    return validateProviderDraft(
+      draft: draft,
+      type: type,
+      storedSecretKeys: existing?.storedSecretKeys ?? const {},
+    ).errorCode;
   }
 }
 

@@ -115,6 +115,7 @@ dart run melos run dependency_validator
 cargo fmt --all -- --check
 cargo clippy --locked --workspace --all-targets -- -D warnings
 cargo test --locked --workspace
+python3 scripts/check_uniffi_surface.py
 ```
 
 Use `python3 scripts/format.py --check` to check Dart, Rust, and Swift formatting

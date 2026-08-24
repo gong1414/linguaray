@@ -3,7 +3,33 @@ import '../services/runtime.dart';
 
 /// True for engine adapters that expose an LLM rather than a traditional
 /// translation endpoint.
-bool isLlmProviderType(ProviderType type) {
+bool isLlmProviderType(ProviderType type) =>
+    providerCapabilitiesForType(type).isLlm;
+
+final class ProviderCapabilities {
+  const ProviderCapabilities({
+    required this.isLlm,
+    required this.streamingTranslation,
+    required this.omitsSourceLanguage,
+  });
+
+  final bool isLlm;
+  final bool streamingTranslation;
+  final bool omitsSourceLanguage;
+}
+
+const _llmCapabilities = ProviderCapabilities(
+  isLlm: true,
+  streamingTranslation: true,
+  omitsSourceLanguage: true,
+);
+const _traditionalCapabilities = ProviderCapabilities(
+  isLlm: false,
+  streamingTranslation: false,
+  omitsSourceLanguage: false,
+);
+
+ProviderCapabilities providerCapabilitiesForType(ProviderType? type) {
   return switch (type) {
     ProviderType.anthropic ||
     ProviderType.openAi ||
@@ -16,8 +42,21 @@ bool isLlmProviderType(ProviderType type) {
     ProviderType.doubao ||
     ProviderType.groq ||
     ProviderType.gemini ||
-    ProviderType.openAiCompatible => true,
-    _ => false,
+    ProviderType.openAiCompatible => _llmCapabilities,
+    ProviderType.baidu ||
+    ProviderType.caiyun ||
+    ProviderType.deepL ||
+    ProviderType.google ||
+    ProviderType.system ||
+    ProviderType.ecdict ||
+    ProviderType.tencent ||
+    ProviderType.youdao ||
+    ProviderType.googleWeb ||
+    ProviderType.bingWeb ||
+    ProviderType.tencentTransmartWeb ||
+    ProviderType.libreTranslate ||
+    ProviderType.mTranServer ||
+    null => _traditionalCapabilities,
   };
 }
 

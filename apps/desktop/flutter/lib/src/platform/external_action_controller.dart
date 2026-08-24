@@ -23,32 +23,9 @@ class ExternalActionController {
   }
 
   Future<void> dispatchProtocol(ProtocolCommand command) async {
-    switch (command.action) {
-      case ProtocolAction.translate:
-        final text = command.text?.trim();
-        if (text == null || text.isEmpty) return;
-        await _translateText(text);
-      case ProtocolAction.translateSelection:
-        await _triggers.trigger(TriggerAction.translateSelection);
-      case ProtocolAction.translateInput:
-        await _triggers.openInputWindow();
-      case ProtocolAction.translateClipboard:
-        await _triggers.trigger(TriggerAction.translateInput);
-      case ProtocolAction.captureTranslate:
-        await _triggers.trigger(TriggerAction.captureAndTranslate);
-      case ProtocolAction.captureOcr:
-        await _triggers.trigger(TriggerAction.captureOcr);
-      case ProtocolAction.clipboardOcr:
-        await _triggers.trigger(TriggerAction.clipboardOcr);
-      case ProtocolAction.showTranslationWindow:
-        await _triggers.showTranslationWindow();
-      case ProtocolAction.showOcrWindow:
-        await showOcrWindow(position: ocrWindowPositionNearCursor());
-      case ProtocolAction.settings:
-        showSettingsWindow();
-      case ProtocolAction.ignored:
-        break;
-    }
+    final kind = _externalKindFor(command.action);
+    if (kind == null) return;
+    await _dispatch(kind, command.text);
   }
 
   Future<void> _listen() async {
@@ -66,9 +43,13 @@ class ExternalActionController {
   }
 
   Future<void> _dispatchRuntime(ExternalActionRequest request) async {
-    switch (request.kind) {
+    await _dispatch(request.kind, request.text);
+  }
+
+  Future<void> _dispatch(ExternalActionKind kind, String? rawText) async {
+    switch (kind) {
       case ExternalActionKind.translateText:
-        final text = request.text?.trim();
+        final text = rawText?.trim();
         if (text == null || text.isEmpty) return;
         await _translateText(text);
       case ExternalActionKind.translateSelection:
@@ -103,5 +84,20 @@ class ExternalActionController {
     );
   }
 }
+
+ExternalActionKind? _externalKindFor(ProtocolAction action) => switch (action) {
+  ProtocolAction.translate => ExternalActionKind.translateText,
+  ProtocolAction.translateSelection => ExternalActionKind.translateSelection,
+  ProtocolAction.translateInput => ExternalActionKind.translateInput,
+  ProtocolAction.translateClipboard => ExternalActionKind.translateClipboard,
+  ProtocolAction.captureTranslate => ExternalActionKind.captureTranslate,
+  ProtocolAction.captureOcr => ExternalActionKind.captureOcr,
+  ProtocolAction.clipboardOcr => ExternalActionKind.clipboardOcr,
+  ProtocolAction.showTranslationWindow =>
+    ExternalActionKind.showTranslationWindow,
+  ProtocolAction.showOcrWindow => ExternalActionKind.showOcrWindow,
+  ProtocolAction.settings => ExternalActionKind.openSettings,
+  ProtocolAction.ignored => null,
+};
 
 final externalActionController = ExternalActionController();

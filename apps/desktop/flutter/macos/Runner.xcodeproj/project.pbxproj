@@ -22,11 +22,7 @@
 
 /* Begin PBXBuildFile section */
 		04062AE74CA4566581FA83AC /* Pods_Runner.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = ABBDA37B225F074B2B8AA6ED /* Pods_Runner.framework */; };
-		2A0D6A422E0A100100A1B2C3 /* MacWindowAppearancePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0D6A412E0A100100A1B2C3 /* MacWindowAppearancePlugin.swift */; };
-		2A0D6A452E0A100100A1B2C3 /* NativeTextFieldPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0D6A442E0A100100A1B2C3 /* NativeTextFieldPlugin.swift */; };
 		2A0D6A492E0A100100A1B2C3 /* MacAppPresentationPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0D6A482E0A100100A1B2C3 /* MacAppPresentationPlugin.swift */; };
-		2A0D6A4D2E0A100100A1B2C3 /* NativeTextPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0D6A4C2E0A100100A1B2C3 /* NativeTextPlugin.swift */; };
-		2A0D6A4F2E0A100100A1B2C3 /* SelectionLayoutManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0D6A4E2E0A100100A1B2C3 /* SelectionLayoutManager.swift */; };
 		331C80D8294CF71000263BE5 /* RunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 331C80D7294CF71000263BE5 /* RunnerTests.swift */; };
 		335BBD1B22A9A15E00E9071D /* GeneratedPluginRegistrant.swift in Sources */ = {isa = PBXBuildFile; fileRef = 335BBD1A22A9A15E00E9071D /* GeneratedPluginRegistrant.swift */; };
 		33CC10F12044A3C60003C045 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33CC10F02044A3C60003C045 /* AppDelegate.swift */; };
@@ -68,11 +64,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		2A0D6A412E0A100100A1B2C3 /* MacWindowAppearancePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacWindowAppearancePlugin.swift; sourceTree = "<group>"; };
-		2A0D6A442E0A100100A1B2C3 /* NativeTextFieldPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeTextFieldPlugin.swift; sourceTree = "<group>"; };
 		2A0D6A482E0A100100A1B2C3 /* MacAppPresentationPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacAppPresentationPlugin.swift; sourceTree = "<group>"; };
-		2A0D6A4C2E0A100100A1B2C3 /* NativeTextPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeTextPlugin.swift; sourceTree = "<group>"; };
-		2A0D6A4E2E0A100100A1B2C3 /* SelectionLayoutManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectionLayoutManager.swift; sourceTree = "<group>"; };
 		2F2FBA49257547D877808D45 /* Pods-RunnerTests.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.profile.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.profile.xcconfig"; sourceTree = "<group>"; };
 		331C80D5294CF71000263BE5 /* RunnerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunnerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		331C80D7294CF71000263BE5 /* RunnerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunnerTests.swift; sourceTree = "<group>"; };
@@ -186,10 +178,6 @@
 			isa = PBXGroup;
 			children = (
 				2A0D6A482E0A100100A1B2C3 /* MacAppPresentationPlugin.swift */,
-				2A0D6A412E0A100100A1B2C3 /* MacWindowAppearancePlugin.swift */,
-				2A0D6A442E0A100100A1B2C3 /* NativeTextFieldPlugin.swift */,
-				2A0D6A4C2E0A100100A1B2C3 /* NativeTextPlugin.swift */,
-				2A0D6A4E2E0A100100A1B2C3 /* SelectionLayoutManager.swift */,
 			);
 			path = Plugins;
 			sourceTree = "<group>";
@@ -678,10 +666,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				2A0D6A492E0A100100A1B2C3 /* MacAppPresentationPlugin.swift in Sources */,
-				2A0D6A422E0A100100A1B2C3 /* MacWindowAppearancePlugin.swift in Sources */,
-				2A0D6A452E0A100100A1B2C3 /* NativeTextFieldPlugin.swift in Sources */,
-				2A0D6A4D2E0A100100A1B2C3 /* NativeTextPlugin.swift in Sources */,
-				2A0D6A4F2E0A100100A1B2C3 /* SelectionLayoutManager.swift in Sources */,
 				33CC10F12044A3C60003C045 /* AppDelegate.swift in Sources */,
 				33CC11132044BFA00003C045 /* MainFlutterWindow.swift in Sources */,
 				335BBD1B22A9A15E00E9071D /* GeneratedPluginRegistrant.swift in Sources */,

@@ -37,6 +37,7 @@ jobs:
       - run: cargo clippy --locked --workspace --all-targets -- -D warnings
       - run: cargo test --locked --workspace
       - run: dart run melos run dependency_validator
+      - run: python3 scripts/check_uniffi_surface.py
 
   desktop:
     name: desktop-${{ matrix.device }}

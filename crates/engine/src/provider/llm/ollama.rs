@@ -8,6 +8,8 @@ use linguaray_core::{
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use super::configured_default_model;
+
 // ── Config ────────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Serialize)]
@@ -18,19 +20,9 @@ pub struct OllamaProviderConfig {
     pub default_model: String,
 }
 
-fn configured_default_model(default_model: &str) -> Result<String, String> {
-    let default_model = default_model.trim().to_string();
-    if default_model.is_empty() {
-        return Err("default_model must be configured".to_owned());
-    }
-    Ok(default_model)
-}
-
 // ── Provider ──────────────────────────────────────────────────────────────────
 
 pub struct OllamaProvider {
-    #[allow(dead_code)]
-    config: OllamaProviderConfig,
     llm_service: Arc<OllamaLlmService>,
 }
 
@@ -49,10 +41,7 @@ impl OllamaProvider {
             http: http.clone(),
         });
 
-        Ok(Self {
-            config: config.clone(),
-            llm_service: llm_service.clone(),
-        })
+        Ok(Self { llm_service })
     }
 }
 

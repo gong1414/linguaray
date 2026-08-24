@@ -11,23 +11,32 @@ import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 import 'package:nativeapi/nativeapi.dart';
 
+import '../models/settings_navigation.dart';
 import '../utils/platform_util.dart';
 import 'dock_icon_controller.dart';
+import 'window_positioning.dart';
+
+export '../models/settings_navigation.dart' show SettingsDestination;
+export 'window_positioning.dart'
+    show
+        miniTranslatorPositionAtCursorScreenTopRight,
+        miniTranslatorPositionNearCursor,
+        miniTranslatorPositionNearPoint,
+        ocrWindowPositionNearCursor,
+        ocrWindowPositionNearPoint,
+        positionPopoverNearPoint;
 
 const kSettingsWindowTitle = 'LinguaRay';
 const kMiniTranslatorWindowTitle = 'LinguaRay Quick Translate';
 const kOcrWindowTitle = 'LinguaRay OCR';
 const _kSettingsWindowSize = Size(1000, 700);
 const _kSettingsWindowMinimumSize = Size(780, 520);
-const _kMiniTranslatorInitialSize = Size(396, 420);
 const _kMiniTranslatorMinimumSize = Size(396, 180);
-const _kOcrWindowSize = Size(600, 520);
 const _kOcrWindowMinimumSize = Size(440, 300);
-const _kMiniTranslatorTrayGap = 10.0;
-const _kMiniTranslatorCursorGap = 12.0;
 
 GoRouter? _settingsRouter;
-String _pendingSettingsLocation = '/settings/translation';
+String _pendingSettingsLocation =
+    SettingsDestination.settingsTranslation.location;
 bool _settingsWindowConfigured = false;
 int _surfaceSwitchGeneration = 0;
 
@@ -67,27 +76,6 @@ class AppWindowController {
 const settingsWindowController = AppWindowController();
 const miniTranslatorWindowController = AppWindowController();
 const ocrWindowController = AppWindowController();
-
-enum SettingsDestination {
-  settingsTranslation('/settings/translation'),
-  settingsTranslationServices('/settings/services/translation'),
-  settingsFavorites('/settings/favorites'),
-  settingsHistory('/settings/history'),
-  settingsGlossary('/settings/glossary'),
-  settingsVocabulary('/settings/vocabulary'),
-  settingsOcr('/settings/ocr'),
-  settingsOcrServices('/settings/services/ocr'),
-  settingsGeneral('/settings/general'),
-  settingsPermissions('/settings/permissions'),
-  settingsDataTransfer('/settings/data-transfer'),
-  settingsIntegration('/settings/integration'),
-  settingsUpdates('/settings/updates'),
-  settingsAbout('/settings/about');
-
-  const SettingsDestination(this.location);
-
-  final String location;
-}
 
 void attachSettingsRouter(GoRouter router) {
   _settingsRouter = router;
@@ -186,52 +174,70 @@ void hideSettingsWindow() {
   dockIconController.setSettingsWindowVisible(false);
 }
 
+Future<bool> _mountTransientSurface(Window window, AppSurface surface) async {
+  _surfaceSwitchGeneration++;
+  _requestedSurface = surface;
+  final switchedSurface = appSurface.value != surface;
+  if (!switchedSurface) return false;
+
+  // A fully hidden macOS window may stop producing Flutter frames. Mount the
+  // requested surface while the native host is transparent, then reveal it
+  // only after the new frame has completed.
+  window.opacity = 0;
+  if (!window.isVisible) window.showInactive();
+  appSurface.value = surface;
+  WidgetsBinding.instance.scheduleFrame();
+  await WidgetsBinding.instance.endOfFrame;
+  return true;
+}
+
+void _configureTransientWindow(
+  Window window, {
+  required String title,
+  required Size minimumSize,
+  required bool isResizable,
+}) {
+  window.title = title;
+  window.titleBarStyle = TitleBarStyle.hidden;
+  window.windowControlButtonsVisible = false;
+  window.isResizable = isResizable;
+  window.setMinimumSize(minimumSize.width, minimumSize.height);
+}
+
+void _presentTransientWindow(Window window, Offset? position) {
+  if (position != null) window.setPosition(position.dx, position.dy);
+  window.opacity = 1;
+  window.show();
+  window.focus();
+  dockIconController.setSettingsWindowVisible(false);
+}
+
 Future<void> showMiniTranslatorWindow({
   Offset? position,
   Rect? trayBounds,
 }) async {
   final window = miniTranslatorWindowController.window;
-  _surfaceSwitchGeneration++;
-  _requestedSurface = AppSurface.miniTranslator;
-  final switchedSurface = appSurface.value != AppSurface.miniTranslator;
-  if (switchedSurface) {
-    // A fully hidden macOS window may stop producing Flutter frames. Mount the
-    // compact surface while the native host is transparent, then reveal it
-    // only after the new frame has completed.
-    window.opacity = 0;
-    if (!window.isVisible) window.showInactive();
-    appSurface.value = AppSurface.miniTranslator;
-    WidgetsBinding.instance.scheduleFrame();
-    await WidgetsBinding.instance.endOfFrame;
-  }
-
-  window.title = kMiniTranslatorWindowTitle;
-  window.titleBarStyle = TitleBarStyle.hidden;
-  window.windowControlButtonsVisible = false;
-  window.isResizable = false;
-  window.setMinimumSize(
-    _kMiniTranslatorMinimumSize.width,
-    _kMiniTranslatorMinimumSize.height,
+  final switchedSurface = await _mountTransientSurface(
+    window,
+    AppSurface.miniTranslator,
+  );
+  _configureTransientWindow(
+    window,
+    title: kMiniTranslatorWindowTitle,
+    minimumSize: _kMiniTranslatorMinimumSize,
+    isResizable: false,
   );
   if (switchedSurface) {
     window.setSize(
-      _kMiniTranslatorInitialSize.width,
-      _kMiniTranslatorInitialSize.height,
+      miniTranslatorInitialSize.width,
+      miniTranslatorInitialSize.height,
     );
   }
 
   final newPosition =
       position ??
-      (trayBounds != null
-          ? _miniTranslatorPositionBelowTray(trayBounds)
-          : null);
-  if (newPosition != null) {
-    window.setPosition(newPosition.dx, newPosition.dy);
-  }
-  window.opacity = 1;
-  window.show();
-  window.focus();
-  dockIconController.setSettingsWindowVisible(false);
+      (trayBounds != null ? windowPositionBelowTray(trayBounds) : null);
+  _presentTransientWindow(window, newPosition);
 }
 
 void hideMiniTranslatorWindow() {
@@ -245,43 +251,22 @@ bool get isMiniTranslatorWindowVisible =>
 
 Future<void> showOcrWindow({Offset? position, Rect? trayBounds}) async {
   final window = ocrWindowController.window;
-  _surfaceSwitchGeneration++;
-  _requestedSurface = AppSurface.ocr;
-  final switchedSurface = appSurface.value != AppSurface.ocr;
-  if (switchedSurface) {
-    window.opacity = 0;
-    if (!window.isVisible) window.showInactive();
-    appSurface.value = AppSurface.ocr;
-    WidgetsBinding.instance.scheduleFrame();
-    await WidgetsBinding.instance.endOfFrame;
-  }
-
-  window.title = kOcrWindowTitle;
-  window.titleBarStyle = TitleBarStyle.hidden;
-  window.windowControlButtonsVisible = false;
-  window.isResizable = true;
-  window.setMinimumSize(
-    _kOcrWindowMinimumSize.width,
-    _kOcrWindowMinimumSize.height,
+  final switchedSurface = await _mountTransientSurface(window, AppSurface.ocr);
+  _configureTransientWindow(
+    window,
+    title: kOcrWindowTitle,
+    minimumSize: _kOcrWindowMinimumSize,
+    isResizable: true,
   );
   if (switchedSurface) {
-    window.setSize(_kOcrWindowSize.width, _kOcrWindowSize.height);
+    window.setSize(ocrWindowSize.width, ocrWindowSize.height);
   }
   final newPosition =
       position ??
       (trayBounds != null
-          ? _miniTranslatorPositionBelowTray(
-              trayBounds,
-              windowSize: _kOcrWindowSize,
-            )
+          ? windowPositionBelowTray(trayBounds, windowSize: ocrWindowSize)
           : null);
-  if (newPosition != null) {
-    window.setPosition(newPosition.dx, newPosition.dy);
-  }
-  window.opacity = 1;
-  window.show();
-  window.focus();
-  dockIconController.setSettingsWindowVisible(false);
+  _presentTransientWindow(window, newPosition);
 }
 
 void hideOcrWindow() {
@@ -291,221 +276,3 @@ void hideOcrWindow() {
 
 bool get isOcrWindowVisible =>
     appSurface.value == AppSurface.ocr && ocrWindowController.window.isVisible;
-
-Offset? _miniTranslatorPositionBelowTray(Rect trayBounds, {Size? windowSize}) {
-  final size = windowSize ?? _kMiniTranslatorInitialSize;
-  final anchor = _resolveTrayAnchor(trayBounds);
-  if (anchor == null) return null;
-
-  if (!kIsMacOS) {
-    final position = Offset(
-      anchor.bounds.left - (size.width - anchor.bounds.width) / 2,
-      anchor.bounds.bottom + _kMiniTranslatorTrayGap,
-    );
-    return _clampPositionToDisplay(position, size, anchor.display);
-  }
-
-  final displayBounds = _displayBounds(anchor.display);
-  final menuBarBottom = anchor.display.workArea.top > displayBounds.top
-      ? anchor.display.workArea.top
-      : displayBounds.top + anchor.bounds.height;
-  final position = Offset(
-    anchor.bounds.center.dx - size.width / 2,
-    menuBarBottom + _kMiniTranslatorTrayGap,
-  );
-  return _clampPositionToDisplay(position, size, anchor.display);
-}
-
-/// Places the quick window next to [point] and keeps it in the display's work
-/// area. It flips around the pointer before falling back to clamping.
-Offset? miniTranslatorPositionNearPoint(Offset point, {Size? windowSize}) {
-  final displays = DisplayManager.instance.getAll();
-  if (displays.isEmpty) return null;
-
-  Display? pointDisplay;
-  for (final display in displays) {
-    if (_displayBounds(display).contains(point)) {
-      pointDisplay = display;
-      break;
-    }
-  }
-
-  pointDisplay ??= displays.first;
-  return positionPopoverNearPoint(
-    point: point,
-    windowSize: windowSize ?? _kMiniTranslatorInitialSize,
-    workArea: pointDisplay.workArea,
-  );
-}
-
-Offset? miniTranslatorPositionNearCursor({Size? windowSize}) =>
-    miniTranslatorPositionNearPoint(
-      DisplayManager.instance.getCursorPosition(),
-      windowSize: windowSize,
-    );
-
-Offset? ocrWindowPositionNearPoint(Offset point) =>
-    miniTranslatorPositionNearPoint(point, windowSize: _kOcrWindowSize);
-
-Offset? ocrWindowPositionNearCursor() =>
-    ocrWindowPositionNearPoint(DisplayManager.instance.getCursorPosition());
-
-/// Compatibility alias retained for upstream callers.
-Offset? miniTranslatorPositionAtCursorScreenTopRight({Size? windowSize}) =>
-    miniTranslatorPositionNearCursor(windowSize: windowSize);
-
-@visibleForTesting
-Offset positionPopoverNearPoint({
-  required Offset point,
-  required Size windowSize,
-  required Rect workArea,
-}) {
-  final candidates = [
-    Offset(
-      point.dx + _kMiniTranslatorCursorGap,
-      point.dy + _kMiniTranslatorCursorGap,
-    ),
-    Offset(
-      point.dx + _kMiniTranslatorCursorGap,
-      point.dy - windowSize.height - _kMiniTranslatorCursorGap,
-    ),
-    Offset(
-      point.dx - windowSize.width - _kMiniTranslatorCursorGap,
-      point.dy + _kMiniTranslatorCursorGap,
-    ),
-    Offset(
-      point.dx - windowSize.width - _kMiniTranslatorCursorGap,
-      point.dy - windowSize.height - _kMiniTranslatorCursorGap,
-    ),
-  ];
-  for (final candidate in candidates) {
-    final bounds = candidate & windowSize;
-    if (bounds.left >= workArea.left &&
-        bounds.top >= workArea.top &&
-        bounds.right <= workArea.right &&
-        bounds.bottom <= workArea.bottom) {
-      return candidate;
-    }
-  }
-  final first = candidates.first;
-  return Offset(
-    _clampDouble(first.dx, workArea.left, workArea.right - windowSize.width),
-    _clampDouble(first.dy, workArea.top, workArea.bottom - windowSize.height),
-  );
-}
-
-Offset _clampPositionToDisplay(
-  Offset position,
-  Size windowSize,
-  Display display,
-) {
-  final workArea = display.workArea;
-  return Offset(
-    _clampDouble(position.dx, workArea.left, workArea.right - windowSize.width),
-    _clampDouble(
-      position.dy,
-      workArea.top,
-      workArea.bottom - windowSize.height,
-    ),
-  );
-}
-
-_TrayAnchor? _resolveTrayAnchor(Rect rawBounds) {
-  final displays = DisplayManager.instance.getAll();
-  if (displays.isEmpty) return null;
-
-  final rawCenter = rawBounds.center;
-  for (final display in displays) {
-    if (_displayBounds(display).contains(rawCenter)) {
-      return _TrayAnchor(
-        display: display,
-        bounds: _trayBoundsOnDisplay(rawBounds, display),
-      );
-    }
-  }
-  for (final display in displays) {
-    if (_containsHorizontally(_displayBounds(display), rawCenter.dx)) {
-      return _TrayAnchor(
-        display: display,
-        bounds: _trayBoundsOnDisplay(rawBounds, display),
-      );
-    }
-  }
-  for (final display in displays) {
-    final normalizedBounds = _normalizeScaledTrayBounds(rawBounds, display);
-    if (_containsHorizontally(
-      _displayBounds(display),
-      normalizedBounds.center.dx,
-    )) {
-      return _TrayAnchor(
-        display: display,
-        bounds: _trayBoundsOnDisplay(normalizedBounds, display),
-      );
-    }
-  }
-
-  displays.sort((a, b) {
-    final aDistance = _distanceSquared(_displayBounds(a).center, rawCenter);
-    final bDistance = _distanceSquared(_displayBounds(b).center, rawCenter);
-    return aDistance.compareTo(bDistance);
-  });
-  final display = displays.first;
-  return _TrayAnchor(
-    display: display,
-    bounds: _trayBoundsOnDisplay(rawBounds, display),
-  );
-}
-
-Rect _displayBounds(Display display) {
-  return Rect.fromLTWH(
-    display.position.dx,
-    display.position.dy,
-    display.size.width,
-    display.size.height,
-  );
-}
-
-Rect _trayBoundsOnDisplay(Rect bounds, Display display) {
-  return Rect.fromLTWH(
-    bounds.left,
-    _displayBounds(display).top,
-    bounds.width,
-    bounds.height,
-  );
-}
-
-Rect _normalizeScaledTrayBounds(Rect bounds, Display display) {
-  final scaleFactor = display.scaleFactor;
-  if (scaleFactor == 0 || scaleFactor == 1) return bounds;
-
-  final displayBounds = _displayBounds(display);
-  return Rect.fromLTWH(
-    displayBounds.left +
-        (bounds.left - displayBounds.left * scaleFactor) / scaleFactor,
-    displayBounds.top +
-        (bounds.top - displayBounds.top * scaleFactor) / scaleFactor,
-    bounds.width / scaleFactor,
-    bounds.height / scaleFactor,
-  );
-}
-
-bool _containsHorizontally(Rect rect, double x) =>
-    x >= rect.left && x <= rect.right;
-
-double _distanceSquared(Offset a, Offset b) {
-  final dx = a.dx - b.dx;
-  final dy = a.dy - b.dy;
-  return dx * dx + dy * dy;
-}
-
-double _clampDouble(double value, double min, double max) {
-  if (max < min) return min;
-  return value.clamp(min, max).toDouble();
-}
-
-class _TrayAnchor {
-  const _TrayAnchor({required this.display, required this.bounds});
-
-  final Display display;
-  final Rect bounds;
-}

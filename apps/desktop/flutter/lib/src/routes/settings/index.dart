@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:linguaray_application/linguaray_application.dart';
 
+import '../../models/settings_navigation.dart';
 import '../../services/app_windows.dart'
     show hideSettingsWindow, settingsWindowController;
 import '../../ui/history/history_screen.dart';
@@ -19,90 +20,41 @@ List<RouteBase> get $appRoutes => <RouteBase>[
       child: SettingsHostScreen(location: state.uri.path, child: child),
     ),
     routes: [
-      GoRoute(
-        path: '/settings/translation',
-        pageBuilder: (_, state) =>
-            _noTransitionPage(state, const TranslationSettingsScreen()),
-      ),
-      GoRoute(
-        path: '/settings/services/translation',
-        pageBuilder: (_, state) => _noTransitionPage(
-          state,
-          const ServicesSettingsScreen(serviceKind: 'translation'),
+      for (final destination in SettingsDestination.values)
+        GoRoute(
+          path: destination.location,
+          pageBuilder: (_, state) =>
+              _noTransitionPage(state, _settingsPage(destination)),
         ),
-      ),
-      GoRoute(
-        path: '/settings/favorites',
-        pageBuilder: (_, state) => _noTransitionPage(
-          state,
-          const HistoryScreen(
-            initialFilter: HistoryFilter.favorites,
-            lockFilter: true,
-          ),
-        ),
-      ),
-      GoRoute(
-        path: '/settings/history',
-        pageBuilder: (_, state) => _noTransitionPage(
-          state,
-          const HistoryScreen(initialFilter: HistoryFilter.all),
-        ),
-      ),
-      GoRoute(
-        path: '/settings/glossary',
-        pageBuilder: (_, state) =>
-            _noTransitionPage(state, const GlossarySettingsScreen()),
-      ),
-      GoRoute(
-        path: '/settings/vocabulary',
-        pageBuilder: (_, state) =>
-            _noTransitionPage(state, const VocabularySettingsScreen()),
-      ),
-      GoRoute(
-        path: '/settings/ocr',
-        pageBuilder: (_, state) =>
-            _noTransitionPage(state, const OcrSettingsScreen()),
-      ),
-      GoRoute(
-        path: '/settings/services/ocr',
-        pageBuilder: (_, state) => _noTransitionPage(
-          state,
-          const ServicesSettingsScreen(serviceKind: 'ocr'),
-        ),
-      ),
-      GoRoute(
-        path: '/settings/general',
-        pageBuilder: (_, state) =>
-            _noTransitionPage(state, const GeneralSettingsScreen()),
-      ),
-      GoRoute(
-        path: '/settings/permissions',
-        pageBuilder: (_, state) =>
-            _noTransitionPage(state, const PermissionsSettingsScreen()),
-      ),
-      GoRoute(
-        path: '/settings/integration',
-        pageBuilder: (_, state) =>
-            _noTransitionPage(state, const AdvancedSettingsScreen()),
-      ),
-      GoRoute(
-        path: '/settings/data-transfer',
-        pageBuilder: (_, state) =>
-            _noTransitionPage(state, const DataTransferSettingsScreen()),
-      ),
-      GoRoute(
-        path: '/settings/updates',
-        pageBuilder: (_, state) =>
-            _noTransitionPage(state, const UpdatesSettingsScreen()),
-      ),
-      GoRoute(
-        path: '/settings/about',
-        pageBuilder: (_, state) =>
-            _noTransitionPage(state, const AboutSettingsScreen()),
-      ),
     ],
   ),
 ];
+
+Widget _settingsPage(SettingsDestination destination) => switch (destination) {
+  SettingsDestination.settingsTranslation => const TranslationSettingsScreen(),
+  SettingsDestination.settingsTranslationServices =>
+    const ServicesSettingsScreen(serviceKind: 'translation'),
+  SettingsDestination.settingsFavorites => const HistoryScreen(
+    initialFilter: HistoryFilter.favorites,
+    lockFilter: true,
+  ),
+  SettingsDestination.settingsHistory => const HistoryScreen(
+    initialFilter: HistoryFilter.all,
+  ),
+  SettingsDestination.settingsGlossary => const GlossarySettingsScreen(),
+  SettingsDestination.settingsVocabulary => const VocabularySettingsScreen(),
+  SettingsDestination.settingsOcr => const OcrSettingsScreen(),
+  SettingsDestination.settingsOcrServices => const ServicesSettingsScreen(
+    serviceKind: 'ocr',
+  ),
+  SettingsDestination.settingsGeneral => const GeneralSettingsScreen(),
+  SettingsDestination.settingsPermissions => const PermissionsSettingsScreen(),
+  SettingsDestination.settingsDataTransfer =>
+    const DataTransferSettingsScreen(),
+  SettingsDestination.settingsIntegration => const AdvancedSettingsScreen(),
+  SettingsDestination.settingsUpdates => const UpdatesSettingsScreen(),
+  SettingsDestination.settingsAbout => const AboutSettingsScreen(),
+};
 
 Page<void> _noTransitionPage(GoRouterState state, Widget child) =>
     NoTransitionPage<void>(key: state.pageKey, child: child);

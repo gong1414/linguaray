@@ -13,10 +13,10 @@ import '../../platform/platform_types.dart';
 import '../../platform/trigger_controller.dart';
 import '../../services/app_windows.dart';
 import '../../services/settings_store.dart';
-import '../../utils/platform_util.dart';
 import '../i18n_labels.dart';
 import '../translation/view_models/translation_view_model.dart';
 import '../translation/widgets/dictionary_lookup_dialog.dart';
+import 'quick_translate_window_coordinator.dart';
 import 'widgets/quick_translate_view.dart';
 
 class QuickTranslateScreen extends ConsumerStatefulWidget {
@@ -29,8 +29,6 @@ class QuickTranslateScreen extends ConsumerStatefulWidget {
 
 class _QuickTranslateScreenState extends ConsumerState<QuickTranslateScreen>
     with WidgetsBindingObserver {
-  final GlobalKey _toolbarKey = GlobalKey();
-  final GlobalKey _contentKey = GlobalKey();
   bool _pinned = false;
   bool _copied = false;
   bool _speechAvailable = false;
@@ -41,16 +39,13 @@ class _QuickTranslateScreenState extends ConsumerState<QuickTranslateScreen>
   SpeechUtteranceKind? _requestedSpeechKind;
   QuickTranslateNotice _notice = QuickTranslateNotice.none;
   Timer? _copiedTimer;
-  Timer? _resizeSettledTimer;
   StreamSubscription<SpeechState>? _speechSubscription;
   late final SpeechService _speechService;
   late final LookUpWord _lookUpWord;
   late final VocabularyRepository _vocabularyRepository;
-  bool _isWindowResizeScheduled = false;
-  int? _windowFocusedListenerId;
-  int? _windowBlurredListenerId;
+  late final QuickTranslateWindowCoordinator _windowCoordinator;
 
-  nativeapi.Window get _window => miniTranslatorWindowController.window;
+  nativeapi.Window get _window => _windowCoordinator.window;
 
   @override
   void initState() {
@@ -58,14 +53,16 @@ class _QuickTranslateScreenState extends ConsumerState<QuickTranslateScreen>
     _speechService = ref.read(speechServiceProvider);
     _lookUpWord = ref.read(lookUpWordProvider);
     _vocabularyRepository = ref.read(vocabularyRepositoryProvider);
+    _windowCoordinator = QuickTranslateWindowCoordinator(
+      () => miniTranslatorWindowController.window,
+      () => mounted,
+    );
     _speechSubscription = _speechService.states.listen(_handleSpeechState);
     WidgetsBinding.instance.addObserver(this);
     triggerController.quickWindowRequest.addListener(_consumeWindowRequest);
     triggerController.lastError.addListener(_showTriggerError);
     permissionController.addListener(_onPermissionChanged);
-    if (kIsMacOS || kIsWindows) {
-      _registerWindowEvents();
-    }
+    _windowCoordinator.registerEvents();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _consumeWindowRequest();
       _scheduleWindowResize();
@@ -79,9 +76,8 @@ class _QuickTranslateScreenState extends ConsumerState<QuickTranslateScreen>
     triggerController.lastError.removeListener(_showTriggerError);
     permissionController.removeListener(_onPermissionChanged);
     WidgetsBinding.instance.removeObserver(this);
-    _unregisterWindowEvents();
+    _windowCoordinator.dispose();
     _copiedTimer?.cancel();
-    _resizeSettledTimer?.cancel();
     unawaited(_speechSubscription?.cancel());
     unawaited(_speechService.stop());
     super.dispose();
@@ -91,30 +87,6 @@ class _QuickTranslateScreenState extends ConsumerState<QuickTranslateScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       unawaited(permissionController.refresh());
-    }
-  }
-
-  void _registerWindowEvents() {
-    _windowFocusedListenerId = nativeapi.WindowManager.instance
-        .on<nativeapi.WindowFocusedEvent>((event) {
-          if (event.windowId == _window.id) {
-            unawaited(permissionController.refresh());
-          }
-        });
-    _windowBlurredListenerId = nativeapi.WindowManager.instance
-        .on<nativeapi.WindowBlurredEvent>((event) {
-          if (event.windowId == _window.id && !_window.isAlwaysOnTop) {
-            hideMiniTranslatorWindow();
-          }
-        });
-  }
-
-  void _unregisterWindowEvents() {
-    if (_windowFocusedListenerId != null) {
-      nativeapi.WindowManager.instance.off(_windowFocusedListenerId!);
-    }
-    if (_windowBlurredListenerId != null) {
-      nativeapi.WindowManager.instance.off(_windowBlurredListenerId!);
     }
   }
 
@@ -168,37 +140,7 @@ class _QuickTranslateScreenState extends ConsumerState<QuickTranslateScreen>
     }
   }
 
-  void _scheduleWindowResize() {
-    if (!(kIsMacOS || kIsWindows)) return;
-    if (_isWindowResizeScheduled) return;
-    _isWindowResizeScheduled = true;
-    WidgetsBinding.instance.endOfFrame.then((_) {
-      _isWindowResizeScheduled = false;
-      if (!mounted) return;
-      _resizeWindow();
-      _resizeSettledTimer?.cancel();
-      _resizeSettledTimer = Timer(const Duration(milliseconds: 120), () {
-        if (mounted) _resizeWindow();
-      });
-    });
-  }
-
-  void _resizeWindow() {
-    if (!canResizeMiniTranslatorWindow) return;
-    try {
-      final toolbar = _renderHeight(_toolbarKey);
-      final content = _renderHeight(_contentKey);
-      final height = (toolbar + content + 24.0).clamp(180.0, 800.0);
-      final size = _window.contentSize;
-      if ((size.height - height).abs() < 1) return;
-      _window.setContentSize(size.width, height);
-    } catch (_) {}
-  }
-
-  double _renderHeight(GlobalKey key) {
-    final box = key.currentContext?.findRenderObject() as RenderBox?;
-    return box?.size.height ?? 0;
-  }
+  void _scheduleWindowResize() => _windowCoordinator.scheduleResize();
 
   Future<void> _copy(String value) async {
     await Clipboard.setData(ClipboardData(text: value));
@@ -386,8 +328,8 @@ class _QuickTranslateScreenState extends ConsumerState<QuickTranslateScreen>
 
     return QuickTranslateView(
       labels: quickTranslateLabels(),
-      toolbarKey: _toolbarKey,
-      contentKey: _contentKey,
+      toolbarKey: _windowCoordinator.toolbarKey,
+      contentKey: _windowCoordinator.contentKey,
       languages: languages,
       services: state.services,
       sourceText: state.sourceText,

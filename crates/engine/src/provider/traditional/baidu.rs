@@ -31,8 +31,6 @@ pub struct BaiduProviderConfig {
 }
 
 pub struct BaiduProvider {
-    #[allow(dead_code)]
-    config: BaiduProviderConfig,
     translation_service: Option<BaiduTranslationService>,
     ocr_service: Option<BaiduOcrService>,
 }
@@ -74,7 +72,6 @@ impl BaiduProvider {
             None
         };
         Ok(Self {
-            config: config.clone(),
             translation_service: translation_http.map(|http| BaiduTranslationService {
                 app_id: config.app_id.clone(),
                 app_key: config.app_key.clone(),

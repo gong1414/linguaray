@@ -4,7 +4,12 @@ import 'package:linguaray_runtime/linguaray_runtime.dart' as rt;
 import '../services/runtime.dart' as runtime_service;
 
 final class RuntimeHistoryRepository implements HistoryRepository {
-  rt.RuntimeHistory get _history => runtime_service.runtime.history();
+  RuntimeHistoryRepository({rt.RuntimeHistory? history}) : _override = history;
+
+  final rt.RuntimeHistory? _override;
+
+  rt.RuntimeHistory get _history =>
+      _override ?? runtime_service.runtime.history();
 
   @override
   Future<int> clear() => _history.clear();

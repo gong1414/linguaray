@@ -4,7 +4,13 @@ import 'package:linguaray_runtime/linguaray_runtime.dart' as rt;
 import '../services/runtime.dart' as runtime_service;
 
 final class RuntimeGlossaryRepository implements GlossaryRepository {
-  rt.RuntimeGlossary get _glossary => runtime_service.runtime.glossary();
+  RuntimeGlossaryRepository({rt.RuntimeGlossary? glossary})
+    : _override = glossary;
+
+  final rt.RuntimeGlossary? _override;
+
+  rt.RuntimeGlossary get _glossary =>
+      _override ?? runtime_service.runtime.glossary();
 
   @override
   Future<List<GlossaryComplianceWarning>> checkCompliance({

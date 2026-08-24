@@ -5,7 +5,6 @@ import 'package:flutter/material.dart' show ThemeMode;
 import 'package:linguaray_runtime/linguaray_runtime.dart';
 import 'package:nativeapi/nativeapi.dart';
 
-import '../theme/app_theme.dart' show DesignThemeFamily;
 import '../utils/language_util.dart';
 import '../utils/platform_util.dart';
 import 'runtime.dart' as runtime_service;
@@ -102,11 +101,6 @@ class SettingsStore extends ChangeNotifier {
     }
   }
 
-  /// The palette family the design system paints with. Orthogonal to
-  /// [themeMode], which only decides light vs dark.
-  DesignThemeFamily get themeFamily =>
-      DesignThemeFamily.fromId(_appearance.theme);
-
   InputSubmitMode get inputSubmitMode => _general.inputSubmitMode;
   bool get autoCopyDetectedText => _general.autoCopyDetectedText;
   bool get doubleClickCopyResult => _general.doubleClickCopyResult;
@@ -167,11 +161,12 @@ class SettingsStore extends ChangeNotifier {
         case SettingsChange.advanced:
           await reloadAdvanced();
         case SettingsChange.glossary:
-          // Glossary data lives outside settings; GlossaryStore keeps its
-          // own subscription and reloads itself.
+          // Glossary views load through their repository when they become
+          // active; glossary data does not belong in this settings cache.
           break;
         case SettingsChange.history:
-          // HistoryStore owns history reloads through its own subscription.
+          // History views load through their repository when they become
+          // active; history data does not belong in this settings cache.
           break;
         case SettingsChange.vocabulary:
           break;

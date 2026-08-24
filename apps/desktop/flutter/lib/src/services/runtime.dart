@@ -138,16 +138,3 @@ void stopApiServer() {
   _apiServer = null;
   _apiServerInfo = null;
 }
-
-/// A simple error class used to record translation / dictionary lookup
-/// failures in [TranslationResultRecord].
-class TranslationError {
-  final String message;
-
-  const TranslationError({required this.message});
-
-  factory TranslationError.fromJson(Map<String, dynamic> json) =>
-      TranslationError(message: json['message'] ?? '');
-
-  Map<String, dynamic> toJson() => {'message': message};
-}
