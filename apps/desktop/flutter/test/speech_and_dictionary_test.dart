@@ -52,6 +52,7 @@ void main() {
             labels: const DictionaryLookupDialogLabels(
               title: 'Dictionary',
               pronunciation: 'Pronunciation',
+              speak: 'Speak',
               definitions: 'Definitions',
               save: 'Save',
               saved: 'Saved',

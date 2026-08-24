@@ -1,6 +1,6 @@
 use super::models::{
     field, AuthScheme, NetworkPolicy, ProviderCategory, ProviderPreset, Stability, BOTH_DESKTOPS,
-    DICTIONARY_ONLY, LLM_TRANSLATION, SYSTEM_CAPABILITIES, TRANSLATION_ONLY,
+    DICTIONARY_ONLY, LLM_TRANSLATION, OCR_ONLY, SYSTEM_CAPABILITIES, TRANSLATION_ONLY,
 };
 use crate::engine::ProviderType;
 
@@ -306,6 +306,41 @@ pub const PRESETS: &[ProviderPreset] = &[
             ),
         ],
         capabilities: TRANSLATION_ONLY,
+        auth_scheme: AuthScheme::Custom,
+        supported_platforms: BOTH_DESKTOPS,
+        network_policy: NetworkPolicy::OfficialApi,
+        stability: Stability::Stable,
+    },
+    ProviderPreset {
+        id: "baidu-ocr",
+        engine_type: ProviderType::Baidu,
+        protocol: "baidu_ocr",
+        category: ProviderCategory::TraditionalApi,
+        name: "Baidu OCR",
+        description_key: "settings.providers.catalog.baidu_ocr",
+        homepage_url: Some("https://ai.baidu.com/tech/ocr"),
+        api_key_url: Some("https://console.bce.baidu.com/ai/#/ai/ocr/overview/index"),
+        base_url: "https://aip.baidubce.com",
+        models_url: "",
+        fields: &[
+            field(
+                "apiKey",
+                "settings.providers.fields.api_key",
+                true,
+                true,
+                false,
+                None,
+            ),
+            field(
+                "secretKey",
+                "settings.providers.fields.secret_key",
+                true,
+                true,
+                false,
+                None,
+            ),
+        ],
+        capabilities: OCR_ONLY,
         auth_scheme: AuthScheme::Custom,
         supported_platforms: BOTH_DESKTOPS,
         network_policy: NetworkPolicy::OfficialApi,

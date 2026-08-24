@@ -602,6 +602,7 @@
         "deepl_pro": "DeepL API Pro。",
         "google_cloud": "Google Cloud Translation API。",
         "baidu": "百度翻译 API。",
+        "baidu_ocr": "百度通用文字识别，返回逐行文字与位置信息。",
         "tencent_cloud": "腾讯云机器翻译。",
         "youdao": "有道智云翻译、词典和 OCR。",
         "caiyun": "彩云小译翻译 API。",

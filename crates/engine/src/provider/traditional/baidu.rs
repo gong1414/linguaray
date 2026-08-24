@@ -2,9 +2,11 @@
 
 use crate::common::HttpClient;
 use async_trait::async_trait;
+use base64::Engine as _;
 use linguaray_core::{
-    DetectLanguageRequest, DetectLanguageResponse, Provider, TextDetection, TextTranslation,
-    TranslateRequest, TranslateResponse, TranslationError, TranslationService,
+    DetectLanguageRequest, DetectLanguageResponse, OcrError, OcrService, Provider,
+    RecognizeTextRequest, RecognizeTextResponse, RecognizedRect, TextDetection, TextRecognition,
+    TextTranslation, TranslateRequest, TranslateResponse, TranslationError, TranslationService,
 };
 use rand::random;
 use serde::{Deserialize, Serialize};
@@ -12,10 +14,18 @@ use serde_json::Value;
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Serialize)]
 pub struct BaiduProviderConfig {
+    #[serde(default)]
     #[serde(rename = "appId", alias = "app_id")]
     pub app_id: String,
+    #[serde(default)]
     #[serde(rename = "appKey", alias = "app_key")]
     pub app_key: String,
+    #[serde(default)]
+    #[serde(rename = "apiKey", alias = "api_key")]
+    pub api_key: String,
+    #[serde(default)]
+    #[serde(rename = "secretKey", alias = "secret_key")]
+    pub secret_key: String,
     #[serde(rename = "baseUrl", alias = "base_url")]
     pub base_url: Option<String>,
 }
@@ -23,7 +33,8 @@ pub struct BaiduProviderConfig {
 pub struct BaiduProvider {
     #[allow(dead_code)]
     config: BaiduProviderConfig,
-    translation_service: BaiduTranslationService,
+    translation_service: Option<BaiduTranslationService>,
+    ocr_service: Option<BaiduOcrService>,
 }
 
 struct BaiduTranslationService {
@@ -32,26 +43,42 @@ struct BaiduTranslationService {
     http: HttpClient,
 }
 
+struct BaiduOcrService {
+    api_key: String,
+    secret_key: String,
+    http: HttpClient,
+}
+
 impl BaiduProvider {
     pub fn new(config: BaiduProviderConfig) -> Result<Self, String> {
-        if config.app_id.trim().is_empty() {
-            return Err("app_id must not be empty".to_owned());
+        let has_translation = !config.app_id.trim().is_empty() && !config.app_key.trim().is_empty();
+        let has_ocr = !config.api_key.trim().is_empty() && !config.secret_key.trim().is_empty();
+        if !has_translation && !has_ocr {
+            return Err(
+                "provide appId/appKey for translation or apiKey/secretKey for OCR".to_owned(),
+            );
         }
-        if config.app_key.trim().is_empty() {
-            return Err("app_key must not be empty".to_owned());
-        }
+        let base_url = config.base_url.clone();
         Ok(Self {
             config: config.clone(),
-            translation_service: BaiduTranslationService {
-                app_id: config.app_id,
-                app_key: config.app_key,
+            translation_service: has_translation.then(|| BaiduTranslationService {
+                app_id: config.app_id.clone(),
+                app_key: config.app_key.clone(),
                 http: HttpClient::new(
-                    config
-                        .base_url
+                    base_url
+                        .clone()
                         .unwrap_or_else(|| "https://fanyi-api.baidu.com".to_owned()),
                     Default::default(),
                 ),
-            },
+            }),
+            ocr_service: has_ocr.then(|| BaiduOcrService {
+                api_key: config.api_key,
+                secret_key: config.secret_key,
+                http: HttpClient::new(
+                    base_url.unwrap_or_else(|| "https://aip.baidubce.com".to_owned()),
+                    Default::default(),
+                ),
+            }),
         })
     }
 }
@@ -167,8 +194,141 @@ impl Provider for BaiduProvider {
     }
 
     fn translation(&self) -> Option<&dyn TranslationService> {
-        Some(&self.translation_service)
+        self.translation_service
+            .as_ref()
+            .map(|service| service as &dyn TranslationService)
     }
+
+    fn ocr(&self) -> Option<&dyn OcrService> {
+        self.ocr_service
+            .as_ref()
+            .map(|service| service as &dyn OcrService)
+    }
+}
+
+#[async_trait(?Send)]
+impl OcrService for BaiduOcrService {
+    async fn recognize_text(
+        &self,
+        request: RecognizeTextRequest,
+    ) -> Result<RecognizeTextResponse, OcrError> {
+        let image = image_base64(request)?;
+        let token_response = self
+            .http
+            .client()
+            .post(format!("{}/oauth/2.0/token", self.http.base_url()))
+            .query(&[
+                ("grant_type", "client_credentials"),
+                ("client_id", self.api_key.as_str()),
+                ("client_secret", self.secret_key.as_str()),
+            ]);
+        let token_response = self
+            .http
+            .execute(token_response)
+            .await
+            .map_err(OcrError::from_network_error)?;
+        let token_response = OcrError::from_response("baidu-ocr-token", token_response).await?;
+        let token: Value = token_response
+            .json()
+            .await
+            .map_err(|error| OcrError::SerializationError(error.to_string()))?;
+        let access_token = token["access_token"].as_str().ok_or_else(|| {
+            OcrError::NetworkError(baidu_ocr_error(&token, "missing access_token"))
+        })?;
+
+        let response = self
+            .http
+            .client()
+            .post(format!("{}/rest/2.0/ocr/v1/general", self.http.base_url()))
+            .query(&[("access_token", access_token)])
+            .form(&[("image", image.as_str()), ("detect_direction", "true")]);
+        let response = self
+            .http
+            .execute(response)
+            .await
+            .map_err(OcrError::from_network_error)?;
+        let response = OcrError::from_response("baidu-ocr", response).await?;
+        let data: Value = response
+            .json()
+            .await
+            .map_err(|error| OcrError::SerializationError(error.to_string()))?;
+        if data.get("error_code").is_some() {
+            return Err(OcrError::NetworkError(baidu_ocr_error(
+                &data,
+                "recognition failed",
+            )));
+        }
+
+        let recognitions = data["words_result"]
+            .as_array()
+            .ok_or_else(|| {
+                OcrError::SerializationError("missing words_result in Baidu OCR response".to_owned())
+            })?
+            .iter()
+            .filter_map(|item| {
+                let text = item["words"].as_str()?.trim();
+                if text.is_empty() {
+                    return None;
+                }
+                let location = item["location"].as_object();
+                Some(TextRecognition {
+                    text: text.to_owned(),
+                    recognized_rect: location.map(|value| RecognizedRect {
+                        x: value.get("left").and_then(Value::as_f64).unwrap_or_default(),
+                        y: value.get("top").and_then(Value::as_f64).unwrap_or_default(),
+                        width: value
+                            .get("width")
+                            .and_then(Value::as_f64)
+                            .unwrap_or_default(),
+                        height: value
+                            .get("height")
+                            .and_then(Value::as_f64)
+                            .unwrap_or_default(),
+                        top: value.get("top").and_then(Value::as_f64),
+                        right: None,
+                        bottom: None,
+                        left: value.get("left").and_then(Value::as_f64),
+                    }),
+                })
+            })
+            .collect::<Vec<_>>();
+        let text = recognitions
+            .iter()
+            .map(|item| item.text.as_str())
+            .collect::<Vec<_>>()
+            .join("\n");
+        Ok(RecognizeTextResponse {
+            text,
+            recognitions: Some(recognitions),
+        })
+    }
+}
+
+fn image_base64(request: RecognizeTextRequest) -> Result<String, OcrError> {
+    match (request.base64_image, request.image_path) {
+        (Some(image), _) => Ok(image),
+        (None, Some(path)) => std::fs::read(&path)
+            .map(|bytes| base64::engine::general_purpose::STANDARD.encode(bytes))
+            .map_err(|error| {
+                OcrError::InvalidRequest(format!("failed to read image file '{path}': {error}"))
+            }),
+        (None, None) => Err(OcrError::InvalidRequest(
+            "either base64_image or image_path must be provided".to_owned(),
+        )),
+    }
+}
+
+fn baidu_ocr_error(data: &Value, fallback: &str) -> String {
+    let code = data["error_code"]
+        .as_i64()
+        .map(|value| value.to_string())
+        .or_else(|| data["error"].as_str().map(ToOwned::to_owned))
+        .unwrap_or_else(|| "unknown".to_owned());
+    let message = data["error_msg"]
+        .as_str()
+        .or_else(|| data["error_description"].as_str())
+        .unwrap_or(fallback);
+    format!("baidu OCR: {code}: {message}")
 }
 
 fn baidu_language_code(language: Option<&str>) -> Option<&str> {

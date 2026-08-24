@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use base64::Engine as _;
 use linguaray_core::{
     ChatMessage, DetectLanguageRequest, DetectLanguageResponse, LanguageInfo, LanguagePair,
     LookUpRequest, LookUpResponse, RecognizeTextRequest, RecognizeTextResponse, TranslateRequest,
@@ -984,9 +985,10 @@ impl RuntimeSettings {
     /// the process-wide runtime engine. The caller supplies credentials read
     /// from secure storage; they live only in this temporary provider object.
     ///
-    /// LLM providers are probed by listing models. Traditional translation
-    /// providers translate a small fixed phrase. The returned number is the
-    /// model count for LLM providers and zero for traditional providers.
+    /// LLM providers are probed by listing models. Translation, dictionary,
+    /// and OCR-only providers execute a small capability-specific request.
+    /// The returned number is the model count for LLM providers and zero for
+    /// traditional providers.
     pub async fn test_provider(
         &self,
         provider_id: String,
@@ -1034,18 +1036,40 @@ impl RuntimeSettings {
                 return Ok(0);
             }
 
-            let translation = provider
-                .translation()
-                .ok_or_else(|| "provider does not support translation".to_owned())?;
-            translation
-                .translate(TranslateRequest {
-                    source_language: Some("en".to_owned()),
-                    target_language: Some("zh-Hans".to_owned()),
-                    text: "Hello".to_owned(),
+            if let Some(translation) = provider.translation() {
+                translation
+                    .translate(TranslateRequest {
+                        source_language: Some("en".to_owned()),
+                        target_language: Some("zh-Hans".to_owned()),
+                        text: "Hello".to_owned(),
+                    })
+                    .await
+                    .map_err(|error| error.to_string())?;
+                return Ok(0);
+            }
+            if let Some(dictionary) = provider.dictionary() {
+                dictionary
+                    .look_up(LookUpRequest {
+                        source_language: "en".to_owned(),
+                        target_language: "zh-Hans".to_owned(),
+                        word: "hello".to_owned(),
+                    })
+                    .await
+                    .map_err(|error| error.to_string())?;
+                return Ok(0);
+            }
+            if let Some(ocr) = provider.ocr() {
+                let fixture = base64::engine::general_purpose::STANDARD
+                    .encode(include_bytes!("../test/fixtures/system_ocr_stable.png"));
+                ocr.recognize_text(RecognizeTextRequest {
+                    image_path: None,
+                    base64_image: Some(fixture),
                 })
                 .await
                 .map_err(|error| error.to_string())?;
-            Ok(0)
+                return Ok(0);
+            }
+            Err("provider does not expose a testable capability".to_owned())
         })
         .await
         .map_err(RuntimeError::from)

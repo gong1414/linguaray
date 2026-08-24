@@ -282,6 +282,7 @@ class _QuickTranslateScreenState extends ConsumerState<QuickTranslateScreen>
           labels: DictionaryLookupDialogLabels(
             title: t.ui.dictionary.title,
             pronunciation: t.ui.dictionary.pronunciation,
+            speak: t.ui.speech.speak_source,
             definitions: t.ui.dictionary.definitions,
             save: t.ui.dictionary.save,
             saved: t.ui.vocabulary.saved,
@@ -309,6 +310,11 @@ class _QuickTranslateScreenState extends ConsumerState<QuickTranslateScreen>
               targetLanguage: targetLanguage,
               source: 'dictionary',
             ),
+          ),
+          onSpeak: (entry) => _speak(
+            kind: SpeechUtteranceKind.source,
+            text: entry.word,
+            language: sourceLanguage,
           ),
         ),
       );

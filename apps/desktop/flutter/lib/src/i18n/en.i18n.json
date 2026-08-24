@@ -602,6 +602,7 @@
         "deepl_pro": "DeepL API Pro.",
         "google_cloud": "Google Cloud Translation API.",
         "baidu": "Baidu Translate API.",
+        "baidu_ocr": "Baidu General OCR with text-line positions.",
         "tencent_cloud": "Tencent Cloud Machine Translation.",
         "youdao": "Youdao Zhiyun translation, dictionary, and OCR.",
         "caiyun": "Caiyun Xiaoyi translation API.",

@@ -195,6 +195,7 @@ mod tests {
                 "deepl-pro",
                 "google-cloud-translation",
                 "baidu-translate",
+                "baidu-ocr",
                 "tencent-cloud-tmt",
                 "youdao-zhiyun",
                 "caiyun",

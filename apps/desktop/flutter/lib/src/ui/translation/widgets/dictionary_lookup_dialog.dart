@@ -5,6 +5,7 @@ final class DictionaryLookupDialogLabels {
   const DictionaryLookupDialogLabels({
     required this.title,
     required this.pronunciation,
+    required this.speak,
     required this.definitions,
     required this.save,
     required this.saved,
@@ -16,6 +17,7 @@ final class DictionaryLookupDialogLabels {
 
   final String title;
   final String pronunciation;
+  final String speak;
   final String definitions;
   final String save;
   final String saved;
@@ -30,12 +32,14 @@ class DictionaryLookupDialog extends StatefulWidget {
     required this.labels,
     required this.lookup,
     required this.onSave,
+    this.onSpeak,
     super.key,
   });
 
   final DictionaryLookupDialogLabels labels;
   final Future<DictionaryEntry?> lookup;
   final Future<void> Function(DictionaryEntry entry) onSave;
+  final Future<void> Function(DictionaryEntry entry)? onSpeak;
 
   @override
   State<DictionaryLookupDialog> createState() => _DictionaryLookupDialogState();
@@ -44,6 +48,7 @@ class DictionaryLookupDialog extends StatefulWidget {
 class _DictionaryLookupDialogState extends State<DictionaryLookupDialog> {
   bool _saving = false;
   bool _saved = false;
+  bool _speaking = false;
   String? _saveError;
 
   Future<void> _save(DictionaryEntry entry) async {
@@ -65,6 +70,16 @@ class _DictionaryLookupDialogState extends State<DictionaryLookupDialog> {
         _saving = false;
         _saveError = widget.labels.saveFailed;
       });
+    }
+  }
+
+  Future<void> _speak(DictionaryEntry entry) async {
+    if (_speaking || widget.onSpeak == null) return;
+    setState(() => _speaking = true);
+    try {
+      await widget.onSpeak!(entry);
+    } finally {
+      if (mounted) setState(() => _speaking = false);
     }
   }
 
@@ -106,6 +121,8 @@ class _DictionaryLookupDialogState extends State<DictionaryLookupDialog> {
               onSave: _vocabularyTranslation(entry).isEmpty
                   ? null
                   : () => _save(entry),
+              speaking: _speaking,
+              onSpeak: widget.onSpeak == null ? null : () => _speak(entry),
             );
           },
         ),
@@ -128,6 +145,8 @@ class _DictionaryEntryBody extends StatelessWidget {
     required this.saved,
     required this.saveError,
     required this.onSave,
+    required this.speaking,
+    required this.onSpeak,
   });
 
   final DictionaryLookupDialogLabels labels;
@@ -136,6 +155,8 @@ class _DictionaryEntryBody extends StatelessWidget {
   final bool saved;
   final String? saveError;
   final VoidCallback? onSave;
+  final bool speaking;
+  final VoidCallback? onSpeak;
 
   @override
   Widget build(BuildContext context) {
@@ -144,7 +165,24 @@ class _DictionaryEntryBody extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(entry.word, style: theme.textTheme.headlineSmall),
+          Row(
+            children: [
+              Expanded(
+                child: Text(entry.word, style: theme.textTheme.headlineSmall),
+              ),
+              if (onSpeak != null)
+                IconButton(
+                  tooltip: labels.speak,
+                  onPressed: speaking ? null : onSpeak,
+                  icon: speaking
+                      ? const SizedBox.square(
+                          dimension: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.volume_up_outlined),
+                ),
+            ],
+          ),
           if (entry.providerName.trim().isNotEmpty) ...[
             const SizedBox(height: 2),
             Text(
