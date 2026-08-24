@@ -7,6 +7,7 @@ import 'package:linguaray_application/linguaray_application.dart';
 import '../../config/dependencies.dart';
 import '../../i18n/i18n.dart';
 import '../../utils/env.dart';
+import '../../platform/startup_update_controller.dart';
 import '../i18n_labels.dart';
 import 'updates_view.dart';
 
@@ -16,7 +17,8 @@ final updatesViewModelProvider =
 final class UpdatesViewModel extends Notifier<UpdateState> {
   @override
   UpdateState build() {
-    return UpdateState.idle(Env.instance.appVersion);
+    return startupUpdateController.result.value ??
+        UpdateState.idle(Env.instance.appVersion);
   }
 
   Future<void> check() async {
@@ -54,9 +56,18 @@ final class UpdatesViewModel extends Notifier<UpdateState> {
     final manifest = state.manifest;
     final path = state.downloadedPath;
     if (manifest == null || path == null || !state.canInstall) return;
-    await ref
-        .read(updateInstallerProvider)
-        .handOff(filePath: path, manifest: manifest);
+    try {
+      await ref
+          .read(updateInstallerProvider)
+          .handOff(filePath: path, manifest: manifest);
+    } catch (_) {
+      state = UpdateState(
+        status: UpdateStatus.failed,
+        currentVersion: state.currentVersion,
+        manifest: manifest,
+        errorCode: AppErrorCode.updateInstallFailed.wireName,
+      );
+    }
   }
 }
 

@@ -67,6 +67,25 @@ pub struct VocabularyStore {
 }
 
 impl VocabularyStore {
+    pub(crate) fn validate_backup(data_dir: impl AsRef<Path>) -> Result<(), String> {
+        let path = data_dir.as_ref().join(VOCABULARY_FILE);
+        if !path.exists() {
+            return Ok(());
+        }
+        let content = fs::read_to_string(&path)
+            .map_err(|error| format!("failed to read `{}`: {error}", path.display()))?;
+        let file = serde_json::from_str::<VocabularyFile>(&content)
+            .map_err(|error| format!("failed to parse `{}`: {error}", path.display()))?;
+        if file.version != VOCABULARY_VERSION {
+            return Err(format!(
+                "unsupported vocabulary version {} in `{}`",
+                file.version,
+                path.display()
+            ));
+        }
+        Ok(())
+    }
+
     pub fn load(data_dir: impl AsRef<Path>) -> Self {
         let path = data_dir.as_ref().join(VOCABULARY_FILE);
         let file = match fs::read_to_string(&path) {

@@ -478,6 +478,18 @@ final class _FakeWorkspaceSettingsRepository
   Future<ApiServerStatus> setApiServerPort(int port) async => loadApiServer();
 
   @override
+  Future<NetworkSettings> loadNetworkSettings() async => const NetworkSettings(
+    proxyMode: NetworkProxyMode.system,
+    proxyUrl: '',
+    proxyBypass: 'localhost,127.0.0.1',
+    checkUpdatesOnLaunch: true,
+  );
+
+  @override
+  Future<NetworkSettings> saveNetworkSettings(NetworkSettings settings) async =>
+      settings;
+
+  @override
   Future<PlatformCapabilities> loadCapabilities() async =>
       const PlatformCapabilities.macos();
 }

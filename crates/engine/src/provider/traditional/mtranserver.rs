@@ -37,7 +37,7 @@ impl MTranServerProvider {
         Ok(Self {
             translation_service: MTranServerTranslationService {
                 token: config.token.trim().to_owned(),
-                http: HttpClient::new(base_url, Default::default()),
+                http: HttpClient::proxy_aware(base_url)?,
             },
         })
     }

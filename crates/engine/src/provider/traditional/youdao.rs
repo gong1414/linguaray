@@ -62,7 +62,7 @@ impl YoudaoProvider {
         if config.app_secret.trim().is_empty() {
             return Err("app_secret must not be empty".to_owned());
         }
-        let client = reqwest::Client::default();
+        let client = crate::common::build_http_client()?;
         let base_url = config
             .base_url
             .clone()

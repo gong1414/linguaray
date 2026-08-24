@@ -6,6 +6,7 @@ import '../../services/app_windows.dart'
     show hideSettingsWindow, settingsWindowController;
 import '../../ui/history/history_screen.dart';
 import '../../ui/settings/library_settings_screens.dart';
+import '../../ui/settings/data_transfer_settings_screen.dart';
 import '../../ui/settings/settings_screens.dart';
 import '../../ui/updates/updates_screen.dart';
 import '../../utils/platform_util.dart';
@@ -83,6 +84,11 @@ List<RouteBase> get $appRoutes => <RouteBase>[
         path: '/settings/integration',
         pageBuilder: (_, state) =>
             _noTransitionPage(state, const AdvancedSettingsScreen()),
+      ),
+      GoRoute(
+        path: '/settings/data-transfer',
+        pageBuilder: (_, state) =>
+            _noTransitionPage(state, const DataTransferSettingsScreen()),
       ),
       GoRoute(
         path: '/settings/updates',

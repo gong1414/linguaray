@@ -63,6 +63,7 @@ final class DownloadVerifiedUpdate {
         filePath: path,
         sha256: manifest.checksumSha256!,
       );
+      await _repository.verifyPlatformSignature(filePath: path);
       return UpdateState(
         status: UpdateStatus.readyToInstall,
         currentVersion: currentVersion,
@@ -81,7 +82,7 @@ final class DownloadVerifiedUpdate {
         status: UpdateStatus.failed,
         currentVersion: currentVersion,
         manifest: manifest,
-        errorCode: AppErrorCode.updateChecksumMismatch.wireName,
+        errorCode: AppErrorCode.updateDownloadFailed.wireName,
       );
     }
   }

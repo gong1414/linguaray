@@ -209,6 +209,33 @@ pub struct GlossaryStore {
 }
 
 impl GlossaryStore {
+    pub(crate) fn validate_backup(data_dir: impl AsRef<Path>) -> Result<(), String> {
+        let dir = data_dir.as_ref().join(GLOSSARY_DIR);
+        if !dir.exists() {
+            return Ok(());
+        }
+        let listing = fs::read_dir(&dir).map_err(|error| {
+            format!(
+                "failed to read glossary directory `{}`: {error}",
+                dir.display()
+            )
+        })?;
+        for entry in listing {
+            let entry = entry.map_err(|error| {
+                format!(
+                    "failed to read glossary directory `{}`: {error}",
+                    dir.display()
+                )
+            })?;
+            let path = entry.path();
+            if path.extension().and_then(|ext| ext.to_str()) == Some("json") {
+                load_book_file(&path)
+                    .map_err(|error| format!("invalid `{}`: {error}", path.display()))?;
+            }
+        }
+        Ok(())
+    }
+
     /// Loads every book under `<data_dir>/glossary`. A missing directory is
     /// an empty glossary, not an error; it is created on first write.
     pub fn load(data_dir: impl AsRef<Path>) -> Result<Self, String> {

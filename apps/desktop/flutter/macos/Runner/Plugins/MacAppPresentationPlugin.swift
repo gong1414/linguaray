@@ -1,6 +1,7 @@
 import AVFoundation
 import AppKit
 import FlutterMacOS
+import SystemConfiguration
 
 /// Owns how the process presents itself to macOS: with a Dock icon and the main
 /// menu bar (`.regular`), or as a status-bar-only app (`.accessory`).
@@ -51,6 +52,8 @@ final class MacAppPresentationPlugin: NSObject, FlutterPlugin {
       binaryMessenger: registrar.messenger
     )
     ProtocolPlugin.register(channel: protocolChannel)
+
+    SystemProxyPlugin.register(messenger: registrar.messenger)
   }
 
   func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -135,6 +138,76 @@ final class MacAppPresentationPlugin: NSObject, FlutterPlugin {
   @MainActor
   private static func hasVisibleActivatableWindow() -> Bool {
     NSApp.windows.contains { $0.isVisible && $0.canBecomeKey }
+  }
+}
+
+private enum SystemProxyPlugin {
+  private static var channel: FlutterMethodChannel?
+
+  static func register(messenger: FlutterBinaryMessenger) {
+    let channel = FlutterMethodChannel(
+      name: "linguaray/system_proxy",
+      binaryMessenger: messenger
+    )
+    self.channel = channel
+    channel.setMethodCallHandler { call, result in
+      guard call.method == "read" else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      result(readSystemProxy())
+    }
+  }
+
+  private static func readSystemProxy() -> [String: Any] {
+    guard
+      let unmanaged = SCDynamicStoreCopyProxies(nil),
+      let proxies = unmanaged.takeRetainedValue() as? [String: Any]
+    else {
+      return [:]
+    }
+
+    var value: [String: Any] = [:]
+    if let endpoint = endpoint(
+      proxies,
+      enabledKey: kSCPropNetProxiesHTTPEnable,
+      hostKey: kSCPropNetProxiesHTTPProxy,
+      portKey: kSCPropNetProxiesHTTPPort
+    ) {
+      value["http"] = endpoint
+    }
+    if let endpoint = endpoint(
+      proxies,
+      enabledKey: kSCPropNetProxiesHTTPSEnable,
+      hostKey: kSCPropNetProxiesHTTPSProxy,
+      portKey: kSCPropNetProxiesHTTPSPort
+    ) {
+      value["https"] = endpoint
+    }
+    var bypass = proxies[kSCPropNetProxiesExceptionsList as String] as? [String] ?? []
+    if (proxies[kSCPropNetProxiesExcludeSimpleHostnames as String] as? NSNumber)?.boolValue == true {
+      bypass.append("<local>")
+    }
+    value["bypass"] = bypass
+    return value
+  }
+
+  private static func endpoint(
+    _ proxies: [String: Any],
+    enabledKey: CFString,
+    hostKey: CFString,
+    portKey: CFString
+  ) -> String? {
+    guard
+      (proxies[enabledKey as String] as? NSNumber)?.boolValue == true,
+      let host = proxies[hostKey as String] as? String,
+      !host.isEmpty,
+      let port = proxies[portKey as String] as? NSNumber,
+      port.intValue > 0
+    else {
+      return nil
+    }
+    return "\(host):\(port.intValue)"
   }
 }
 

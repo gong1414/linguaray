@@ -545,6 +545,35 @@ final class RuntimeWorkspaceSettingsRepository
   }
 
   @override
+  Future<NetworkSettings> loadNetworkSettings() async {
+    await _store.reloadAdvanced();
+    final advanced = _store.advanced;
+    return NetworkSettings(
+      proxyMode: switch (advanced.proxyMode) {
+        'direct' => NetworkProxyMode.direct,
+        'custom' => NetworkProxyMode.custom,
+        _ => NetworkProxyMode.system,
+      },
+      proxyUrl: advanced.proxyUrl,
+      proxyBypass: advanced.proxyBypass,
+      checkUpdatesOnLaunch: advanced.checkUpdatesOnLaunch,
+    );
+  }
+
+  @override
+  Future<NetworkSettings> saveNetworkSettings(NetworkSettings settings) async {
+    await _store.updateAdvanced(
+      AdvancedSettingsPatch(
+        proxyMode: settings.proxyMode.name,
+        proxyUrl: settings.proxyUrl.trim(),
+        proxyBypass: settings.proxyBypass.trim(),
+        checkUpdatesOnLaunch: settings.checkUpdatesOnLaunch,
+      ),
+    );
+    return loadNetworkSettings();
+  }
+
+  @override
   Future<PlatformCapabilities> loadCapabilities() async {
     if (Platform.isWindows) return const PlatformCapabilities.windows();
     if (Platform.isMacOS) return const PlatformCapabilities.macos();

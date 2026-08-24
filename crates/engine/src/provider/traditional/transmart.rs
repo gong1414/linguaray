@@ -43,7 +43,7 @@ impl TransmartProvider {
             translation_service: TransmartTranslationService {
                 username: config.username.trim().to_owned(),
                 token: config.token.trim().to_owned(),
-                http: HttpClient::new(base_url, Default::default()),
+                http: HttpClient::proxy_aware(base_url)?,
             },
         })
     }

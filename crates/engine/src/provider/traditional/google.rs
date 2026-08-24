@@ -38,12 +38,11 @@ impl GoogleProvider {
             config: config.clone(),
             translation_service: GoogleTranslationService {
                 api_key: config.api_key,
-                http: HttpClient::new(
+                http: HttpClient::proxy_aware(
                     config
                         .base_url
                         .unwrap_or_else(|| "https://translation.googleapis.com".to_owned()),
-                    Default::default(),
-                ),
+                )?,
             },
         })
     }

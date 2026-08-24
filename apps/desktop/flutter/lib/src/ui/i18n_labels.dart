@@ -54,6 +54,8 @@ String appErrorMessage(String? code) {
     AppErrorCode.updateCheckFailed => errors.update_check_failed,
     AppErrorCode.updateChecksumMissing => errors.update_checksum_missing,
     AppErrorCode.updateChecksumMismatch => errors.update_checksum_mismatch,
+    AppErrorCode.updateSignatureInvalid => errors.update_signature_invalid,
+    AppErrorCode.updateInstallFailed => errors.update_install_failed,
     AppErrorCode.protocolInvalid => errors.protocol_invalid,
     AppErrorCode.protocolTooLarge => errors.protocol_too_large,
     AppErrorCode.apiServerBindFailed => errors.api_server_bind_failed,
@@ -123,6 +125,7 @@ SettingsShellLabels settingsShellLabels() => SettingsShellLabels(
   general: t.settings.navigation.general_settings,
   permissions: t.settings.permissions.title,
   integration: t.settings.advanced.title,
+  dataTransfer: t.settings.data_transfer.title,
   about: t.settings.about.title,
   updates: t.ui.updates.title,
 );

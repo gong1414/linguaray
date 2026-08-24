@@ -14,6 +14,7 @@ export 'package:linguaray_runtime/linguaray_runtime.dart'
         ApiServerInfo,
         AppearanceSettings,
         AppearanceSettingsPatch,
+        BackupSummary,
         ExternalActionKind,
         ExternalActionRequest,
         ExternalActionSubscription,
@@ -66,8 +67,10 @@ export 'package:linguaray_runtime/linguaray_runtime.dart'
         RecognizeTextRequest,
         RecognizeTextResponse,
         RuntimeApiServer,
+        RuntimeBackup,
         RuntimeOcr,
         RuntimeTextExtractor,
+        RestoreSummary,
         SelectionExtraction;
 
 /// Singleton [Runtime] handle, backed by the Rust native library.

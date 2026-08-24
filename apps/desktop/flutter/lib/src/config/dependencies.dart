@@ -3,6 +3,7 @@ import 'package:linguaray_application/linguaray_application.dart';
 
 import '../data/channel_speech_service.dart';
 import '../data/github_update_repository.dart';
+import '../services/network_proxy.dart';
 import '../data/permission_repository.dart';
 import '../data/runtime_dictionary_repository.dart';
 import '../data/runtime_glossary_repository.dart';
@@ -67,9 +68,11 @@ final speechServiceProvider = Provider<SpeechService>((ref) {
   return service;
 });
 
-final updateRepositoryProvider = Provider<UpdateRepository>(
-  (ref) => GitHubUpdateRepository(),
-);
+final updateRepositoryProvider = Provider<UpdateRepository>((ref) {
+  final repository = GitHubUpdateRepository(client: createNetworkHttpClient());
+  ref.onDispose(repository.close);
+  return repository;
+});
 
 final updateInstallerProvider = Provider<UpdateInstaller>(
   (ref) => DesktopUpdateInstaller(),

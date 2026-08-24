@@ -23,7 +23,10 @@ import 'runtime.dart' as runtime_service;
 /// runtime. Anything UI-only (e.g. window sizing) should live elsewhere.
 class SettingsStore extends ChangeNotifier {
   SettingsStore._() {
-    _launchAtLogin = LaunchAtLogin();
+    _launchAtLogin = LaunchAtLogin(
+      id: 'io.github.gong1414.linguaray',
+      displayName: 'LinguaRay',
+    );
   }
 
   static final SettingsStore instance = SettingsStore._();
@@ -72,6 +75,10 @@ class SettingsStore extends ChangeNotifier {
     apiServerEnabled: false,
     apiServerHost: '127.0.0.1',
     apiServerPort: 0,
+    proxyMode: 'system',
+    proxyUrl: '',
+    proxyBypass: 'localhost,127.0.0.1',
+    checkUpdatesOnLaunch: true,
   );
   List<ProviderConfigEntry> _providers = const [];
   List<ServiceConfigEntry> _services = const [];
@@ -126,6 +133,7 @@ class SettingsStore extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _subscription = null;
+    _launchAtLogin.dispose();
     super.dispose();
   }
 
@@ -194,7 +202,15 @@ class SettingsStore extends ChangeNotifier {
       } else {
         _didEnsureDefaultTranslationTarget = true;
       }
-      _applyLaunchAtLogin(_general.launchAtLogin);
+      if (!_applyLaunchAtLogin(_general.launchAtLogin) &&
+          (kIsMacOS || kIsWindows) &&
+          LaunchAtLogin.isSupported) {
+        _general = await settings.updateGeneral(
+          patch: GeneralSettingsPatch(
+            launchAtLogin: _launchAtLogin.isEnabled,
+          ),
+        );
+      }
       notifyListeners();
     } catch (_) {
       // keep cached defaults
@@ -245,24 +261,32 @@ class SettingsStore extends ChangeNotifier {
   }
 
   Future<void> updateGeneral(GeneralSettingsPatch patch) async {
-    final settings = runtime_service.runtime.settings();
-    _general = await settings.updateGeneral(patch: patch);
-    if (patch.launchAtLogin != null) {
-      _applyLaunchAtLogin(patch.launchAtLogin!);
+    final previousLaunchAtLogin = _general.launchAtLogin;
+    final changesLoginItem = patch.launchAtLogin != null;
+    if (patch.launchAtLogin != null &&
+        !_applyLaunchAtLogin(patch.launchAtLogin!)) {
+      throw StateError('The operating system rejected the login item change.');
     }
-    notifyListeners();
+    try {
+      final settings = runtime_service.runtime.settings();
+      _general = await settings.updateGeneral(patch: patch);
+      notifyListeners();
+    } catch (_) {
+      if (changesLoginItem) {
+        _applyLaunchAtLogin(previousLaunchAtLogin);
+      }
+      rethrow;
+    }
   }
 
   /// Enables or disables the OS-level launch-at-login feature.
   ///
   /// Only applies on macOS and Windows. No-op on other platforms.
-  void _applyLaunchAtLogin(bool value) {
-    if (!kIsMacOS && !kIsWindows) return;
-    if (value) {
-      _launchAtLogin.enable();
-    } else {
-      _launchAtLogin.disable();
-    }
+  bool _applyLaunchAtLogin(bool value) {
+    if (!kIsMacOS && !kIsWindows) return false;
+    if (!LaunchAtLogin.isSupported) return false;
+    if (_launchAtLogin.isEnabled == value) return true;
+    return value ? _launchAtLogin.enable() : _launchAtLogin.disable();
   }
 
   Future<void> updateAppearance(AppearanceSettingsPatch patch) async {

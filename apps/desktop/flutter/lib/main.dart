@@ -7,6 +7,7 @@ import 'src/platform/secret_store.dart';
 import 'src/routes/app_router.dart';
 import 'src/services/runtime.dart' show initRuntime;
 import 'src/services/settings_store.dart';
+import 'src/services/system_proxy.dart';
 import 'src/utils/env.dart';
 import 'src/utils/language_util.dart';
 
@@ -32,6 +33,8 @@ Future<void> _ensureInitialized() async {
   debugPrint('[LinguaRay] Provider credentials hydrated.');
   await settingsStore.init();
   debugPrint('[LinguaRay] Settings initialized.');
+  await initializeSystemProxy();
+  debugPrint('[LinguaRay] Network policy initialized.');
 }
 
 Future<void> main() async {

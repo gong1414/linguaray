@@ -37,7 +37,7 @@ impl LibreTranslateProvider {
         Ok(Self {
             translation_service: LibreTranslateTranslationService {
                 api_key: config.api_key.trim().to_owned(),
-                http: HttpClient::new(base_url, Default::default()),
+                http: HttpClient::proxy_aware(base_url)?,
             },
         })
     }

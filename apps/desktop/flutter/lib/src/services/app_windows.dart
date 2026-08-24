@@ -79,6 +79,7 @@ enum SettingsDestination {
   settingsOcrServices('/settings/services/ocr'),
   settingsGeneral('/settings/general'),
   settingsPermissions('/settings/permissions'),
+  settingsDataTransfer('/settings/data-transfer'),
   settingsIntegration('/settings/integration'),
   settingsUpdates('/settings/updates'),
   settingsAbout('/settings/about');

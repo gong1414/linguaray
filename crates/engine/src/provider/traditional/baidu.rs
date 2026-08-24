@@ -59,25 +59,33 @@ impl BaiduProvider {
             );
         }
         let base_url = config.base_url.clone();
+        let translation_http = if has_translation {
+            Some(HttpClient::proxy_aware(
+                base_url
+                    .clone()
+                    .unwrap_or_else(|| "https://fanyi-api.baidu.com".to_owned()),
+            )?)
+        } else {
+            None
+        };
+        let ocr_http = if has_ocr {
+            Some(HttpClient::proxy_aware(
+                base_url.unwrap_or_else(|| "https://aip.baidubce.com".to_owned()),
+            )?)
+        } else {
+            None
+        };
         Ok(Self {
             config: config.clone(),
-            translation_service: has_translation.then(|| BaiduTranslationService {
+            translation_service: translation_http.map(|http| BaiduTranslationService {
                 app_id: config.app_id.clone(),
                 app_key: config.app_key.clone(),
-                http: HttpClient::new(
-                    base_url
-                        .clone()
-                        .unwrap_or_else(|| "https://fanyi-api.baidu.com".to_owned()),
-                    Default::default(),
-                ),
+                http,
             }),
-            ocr_service: has_ocr.then(|| BaiduOcrService {
+            ocr_service: ocr_http.map(|http| BaiduOcrService {
                 api_key: config.api_key,
                 secret_key: config.secret_key,
-                http: HttpClient::new(
-                    base_url.unwrap_or_else(|| "https://aip.baidubce.com".to_owned()),
-                    Default::default(),
-                ),
+                http,
             }),
         })
     }

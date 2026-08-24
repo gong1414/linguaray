@@ -16,6 +16,7 @@ final class SettingsShellLabels {
     this.glossary = '',
     this.vocabulary = '',
     this.integration = '',
+    this.dataTransfer = '',
   });
 
   final String translationGroup;
@@ -34,6 +35,7 @@ final class SettingsShellLabels {
   final String glossary;
   final String vocabulary;
   final String integration;
+  final String dataTransfer;
 }
 
 enum SettingsSection {
@@ -48,6 +50,7 @@ enum SettingsSection {
   general,
   permissions,
   integration,
+  dataTransfer,
   updates,
   about,
 }

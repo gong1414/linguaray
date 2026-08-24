@@ -39,12 +39,11 @@ impl DeepLProvider {
             config: config.clone(),
             translation_service: DeepLTranslationService {
                 api_key: config.api_key,
-                http: HttpClient::new(
+                http: HttpClient::proxy_aware(
                     config
                         .base_url
                         .unwrap_or_else(|| "https://api.deepl.com".to_owned()),
-                    Default::default(),
-                ),
+                )?,
             },
         })
     }

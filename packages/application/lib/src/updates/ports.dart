@@ -14,6 +14,8 @@ abstract interface class UpdateRepository {
     required String filePath,
     required String sha256,
   });
+
+  Future<void> verifyPlatformSignature({required String filePath});
 }
 
 abstract interface class UpdateInstaller {

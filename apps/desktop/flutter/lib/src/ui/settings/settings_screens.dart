@@ -10,6 +10,7 @@ import 'package:linguaray_application/linguaray_application.dart';
 import '../../config/dependencies.dart';
 import '../../i18n/i18n.dart';
 import '../../routes/settings/provider_catalog.dart';
+import '../../services/system_proxy.dart';
 import '../../utils/external_url.dart';
 import '../i18n_labels.dart';
 import '../shared/status_message.dart';
@@ -63,6 +64,9 @@ class SettingsHostScreen extends StatelessWidget {
     if (location.startsWith('/settings/integration')) {
       return SettingsSection.integration;
     }
+    if (location.startsWith('/settings/data-transfer')) {
+      return SettingsSection.dataTransfer;
+    }
     if (location.startsWith('/settings/about')) {
       return SettingsSection.about;
     }
@@ -89,6 +93,7 @@ class SettingsHostScreen extends StatelessWidget {
         SettingsSection.general => '/settings/general',
         SettingsSection.permissions => '/settings/permissions',
         SettingsSection.integration => '/settings/integration',
+        SettingsSection.dataTransfer => '/settings/data-transfer',
         SettingsSection.updates => '/settings/updates',
         SettingsSection.about => '/settings/about',
       }),
@@ -1505,8 +1510,12 @@ class AdvancedSettingsScreen extends ConsumerStatefulWidget {
 class _AdvancedSettingsScreenState
     extends ConsumerState<AdvancedSettingsScreen> {
   ApiServerStatus? _status;
-  String? _error;
+  NetworkSettings? _network;
+  String? _apiError;
+  String? _networkError;
   final TextEditingController _port = TextEditingController();
+  final TextEditingController _proxyUrl = TextEditingController();
+  final TextEditingController _proxyBypass = TextEditingController();
 
   @override
   void initState() {
@@ -1517,23 +1526,37 @@ class _AdvancedSettingsScreenState
   @override
   void dispose() {
     _port.dispose();
+    _proxyUrl.dispose();
+    _proxyBypass.dispose();
     super.dispose();
   }
 
   Future<void> _reload() async {
+    final repository = ref.read(workspaceSettingsRepositoryProvider);
     try {
-      final status = await ref
-          .read(workspaceSettingsRepositoryProvider)
-          .loadApiServer();
+      final status = await repository.loadApiServer();
       if (!mounted) return;
       setState(() {
         _status = status;
-        _error = status.bindErrorCode;
+        _apiError = status.bindErrorCode;
         _port.text = '${status.port}';
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() => _error = AppErrorCode.apiServerBindFailed.wireName);
+      setState(() => _apiError = AppErrorCode.apiServerBindFailed.wireName);
+    }
+    try {
+      final network = await repository.loadNetworkSettings();
+      if (!mounted) return;
+      setState(() {
+        _network = network;
+        _networkError = null;
+        _proxyUrl.text = network.proxyUrl;
+        _proxyBypass.text = network.proxyBypass;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _networkError = AppErrorCode.networkFailure.wireName);
     }
   }
 
@@ -1560,12 +1583,12 @@ class _AdvancedSettingsScreenState
                 if (!mounted) return;
                 setState(() {
                   _status = next;
-                  _error = next.bindErrorCode;
+                  _apiError = next.bindErrorCode;
                 });
               } catch (_) {
                 if (!mounted) return;
                 setState(
-                  () => _error = AppErrorCode.apiServerBindFailed.wireName,
+                  () => _apiError = AppErrorCode.apiServerBindFailed.wireName,
                 );
               }
             },
@@ -1581,7 +1604,7 @@ class _AdvancedSettingsScreenState
               onSubmitted: (value) async {
                 final port = int.tryParse(value);
                 if (port == null) {
-                  setState(() => _error = AppErrorCode.invalidPort.wireName);
+                  setState(() => _apiError = AppErrorCode.invalidPort.wireName);
                   return;
                 }
                 final next = await ref
@@ -1590,7 +1613,7 @@ class _AdvancedSettingsScreenState
                 if (!mounted) return;
                 setState(() {
                   _status = next;
-                  _error = next.bindErrorCode;
+                  _apiError = next.bindErrorCode;
                 });
               },
             ),
@@ -1617,10 +1640,133 @@ class _AdvancedSettingsScreenState
             ),
           ),
         ],
-        if (_error != null)
-          StatusMessage(kind: StatusKind.error, title: appErrorMessage(_error)),
+        if (_apiError != null)
+          StatusMessage(
+            kind: StatusKind.error,
+            title: appErrorMessage(_apiError),
+          ),
+        const SizedBox(height: 24),
+        const Divider(),
+        const SizedBox(height: 16),
+        Text(advanced.network, style: Theme.of(context).textTheme.titleMedium),
+        if (_network != null) ...[
+          const SizedBox(height: 8),
+          DropdownButtonFormField<NetworkProxyMode>(
+            initialValue: _network!.proxyMode,
+            decoration: InputDecoration(labelText: advanced.proxy_mode),
+            items: [
+              DropdownMenuItem(
+                value: NetworkProxyMode.system,
+                child: Text(advanced.proxy_system),
+              ),
+              DropdownMenuItem(
+                value: NetworkProxyMode.direct,
+                child: Text(advanced.proxy_direct),
+              ),
+              DropdownMenuItem(
+                value: NetworkProxyMode.custom,
+                child: Text(advanced.proxy_custom),
+              ),
+            ],
+            onChanged: (mode) {
+              if (mode == null) return;
+              setState(
+                () => _network = NetworkSettings(
+                  proxyMode: mode,
+                  proxyUrl: _proxyUrl.text,
+                  proxyBypass: _proxyBypass.text,
+                  checkUpdatesOnLaunch: _network!.checkUpdatesOnLaunch,
+                ),
+              );
+            },
+          ),
+          if (_network!.proxyMode == NetworkProxyMode.custom) ...[
+            const SizedBox(height: 12),
+            TextField(
+              controller: _proxyUrl,
+              decoration: InputDecoration(
+                labelText: advanced.proxy_url,
+                hintText: advanced.proxy_url_hint,
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _proxyBypass,
+              decoration: InputDecoration(
+                labelText: advanced.proxy_bypass,
+                hintText: advanced.proxy_bypass_hint,
+              ),
+            ),
+          ],
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(advanced.check_updates_on_launch),
+            value: _network!.checkUpdatesOnLaunch,
+            onChanged: (value) => setState(
+              () => _network = NetworkSettings(
+                proxyMode: _network!.proxyMode,
+                proxyUrl: _proxyUrl.text,
+                proxyBypass: _proxyBypass.text,
+                checkUpdatesOnLaunch: value,
+              ),
+            ),
+          ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: FilledButton(
+              onPressed: _saveNetwork,
+              child: Text(advanced.save_network),
+            ),
+          ),
+          if (_networkError != null) ...[
+            const SizedBox(height: 12),
+            StatusMessage(
+              kind: StatusKind.error,
+              title: appErrorMessage(_networkError),
+            ),
+          ],
+        ],
       ],
     );
+  }
+
+  Future<void> _saveNetwork() async {
+    final network = _network;
+    if (network == null) return;
+    if (network.proxyMode == NetworkProxyMode.custom) {
+      final uri = Uri.tryParse(_proxyUrl.text.trim());
+      if (uri == null ||
+          (uri.scheme != 'http' && uri.scheme != 'https') ||
+          uri.host.isEmpty ||
+          uri.userInfo.isNotEmpty) {
+        setState(
+          () => _networkError =
+              AppErrorCode.proxyConfigurationInvalid.wireName,
+        );
+        return;
+      }
+    }
+    try {
+      final saved = await ref
+          .read(workspaceSettingsRepositoryProvider)
+          .saveNetworkSettings(
+            NetworkSettings(
+              proxyMode: network.proxyMode,
+              proxyUrl: _proxyUrl.text,
+              proxyBypass: _proxyBypass.text,
+              checkUpdatesOnLaunch: network.checkUpdatesOnLaunch,
+            ),
+          );
+      await initializeSystemProxy();
+      if (!mounted) return;
+      setState(() {
+        _network = saved;
+        _networkError = null;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _networkError = AppErrorCode.networkFailure.wireName);
+    }
   }
 }
 

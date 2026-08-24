@@ -42,12 +42,33 @@ void main() {
     expect(state.status, UpdateStatus.failed);
     expect(state.errorCode, AppErrorCode.updateChecksumMissing.wireName);
   });
+
+  test('download verifies checksum before the platform signature', () async {
+    final repository = _FakeUpdateRepository();
+    const manifest = UpdateManifest(
+      version: '0.6.0',
+      notes: '',
+      assetName: 'LinguaRay-macos.dmg',
+      assetUrl: 'https://example.invalid/LinguaRay-macos.dmg',
+      checksumSha256:
+          '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+    );
+
+    final state = await DownloadVerifiedUpdate(repository)(
+      currentVersion: '0.5.0',
+      manifest: manifest,
+    );
+
+    expect(state.status, UpdateStatus.readyToInstall);
+    expect(repository.calls, ['download', 'checksum', 'signature']);
+  });
 }
 
 final class _FakeUpdateRepository implements UpdateRepository {
   _FakeUpdateRepository({this.latest});
 
   final UpdateManifest? latest;
+  final List<String> calls = [];
 
   @override
   Future<UpdateManifest?> checkLatest() async => latest;
@@ -59,11 +80,21 @@ final class _FakeUpdateRepository implements UpdateRepository {
   Future<String> download({
     required UpdateManifest manifest,
     void Function(double progress)? onProgress,
-  }) async => '/tmp/app.zip';
+  }) async {
+    calls.add('download');
+    return '/tmp/app.zip';
+  }
 
   @override
   Future<void> verifyChecksum({
     required String filePath,
     required String sha256,
-  }) async {}
+  }) async {
+    calls.add('checksum');
+  }
+
+  @override
+  Future<void> verifyPlatformSignature({required String filePath}) async {
+    calls.add('signature');
+  }
 }

@@ -188,7 +188,7 @@ impl OpenAiCompatibleProvider {
             api_key,
             default_model,
             models_url,
-            client: reqwest::Client::new(),
+            client: crate::common::build_http_client()?,
         });
 
         Ok(Self {
@@ -320,9 +320,9 @@ impl OpenAiCompatibleLlmService {
         } else {
             vec![self.api_key.as_str()]
         };
-        let client = reqwest::Client::builder()
-            .timeout(crate::catalog::MODELS_FETCH_TIMEOUT)
-            .build()
+        let client = crate::common::build_http_client_with(
+            reqwest::Client::builder().timeout(crate::catalog::MODELS_FETCH_TIMEOUT),
+        )
             .map_err(|error| LlmError::NetworkError(error.to_string()))?;
         crate::catalog::fetch_models_with_candidates(&candidates, &secrets, |url| {
             let client = client.clone();

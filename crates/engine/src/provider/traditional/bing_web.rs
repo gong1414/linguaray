@@ -41,7 +41,7 @@ impl BingWebProvider {
     pub fn new(_config: BingWebProviderConfig) -> Result<Self, String> {
         Ok(Self {
             translation_service: BingWebTranslationService {
-                client: reqwest::Client::new(),
+                client: crate::common::build_http_client()?,
                 token: Mutex::new(None),
             },
         })

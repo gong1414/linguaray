@@ -35,7 +35,7 @@ impl GoogleWebProvider {
             .unwrap_or_else(|| "https://translate.google.com".to_owned());
         Ok(Self {
             translation_service: GoogleWebTranslationService {
-                http: HttpClient::new(base_url, Default::default()),
+                http: HttpClient::proxy_aware(base_url)?,
             },
         })
     }

@@ -187,6 +187,14 @@ pub struct AdvancedSettings {
     pub api_server_host: String,
     #[serde(rename = "apiServerPort")]
     pub api_server_port: u16,
+    #[serde(default = "default_proxy_mode", rename = "proxyMode")]
+    pub proxy_mode: String,
+    #[serde(default, rename = "proxyUrl")]
+    pub proxy_url: String,
+    #[serde(default, rename = "proxyBypass")]
+    pub proxy_bypass: String,
+    #[serde(default = "default_true", rename = "checkUpdatesOnLaunch")]
+    pub check_updates_on_launch: bool,
 }
 
 impl Default for AdvancedSettings {
@@ -195,12 +203,24 @@ impl Default for AdvancedSettings {
             api_server_enabled: false,
             api_server_host: default_api_server_host(),
             api_server_port: 0,
+            proxy_mode: default_proxy_mode(),
+            proxy_url: String::new(),
+            proxy_bypass: "localhost,127.0.0.1".to_owned(),
+            check_updates_on_launch: true,
         }
     }
 }
 
 fn default_api_server_host() -> String {
     "127.0.0.1".to_owned()
+}
+
+fn default_proxy_mode() -> String {
+    "system".to_owned()
+}
+
+fn default_true() -> bool {
+    true
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize, uniffi::Record)]

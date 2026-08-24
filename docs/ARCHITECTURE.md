@@ -97,3 +97,7 @@ OCR uses fixed, non-sensitive fixture images.
 LinguaRay uses its own `v2` configuration namespace and does not read or delete
 data from the former Tauri application. Logs, UI state, and normal settings must
 not contain provider secrets.
+
+Versioned backup/restore and the shared proxy policy are documented in
+[Data transfer and network policy](DATA_AND_NETWORK.md). Backups deliberately
+exclude secure-storage values.

@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart' hide Image;
 import 'package:go_router/go_router.dart';
+import 'package:linguaray_application/linguaray_application.dart'
+    show UpdateStatus;
 import 'package:linguaray_ui/linguaray_ui.dart' show LinguaRayMaterialTheme;
 import 'package:nativeapi/nativeapi.dart';
 
@@ -13,6 +15,7 @@ import '../platform/menu_accelerator.dart';
 import '../platform/permission_controller.dart';
 import '../platform/platform_types.dart';
 import '../platform/protocol_controller.dart';
+import '../platform/startup_update_controller.dart';
 import '../platform/trigger_controller.dart';
 import '../services/app_windows.dart';
 import '../services/dock_icon_controller.dart';
@@ -254,10 +257,17 @@ class _RootBodyViewState extends State<_RootBodyView>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_debugInitialDestination == null) {
         initializeResidentApp();
+        unawaited(_checkForUpdatesOnLaunch());
       } else {
         showSettingsWindow(destination: _debugInitialDestination);
       }
     });
+  }
+
+  Future<void> _checkForUpdatesOnLaunch() async {
+    final state = await startupUpdateController.check();
+    if (!mounted || state?.status != UpdateStatus.available) return;
+    showSettingsWindow(destination: SettingsDestination.settingsUpdates);
   }
 
   @override

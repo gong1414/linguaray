@@ -44,12 +44,11 @@ impl CaiyunProvider {
             translation_service: CaiyunTranslationService {
                 token: config.token,
                 request_id: config.request_id,
-                http: HttpClient::new(
+                http: HttpClient::proxy_aware(
                     config
                         .base_url
                         .unwrap_or_else(|| "http://api.interpreter.caiyunai.com".to_owned()),
-                    Default::default(),
-                ),
+                )?,
             },
         })
     }

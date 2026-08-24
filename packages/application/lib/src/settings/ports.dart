@@ -80,6 +80,10 @@ abstract interface class WorkspaceSettingsRepository {
 
   Future<ApiServerStatus> setApiServerPort(int port);
 
+  Future<NetworkSettings> loadNetworkSettings();
+
+  Future<NetworkSettings> saveNetworkSettings(NetworkSettings settings);
+
   Future<AboutInfo> loadAbout();
 
   Future<PlatformCapabilities> loadCapabilities();

@@ -101,6 +101,14 @@ class SettingsShellView extends StatelessWidget {
                   selected: section == SettingsSection.permissions,
                   onTap: () => onSectionSelected(SettingsSection.permissions),
                 ),
+                if (labels.dataTransfer.isNotEmpty)
+                  _Destination(
+                    icon: Icons.import_export_rounded,
+                    label: labels.dataTransfer,
+                    selected: section == SettingsSection.dataTransfer,
+                    onTap: () =>
+                        onSectionSelected(SettingsSection.dataTransfer),
+                  ),
                 if (labels.integration.isNotEmpty)
                   _Destination(
                     icon: Icons.integration_instructions_outlined,

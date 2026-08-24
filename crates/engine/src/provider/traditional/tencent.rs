@@ -53,12 +53,11 @@ impl TencentProvider {
             translation_service: TencentTranslationService {
                 secret_id: config.secret_id,
                 secret_key: config.secret_key,
-                http: HttpClient::new(
+                http: HttpClient::proxy_aware(
                     config
                         .base_url
                         .unwrap_or_else(|| "https://tmt.tencentcloudapi.com".to_owned()),
-                    Default::default(),
-                ),
+                )?,
             },
         })
     }

@@ -46,7 +46,7 @@ impl AnthropicProvider {
             .clone()
             .unwrap_or_else(|| "https://api.anthropic.com".to_string());
 
-        let http = HttpClient::new(&base_url);
+        let http = HttpClient::new(&base_url)?;
         let default_model = configured_default_model(&config.default_model)?;
 
         let llm_service = Arc::new(AnthropicLlmService {
@@ -86,11 +86,11 @@ struct HttpClient {
 }
 
 impl HttpClient {
-    fn new(base_url: &str) -> Self {
-        Self {
+    fn new(base_url: &str) -> Result<Self, String> {
+        Ok(Self {
             base_url: base_url.to_string(),
-            client: reqwest::Client::new(),
-        }
+            client: crate::common::build_http_client()?,
+        })
     }
 
     fn join_url(&self, path: &str) -> String {

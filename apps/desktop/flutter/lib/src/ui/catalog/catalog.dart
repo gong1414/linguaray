@@ -6,6 +6,7 @@ import '../../platform/platform_types.dart';
 import '../history/history_view.dart';
 import '../ocr/ocr_view.dart';
 import '../quick_translate/widgets/quick_translate_view.dart';
+import '../settings/data_transfer_settings_screen.dart';
 import '../settings/settings_labels.dart';
 import '../settings/settings_shell_view.dart';
 import '../settings/views/about_settings_view.dart';
@@ -401,6 +402,7 @@ class SettingsCatalogPreview extends StatelessWidget {
           onGrantScreenRecording: () {},
           onRecheck: () {},
         ),
+        SettingsSection.dataTransfer => const DataTransferSettingsScreen(),
         SettingsSection.favorites ||
         SettingsSection.history ||
         SettingsSection.glossary ||

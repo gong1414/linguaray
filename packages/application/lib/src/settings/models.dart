@@ -346,6 +346,22 @@ final class ApiServerStatus {
   bool get running => baseUrl != null && baseUrl!.isNotEmpty;
 }
 
+enum NetworkProxyMode { system, direct, custom }
+
+final class NetworkSettings {
+  const NetworkSettings({
+    required this.proxyMode,
+    required this.proxyUrl,
+    required this.proxyBypass,
+    required this.checkUpdatesOnLaunch,
+  });
+
+  final NetworkProxyMode proxyMode;
+  final String proxyUrl;
+  final String proxyBypass;
+  final bool checkUpdatesOnLaunch;
+}
+
 final class PlatformCapabilities {
   const PlatformCapabilities({
     required this.systemTranslation,

@@ -9,6 +9,9 @@ pub use engine::{
     ProviderType,
 };
 pub use languages::{all_languages, app_languages};
+pub use common::{
+    configure_network_proxy, current_network_proxy, NetworkProxyConfig, NetworkProxyMode,
+};
 pub use linguaray_core::{
     DictionaryError, DictionaryService, OcrError, OcrService, Provider, TranslationError,
     TranslationService,
