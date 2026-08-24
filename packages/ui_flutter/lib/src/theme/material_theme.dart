@@ -261,7 +261,6 @@ abstract final class LinguaRayMaterialTheme {
       visualDensity: VisualDensity.compact,
       splashFactory: InkRipple.splashFactory,
       platform: resolvedPlatform,
-      fontFamily: 'MiSans',
       fontFamilyFallback: const [
         '.AppleSystemUIFont',
         'Segoe UI',

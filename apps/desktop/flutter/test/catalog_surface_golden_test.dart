@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:linguaray_desktop/widgetbook.dart';
 import 'package:linguaray_ui/linguaray_ui.dart' show LinguaRayMaterialTheme;
+import 'package:linguaray_ui/testing.dart' show loadGoldenFonts;
 
 import 'support/golden_comparator.dart';
 
@@ -12,14 +13,8 @@ void main() {
   installGoldenComparator();
 
   setUpAll(() async {
-    await _loadFont('Golden Sans', 'resources/fonts/MiSans-Regular.ttf');
-    await _loadFont('MiSans', 'resources/fonts/MiSans-Regular.ttf');
-    await _loadFont('Golden Mono', 'resources/fonts/RobotoMono-Regular.ttf');
+    await loadGoldenFonts();
     await _loadFont('MaterialIcons', 'fonts/MaterialIcons-Regular.otf');
-    await _loadFont(
-      'packages/fluentui_system_icons/FluentSystemIcons-Regular',
-      'packages/fluentui_system_icons/fonts/FluentSystemIcons-Regular.ttf',
-    );
   });
 
   // The override lets maintainers refresh both deterministic platform themes
@@ -46,7 +41,7 @@ void main() {
 
           final baseTheme = LinguaRayMaterialTheme.forBrightness(brightness);
           final fixedTextTheme = baseTheme.textTheme.apply(
-            fontFamily: 'Golden Sans',
+            fontFamily: 'Golden UI',
           );
           final theme = baseTheme.copyWith(
             platform: target,

@@ -56,10 +56,10 @@ tray menu and global shortcuts; Preferences is the only persistent window.
 | macOS and Windows desktop builds | Built and exercised by CI |
 | Signed installers and stable releases | Not published yet |
 
-Linux packages, migration from the retired Tauri prototype, and automatic
-replacement of selected source text are intentionally outside the current
-scope. Half-finished entry points stay hidden until they meet the same test and
-platform requirements as the core workflows.
+Migration from the retired Tauri prototype and automatic replacement of
+selected source text are intentionally outside the current scope. Half-finished
+entry points stay hidden until they meet the same test and platform requirements
+as the core workflows.
 
 ## Platform support
 
@@ -67,8 +67,6 @@ platform requirements as the core workflows.
 | --- | --- | --- |
 | macOS | 13.0 | Supported in CI |
 | Windows | Windows 10 | Supported in CI |
-
-Linux is not currently supported.
 
 ## Run from source
 

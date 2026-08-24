@@ -2,9 +2,8 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:linguaray_ui/linguaray_ui.dart';
 
-/// The Windows/Linux window chrome, as the React `window-controls` and
-/// `WindowTitlebar` state it: the platform swaps the control cluster, the
-/// cluster answers presses, and the production brand mark paints at exact
+/// The macOS/Windows window chrome: the platform swaps the control cluster,
+/// the cluster answers presses, and the production brand mark paints at exact
 /// requested sizes.
 void main() {
   Widget specimen(Widget child) => DesignThemeProvider(
@@ -66,22 +65,6 @@ void main() {
     final cluster = tester.getRect(find.byType(WindowsCaptionControls));
     expect(cluster.right, band.right);
 
-    await tester.pumpWidget(
-      specimen(
-        const SizedBox(
-          width: 600,
-          child: WindowTitlebar(
-            platform: WindowPlatform.linux,
-            buttons: [CaptionButton.close],
-            title: Text('翻译'),
-          ),
-        ),
-      ),
-    );
-    expect(find.byType(LinuxWindowControls), findsOneWidget);
-    expect(find.bySemanticsLabel('关闭'), findsOneWidget);
-    expect(find.bySemanticsLabel('最小化'), findsNothing);
-
     // macOS keeps the lights and draws no cluster.
     await tester.pumpWidget(
       specimen(
@@ -90,7 +73,6 @@ void main() {
     );
     expect(find.byType(TrafficLights), findsOneWidget);
     expect(find.byType(WindowsCaptionControls), findsNothing);
-    expect(find.byType(LinuxWindowControls), findsNothing);
   });
 
   testWidgets('the production brand mark paints at requested sizes', (

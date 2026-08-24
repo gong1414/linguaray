@@ -2,14 +2,11 @@ import 'package:flutter/widgets.dart';
 import 'package:linguaray_ui/src/theme/theme.dart';
 import 'package:linguaray_ui/src/widgets/pressable.dart';
 
-/// Which OS draws the window. Shape belongs to the platform the way it does on
-/// iOS: the theme keeps its colours everywhere, but Windows clips corners at
-/// DWM's 8px and Linux CSD draws its own 12px, so both pin the radius that the
-/// theme would otherwise set.
-enum WindowPlatform { macos, windows, linux }
+/// Which supported desktop OS draws the window chrome.
+enum WindowPlatform { macos, windows }
 
-/// The buttons a Windows/Linux control cluster carries, mirroring
-/// [TrafficLights.buttons] on the macOS side.
+/// The buttons a Windows control cluster carries, mirroring the traffic-light
+/// group on the macOS side.
 enum CaptionButton { minimize, maximize, close }
 
 const List<CaptionButton> kDefaultCaptionButtons = [
@@ -98,57 +95,6 @@ class WindowsCaptionControls extends StatelessWidget {
   }
 }
 
-/// Adwaita-style CSD buttons: circular pads inset from the corner, hover
-/// brightening the pad. GNOME's stock config shows close alone; the trio is
-/// for environments configured to carry all three.
-class LinuxWindowControls extends StatelessWidget {
-  const LinuxWindowControls({
-    super.key,
-    this.buttons = kDefaultCaptionButtons,
-    this.onPressed,
-  });
-
-  /// Which buttons the window actually carries.
-  final List<CaptionButton> buttons;
-
-  /// Real-window wiring; null keeps the pads decorative.
-  final ValueChanged<CaptionButton>? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        for (var i = 0; i < buttons.length; i++) ...[
-          if (i > 0) const SizedBox(width: 13),
-          Pressable(
-            onPressed: onPressed == null ? null : () => onPressed!(buttons[i]),
-            cursor: SystemMouseCursors.basic,
-            showFocusRing: false,
-            semanticsLabel: _defaultLabel(buttons[i]),
-            builder: (context, state) => AnimatedContainer(
-              duration: kTransitionDuration,
-              width: 24,
-              height: 24,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: state.hovered ? colors.controlHover : colors.control,
-                shape: BoxShape.circle,
-              ),
-              child: CustomPaint(
-                size: const Size.square(8),
-                painter: _LinuxGlyphPainter(buttons[i], colors.fgControl),
-              ),
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
 /// Segoe Fluent-style caption glyphs: a 10×10 box with 1px strokes.
 class _WindowsGlyphPainter extends CustomPainter {
   const _WindowsGlyphPainter(this.button, this.color);
@@ -182,36 +128,5 @@ class _WindowsGlyphPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_WindowsGlyphPainter oldDelegate) =>
-      button != oldDelegate.button || color != oldDelegate.color;
-}
-
-/// GNOME symbolic glyphs: an 8×8 box, round caps, minimise is a floor line.
-class _LinuxGlyphPainter extends CustomPainter {
-  const _LinuxGlyphPainter(this.button, this.color);
-
-  final CaptionButton button;
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2
-      ..strokeCap = StrokeCap.round
-      ..color = color;
-
-    switch (button) {
-      case CaptionButton.minimize:
-        canvas.drawLine(const Offset(0.5, 7.5), const Offset(7.5, 7.5), paint);
-      case CaptionButton.maximize:
-        canvas.drawRect(const Rect.fromLTRB(0.5, 0.5, 7.5, 7.5), paint);
-      case CaptionButton.close:
-        canvas.drawLine(const Offset(0.5, 0.5), const Offset(7.5, 7.5), paint);
-        canvas.drawLine(const Offset(7.5, 0.5), const Offset(0.5, 7.5), paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(_LinuxGlyphPainter oldDelegate) =>
       button != oldDelegate.button || color != oldDelegate.color;
 }

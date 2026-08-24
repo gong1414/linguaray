@@ -1,6 +1,6 @@
 mod model;
-mod provider;
-mod service;
+mod capability;
+mod provider_contract;
 
 pub use model::{
     ChatChoice, ChatMessage, ChatRequest, ChatResponse, ChatRole, ChatUsage, DetectLanguageRequest,
@@ -10,8 +10,8 @@ pub use model::{
     TranslateResponse, TranslationTarget, WordDefinition, WordEtymology, WordImage, WordPhrase,
     WordPronunciation, WordSentence, WordSynonym, WordTag, WordTense,
 };
-pub use provider::Provider;
-pub use service::{
+pub use capability::{
     DictionaryError, DictionaryService, LlmError, LlmService, LlmStreamReceiver, OcrError,
     OcrService, TranslationError, TranslationService,
 };
+pub use provider_contract::Provider;

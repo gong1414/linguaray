@@ -1,5 +1,32 @@
 # Third-party notices
 
+## Flutter desktop templates
+
+The macOS and Windows runner scaffolding was generated from the Flutter SDK
+project templates and remains under the Flutter project's BSD 3-Clause
+License. Copyright 2014 The Flutter Authors. The license is available at
+<https://github.com/flutter/flutter/blob/master/LICENSE>.
+
+## Unicode CLDR
+
+The curated language names in `scripts/generate/data/languages.json` are based
+on Unicode Common Locale Data Repository display names and are normalized for
+the languages exposed by LinguaRay. CLDR is distributed under the Unicode
+License v3. Copyright Unicode, Inc. The license is available at
+<https://www.unicode.org/license.txt>.
+
+## MiSans
+
+The outlined `LinguaRay` wordmark in the user-supplied brand package was
+created with MiSans Semibold. LinguaRay does not redistribute the MiSans font
+software and does not load it at runtime; the exported artwork contains only
+the resulting vector outline.
+
+MiSans is Copyright Xiaomi Inc. Its intellectual-property license permits use
+of works created with the font and requires software using it to identify that
+use. The current agreement is published at
+<https://hyperos.mi.com/font/en/download/>.
+
 ## ECDICT
 
 LinguaRay includes a compact, mechanically selected subset of the

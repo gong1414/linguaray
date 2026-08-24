@@ -200,7 +200,11 @@ class _RuntimeDebugPageState extends State<RuntimeDebugPage> {
           SelectableText(
             content,
             style: Theme.of(context).textTheme.bodyMedium
-                ?.copyWith(fontFamily: 'Roboto Mono', height: 1.4),
+                ?.copyWith(
+                  fontFamily: kIsWindows ? 'Cascadia Mono' : 'SF Mono',
+                  fontFamilyFallback: const ['Consolas', 'Menlo'],
+                  height: 1.4,
+                ),
           ),
         ],
       ),

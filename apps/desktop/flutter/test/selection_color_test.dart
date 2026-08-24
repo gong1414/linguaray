@@ -53,7 +53,7 @@ void main() {
       expect(text.brightness, tokens.brightness);
     });
 
-    testOn(TargetPlatform.linux, 'dresses the Flutter selection to match', (
+    testOn(TargetPlatform.windows, 'dresses the Flutter selection to match', (
       tester,
     ) async {
       await pump(tester, const TranslationText('hello'));
@@ -79,7 +79,7 @@ void main() {
       expect(field.brightness, tokens.brightness);
     });
 
-    testOn(TargetPlatform.linux, 'carries the accent into EditableText', (
+    testOn(TargetPlatform.windows, 'carries the accent into EditableText', (
       tester,
     ) async {
       await pump(tester, const TextField());

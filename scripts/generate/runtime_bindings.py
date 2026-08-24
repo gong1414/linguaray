@@ -125,8 +125,6 @@ def host_cdylib(target_dir: Path) -> Path | None:
     system = platform.system()
     if system == "Darwin":
         return target_dir / "release/liblinguaray_runtime.dylib"
-    if system == "Linux":
-        return target_dir / "release/liblinguaray_runtime.so"
     if system == "Windows" or system.startswith(("MSYS", "MINGW", "CYGWIN")):
         return target_dir / "release/linguaray_runtime.dll"
     return None

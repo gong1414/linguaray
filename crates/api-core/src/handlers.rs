@@ -2,7 +2,7 @@ use linguaray_core::{DetectLanguageRequest, LanguagePair, LookUpRequest, Transla
 use serde::Serialize;
 use serde_json::Value;
 
-use crate::{utils, ApiError};
+use crate::{normalization, ApiError};
 
 const OPENAPI_YAML: &str = include_str!("../openapi.yaml");
 const API_REFERENCE_SCRIPT_URL: &str = "https://cdn.jsdelivr.net/npm/@scalar/api-reference";
@@ -23,7 +23,7 @@ pub fn health() -> HealthResponse {
 }
 
 pub fn index(path: &str) -> IndexResponse {
-    let prefix = utils::normalized_prefix(path);
+    let prefix = normalization::path_prefix(path);
     IndexResponse {
         message: "Welcome to LinguaRay API",
         references: vec![format!("{prefix}/reference")],
@@ -68,7 +68,7 @@ pub fn reference_html() -> String {
 }
 
 pub fn translate_request(request: TranslateRequest) -> Result<TranslateRequest, ApiError> {
-    let text = utils::trim_required_text(request.text);
+    let text = normalization::text(request.text);
     if text.is_empty() {
         return Err(ApiError::bad_request(
             "INVALID_REQUEST",
@@ -77,8 +77,8 @@ pub fn translate_request(request: TranslateRequest) -> Result<TranslateRequest, 
     }
 
     Ok(TranslateRequest {
-        source_language: utils::normalize_optional_language(request.source_language),
-        target_language: utils::normalize_optional_language(request.target_language),
+        source_language: normalization::optional_language(request.source_language),
+        target_language: normalization::optional_language(request.target_language),
         text,
     })
 }
@@ -89,7 +89,7 @@ pub fn detect_language_request(
     let texts = request
         .texts
         .into_iter()
-        .map(utils::trim_required_text)
+        .map(normalization::text)
         .filter(|value| !value.is_empty())
         .collect::<Vec<_>>();
 
@@ -104,9 +104,9 @@ pub fn detect_language_request(
 }
 
 pub fn lookup_request(request: LookUpRequest) -> Result<LookUpRequest, ApiError> {
-    let source_language = utils::normalize_required_language(request.source_language);
-    let target_language = utils::normalize_required_language(request.target_language);
-    let word = utils::trim_required_text(request.word);
+    let source_language = normalization::required_language(request.source_language);
+    let target_language = normalization::required_language(request.target_language);
+    let word = normalization::text(request.word);
 
     if word.is_empty() {
         return Err(ApiError::bad_request(

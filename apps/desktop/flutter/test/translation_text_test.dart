@@ -40,7 +40,7 @@ void main() {
     );
   }
 
-  testOn(TargetPlatform.linux, 'off macOS the text stays a Flutter widget', (
+  testOn(TargetPlatform.windows, 'on Windows the text stays a Flutter widget', (
     tester,
   ) async {
     await pump(tester, const TranslationText('注意力就是你所需要的一切。'));
@@ -52,7 +52,7 @@ void main() {
     );
   });
 
-  testOn(TargetPlatform.linux, '双击复制 reaches the callback off macOS', (
+  testOn(TargetPlatform.windows, '双击复制 reaches the callback on Windows', (
     tester,
   ) async {
     var doubleTaps = 0;
@@ -131,7 +131,7 @@ void main() {
     expect(tester.getSize(find.byType(NativeText)), const Size(300, 30));
   });
 
-  testOn(TargetPlatform.linux, 'the platform view draws nothing off macOS', (
+  testOn(TargetPlatform.windows, 'the platform view draws nothing on Windows', (
     tester,
   ) async {
     await pump(

@@ -14,9 +14,9 @@ void main() {
   /// [testWidgets], with the target platform pinned off macOS for the length
   /// of the body — the framework checks the override is back to null before
   /// the test ends, so it cannot be undone from `tearDown`.
-  void testOnLinux(String description, WidgetTesterCallback body) {
+  void testOnWindows(String description, WidgetTesterCallback body) {
     testWidgets(description, (tester) async {
-      debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+      debugDefaultTargetPlatformOverride = TargetPlatform.windows;
       try {
         await body(tester);
       } finally {
@@ -68,7 +68,7 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testOnLinux('paste drops the whitespace around what it inserts', (t) async {
+  testOnWindows('paste drops the whitespace around what it inserts', (t) async {
     putOnClipboard('\n\n  Attention is all you need.  \n');
     final controller = await pump(t, '');
 
@@ -77,7 +77,7 @@ void main() {
     expect(controller.text, 'Attention is all you need.');
   });
 
-  testOnLinux('the text inside a paste is left alone', (tester) async {
+  testOnWindows('the text inside a paste is left alone', (tester) async {
     putOnClipboard('  first line\n\n   indented second\n');
     final controller = await pump(tester, '');
 
@@ -86,7 +86,7 @@ void main() {
     expect(controller.text, 'first line\n\n   indented second');
   });
 
-  testOnLinux('paste lands at the cursor, not over the field', (tester) async {
+  testOnWindows('paste lands at the cursor, not over the field', (tester) async {
     putOnClipboard('  world  ');
     final controller = await pump(tester, 'hello ');
     controller.selection = const TextSelection.collapsed(offset: 6);
@@ -97,7 +97,7 @@ void main() {
     expect(controller.selection.baseOffset, 11);
   });
 
-  testOnLinux('paste replaces the selection', (tester) async {
+  testOnWindows('paste replaces the selection', (tester) async {
     putOnClipboard(' there ');
     final controller = await pump(tester, 'hello world');
     controller.selection = const TextSelection(baseOffset: 6, extentOffset: 11);
@@ -107,7 +107,7 @@ void main() {
     expect(controller.text, 'hello there');
   });
 
-  testOnLinux('an empty clipboard leaves the field alone', (tester) async {
+  testOnWindows('an empty clipboard leaves the field alone', (tester) async {
     putOnClipboard(null);
     final controller = await pump(tester, 'hello');
 

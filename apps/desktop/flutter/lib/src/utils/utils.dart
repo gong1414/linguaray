@@ -16,7 +16,7 @@ Future<Directory> getAppDirectory() async {
   if (_dataDirectory == null) {
     final docDir = await getApplicationDocumentsDirectory();
 
-    if (kIsLinux || kIsWindows) {
+    if (kIsWindows) {
       _dataDirectory = Directory(
         path.join(docDir.parent.path, '.linguaray', 'v2'),
       );

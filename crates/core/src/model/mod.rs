@@ -1,57 +1,21 @@
-mod chat_message;
-mod chat_request;
-mod chat_response;
-mod detect_language_request;
-mod detect_language_response;
-mod language_info;
-mod language_pair;
-mod look_up_request;
-mod look_up_response;
-mod recognize_text_request;
-mod recognize_text_response;
-mod recognized_rect;
-mod stream_chunk;
-mod text_detection;
-mod text_recognition;
-mod text_translation;
-mod translate_request;
-mod translate_response;
-mod translation_target;
-mod word_definition;
-mod word_etymology;
-mod word_image;
-mod word_phrase;
-mod word_pronunciation;
-mod word_sentence;
-mod word_synonym;
-mod word_tag;
-mod word_tense;
+mod chat;
+mod dictionary;
+mod language;
+mod translation;
 
-pub use chat_message::{ChatMessage, ChatRole};
-pub use chat_request::{ChatRequest, ResponseFormat};
-pub use chat_response::{ChatChoice, ChatResponse, ChatUsage};
-pub use detect_language_request::DetectLanguageRequest;
-pub use detect_language_response::DetectLanguageResponse;
-pub use language_info::LanguageInfo;
-pub use language_pair::LanguagePair;
-pub use look_up_request::LookUpRequest;
-pub use look_up_response::LookUpResponse;
-pub use recognize_text_request::RecognizeTextRequest;
-pub use recognize_text_response::RecognizeTextResponse;
-pub use recognized_rect::RecognizedRect;
-pub use stream_chunk::{StreamChunk, StreamState};
-pub use text_detection::TextDetection;
-pub use text_recognition::TextRecognition;
-pub use text_translation::TextTranslation;
-pub use translate_request::TranslateRequest;
-pub use translate_response::TranslateResponse;
-pub use translation_target::TranslationTarget;
-pub use word_definition::WordDefinition;
-pub use word_etymology::WordEtymology;
-pub use word_image::WordImage;
-pub use word_phrase::WordPhrase;
-pub use word_pronunciation::WordPronunciation;
-pub use word_sentence::WordSentence;
-pub use word_synonym::WordSynonym;
-pub use word_tag::WordTag;
-pub use word_tense::WordTense;
+pub use chat::{
+    ChatChoice, ChatMessage, ChatRequest, ChatResponse, ChatRole, ChatUsage, ResponseFormat,
+    StreamChunk, StreamState,
+};
+pub use dictionary::{
+    LookUpRequest, LookUpResponse, WordDefinition, WordEtymology, WordImage, WordPhrase,
+    WordPronunciation, WordSentence, WordSynonym, WordTag, WordTense,
+};
+pub use language::{
+    DetectLanguageRequest, DetectLanguageResponse, LanguageInfo, LanguagePair, TextDetection,
+    TranslationTarget,
+};
+pub use translation::{
+    RecognizeTextRequest, RecognizeTextResponse, RecognizedRect, TextRecognition, TextTranslation,
+    TranslateRequest, TranslateResponse,
+};

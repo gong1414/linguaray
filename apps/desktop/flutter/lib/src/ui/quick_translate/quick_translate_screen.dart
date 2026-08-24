@@ -63,7 +63,7 @@ class _QuickTranslateScreenState extends ConsumerState<QuickTranslateScreen>
     triggerController.quickWindowRequest.addListener(_consumeWindowRequest);
     triggerController.lastError.addListener(_showTriggerError);
     permissionController.addListener(_onPermissionChanged);
-    if (kIsLinux || kIsMacOS || kIsWindows) {
+    if (kIsMacOS || kIsWindows) {
       _registerWindowEvents();
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -169,7 +169,7 @@ class _QuickTranslateScreenState extends ConsumerState<QuickTranslateScreen>
   }
 
   void _scheduleWindowResize() {
-    if (!(kIsLinux || kIsMacOS || kIsWindows)) return;
+    if (!(kIsMacOS || kIsWindows)) return;
     if (_isWindowResizeScheduled) return;
     _isWindowResizeScheduled = true;
     WidgetsBinding.instance.endOfFrame.then((_) {

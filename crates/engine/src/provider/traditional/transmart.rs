@@ -8,7 +8,7 @@ use linguaray_core::{
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-use crate::common::http_client::HttpClient;
+use crate::common::HttpClient;
 
 const USER_AGENT: &str = "LinguaRay/1.0";
 

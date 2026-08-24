@@ -5,7 +5,6 @@
 //
 // macOS:  objc2 (NSPasteboard) + CoreGraphics (CGEvent) + ApplicationServices (AX)
 // Windows: extern "system" (user32: SendInput, clipboard APIs)
-// Linux:   std::process::Command (xclip)
 //
 // ── Error ──────────────────────────────────────────────────────────────────
 
@@ -218,7 +217,7 @@ mod platform {
     /// Extract text from screen selection: simulate Cmd+C, poll for
     /// clipboard change, then read clipboard.
     pub fn extract_from_screen_selection() -> Result<SelectionExtraction, TextExtractorError> {
-        if !crate::domain::permission::is_accessibility_permission_granted() {
+        if !crate::domain::permissions::is_accessibility_permission_granted() {
             return Err(TextExtractorError::AccessibilityDenied);
         }
         let (contents, snapshot_warning) = match snapshot_clipboard_contents() {
@@ -562,91 +561,6 @@ mod platform {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  Linux
-// ═══════════════════════════════════════════════════════════════════════════
-
-#[cfg(target_os = "linux")]
-mod platform {
-    use std::process::Command;
-
-    use super::{SelectionExtraction, TextExtractorError};
-
-    /// Read clipboard text (CLIPBOARD selection).
-    pub fn read_clipboard_text() -> Result<String, TextExtractorError> {
-        let output = Command::new("xclip")
-            .args(["-selection", "clipboard", "-o"])
-            .output()
-            .map_err(|e| TextExtractorError::OperationFailed(format!("xclip error: {e}")))?;
-
-        if output.status.success() {
-            let text = String::from_utf8_lossy(&output.stdout).trim().to_owned();
-            if text.is_empty() {
-                Err(TextExtractorError::NoTextSelected)
-            } else {
-                Ok(text)
-            }
-        } else {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            Err(TextExtractorError::OperationFailed(format!(
-                "xclip failed: {stderr}"
-            )))
-        }
-    }
-
-    /// Extract text from screen selection (PRIMARY selection on Linux,
-    /// no simulated copy needed).
-    pub fn extract_from_screen_selection() -> Result<SelectionExtraction, TextExtractorError> {
-        let output = Command::new("xclip")
-            .args(["-selection", "primary", "-o"])
-            .output()
-            .map_err(|e| TextExtractorError::OperationFailed(format!("xclip error: {e}")))?;
-
-        if output.status.success() {
-            let text = String::from_utf8_lossy(&output.stdout).trim().to_owned();
-            if text.is_empty() {
-                Err(TextExtractorError::NoTextSelected)
-            } else {
-                Ok(SelectionExtraction {
-                    text,
-                    read_method: "primarySelection".to_owned(),
-                    recoverable_error: None,
-                })
-            }
-        } else {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            Err(TextExtractorError::OperationFailed(format!(
-                "xclip failed: {stderr}"
-            )))
-        }
-    }
-
-    /// Unused on Linux (no simulated copy needed).
-    pub fn simulate_copy_key_press() -> Result<(), TextExtractorError> {
-        Ok(())
-    }
-
-    /// Capture a screenshot of a selected screen region.
-    ///
-    /// Uses ImageMagick's `import` command in interactive mode.
-    /// The user draws a selection rectangle, and the image is saved to `path`.
-    /// Returns the path on success.
-    pub fn capture_screen(path: &str) -> Result<String, TextExtractorError> {
-        let output = Command::new("import").args([path]).output().map_err(|e| {
-            TextExtractorError::OperationFailed(format!("failed to run import (ImageMagick): {e}"))
-        })?;
-
-        if output.status.success() && std::path::Path::new(path).exists() {
-            Ok(path.to_owned())
-        } else {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            Err(TextExtractorError::OperationFailed(format!(
-                "import (ImageMagick) failed: {stderr}"
-            )))
-        }
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
 //  Public API (platform-agnostic)
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -654,17 +568,12 @@ mod platform {
 ///
 /// On macOS this posts a CGEvent with Cmd modifier.
 /// On Windows this uses SendInput with Ctrl modifier.
-/// No-op on Linux (uses PRIMARY selection instead).
 pub fn simulate_copy_key_press() -> Result<(), TextExtractorError> {
     #[cfg(any(target_os = "macos", target_os = "windows"))]
     {
         platform::simulate_copy_key_press()
     }
-    #[cfg(target_os = "linux")]
-    {
-        platform::simulate_copy_key_press()
-    }
-    #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
         Err(TextExtractorError::UnsupportedMethod(
             "key press simulation is not supported on this platform".into(),
@@ -674,11 +583,11 @@ pub fn simulate_copy_key_press() -> Result<(), TextExtractorError> {
 
 /// Read the current clipboard text.
 pub fn extract_from_clipboard() -> Result<String, TextExtractorError> {
-    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
     {
         platform::read_clipboard_text()
     }
-    #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
         Err(TextExtractorError::UnsupportedMethod(
             "clipboard is not supported on this platform".into(),
@@ -689,17 +598,16 @@ pub fn extract_from_clipboard() -> Result<String, TextExtractorError> {
 /// Capture a screenshot of a selected screen region and return the image path.
 ///
 /// **macOS:** Uses `screencapture -i` (interactive region selection).
-/// **Linux:** Uses ImageMagick's `import` command (interactive region selection).
 /// **Windows:** Not supported (returns [`TextExtractorError::UnsupportedMethod`]).
 ///
 /// The user interactively selects a screen region. The resulting image is
 /// saved to `path`, which is then returned on success.
 pub fn capture_screen(path: &str) -> Result<String, TextExtractorError> {
-    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    #[cfg(target_os = "macos")]
     {
         platform::capture_screen(path)
     }
-    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+    #[cfg(not(target_os = "macos"))]
     {
         let _ = path;
         Err(TextExtractorError::UnsupportedMethod(
@@ -713,7 +621,6 @@ pub fn capture_screen(path: &str) -> Result<String, TextExtractorError> {
 /// **macOS / Windows:** Simulates Cmd+C / Ctrl+C, polls the clipboard until
 /// the content changes (or timeout), then returns the clipboard text.
 ///
-/// **Linux:** Reads the PRIMARY selection directly via `xclip`.
 pub fn extract_from_screen_selection() -> Result<String, TextExtractorError> {
     extract_from_screen_selection_detailed().map(|result| result.text)
 }
@@ -723,11 +630,7 @@ pub fn extract_from_screen_selection_detailed() -> Result<SelectionExtraction, T
     {
         platform::extract_from_screen_selection()
     }
-    #[cfg(target_os = "linux")]
-    {
-        platform::extract_from_screen_selection()
-    }
-    #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
         Err(TextExtractorError::UnsupportedMethod(
             "screen text extraction is not supported on this platform".into(),

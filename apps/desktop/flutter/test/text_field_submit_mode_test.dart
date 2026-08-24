@@ -15,9 +15,9 @@ void main() {
   /// [testWidgets], with the target platform pinned off macOS for the length
   /// of the body — the framework checks the override is back to null before
   /// the test ends, so it cannot be undone from `tearDown`.
-  void testOnLinux(String description, WidgetTesterCallback body) {
+  void testOnWindows(String description, WidgetTesterCallback body) {
     testWidgets(description, (tester) async {
-      debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+      debugDefaultTargetPlatformOverride = TargetPlatform.windows;
       try {
         await body(tester);
       } finally {
@@ -65,7 +65,7 @@ void main() {
     await tester.pump();
   }
 
-  testOnLinux('按 Enter 提交: ⏎ sends, ⇧⏎ writes a newline', (tester) async {
+  testOnWindows('按 Enter 提交: ⏎ sends, ⇧⏎ writes a newline', (tester) async {
     final submitted = await pump(
       tester,
       submitOnEnter: true,
@@ -79,7 +79,7 @@ void main() {
     expect(submitted, ['hello']);
   });
 
-  testOnLinux('按 ⌘ + Enter 提交: a bare ⏎ writes a newline', (tester) async {
+  testOnWindows('按 ⌘ + Enter 提交: a bare ⏎ writes a newline', (tester) async {
     final submitted = await pump(
       tester,
       submitOnEnter: false,
@@ -97,7 +97,7 @@ void main() {
     expect(submitted, ['hello', 'hello']);
   });
 
-  testOnLinux('a field with no submit mode keeps Enter to itself', (
+  testOnWindows('a field with no submit mode keeps Enter to itself', (
     tester,
   ) async {
     final submitted = await pump(

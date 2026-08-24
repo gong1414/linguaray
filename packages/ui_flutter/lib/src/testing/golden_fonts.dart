@@ -37,27 +37,53 @@ Directory _packageRoot(String package) {
   }
 }
 
-/// The host faces the tokens resolve to. `-apple-system` is SF; the CJK
-/// fallback is PingFang SC; ⌕ ⇄ ✕ ✓ sit outside SF's own coverage and macOS
-/// resolves them through Apple Symbols, which the test environment has to be
-/// told about — it goes in as its own family and is reached through the
-/// fallback lists, so it never outranks the CJK face.
-const goldenHostFaces = {
-  'SF': '/System/Library/Fonts/SFNS.ttf',
-  'PingFang SC': '/System/Library/Fonts/STHeiti Medium.ttc',
-  'SF Mono': '/System/Library/Fonts/Menlo.ttc',
-  'Symbols': '/System/Library/Fonts/Apple Symbols.ttf',
-};
+/// Native faces used for deterministic desktop goldens.
+///
+/// Production uses the platform UI font instead of shipping a private font
+/// bundle. Tests register the host font files under stable family aliases so
+/// macOS and Windows can each maintain an intentional baseline.
+Map<String, String> get goldenHostFaces {
+  if (Platform.isWindows) {
+    final windows = Platform.environment['WINDIR'] ?? r'C:\Windows';
+    return {
+      'Golden UI': '$windows\\Fonts\\segoeui.ttf',
+      'Golden CJK': '$windows\\Fonts\\msyh.ttc',
+      'Golden Mono': '$windows\\Fonts\\consola.ttf',
+      'Golden Symbols': '$windows\\Fonts\\seguisym.ttf',
+    };
+  }
+  return const {
+    'Golden UI': '/System/Library/Fonts/SFNS.ttf',
+    'Golden CJK': '/System/Library/Fonts/STHeiti Medium.ttc',
+    'Golden Mono': '/System/Library/Fonts/Menlo.ttc',
+    'Golden Symbols': '/System/Library/Fonts/Apple Symbols.ttf',
+  };
+}
 
 /// The type roles bound to those faces. `flutter test` does not resolve
 /// `family: null` to the platform UI font the way the running app does, so the
 /// roles have to name the families that were just registered.
 const goldenTypography = DesignTypography(
-  display: DesignFont(family: 'SF', fallback: ['PingFang SC', 'Symbols']),
-  sans: DesignFont(family: 'SF', fallback: ['PingFang SC', 'Symbols']),
-  label: DesignFont(family: 'SF', fallback: ['PingFang SC', 'Symbols']),
-  cjk: DesignFont(family: 'PingFang SC', fallback: ['SF', 'Symbols']),
-  mono: DesignFont(family: 'SF Mono', fallback: ['PingFang SC', 'Symbols']),
+  display: DesignFont(
+    family: 'Golden UI',
+    fallback: ['Golden CJK', 'Golden Symbols'],
+  ),
+  sans: DesignFont(
+    family: 'Golden UI',
+    fallback: ['Golden CJK', 'Golden Symbols'],
+  ),
+  label: DesignFont(
+    family: 'Golden UI',
+    fallback: ['Golden CJK', 'Golden Symbols'],
+  ),
+  cjk: DesignFont(
+    family: 'Golden CJK',
+    fallback: ['Golden UI', 'Golden Symbols'],
+  ),
+  mono: DesignFont(
+    family: 'Golden Mono',
+    fallback: ['Golden CJK', 'Golden Symbols'],
+  ),
 );
 
 /// Host face names whose font file is missing on this machine — a non-empty

@@ -1,3 +1,4 @@
 fn main() {
-    uniffi_dart::generate_scaffolding("./src/api.udl".into()).unwrap();
+    let interface = std::path::PathBuf::from("src/api.udl");
+    uniffi_dart::generate_scaffolding(interface).expect("generate UniFFI Dart scaffolding");
 }

@@ -1,1 +1,3 @@
-pub mod http_client;
+mod transport;
+
+pub use transport::HttpClient;

@@ -5,16 +5,14 @@
 // and the image is small enough to look at. Refresh them with
 // `flutter test --update-goldens` after a deliberate visual change.
 //
-// The faces are the real ones: `-apple-system` and PingFang SC are what the
-// tokens resolve to on the machines this ships from, and half of what these
-// images are for is reading the type — a wall of placeholder boxes would show
-// the boxes but not the typography. The icon font comes out of the pub package,
-// so the chevrons and arrows are real glyphs too.
+// The faces are the native UI, CJK, mono and symbol fonts on the release host,
+// registered under stable test aliases. The icon font comes out of the pub
+// package, so chevrons and arrows are real glyphs too.
 //
 // The trade is that a host without those faces cannot reproduce the images, so
 // the suite skips itself there rather than reporting a wall of false diffs.
-// That makes these a macOS-local guard; `widget_metrics_test.dart` is the part
-// that holds everywhere.
+// macOS and Windows keep separate baselines; `widget_metrics_test.dart` holds
+// the platform-independent geometry.
 
 import 'dart:io';
 

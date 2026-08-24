@@ -6,11 +6,8 @@
 // in the generated Dart bindings resolve at runtime.
 //
 // Pre-requisites:
-//  - `rustup` is installed and the relevant cross-compilation targets
-//    have been added (e.g. `rustup target add aarch64-apple-ios ...`).
-//  - For Android: a working NDK toolchain reachable on `PATH`. Easiest
-//    path is `cargo install cargo-ndk` and let cargo pick the right linker
-//    via `~/.cargo/config.toml`.
+//  - `rustup` is installed with the macOS or Windows Rust target used by the
+//    Flutter desktop runner.
 //  - Flutter has native-assets enabled: `flutter config --enable-native-assets`.
 
 import 'dart:io';
@@ -40,7 +37,7 @@ Future<void> main(List<String> args) async {
     final code = input.config.code;
     final targetOS = code.targetOS;
     final targetArch = code.targetArchitecture;
-    final triple = _rustTriple(code, targetOS, targetArch);
+    final triple = _rustTriple(targetOS, targetArch);
 
     final cargoArgs = <String>[
       'build',
@@ -114,12 +111,11 @@ Future<void> main(List<String> args) async {
 }
 
 Future<Map<String, String>> _cargoEnvironment(OS os, String triple) async {
-  if (os != OS.macOS && os != OS.iOS) {
+  if (os != OS.macOS) {
     return const {};
   }
 
-  final sdk = os == OS.iOS ? 'iphoneos' : 'macosx';
-  final sdkPath = await _xcrun(['--sdk', sdk, '--show-sdk-path']);
+  final sdkPath = await _xcrun(['--sdk', 'macosx', '--show-sdk-path']);
   final cflags = '-isysroot $sdkPath';
   final normalizedTriple = triple.replaceAll('-', '_');
 
@@ -142,47 +138,12 @@ Future<String> _xcrun(List<String> args) async {
   return (result.stdout as String).trim();
 }
 
-String _rustTriple(CodeConfig code, OS os, Architecture arch) {
+String _rustTriple(OS os, Architecture arch) {
   if (os == OS.macOS) {
     return switch (arch) {
       Architecture.arm64 => 'aarch64-apple-darwin',
       Architecture.x64 => 'x86_64-apple-darwin',
       _ => _unsupported(os, arch),
-    };
-  }
-  if (os == OS.iOS) {
-    final isSimulator = code.iOS.targetSdk == IOSSdk.iPhoneSimulator;
-    return switch (arch) {
-      Architecture.arm64 =>
-        isSimulator ? 'aarch64-apple-ios-sim' : 'aarch64-apple-ios',
-      Architecture.x64 => 'x86_64-apple-ios',
-      _ => _unsupported(os, arch),
-    };
-  }
-  if (os == OS.android) {
-    return switch (arch) {
-      Architecture.arm64 => 'aarch64-linux-android',
-      Architecture.arm => 'armv7-linux-androideabi',
-      Architecture.x64 => 'x86_64-linux-android',
-      Architecture.ia32 => 'i686-linux-android',
-      _ => _unsupported(os, arch),
-    };
-  }
-  if (os == OS.linux) {
-    // On Linux, the built binary must match the host architecture.
-    // Use `uname -m` to detect the actual host instead of relying on
-    // Flutter's reported target architecture, which may differ.
-    final hostArch = _hostArchitecture();
-    stdout.writeln(
-      '[linguaray_runtime] Linux host architecture: $hostArch '
-      '(Flutter target: $arch)',
-    );
-    return switch (hostArch) {
-      'x86_64' => 'x86_64-unknown-linux-gnu',
-      'aarch64' => 'aarch64-unknown-linux-gnu',
-      _ => throw Exception(
-        '[linguaray_runtime] unsupported Linux host architecture: $hostArch',
-      ),
     };
   }
   if (os == OS.windows) {
@@ -195,17 +156,6 @@ String _rustTriple(CodeConfig code, OS os, Architecture arch) {
   return _unsupported(os, arch);
 }
 
-String _hostArchitecture() {
-  final result = Process.runSync('uname', ['-m']);
-  if (result.exitCode != 0) {
-    throw Exception(
-      '[linguaray_runtime] failed to detect host architecture: '
-      'uname -m exited with ${result.exitCode}',
-    );
-  }
-  return (result.stdout as String).trim();
-}
-
 Never _unsupported(OS os, Architecture arch) {
   throw UnsupportedError(
     '[linguaray_runtime] no Rust target triple mapped for $os/$arch',
@@ -214,9 +164,11 @@ Never _unsupported(OS os, Architecture arch) {
 
 Uri _resolveCdylib(Uri rustDir, String triple, OS os) {
   final fileName = switch (os) {
-    OS.macOS || OS.iOS => 'lib$_cdylibBaseName.dylib',
+    OS.macOS => 'lib$_cdylibBaseName.dylib',
     OS.windows => '$_cdylibBaseName.dll',
-    _ => 'lib$_cdylibBaseName.so',
+    _ => throw UnsupportedError(
+      '[linguaray_runtime] shared libraries are only packaged for macOS and Windows',
+    ),
   };
   // The Rust workspace lives at the repo root (../../../target relative to
   // packages/runtime/rust/Cargo.toml), so build artifacts land there.

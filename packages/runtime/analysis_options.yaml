@@ -7,9 +7,5 @@ analyzer:
     # copied into a temp directory by `uniffi_dart::testing::run_test`.
     - rust/**
     - build/**
-    - android/**
-    - ios/**
-    - web/**
     - windows/**
     - macos/**
-    - linux/**

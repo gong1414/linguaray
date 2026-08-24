@@ -8,7 +8,7 @@ use linguaray_core::{
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-use crate::common::http_client::HttpClient;
+use crate::common::HttpClient;
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 #[serde(default)]

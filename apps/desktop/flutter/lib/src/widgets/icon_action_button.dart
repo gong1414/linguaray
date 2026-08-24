@@ -2,13 +2,7 @@ import 'package:flutter/material.dart' hide IconButton;
 
 import 'ui.dart' show IconButton, kTransitionDuration;
 
-/// The design system's 24pt flat toolbar affordance, taking an [IconData]
-/// instead of a widget, wearing a native tooltip, and adding the optional
-/// rotation the mini translator's pin needs.
-///
-/// Everything visual — geometry, hover wash, active read, disabled dimming —
-/// comes from the package's [IconButton], so this stays a convenience adapter
-/// rather than a second implementation.
+/// Adapts an [IconData] to the design system toolbar button.
 class IconActionButton extends StatelessWidget {
   const IconActionButton({
     super.key,
@@ -25,29 +19,25 @@ class IconActionButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final bool selected;
 
-  /// The deck sizes the glyph per call site: 18 in the mini-window toolbar,
-  /// 16 in the sidebar header.
   final double iconSize;
-
-  /// Animated rotation of the glyph, in turns — the pin lies at -45° until
-  /// pinned, matching the deck.
   final double iconTurns;
 
   @override
   Widget build(BuildContext context) {
-    final button = IconButton(
+    final iconWidget = AnimatedRotation(
+      turns: iconTurns,
+      duration: kTransitionDuration,
+      child: Icon(icon, size: iconSize),
+    );
+    final control = IconButton(
       label: tooltip ?? '',
       active: selected,
       iconSize: iconSize,
       onPressed: onPressed,
-      icon: AnimatedRotation(
-        turns: iconTurns,
-        duration: kTransitionDuration,
-        child: Icon(icon),
-      ),
+      icon: iconWidget,
     );
 
-    if (tooltip == null) return button;
-    return Tooltip(message: tooltip!, child: button);
+    final message = tooltip;
+    return message == null ? control : Tooltip(message: message, child: control);
   }
 }

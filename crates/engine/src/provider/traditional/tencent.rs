@@ -1,6 +1,6 @@
 #![cfg_attr(not(feature = "tencent"), allow(dead_code))]
 
-use crate::common::http_client::HttpClient;
+use crate::common::HttpClient;
 use async_trait::async_trait;
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use hmac::{Hmac, Mac};

@@ -21,7 +21,7 @@ use crate::domain::glossary::{
 use crate::domain::history::{
     HistoryCounts, HistoryEntry, HistoryEntryInput, HistoryFilter, HistoryStore,
 };
-use crate::domain::permission;
+use crate::domain::permissions as permission;
 use crate::domain::settings::{
     append_translation_service_order, apply_catalog_seed, effective_translation_service_order,
     provider_entry_from_config, remove_provider_from_translation_order,
@@ -2409,8 +2409,6 @@ impl RuntimeTextExtractor {
     ///
     /// **macOS / Windows:** Simulates Cmd+C / Ctrl+C, polls the clipboard
     /// until content changes (or 3s timeout), then returns the text.
-    ///
-    /// **Linux:** Reads the PRIMARY selection directly via `xclip`.
     pub async fn extract_from_screen_selection(&self) -> Result<String, RuntimeError> {
         text_extractor::extract_from_screen_selection()
             .map_err(|e| RuntimeError::Error { msg: e.to_string() })
@@ -2427,8 +2425,9 @@ impl RuntimeTextExtractor {
 
     /// Capture a screenshot and recognize text using the default OCR service.
     ///
-    /// 1. Interactively captures a screen region (via `screencapture` on macOS
-    ///    or `import` on Linux; unsupported on Windows).
+    /// 1. Interactively captures a screen region with the legacy macOS
+    ///    `screencapture` path. The Flutter platform layer owns the current
+    ///    cross-platform capture workflow.
     /// 2. Sends the captured image to the configured default OCR service.
     /// 3. Returns the recognized text.
     ///

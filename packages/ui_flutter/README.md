@@ -101,13 +101,14 @@ are reached the same way, `context.product` beside `context.tokens`.
 
 ## Gallery
 
-`example/` is every atom under a theme switcher.
+The desktop app owns the live component gallery. Run its Widgetbook entry point
+so component work uses the same fonts, localization and desktop runner as the
+product:
 
 ```bash
-cd example && flutter run -d macos
+cd ../../apps/desktop/flutter
+flutter run -d macos -t lib/widgetbook.dart
 ```
-
-The product's widgets have their own gallery in the app, at `/debug/widgets`.
 
 ## Tests
 
