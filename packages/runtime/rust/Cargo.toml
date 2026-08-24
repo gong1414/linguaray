@@ -11,7 +11,7 @@ crate-type = ["lib", "cdylib", "staticlib"]
 linguaray-core = { path = "../../../crates/core" }
 linguaray-api-core = { path = "../../../crates/api-core" }
 linguaray-engine = { path = "../../../crates/engine" }
-uniffi = { version = "=0.31.2", features = ["cli"] }
+uniffi = { version = "=0.32.0", features = ["cli"] }
 uniffi-dart = { git = "https://github.com/Uniffi-Dart/uniffi-dart.git", branch = "main" }
 aho-corasick.workspace = true
 anyhow = "1"
@@ -39,7 +39,7 @@ uniffi-dart = { git = "https://github.com/Uniffi-Dart/uniffi-dart.git", branch =
 uniffi-dart = { git = "https://github.com/Uniffi-Dart/uniffi-dart.git", branch = "main", features = [
   "bindgen-tests",
 ] }
-uniffi = { version = "=0.31.2", features = ["bindgen-tests"] }
+uniffi = { version = "=0.32.0", features = ["bindgen-tests"] }
 uniffi_testing = "=0.31.2"
 anyhow = "1"
 
