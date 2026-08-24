@@ -61,10 +61,10 @@ packages:
     dependency: transitive
     description:
       name: build
-      sha256: a156715e7cd728130c592f30552575908aae5b100005fbc1f0fb16b3c03a3d10
+      sha256: "45d14a0fb23e018d8287c32fc98d726ce466b231928ed9b9200f29bd3ccd39ae"
       url: "https://pub.dev"
     source: hosted
-    version: "4.0.6"
+    version: "4.0.7"
   build_config:
     dependency: transitive
     description:
@@ -85,10 +85,10 @@ packages:
     dependency: transitive
     description:
       name: build_runner
-      sha256: "1523ce62448ebac2c15a8ba5fbad8acac169788658a7dd2a1c2d9c2a9318b9a6"
+      sha256: "5367e521935b102bdf1e735d2aab461e36b2edca6517662d088dd04cc39f8d16"
       url: "https://pub.dev"
     source: hosted
-    version: "2.15.0"
+    version: "2.15.1"
   built_collection:
     dependency: transitive
     description:
@@ -355,10 +355,10 @@ packages:
     dependency: transitive
     description:
       name: go_router_builder
-      sha256: "52c0403e3fc80db4058d44088f28227f4ecf046f9b8ccbea0e325d3c7b4bb7f5"
+      sha256: "53253ae5bd3d3bfc38c5488ca844f6b054c4b905683667db4544e7ab995fddcc"
       url: "https://pub.dev"
     source: hosted
-    version: "4.3.0"
+    version: "4.4.0"
   graphs:
     dependency: transitive
     description:
@@ -664,10 +664,10 @@ packages:
     dependency: transitive
     description:
       name: path_provider
-      sha256: "50c5dd5b6e1aaf6fb3a78b33f6aa3afca52bf903a8a5298f53101fdaee55bbcd"
+      sha256: a7f4874f987173da295a61c181b8ee71dab59b332a486b391babf26a1b884825
       url: "https://pub.dev"
     source: hosted
-    version: "2.1.5"
+    version: "2.1.6"
   path_provider_android:
     dependency: transitive
     description:
@@ -901,26 +901,26 @@ packages:
     dependency: transitive
     description:
       name: slang
-      sha256: ea6702ed6b1c82065fb2de906fe34ac9298117342e3c2ea2567132efdc81bd17
+      sha256: "430749837528bb692b5ee03699fadab90d0d4a6dfbf42aab28e81df8da4c2fb8"
       url: "https://pub.dev"
     source: hosted
-    version: "4.14.0"
+    version: "4.19.0"
   slang_build_runner:
     dependency: transitive
     description:
       name: slang_build_runner
-      sha256: "1db59254041026aec97df5aca30a602e09e9d1546c3d16b55c3c7cf4c16cdb6c"
+      sha256: f2b6c5fc1f5bc41de80b05e95e7d5d03b5c3041082877ce931fc7ba61cd08afe
       url: "https://pub.dev"
     source: hosted
-    version: "4.14.0"
+    version: "4.19.0"
   slang_flutter:
     dependency: transitive
     description:
       name: slang_flutter
-      sha256: dcc4e77527c91b12348fc8bdd43d3eb92d8cea37c12a23a1f9719cdc12c804c6
+      sha256: "2348a39432c48d7c890a2a1e3409b9faae3e49f117fe56d390d4236de8d064f4"
       url: "https://pub.dev"
     source: hosted
-    version: "4.14.0"
+    version: "4.19.0"
   source_gen:
     dependency: transitive
     description:
