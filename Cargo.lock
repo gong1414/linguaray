@@ -406,7 +406,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1348,7 +1348,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1508,7 +1508,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1736,7 +1736,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3d1e2c7f27f8d4cb10542a02c49005dbd6e93095799d6f3be745fae9f8fedd4"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -1858,7 +1858,7 @@ dependencies = [
  "getrandom 0.4.3",
  "once_cell",
  "rustix",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -2139,7 +2139,7 @@ dependencies = [
 [[package]]
 name = "uniffi-dart"
 version = "0.2.1+v0.31.2"
-source = "git+https://github.com/Uniffi-Dart/uniffi-dart.git?branch=main#3df96c8332f36501c9c2233539ccffde9537af11"
+source = "git+https://github.com/Uniffi-Dart/uniffi-dart.git?branch=main#72d26c1f6710c9c6bb9cbaab022d3326fb0fe412"
 dependencies = [
  "anyhow",
  "camino",
@@ -2216,7 +2216,7 @@ dependencies = [
 [[package]]
 name = "uniffi_dart_macro"
 version = "0.2.1+v0.31.2"
-source = "git+https://github.com/Uniffi-Dart/uniffi-dart.git?branch=main#3df96c8332f36501c9c2233539ccffde9537af11"
+source = "git+https://github.com/Uniffi-Dart/uniffi-dart.git?branch=main#72d26c1f6710c9c6bb9cbaab022d3326fb0fe412"
 dependencies = [
  "futures",
  "proc-macro2",
