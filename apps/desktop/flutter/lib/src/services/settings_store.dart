@@ -206,9 +206,7 @@ class SettingsStore extends ChangeNotifier {
           (kIsMacOS || kIsWindows) &&
           LaunchAtLogin.isSupported) {
         _general = await settings.updateGeneral(
-          patch: GeneralSettingsPatch(
-            launchAtLogin: _launchAtLogin.isEnabled,
-          ),
+          patch: GeneralSettingsPatch(launchAtLogin: _launchAtLogin.isEnabled),
         );
       }
       notifyListeners();

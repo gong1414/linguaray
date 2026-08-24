@@ -137,7 +137,9 @@ final class GitHubUpdateRepository implements UpdateRepository {
       }
       final updateTeam = await _macTeamIdentifier(filePath);
       final currentTeam = await _macTeamIdentifier(Platform.resolvedExecutable);
-      if (updateTeam == null || currentTeam == null || updateTeam != currentTeam) {
+      if (updateTeam == null ||
+          currentTeam == null ||
+          updateTeam != currentTeam) {
         throw const AppFailure(AppErrorCode.updateSignatureInvalid);
       }
       return;
@@ -178,8 +180,10 @@ if ($update.Status -eq 'Valid' -and $current.Status -eq 'Valid' -and
     ]);
     if (result.exitCode != 0) return null;
     final output = '${result.stdout}\n${result.stderr}';
-    final match = RegExp(r'^TeamIdentifier=(.+)$', multiLine: true)
-        .firstMatch(output);
+    final match = RegExp(
+      r'^TeamIdentifier=(.+)$',
+      multiLine: true,
+    ).firstMatch(output);
     final identifier = match?.group(1)?.trim();
     if (identifier == null || identifier.isEmpty || identifier == 'not set') {
       throw const AppFailure(AppErrorCode.updateSignatureInvalid);

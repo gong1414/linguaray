@@ -65,8 +65,8 @@ fn build_client_from_config(
             if url.is_empty() {
                 return Err("custom proxy URL is required".to_owned());
             }
-            let parsed = reqwest::Url::parse(url)
-                .map_err(|error| format!("invalid proxy URL: {error}"))?;
+            let parsed =
+                reqwest::Url::parse(url).map_err(|error| format!("invalid proxy URL: {error}"))?;
             if parsed.scheme() != "http" && parsed.scheme() != "https" {
                 return Err("proxy URL must use http or https".to_owned());
             }
@@ -164,7 +164,10 @@ mod tests {
 
     #[test]
     fn rejects_proxy_secrets_and_non_http_schemes() {
-        for url in ["socks5://127.0.0.1:1080", "http://user:secret@localhost:7890"] {
+        for url in [
+            "socks5://127.0.0.1:1080",
+            "http://user:secret@localhost:7890",
+        ] {
             let result = build_client_from_config(
                 &NetworkProxyConfig {
                     mode: NetworkProxyMode::Custom,

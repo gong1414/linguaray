@@ -28,9 +28,7 @@ class AppDialog extends StatelessWidget {
       DialogHeader(title: title, subtitle: subtitle),
       if (content != null) DialogBody(children: <Widget>[content!]),
       if (actions.isNotEmpty)
-        DialogFooter(
-          children: <Widget>[const Spacer(), ...actions],
-        ),
+        DialogFooter(children: <Widget>[const Spacer(), ...actions]),
     ];
 
     return Semantics(

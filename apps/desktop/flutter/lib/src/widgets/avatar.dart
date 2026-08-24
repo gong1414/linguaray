@@ -4,12 +4,13 @@ import 'ui.dart' show DesignThemeContext, DesignTypographyStyles;
 
 enum AvatarSize { xs, sm, md, lg }
 
-({double side, double typeSize}) _avatarMetrics(AvatarSize size) => switch (size) {
-  AvatarSize.xs => (side: 16, typeSize: 10),
-  AvatarSize.sm => (side: 18, typeSize: 11),
-  AvatarSize.md => (side: 24, typeSize: 12),
-  AvatarSize.lg => (side: 26, typeSize: 13),
-};
+({double side, double typeSize}) _avatarMetrics(AvatarSize size) =>
+    switch (size) {
+      AvatarSize.xs => (side: 16, typeSize: 10),
+      AvatarSize.sm => (side: 18, typeSize: 11),
+      AvatarSize.md => (side: 24, typeSize: 12),
+      AvatarSize.lg => (side: 26, typeSize: 13),
+    };
 
 /// Rounded monogram used wherever a service or source needs a compact marker.
 class Avatar extends StatelessWidget {

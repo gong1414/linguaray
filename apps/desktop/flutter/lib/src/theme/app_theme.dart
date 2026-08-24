@@ -27,10 +27,7 @@ const _windowsTypography = DesignTypography(
     family: 'Segoe UI',
     fallback: ['Microsoft YaHei UI', 'Microsoft YaHei'],
   ),
-  mono: DesignFont(
-    family: 'Cascadia Mono',
-    fallback: ['Consolas'],
-  ),
+  mono: DesignFont(family: 'Cascadia Mono', fallback: ['Consolas']),
 );
 
 /// The palette family the design system paints with.

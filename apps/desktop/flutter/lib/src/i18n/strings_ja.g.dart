@@ -666,9 +666,9 @@ class _TranslationsWorkbenchPlaceholderJa
 
   // Translations
   @override
-  String get history => 'お気に入りと履歴は今後のリリースで提供します';
+  String get history => '以前の翻訳を確認、編集、お気に入り登録して再利用します';
   @override
-  String get glossary => '用語集管理は開発中です';
+  String get glossary => '指定訳と禁止する別訳を管理します';
 }
 
 // Path: workbench.glossary_page
@@ -782,7 +782,7 @@ class _TranslationsWorkbenchTranslationJa
   @override
   String get copy => 'コピー';
   @override
-  String get favorite_unavailable => 'お気に入りは今後のリリースで提供します';
+  String get favorite_unavailable => 'お気に入りを更新できませんでした。もう一度お試しください。';
   @override
   String get preferred => '優先訳文';
   @override
@@ -2324,8 +2324,8 @@ extension on TranslationsJa {
       'workbench.not_configured' => '未設定',
       'workbench.subtitle.translate' => 'ワークベンチ · サービス比較',
       'workbench.subtitle.settings' => '設定',
-      'workbench.placeholder.history' => 'お気に入りと履歴は今後のリリースで提供します',
-      'workbench.placeholder.glossary' => '用語集管理は開発中です',
+      'workbench.placeholder.history' => '以前の翻訳を確認、編集、お気に入り登録して再利用します',
+      'workbench.placeholder.glossary' => '指定訳と禁止する別訳を管理します',
       'workbench.glossary_page.add_entry' => '用語を追加',
       'workbench.glossary_page.term' => '原文',
       'workbench.glossary_page.translation' => '指定訳',
@@ -2379,7 +2379,8 @@ extension on TranslationsJa {
       'workbench.translation.service_unavailable' => 'サービスを利用できません',
       'workbench.translation.waiting' => '翻訳待ち',
       'workbench.translation.copy' => 'コピー',
-      'workbench.translation.favorite_unavailable' => 'お気に入りは今後のリリースで提供します',
+      'workbench.translation.favorite_unavailable' =>
+        'お気に入りを更新できませんでした。もう一度お試しください。',
       'workbench.translation.preferred' => '優先訳文',
       'workbench.translation.other_services' => '他のサービス',
       'workbench.translation.copy_result' => '訳文をコピー',

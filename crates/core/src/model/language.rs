@@ -62,7 +62,11 @@ impl TranslationTarget {
             .cloned()
             .collect::<Vec<_>>();
 
-        if selected.is_empty() { enabled } else { selected }
+        if selected.is_empty() {
+            enabled
+        } else {
+            selected
+        }
     }
 }
 
@@ -81,12 +85,18 @@ mod tests {
     #[test]
     fn detection_never_disables_every_user_route() {
         let routes = [target("en", true), target("ja", false)];
-        assert_eq!(TranslationTarget::filter_active(&routes, Some("ca")).len(), 1);
+        assert_eq!(
+            TranslationTarget::filter_active(&routes, Some("ca")).len(),
+            1
+        );
     }
 
     #[test]
     fn auto_and_matching_routes_are_selected() {
         let routes = [target("auto", true), target("en", true), target("ja", true)];
-        assert_eq!(TranslationTarget::filter_active(&routes, Some("en")).len(), 2);
+        assert_eq!(
+            TranslationTarget::filter_active(&routes, Some("en")).len(),
+            2
+        );
     }
 }

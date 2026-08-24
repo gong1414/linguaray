@@ -6,8 +6,8 @@ import 'package:linguaray_application/linguaray_application.dart';
 
 import '../../config/dependencies.dart';
 import '../../i18n/i18n.dart';
-import '../../utils/env.dart';
 import '../../platform/startup_update_controller.dart';
+import '../../utils/env.dart';
 import '../i18n_labels.dart';
 import 'updates_view.dart';
 

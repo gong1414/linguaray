@@ -160,10 +160,7 @@ private enum SystemProxyPlugin {
   }
 
   private static func readSystemProxy() -> [String: Any] {
-    guard
-      let unmanaged = SCDynamicStoreCopyProxies(nil),
-      let proxies = unmanaged.takeRetainedValue() as? [String: Any]
-    else {
+    guard let proxies = SCDynamicStoreCopyProxies(nil) as? [String: Any] else {
       return [:]
     }
 
@@ -185,7 +182,8 @@ private enum SystemProxyPlugin {
       value["https"] = endpoint
     }
     var bypass = proxies[kSCPropNetProxiesExceptionsList as String] as? [String] ?? []
-    if (proxies[kSCPropNetProxiesExcludeSimpleHostnames as String] as? NSNumber)?.boolValue == true {
+    if (proxies[kSCPropNetProxiesExcludeSimpleHostnames as String] as? NSNumber)?.boolValue == true
+    {
       bypass.append("<local>")
     }
     value["bypass"] = bypass

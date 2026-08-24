@@ -187,6 +187,8 @@ class TranslationsSettingsEn {
       TranslationsSettingsShortcutsEn.internal(_root);
   late final TranslationsSettingsAdvancedEn advanced =
       TranslationsSettingsAdvancedEn.internal(_root);
+  late final TranslationsSettingsDataTransferEn data_transfer =
+      TranslationsSettingsDataTransferEn.internal(_root);
   late final TranslationsSettingsServicesEn services =
       TranslationsSettingsServicesEn.internal(_root);
   late final TranslationsSettingsProvidersEn providers =
@@ -214,6 +216,7 @@ class TranslationsUiEn {
   late final TranslationsUiQuickEn quick = TranslationsUiQuickEn.internal(
     _root,
   );
+  late final TranslationsUiOcrEn ocr = TranslationsUiOcrEn.internal(_root);
   late final TranslationsUiErrorsEn errors = TranslationsUiErrorsEn.internal(
     _root,
   );
@@ -706,6 +709,9 @@ class TranslationsWorkbenchHistoryPageEn {
   /// en: 'Exit selection'
   String get exit_select => 'Exit selection';
 
+  /// en: 'Clear all'
+  String get clear_all => 'Clear all';
+
   /// en: 'Add to glossary'
   String get add_to_glossary => 'Add to glossary';
 
@@ -777,12 +783,12 @@ class TranslationsWorkbenchPlaceholderEn {
 
   // Translations
 
-  /// en: 'Favorites and history will be available in a future release'
+  /// en: 'Review, edit, favorite, and reuse previous translations'
   String get history =>
-      'Favorites and history will be available in a future release';
+      'Review, edit, favorite, and reuse previous translations';
 
-  /// en: 'Glossary management is being built'
-  String get glossary => 'Glossary management is being built';
+  /// en: 'Manage required terms and forbidden alternatives'
+  String get glossary => 'Manage required terms and forbidden alternatives';
 }
 
 // Path: workbench.glossary_page
@@ -932,6 +938,31 @@ class TranslationsWorkbenchGlossaryPageEn {
   /// en: 'Choose file…'
   String get choose_file => 'Choose file…';
 
+  /// en: 'Import'
+  String get import_file => 'Import';
+
+  /// en: 'Export'
+  String get export_file => 'Export';
+
+  /// en: 'Imported $inserted new terms, updated $updated, and skipped $skipped.'
+  String import_success({
+    required Object inserted,
+    required Object updated,
+    required Object skipped,
+  }) =>
+      'Imported ${inserted} new terms, updated ${updated}, and skipped ${skipped}.';
+
+  /// en: 'The glossary file could not be imported. Check its format and try again.'
+  String get import_failed =>
+      'The glossary file could not be imported. Check its format and try again.';
+
+  /// en: 'The glossary was exported.'
+  String get export_success => 'The glossary was exported.';
+
+  /// en: 'The glossary could not be exported. Try another location.'
+  String get export_failed =>
+      'The glossary could not be exported. Try another location.';
+
   /// en: 'Create'
   String get create => 'Create';
 
@@ -1025,9 +1056,9 @@ class TranslationsWorkbenchTranslationEn {
   /// en: 'Copy'
   String get copy => 'Copy';
 
-  /// en: 'Favorites will be available in a future release'
+  /// en: 'The favorite could not be updated. Try again.'
   String get favorite_unavailable =>
-      'Favorites will be available in a future release';
+      'The favorite could not be updated. Try again.';
 
   /// en: 'Preferred translation'
   String get preferred => 'Preferred translation';
@@ -1280,6 +1311,99 @@ class TranslationsSettingsAdvancedEn {
 
   /// en: 'Disabled'
   String get disabled => 'Disabled';
+
+  /// en: 'Network'
+  String get network => 'Network';
+
+  /// en: 'Proxy mode'
+  String get proxy_mode => 'Proxy mode';
+
+  /// en: 'Use system proxy'
+  String get proxy_system => 'Use system proxy';
+
+  /// en: 'Direct connection'
+  String get proxy_direct => 'Direct connection';
+
+  /// en: 'Custom HTTP proxy'
+  String get proxy_custom => 'Custom HTTP proxy';
+
+  /// en: 'Proxy URL'
+  String get proxy_url => 'Proxy URL';
+
+  /// en: 'For example, http://127.0.0.1:7890'
+  String get proxy_url_hint => 'For example, http://127.0.0.1:7890';
+
+  /// en: 'Do not proxy'
+  String get proxy_bypass => 'Do not proxy';
+
+  /// en: 'Comma-separated domains or IP addresses'
+  String get proxy_bypass_hint => 'Comma-separated domains or IP addresses';
+
+  /// en: 'Check for updates when LinguaRay starts'
+  String get check_updates_on_launch =>
+      'Check for updates when LinguaRay starts';
+
+  /// en: 'Save network settings'
+  String get save_network => 'Save network settings';
+}
+
+// Path: settings.data_transfer
+class TranslationsSettingsDataTransferEn {
+  TranslationsSettingsDataTransferEn.internal(this._root);
+
+  final Translations _root; // ignore: unused_field
+
+  // Translations
+
+  /// en: 'Import & Export'
+  String get title => 'Import & Export';
+
+  /// en: 'Move LinguaRay settings and local data between installations.'
+  String get description =>
+      'Move LinguaRay settings and local data between installations.';
+
+  /// en: 'Export backup'
+  String get export_title => 'Export backup';
+
+  /// en: 'Save settings, history, favorites, vocabulary, and glossaries in one ZIP archive.'
+  String get export_description =>
+      'Save settings, history, favorites, vocabulary, and glossaries in one ZIP archive.';
+
+  /// en: 'Export…'
+  String get export_action => 'Export…';
+
+  /// en: 'Restore backup'
+  String get restore_title => 'Restore backup';
+
+  /// en: 'Replace current local data with a LinguaRay backup.'
+  String get restore_description =>
+      'Replace current local data with a LinguaRay backup.';
+
+  /// en: 'Restore…'
+  String get restore_action => 'Restore…';
+
+  /// en: 'Restore this backup?'
+  String get restore_confirm_title => 'Restore this backup?';
+
+  /// en: 'Current settings and local records will be replaced. The operation is rolled back if installation fails.'
+  String get restore_confirm_description =>
+      'Current settings and local records will be replaced. The operation is rolled back if installation fails.';
+
+  /// en: 'API keys and proxy credentials are never included. Re-enter provider keys on another computer.'
+  String get secrets_notice =>
+      'API keys and proxy credentials are never included. Re-enter provider keys on another computer.';
+
+  /// en: 'Working…'
+  String get working => 'Working…';
+
+  /// en: 'Backup exported'
+  String get exported => 'Backup exported';
+
+  /// en: 'Backup restored'
+  String get restored => 'Backup restored';
+
+  /// en: 'The backup operation failed'
+  String get failed => 'The backup operation failed';
 }
 
 // Path: settings.services
@@ -1545,9 +1669,9 @@ class TranslationsUiFirstRunEn {
   /// en: 'Global shortcuts'
   String get shortcuts_title => 'Global shortcuts';
 
-  /// en: 'The four first-release actions are ready. Conflicts can be fixed later in Settings.'
+  /// en: 'Core translation and OCR actions are ready. Conflicts can be fixed later in Settings.'
   String get shortcuts_body =>
-      'The four first-release actions are ready. Conflicts can be fixed later in Settings.';
+      'Core translation and OCR actions are ready. Conflicts can be fixed later in Settings.';
 
   /// en: 'Translation services'
   String get services_title => 'Translation services';
@@ -1650,6 +1774,40 @@ class TranslationsUiQuickEn {
   String get recheck => 'Recheck';
 }
 
+// Path: ui.ocr
+class TranslationsUiOcrEn {
+  TranslationsUiOcrEn.internal(this._root);
+
+  final Translations _root; // ignore: unused_field
+
+  // Translations
+
+  /// en: 'OCR'
+  String get title => 'OCR';
+
+  /// en: 'No recognized text yet'
+  String get empty_title => 'No recognized text yet';
+
+  /// en: 'Capture a region, choose an image, or recognize an image from the clipboard.'
+  String get empty_description =>
+      'Capture a region, choose an image, or recognize an image from the clipboard.';
+
+  /// en: 'Capture'
+  String get capture => 'Capture';
+
+  /// en: 'Image file'
+  String get file => 'Image file';
+
+  /// en: 'Clipboard image'
+  String get clipboard => 'Clipboard image';
+
+  /// en: 'Continuous'
+  String get continuous => 'Continuous';
+
+  /// en: '$count results'
+  String result_count({required Object count}) => '${count} results';
+}
+
 // Path: ui.errors
 class TranslationsUiErrorsEn {
   TranslationsUiErrorsEn.internal(this._root);
@@ -1705,6 +1863,10 @@ class TranslationsUiErrorsEn {
   String get network_failure =>
       'The service could not be reached. Check your connection.';
 
+  /// en: 'Enter an HTTP or HTTPS proxy URL without credentials.'
+  String get proxy_configuration_invalid =>
+      'Enter an HTTP or HTTPS proxy URL without credentials.';
+
   /// en: 'Authentication failed. Check the provider key in Settings.'
   String get provider_auth_failed =>
       'Authentication failed. Check the provider key in Settings.';
@@ -1750,6 +1912,9 @@ class TranslationsUiErrorsEn {
   /// en: 'The update check failed.'
   String get update_check_failed => 'The update check failed.';
 
+  /// en: 'The update could not be downloaded.'
+  String get update_download_failed => 'The update could not be downloaded.';
+
   /// en: 'This update has no checksum and will not be installed.'
   String get update_checksum_missing =>
       'This update has no checksum and will not be installed.';
@@ -1757,6 +1922,14 @@ class TranslationsUiErrorsEn {
   /// en: 'The downloaded file did not match its checksum.'
   String get update_checksum_mismatch =>
       'The downloaded file did not match its checksum.';
+
+  /// en: 'The update does not have a valid LinguaRay platform signature.'
+  String get update_signature_invalid =>
+      'The update does not have a valid LinguaRay platform signature.';
+
+  /// en: 'The verified installer could not be started.'
+  String get update_install_failed =>
+      'The verified installer could not be started.';
 
   /// en: 'This LinguaRay link is not valid.'
   String get protocol_invalid => 'This LinguaRay link is not valid.';
@@ -2055,6 +2228,18 @@ class TranslationsAppTrayContextMenuEn {
 
   /// en: 'Screenshot OCR'
   String get capture_ocr => 'Screenshot OCR';
+
+  /// en: 'Silent Screenshot OCR'
+  String get silent_capture_ocr => 'Silent Screenshot OCR';
+
+  /// en: 'Image File OCR'
+  String get file_ocr => 'Image File OCR';
+
+  /// en: 'Clipboard OCR'
+  String get clipboard_ocr => 'Clipboard OCR';
+
+  /// en: 'Show OCR Window'
+  String get show_ocr_window => 'Show OCR Window';
 
   /// en: 'Preferences...'
   String get preferences => 'Preferences...';
@@ -2469,6 +2654,18 @@ class TranslationsSettingsShortcutsRowEn {
   /// en: 'Screenshot OCR'
   String get capture_ocr => 'Screenshot OCR';
 
+  /// en: 'Silent Screenshot OCR'
+  String get silent_capture_ocr => 'Silent Screenshot OCR';
+
+  /// en: 'Image File OCR'
+  String get file_ocr => 'Image File OCR';
+
+  /// en: 'Clipboard OCR'
+  String get clipboard_ocr => 'Clipboard OCR';
+
+  /// en: 'Show OCR Window'
+  String get show_ocr_window => 'Show OCR Window';
+
   /// en: 'Clipboard Translation'
   String get extract_text_from_clipboard => 'Clipboard Translation';
 
@@ -2502,6 +2699,21 @@ class TranslationsSettingsShortcutsDescriptionEn {
   /// en: 'Select a screen region and show only the recognized text.'
   String get capture_ocr =>
       'Select a screen region and show only the recognized text.';
+
+  /// en: 'Select a screen region, recognize it in the background, and copy the text.'
+  String get silent_capture_ocr =>
+      'Select a screen region, recognize it in the background, and copy the text.';
+
+  /// en: 'Choose an image file and recognize its text.'
+  String get file_ocr => 'Choose an image file and recognize its text.';
+
+  /// en: 'Recognize an image currently stored in the clipboard.'
+  String get clipboard_ocr =>
+      'Recognize an image currently stored in the clipboard.';
+
+  /// en: 'Show the OCR window without starting a new recognition.'
+  String get show_ocr_window =>
+      'Show the OCR window without starting a new recognition.';
 
   /// en: 'Translate text currently stored in the clipboard.'
   String get clipboard => 'Translate text currently stored in the clipboard.';
@@ -2782,6 +2994,9 @@ class TranslationsSettingsProvidersCatalogEn {
 
   /// en: 'Baidu Translate API.'
   String get baidu => 'Baidu Translate API.';
+
+  /// en: 'Baidu General OCR with text-line positions.'
+  String get baidu_ocr => 'Baidu General OCR with text-line positions.';
 
   /// en: 'Tencent Cloud Machine Translation.'
   String get tencent_cloud => 'Tencent Cloud Machine Translation.';
@@ -3434,6 +3649,10 @@ extension on Translations {
           'app.tray.context_menu.show_translation_window' =>
             'Show Translation Window',
           'app.tray.context_menu.capture_ocr' => 'Screenshot OCR',
+          'app.tray.context_menu.silent_capture_ocr' => 'Silent Screenshot OCR',
+          'app.tray.context_menu.file_ocr' => 'Image File OCR',
+          'app.tray.context_menu.clipboard_ocr' => 'Clipboard OCR',
+          'app.tray.context_menu.show_ocr_window' => 'Show OCR Window',
           'app.tray.context_menu.preferences' => 'Preferences...',
           'app.tray.context_menu.about' => 'About LinguaRay',
           'app.tray.context_menu.dev_tools.title' => 'Dev Tools',
@@ -3552,6 +3771,7 @@ extension on Translations {
             required Object count,
           }) => '${count} selected',
           'workbench.history_page.exit_select' => 'Exit selection',
+          'workbench.history_page.clear_all' => 'Clear all',
           'workbench.history_page.add_to_glossary' => 'Add to glossary',
           'workbench.history_page.favorite' => 'Favorite',
           'workbench.history_page.unfavorite' => 'Unfavorite',
@@ -3579,9 +3799,9 @@ extension on Translations {
           'workbench.subtitle.translate' => 'Workbench · Service comparison',
           'workbench.subtitle.settings' => 'Settings',
           'workbench.placeholder.history' =>
-            'Favorites and history will be available in a future release',
+            'Review, edit, favorite, and reuse previous translations',
           'workbench.placeholder.glossary' =>
-            'Glossary management is being built',
+            'Manage required terms and forbidden alternatives',
           'workbench.glossary_page.add_entry' => 'New entry',
           'workbench.glossary_page.term' => 'Source',
           'workbench.glossary_page.translation' => 'Required translation',
@@ -3646,6 +3866,18 @@ extension on Translations {
             required Object format,
           }) => 'Imports the ${format} file right after creating · duplicates take the file’s translation',
           'workbench.glossary_page.choose_file' => 'Choose file…',
+          'workbench.glossary_page.import_file' => 'Import',
+          'workbench.glossary_page.export_file' => 'Export',
+          'workbench.glossary_page.import_success' => ({
+            required Object inserted,
+            required Object updated,
+            required Object skipped,
+          }) => 'Imported ${inserted} new terms, updated ${updated}, and skipped ${skipped}.',
+          'workbench.glossary_page.import_failed' => 'The glossary file could not be imported. Check its format and try again.',
+          'workbench.glossary_page.export_success' =>
+            'The glossary was exported.',
+          'workbench.glossary_page.export_failed' =>
+            'The glossary could not be exported. Try another location.',
           'workbench.glossary_page.create' => 'Create',
           'workbench.glossary_page.add_entry_subtitle' =>
             'A term outranks anything a service returns',
@@ -3684,7 +3916,7 @@ extension on Translations {
           'workbench.translation.waiting' => 'Waiting to translate',
           'workbench.translation.copy' => 'Copy',
           'workbench.translation.favorite_unavailable' =>
-            'Favorites will be available in a future release',
+            'The favorite could not be updated. Try again.',
           'workbench.translation.preferred' => 'Preferred translation',
           'workbench.translation.other_services' => 'Other services',
           'workbench.translation.copy_result' => 'Copy translation',
@@ -3837,6 +4069,11 @@ extension on Translations {
           'settings.shortcuts.row.extract_text_from_screen_capture' =>
             'Screenshot Translation',
           'settings.shortcuts.row.capture_ocr' => 'Screenshot OCR',
+          'settings.shortcuts.row.silent_capture_ocr' =>
+            'Silent Screenshot OCR',
+          'settings.shortcuts.row.file_ocr' => 'Image File OCR',
+          'settings.shortcuts.row.clipboard_ocr' => 'Clipboard OCR',
+          'settings.shortcuts.row.show_ocr_window' => 'Show OCR Window',
           'settings.shortcuts.row.extract_text_from_clipboard' =>
             'Clipboard Translation',
           'settings.shortcuts.row.translate_input' => 'Input Translation',
@@ -3849,6 +4086,13 @@ extension on Translations {
             'Select a screen region, recognize its text, and translate it.',
           'settings.shortcuts.description.capture_ocr' =>
             'Select a screen region and show only the recognized text.',
+          'settings.shortcuts.description.silent_capture_ocr' => 'Select a screen region, recognize it in the background, and copy the text.',
+          'settings.shortcuts.description.file_ocr' =>
+            'Choose an image file and recognize its text.',
+          'settings.shortcuts.description.clipboard_ocr' =>
+            'Recognize an image currently stored in the clipboard.',
+          'settings.shortcuts.description.show_ocr_window' =>
+            'Show the OCR window without starting a new recognition.',
           'settings.shortcuts.description.clipboard' =>
             'Translate text currently stored in the clipboard.',
           'settings.shortcuts.reset_dialog.title' => 'Reset Shortcuts',
@@ -3875,6 +4119,38 @@ extension on Translations {
           'settings.advanced.port' => 'Port',
           'settings.advanced.running_at' => 'Running at {url}',
           'settings.advanced.disabled' => 'Disabled',
+          'settings.advanced.network' => 'Network',
+          'settings.advanced.proxy_mode' => 'Proxy mode',
+          'settings.advanced.proxy_system' => 'Use system proxy',
+          'settings.advanced.proxy_direct' => 'Direct connection',
+          'settings.advanced.proxy_custom' => 'Custom HTTP proxy',
+          'settings.advanced.proxy_url' => 'Proxy URL',
+          'settings.advanced.proxy_url_hint' =>
+            'For example, http://127.0.0.1:7890',
+          'settings.advanced.proxy_bypass' => 'Do not proxy',
+          'settings.advanced.proxy_bypass_hint' =>
+            'Comma-separated domains or IP addresses',
+          'settings.advanced.check_updates_on_launch' =>
+            'Check for updates when LinguaRay starts',
+          'settings.advanced.save_network' => 'Save network settings',
+          'settings.data_transfer.title' => 'Import & Export',
+          'settings.data_transfer.description' =>
+            'Move LinguaRay settings and local data between installations.',
+          'settings.data_transfer.export_title' => 'Export backup',
+          'settings.data_transfer.export_description' => 'Save settings, history, favorites, vocabulary, and glossaries in one ZIP archive.',
+          'settings.data_transfer.export_action' => 'Export…',
+          'settings.data_transfer.restore_title' => 'Restore backup',
+          'settings.data_transfer.restore_description' =>
+            'Replace current local data with a LinguaRay backup.',
+          'settings.data_transfer.restore_action' => 'Restore…',
+          'settings.data_transfer.restore_confirm_title' =>
+            'Restore this backup?',
+          'settings.data_transfer.restore_confirm_description' => 'Current settings and local records will be replaced. The operation is rolled back if installation fails.',
+          'settings.data_transfer.secrets_notice' => 'API keys and proxy credentials are never included. Re-enter provider keys on another computer.',
+          'settings.data_transfer.working' => 'Working…',
+          'settings.data_transfer.exported' => 'Backup exported',
+          'settings.data_transfer.restored' => 'Backup restored',
+          'settings.data_transfer.failed' => 'The backup operation failed',
           'settings.services.title' => 'Services',
           'settings.services.button.add_service' => 'Add Service...',
           'settings.services.button.manage_providers' => 'Manage Providers...',
@@ -3955,6 +4231,8 @@ extension on Translations {
           'settings.providers.catalog.google_cloud' =>
             'Google Cloud Translation API.',
           'settings.providers.catalog.baidu' => 'Baidu Translate API.',
+          'settings.providers.catalog.baidu_ocr' =>
+            'Baidu General OCR with text-line positions.',
           'settings.providers.catalog.tencent_cloud' =>
             'Tencent Cloud Machine Translation.',
           'settings.providers.catalog.youdao' =>
@@ -3982,6 +4260,9 @@ extension on Translations {
             'SiliconFlow global endpoint.',
           'settings.providers.catalog.modelscope' =>
             'ModelScope inference API.',
+          _ => null,
+        } ??
+        switch (path) {
           'settings.providers.catalog.ollama' => 'Local Ollama server.',
           'settings.providers.catalog.lm_studio' => 'Local LM Studio server.',
           'settings.providers.catalog.localai' => 'LocalAI server.',
@@ -4042,9 +4323,6 @@ extension on Translations {
           'settings.providers.detail.section.models' => 'Models',
           'settings.providers.detail.models.loading' => 'Loading models...',
           'settings.providers.detail.models.empty' => 'No models found.',
-          _ => null,
-        } ??
-        switch (path) {
           'settings.providers.detail.models.retry' => 'Retry',
           'settings.providers.detail.models.refresh' => 'Refresh List',
           'settings.providers.detail.models.default_badge' => 'Default',
@@ -4106,7 +4384,7 @@ extension on Translations {
           'ui.first_run.accessibility' => 'Accessibility',
           'ui.first_run.screen_recording' => 'Screen Recording',
           'ui.first_run.shortcuts_title' => 'Global shortcuts',
-          'ui.first_run.shortcuts_body' => 'The four first-release actions are ready. Conflicts can be fixed later in Settings.',
+          'ui.first_run.shortcuts_body' => 'Core translation and OCR actions are ready. Conflicts can be fixed later in Settings.',
           'ui.first_run.services_title' => 'Translation services',
           'ui.first_run.services_body' =>
             'Enable at least one translation service.',
@@ -4143,6 +4421,16 @@ extension on Translations {
           'ui.quick.clipboard_restore_failed' =>
             'The previous clipboard contents could not be restored.',
           'ui.quick.recheck' => 'Recheck',
+          'ui.ocr.title' => 'OCR',
+          'ui.ocr.empty_title' => 'No recognized text yet',
+          'ui.ocr.empty_description' => 'Capture a region, choose an image, or recognize an image from the clipboard.',
+          'ui.ocr.capture' => 'Capture',
+          'ui.ocr.file' => 'Image file',
+          'ui.ocr.clipboard' => 'Clipboard image',
+          'ui.ocr.continuous' => 'Continuous',
+          'ui.ocr.result_count' => ({
+            required Object count,
+          }) => '${count} results',
           'ui.errors.accessibility_denied' =>
             'Accessibility permission is required to read selected text.',
           'ui.errors.screen_recording_denied' =>
@@ -4162,6 +4450,8 @@ extension on Translations {
           'ui.errors.language_pack_missing' => 'Install this language pair in macOS Language & Region, then try again.',
           'ui.errors.network_failure' =>
             'The service could not be reached. Check your connection.',
+          'ui.errors.proxy_configuration_invalid' =>
+            'Enter an HTTP or HTTPS proxy URL without credentials.',
           'ui.errors.provider_auth_failed' =>
             'Authentication failed. Check the provider key in Settings.',
           'ui.errors.translation_failed' =>
@@ -4183,10 +4473,16 @@ extension on Translations {
           'ui.errors.speech_interrupted' => 'Speech was interrupted.',
           'ui.errors.speech_failed' => 'Speech playback failed.',
           'ui.errors.update_check_failed' => 'The update check failed.',
+          'ui.errors.update_download_failed' =>
+            'The update could not be downloaded.',
           'ui.errors.update_checksum_missing' =>
             'This update has no checksum and will not be installed.',
           'ui.errors.update_checksum_mismatch' =>
             'The downloaded file did not match its checksum.',
+          'ui.errors.update_signature_invalid' =>
+            'The update does not have a valid LinguaRay platform signature.',
+          'ui.errors.update_install_failed' =>
+            'The verified installer could not be started.',
           'ui.errors.protocol_invalid' => 'This LinguaRay link is not valid.',
           'ui.errors.protocol_too_large' =>
             'The linked text is too large to open.',

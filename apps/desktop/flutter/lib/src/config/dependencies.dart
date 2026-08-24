@@ -3,7 +3,6 @@ import 'package:linguaray_application/linguaray_application.dart';
 
 import '../data/channel_speech_service.dart';
 import '../data/github_update_repository.dart';
-import '../services/network_proxy.dart';
 import '../data/permission_repository.dart';
 import '../data/runtime_dictionary_repository.dart';
 import '../data/runtime_glossary_repository.dart';
@@ -12,6 +11,7 @@ import '../data/runtime_translation_repository.dart';
 import '../data/runtime_vocabulary_repository.dart';
 import '../data/shortcut_repository.dart';
 import '../data/workspace_settings_repository.dart';
+import '../services/network_proxy.dart';
 
 final translationRepositoryProvider = Provider<TranslationRepository>(
   (ref) => RuntimeTranslationRepository(),

@@ -4,14 +4,14 @@ mod engine;
 mod languages;
 mod provider;
 
+pub use common::{
+    configure_network_proxy, current_network_proxy, NetworkProxyConfig, NetworkProxyMode,
+};
 pub use engine::{
     from_config, from_yaml_str, load_from_file, Engine, EngineConfig, EngineError, ProviderConfig,
     ProviderType,
 };
 pub use languages::{all_languages, app_languages};
-pub use common::{
-    configure_network_proxy, current_network_proxy, NetworkProxyConfig, NetworkProxyMode,
-};
 pub use linguaray_core::{
     DictionaryError, DictionaryService, OcrError, OcrService, Provider, TranslationError,
     TranslationService,

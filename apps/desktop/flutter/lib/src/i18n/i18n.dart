@@ -5,7 +5,10 @@ import 'strings.g.dart';
 export 'strings.g.dart';
 
 String formatTranslation(String value, {List<String> args = const []}) {
-  return args.fold(value, (text, argument) => text.replaceFirst('{}', argument));
+  return args.fold(
+    value,
+    (text, argument) => text.replaceFirst('{}', argument),
+  );
 }
 
 /// Invalidates descendants after a Slang locale change without replacing

@@ -36,6 +36,7 @@ objc2 = "0.6"
 arboard = "=3.6.1"
 
 [build-dependencies]
+camino = "1"
 uniffi-dart = { git = "https://github.com/Uniffi-Dart/uniffi-dart.git", branch = "main", features = [
   "build",
 ] }

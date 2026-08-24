@@ -38,6 +38,8 @@ class IconActionButton extends StatelessWidget {
     );
 
     final message = tooltip;
-    return message == null ? control : Tooltip(message: message, child: control);
+    return message == null
+        ? control
+        : Tooltip(message: message, child: control);
   }
 }

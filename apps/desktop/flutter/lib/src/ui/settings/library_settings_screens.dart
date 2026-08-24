@@ -374,10 +374,7 @@ class _GlossarySettingsScreenState
     final extension = format.name;
     final file = await openFile(
       acceptedTypeGroups: [
-        XTypeGroup(
-          label: extension.toUpperCase(),
-          extensions: [extension],
-        ),
+        XTypeGroup(label: extension.toUpperCase(), extensions: [extension]),
       ],
     );
     if (file == null) return;
@@ -398,9 +395,7 @@ class _GlossarySettingsScreenState
       );
     } catch (_) {
       if (mounted) {
-        await _showExchangeMessage(
-          t.workbench.glossary_page.import_failed,
-        );
+        await _showExchangeMessage(t.workbench.glossary_page.import_failed);
       }
     }
   }
@@ -417,10 +412,7 @@ class _GlossarySettingsScreenState
       suggestedName:
           '${safeName.isEmpty ? 'linguaray-glossary' : safeName}.$extension',
       acceptedTypeGroups: [
-        XTypeGroup(
-          label: extension.toUpperCase(),
-          extensions: [extension],
-        ),
+        XTypeGroup(label: extension.toUpperCase(), extensions: [extension]),
       ],
     );
     if (location == null) return;
@@ -437,15 +429,11 @@ class _GlossarySettingsScreenState
         name: location.path.split(RegExp(r'[/\\]')).last,
       ).saveTo(location.path);
       if (mounted) {
-        await _showExchangeMessage(
-          t.workbench.glossary_page.export_success,
-        );
+        await _showExchangeMessage(t.workbench.glossary_page.export_success);
       }
     } catch (_) {
       if (mounted) {
-        await _showExchangeMessage(
-          t.workbench.glossary_page.export_failed,
-        );
+        await _showExchangeMessage(t.workbench.glossary_page.export_failed);
       }
     }
   }

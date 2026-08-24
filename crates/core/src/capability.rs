@@ -116,7 +116,9 @@ pub struct LlmStreamReceiver {
 
 impl LlmStreamReceiver {
     pub fn recv(&self) -> Result<StreamChunk, LlmError> {
-        self.rx.recv().map_err(|error| LlmError::StreamError(error.to_string()))
+        self.rx
+            .recv()
+            .map_err(|error| LlmError::StreamError(error.to_string()))
     }
 
     pub fn try_recv(&self) -> Option<StreamChunk> {
@@ -127,7 +129,9 @@ impl LlmStreamReceiver {
 #[async_trait(?Send)]
 pub trait TranslationService: Send + Sync {
     async fn get_supported_language_pairs(&self) -> Result<Vec<LanguagePair>, TranslationError> {
-        Err(TranslationError::UnsupportedMethod("get_supported_language_pairs"))
+        Err(TranslationError::UnsupportedMethod(
+            "get_supported_language_pairs",
+        ))
     }
 
     async fn detect_language(
@@ -175,7 +179,11 @@ mod tests {
             message.push('x');
         }
         let sanitized = ["secret", ""].into_iter().fold(message, |value, secret| {
-            if secret.is_empty() { value } else { value.replace(secret, "[redacted]") }
+            if secret.is_empty() {
+                value
+            } else {
+                value.replace(secret, "[redacted]")
+            }
         });
         assert!(sanitized.contains("[redacted]"));
         assert!(!sanitized.contains("Bearer secret"));

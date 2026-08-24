@@ -86,7 +86,9 @@ void main() {
     expect(controller.text, 'first line\n\n   indented second');
   });
 
-  testOnWindows('paste lands at the cursor, not over the field', (tester) async {
+  testOnWindows('paste lands at the cursor, not over the field', (
+    tester,
+  ) async {
     putOnClipboard('  world  ');
     final controller = await pump(tester, 'hello ');
     controller.selection = const TextSelection.collapsed(offset: 6);

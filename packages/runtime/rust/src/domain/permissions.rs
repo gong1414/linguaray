@@ -23,9 +23,7 @@ mod macos {
     }
 
     fn show_privacy_settings(anchor: &str) {
-        let url = format!(
-            "x-apple.systempreferences:com.apple.preference.security?{anchor}"
-        );
+        let url = format!("x-apple.systempreferences:com.apple.preference.security?{anchor}");
         let _ = Command::new("open").arg(url).spawn();
     }
 

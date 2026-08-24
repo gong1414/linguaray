@@ -1,4 +1,4 @@
 fn main() {
-    let interface = std::path::PathBuf::from("src/api.udl");
+    let interface = camino::Utf8Path::new("src/api.udl");
     uniffi_dart::generate_scaffolding(interface).expect("generate UniFFI Dart scaffolding");
 }

@@ -299,7 +299,6 @@ mod platform {
             recoverable_error: snapshot_warning.or(restore_warning),
         })
     }
-
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -615,7 +614,6 @@ pub fn extract_from_clipboard() -> Result<String, TextExtractorError> {
         ))
     }
 }
-
 
 /// Extract text from the current screen selection.
 ///

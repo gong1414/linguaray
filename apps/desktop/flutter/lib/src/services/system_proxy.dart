@@ -3,11 +3,7 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 
 class SystemProxySnapshot {
-  const SystemProxySnapshot({
-    this.http,
-    this.https,
-    this.bypass = const [],
-  });
+  const SystemProxySnapshot({this.http, this.https, this.bypass = const []});
 
   final String? http;
   final String? https;

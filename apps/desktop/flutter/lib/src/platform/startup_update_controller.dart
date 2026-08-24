@@ -14,7 +14,9 @@ class StartupUpdateController {
       return result.value;
     }
     _started = true;
-    final repository = GitHubUpdateRepository(client: createNetworkHttpClient());
+    final repository = GitHubUpdateRepository(
+      client: createNetworkHttpClient(),
+    );
     try {
       final state = await CheckForUpdate(repository)();
       result.value = state;

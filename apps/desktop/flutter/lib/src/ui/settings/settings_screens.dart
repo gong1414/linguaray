@@ -1740,8 +1740,7 @@ class _AdvancedSettingsScreenState
           uri.host.isEmpty ||
           uri.userInfo.isNotEmpty) {
         setState(
-          () => _networkError =
-              AppErrorCode.proxyConfigurationInvalid.wireName,
+          () => _networkError = AppErrorCode.proxyConfigurationInvalid.wireName,
         );
         return;
       }

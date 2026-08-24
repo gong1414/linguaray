@@ -14,7 +14,11 @@ pub fn text(value: String) -> String {
 
 pub fn path_prefix(path: &str) -> &str {
     let trimmed = path.trim_end_matches('/');
-    if trimmed == "/" { "" } else { trimmed }
+    if trimmed == "/" {
+        ""
+    } else {
+        trimmed
+    }
 }
 
 #[cfg(test)]
@@ -23,7 +27,10 @@ mod tests {
 
     #[test]
     fn empty_optional_languages_are_removed() {
-        assert_eq!(optional_language(Some(" EN ".to_owned())).as_deref(), Some("en"));
+        assert_eq!(
+            optional_language(Some(" EN ".to_owned())).as_deref(),
+            Some("en")
+        );
         assert_eq!(optional_language(Some("  ".to_owned())), None);
     }
 

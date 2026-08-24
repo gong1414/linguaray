@@ -14,6 +14,7 @@ use linguaray_core::{
 use struct_patch::Patch as ApplyPatch;
 use tokio::sync::{broadcast, Mutex as AsyncMutex, RwLock};
 
+use crate::backup;
 use crate::domain::engine;
 use crate::domain::glossary::{
     check_compliance, GlossaryBook, GlossaryBookInput, GlossaryComplianceIssue, GlossaryEntry,
@@ -35,7 +36,6 @@ use crate::domain::text_extractor;
 use crate::domain::vocabulary::{
     VocabularyEntry, VocabularyEntryInput, VocabularyFilter, VocabularyStore,
 };
-use crate::backup;
 use crate::RuntimeApiServer;
 use linguaray_core::TranslationTarget;
 use linguaray_engine::prompt::GlossaryTerm;
@@ -269,7 +269,7 @@ pub struct RuntimePermission;
 /// and screen capture with OCR across all supported platforms.
 #[derive(uniffi::Object)]
 pub struct RuntimeTextExtractor {
-    runtime: Runtime,
+    _runtime: Runtime,
 }
 
 /// Foreign-language handle for observing [`SettingsChange`] events.
@@ -389,7 +389,7 @@ impl Runtime {
 
     pub fn text_extractor(self: Arc<Self>) -> Arc<RuntimeTextExtractor> {
         Arc::new(RuntimeTextExtractor {
-            runtime: (*self).clone(),
+            _runtime: (*self).clone(),
         })
     }
 
@@ -698,10 +698,8 @@ impl RuntimeSettings {
             next_provider_secrets
                 .retain(|provider_id, _| next_settings.providers.contains_key(provider_id));
             let previous_proxy = linguaray_engine::current_network_proxy()?;
-            let next_engine = engine::build_from_settings_with_secrets(
-                &next_settings,
-                &next_provider_secrets,
-            )?;
+            let next_engine =
+                engine::build_from_settings_with_secrets(&next_settings, &next_provider_secrets)?;
             if let Err(error) = next_settings.save(settings_file_path) {
                 let _ = linguaray_engine::configure_network_proxy(previous_proxy);
                 return Err(error);
@@ -1860,9 +1858,9 @@ impl RuntimeGlossary {
         format: GlossaryExchangeFormat,
     ) -> Result<String, RuntimeError> {
         let store = self.runtime.inner.glossary.read().await;
-        let book = store
-            .get_book(&book_id)
-            .ok_or_else(|| RuntimeError::from(format!("glossary book `{book_id}` does not exist")))?;
+        let book = store.get_book(&book_id).ok_or_else(|| {
+            RuntimeError::from(format!("glossary book `{book_id}` does not exist"))
+        })?;
         let entries = store
             .list_entries(&book_id, None, 0, 0)
             .map_err(RuntimeError::from)?;
@@ -1884,8 +1882,11 @@ impl RuntimeGlossary {
             .read()
             .await
             .get_book(&book_id)
-            .ok_or_else(|| RuntimeError::from(format!("glossary book `{book_id}` does not exist")))?;
-        let entries = glossary_exchange::decode(&content, &book, format).map_err(RuntimeError::from)?;
+            .ok_or_else(|| {
+                RuntimeError::from(format!("glossary book `{book_id}` does not exist"))
+            })?;
+        let entries =
+            glossary_exchange::decode(&content, &book, format).map_err(RuntimeError::from)?;
         self.commit(|store| store.import_entries(&book_id, entries))
             .await
             .map_err(Into::into)
@@ -2669,13 +2670,12 @@ impl RuntimeOcr {
     }
 
     /// Recognizes an image currently stored in the system clipboard.
-    pub async fn recognize_clipboard_image(
-        &self,
-    ) -> Result<RecognizeTextResponse, RuntimeError> {
-        let image = text_extractor::extract_image_from_clipboard()
-            .map_err(|error| RuntimeError::Error {
+    pub async fn recognize_clipboard_image(&self) -> Result<RecognizeTextResponse, RuntimeError> {
+        let image = text_extractor::extract_image_from_clipboard().map_err(|error| {
+            RuntimeError::Error {
                 msg: error.to_string(),
-            })?;
+            }
+        })?;
         self.recognize_text_impl(RecognizeTextRequest {
             image_path: None,
             base64_image: Some(image),

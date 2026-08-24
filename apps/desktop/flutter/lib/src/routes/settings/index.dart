@@ -5,8 +5,8 @@ import 'package:linguaray_application/linguaray_application.dart';
 import '../../services/app_windows.dart'
     show hideSettingsWindow, settingsWindowController;
 import '../../ui/history/history_screen.dart';
-import '../../ui/settings/library_settings_screens.dart';
 import '../../ui/settings/data_transfer_settings_screen.dart';
+import '../../ui/settings/library_settings_screens.dart';
 import '../../ui/settings/settings_screens.dart';
 import '../../ui/updates/updates_screen.dart';
 import '../../utils/platform_util.dart';

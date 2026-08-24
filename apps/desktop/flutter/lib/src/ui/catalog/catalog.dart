@@ -79,7 +79,7 @@ class OcrCatalogPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final result = const OcrRecognitionResult(
+    const result = OcrRecognitionResult(
       text: 'LinguaRay keeps OCR independent from translation.',
       source: OcrInputSource.screenRegion,
     );

@@ -323,7 +323,7 @@ impl OpenAiCompatibleLlmService {
         let client = crate::common::build_http_client_with(
             reqwest::Client::builder().timeout(crate::catalog::MODELS_FETCH_TIMEOUT),
         )
-            .map_err(|error| LlmError::NetworkError(error.to_string()))?;
+        .map_err(|error| LlmError::NetworkError(error.to_string()))?;
         crate::catalog::fetch_models_with_candidates(&candidates, &secrets, |url| {
             let client = client.clone();
             let api_key = self.api_key.clone();

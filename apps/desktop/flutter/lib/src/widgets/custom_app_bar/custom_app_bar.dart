@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../utils/platform_util.dart';
 import './custom_app_bar_back_button.dart';
 import './custom_app_bar_close_button.dart';
 
@@ -63,9 +62,5 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   }
 
   @override
-  Size get preferredSize {
-    return Size.fromHeight(
-      kIsAndroid ? kToolbarHeight : _kMinInteractiveDimension,
-    );
-  }
+  Size get preferredSize => const Size.fromHeight(_kMinInteractiveDimension);
 }

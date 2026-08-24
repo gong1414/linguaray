@@ -63,7 +63,11 @@ final class HistoryViewModel extends Notifier<HistorySnapshot> {
     await reload();
   }
 
-  Future<void> edit(HistoryRecord entry, String source, String translation) async {
+  Future<void> edit(
+    HistoryRecord entry,
+    String source,
+    String translation,
+  ) async {
     await ref
         .read(historyRepositoryProvider)
         .upsert(
@@ -279,9 +283,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text(t.workbench.history_page.delete_title_many(count: count)),
-        content: Text(
-          t.workbench.history_page.delete_confirm(count: count),
-        ),
+        content: Text(t.workbench.history_page.delete_confirm(count: count)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),

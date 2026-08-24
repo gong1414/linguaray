@@ -152,9 +152,7 @@ final class TranslationViewModel extends Notifier<TranslationViewState> {
       );
       if (_activeHistorySessionId != sessionId) return;
       state = state.copyWith(
-        historyByService: {
-          for (final entry in saved) entry.serviceId: entry,
-        },
+        historyByService: {for (final entry in saved) entry.serviceId: entry},
       );
     } catch (_) {
       // History persistence must never turn a successful translation into an

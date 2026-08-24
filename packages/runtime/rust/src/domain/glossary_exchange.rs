@@ -52,7 +52,11 @@ fn encode_csv(entries: &[GlossaryEntry]) -> Result<String, String> {
                 entry.translation.as_str(),
                 &entry.forbidden.join("|"),
                 entry.note.as_deref().unwrap_or_default(),
-                if entry.case_sensitive { "true" } else { "false" },
+                if entry.case_sensitive {
+                    "true"
+                } else {
+                    "false"
+                },
                 if entry.whole_word { "true" } else { "false" },
             ])
             .map_err(|error| format!("failed to write CSV row: {error}"))?;
@@ -94,11 +98,7 @@ fn decode_csv(content: &str) -> Result<Vec<GlossaryEntryInput>, String> {
         entries.push(GlossaryEntryInput {
             id: None,
             term: row.get(term).unwrap_or_default().trim().to_owned(),
-            translation: row
-                .get(translation)
-                .unwrap_or_default()
-                .trim()
-                .to_owned(),
+            translation: row.get(translation).unwrap_or_default().trim().to_owned(),
             forbidden: forbidden
                 .and_then(|index| row.get(index))
                 .unwrap_or_default()
@@ -190,38 +190,32 @@ fn decode_tbx(content: &str, book: &GlossaryBook) -> Result<Vec<GlossaryEntryInp
     loop {
         match reader.read_event() {
             Ok(Event::Start(element)) => match element.name().as_ref() {
-                b"termEntry" => pending = Some(TbxEntry::default()),
-                b"langSet" => language = attribute(&element, b"xml:lang"),
-                b"term" => begin_capture(&mut capture, &mut text, "term"),
-                b"termNote"
-                    if attribute(&element, b"type").as_deref()
-                        == Some("linguaray:forbidden") =>
+                "termEntry" => pending = Some(TbxEntry::default()),
+                "langSet" => language = attribute(&element, "xml:lang"),
+                "term" => begin_capture(&mut capture, &mut text, "term"),
+                "termNote"
+                    if attribute(&element, "type").as_deref() == Some("linguaray:forbidden") =>
                 {
                     begin_capture(&mut capture, &mut text, "forbidden")
                 }
-                b"descrip" => {
-                    if let Some(kind) = attribute(&element, b"type") {
+                "descrip" => {
+                    if let Some(kind) = attribute(&element, "type") {
                         begin_capture(&mut capture, &mut text, &kind);
                     }
                 }
                 _ => {}
             },
-            Ok(Event::Text(value)) => {
-                if capture.is_some() {
-                    let raw = String::from_utf8_lossy(value.as_ref());
-                    text.push_str(
-                        &quick_xml::escape::unescape(&raw)
-                            .map_err(|error| format!("invalid TBX text: {error}"))?,
-                    );
-                }
+            Ok(Event::Text(value)) if capture.is_some() => {
+                text.push_str(
+                    &quick_xml::escape::unescape(value.as_ref())
+                        .map_err(|error| format!("invalid TBX text: {error}"))?,
+                );
             }
-            Ok(Event::CData(value)) => {
-                if capture.is_some() {
-                    text.push_str(&String::from_utf8_lossy(value.as_ref()));
-                }
+            Ok(Event::CData(value)) if capture.is_some() => {
+                text.push_str(value.as_ref());
             }
             Ok(Event::End(element)) => match element.name().as_ref() {
-                b"term" => {
+                "term" => {
                     if let Some(entry) = &mut pending {
                         let value = text.trim();
                         if !value.is_empty() {
@@ -230,7 +224,7 @@ fn decode_tbx(content: &str, book: &GlossaryBook) -> Result<Vec<GlossaryEntryInp
                     }
                     capture = None;
                 }
-                b"termNote" | b"descrip" => {
+                "termNote" | "descrip" => {
                     if let (Some(entry), Some(kind)) = (&mut pending, capture.take()) {
                         let value = text.trim();
                         match kind.as_str() {
@@ -248,8 +242,8 @@ fn decode_tbx(content: &str, book: &GlossaryBook) -> Result<Vec<GlossaryEntryInp
                         }
                     }
                 }
-                b"langSet" => language = None,
-                b"termEntry" => {
+                "langSet" => language = None,
+                "termEntry" => {
                     if let Some(entry) = pending.take() {
                         if let Some(input) = finish_tbx_entry(entry, book) {
                             entries.push(input);
@@ -267,8 +261,8 @@ fn decode_tbx(content: &str, book: &GlossaryBook) -> Result<Vec<GlossaryEntryInp
 }
 
 fn finish_tbx_entry(entry: TbxEntry, book: &GlossaryBook) -> Option<GlossaryEntryInput> {
-    let source_index = language_term_index(&entry.terms, book.source_language.as_deref(), None)
-        .unwrap_or(0);
+    let source_index =
+        language_term_index(&entry.terms, book.source_language.as_deref(), None).unwrap_or(0);
     let target_index = language_term_index(
         &entry.terms,
         book.target_language.as_deref(),
@@ -308,15 +302,14 @@ fn begin_capture(capture: &mut Option<String>, text: &mut String, kind: &str) {
     text.clear();
 }
 
-fn attribute(element: &BytesStart<'_>, key: &[u8]) -> Option<String> {
+fn attribute(element: &BytesStart<'_>, key: &str) -> Option<String> {
     element
         .attributes()
         .with_checks(false)
         .flatten()
         .find(|attribute| attribute.key.as_ref() == key)
         .and_then(|attribute| {
-            let raw = String::from_utf8_lossy(attribute.value.as_ref());
-            quick_xml::escape::unescape(&raw)
+            quick_xml::escape::unescape(attribute.value.as_ref())
                 .ok()
                 .map(|value| value.into_owned())
         })

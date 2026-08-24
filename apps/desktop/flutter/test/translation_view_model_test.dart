@@ -240,6 +240,19 @@ final class _FakeGlossaryRepository implements GlossaryRepository {
   }) async {}
 
   @override
+  Future<String> exportEntries({
+    required String bookId,
+    required GlossaryExchangeFormat format,
+  }) async => '';
+
+  @override
+  Future<GlossaryImportSummary> importEntries({
+    required String bookId,
+    required String content,
+    required GlossaryExchangeFormat format,
+  }) async => const GlossaryImportSummary(inserted: 0, updated: 0, skipped: 0);
+
+  @override
   Future<List<GlossaryBookRecord>> listBooks() async => const [];
 
   @override

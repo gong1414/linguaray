@@ -226,6 +226,9 @@ class _TranslationsSettingsZhHans extends TranslationsSettingsEn {
   late final _TranslationsSettingsAdvancedZhHans advanced =
       _TranslationsSettingsAdvancedZhHans._(_root);
   @override
+  late final _TranslationsSettingsDataTransferZhHans data_transfer =
+      _TranslationsSettingsDataTransferZhHans._(_root);
+  @override
   late final _TranslationsSettingsServicesZhHans services =
       _TranslationsSettingsServicesZhHans._(_root);
   @override
@@ -262,6 +265,8 @@ class _TranslationsUiZhHans extends TranslationsUiEn {
   late final _TranslationsUiQuickZhHans quick = _TranslationsUiQuickZhHans._(
     _root,
   );
+  @override
+  late final _TranslationsUiOcrZhHans ocr = _TranslationsUiOcrZhHans._(_root);
   @override
   late final _TranslationsUiErrorsZhHans errors = _TranslationsUiErrorsZhHans._(
     _root,
@@ -695,6 +700,8 @@ class _TranslationsWorkbenchHistoryPageZhHans
   @override
   String get exit_select => '退出多选';
   @override
+  String get clear_all => '清空全部';
+  @override
   String get add_to_glossary => '加入术语库';
   @override
   String get favorite => '收藏';
@@ -752,9 +759,9 @@ class _TranslationsWorkbenchPlaceholderZhHans
 
   // Translations
   @override
-  String get history => '收藏与历史将在后续版本中提供';
+  String get history => '查看、编辑、收藏并复用以往译文';
   @override
-  String get glossary => '术语库管理正在建设中';
+  String get glossary => '管理指定译法和禁用译法';
 }
 
 // Path: workbench.glossary_page
@@ -857,6 +864,22 @@ class _TranslationsWorkbenchGlossaryPageZhHans
   @override
   String get choose_file => '选择文件…';
   @override
+  String get import_file => '导入';
+  @override
+  String get export_file => '导出';
+  @override
+  String import_success({
+    required Object inserted,
+    required Object updated,
+    required Object skipped,
+  }) => '已新增 ${inserted} 条、更新 ${updated} 条、跳过 ${skipped} 条术语。';
+  @override
+  String get import_failed => '无法导入术语库文件，请检查文件格式后重试。';
+  @override
+  String get export_success => '术语库已导出。';
+  @override
+  String get export_failed => '无法导出术语库，请换一个位置后重试。';
+  @override
   String get create => '创建';
   @override
   String get add_entry_subtitle => '术语优先级高于任何服务输出';
@@ -924,7 +947,7 @@ class _TranslationsWorkbenchTranslationZhHans
   @override
   String get copy => '复制';
   @override
-  String get favorite_unavailable => '收藏功能将在后续版本中提供';
+  String get favorite_unavailable => '无法更新收藏状态，请重试';
   @override
   String get preferred => '首选译文';
   @override
@@ -1139,6 +1162,70 @@ class _TranslationsSettingsAdvancedZhHans
   String get running_at => '运行于 {url}';
   @override
   String get disabled => '已关闭';
+  @override
+  String get network => '网络';
+  @override
+  String get proxy_mode => '代理模式';
+  @override
+  String get proxy_system => '使用系统代理';
+  @override
+  String get proxy_direct => '直接连接';
+  @override
+  String get proxy_custom => '自定义 HTTP 代理';
+  @override
+  String get proxy_url => '代理地址';
+  @override
+  String get proxy_url_hint => '例如 http://127.0.0.1:7890';
+  @override
+  String get proxy_bypass => '不使用代理';
+  @override
+  String get proxy_bypass_hint => '用英文逗号分隔域名或 IP 地址';
+  @override
+  String get check_updates_on_launch => 'LinguaRay 启动时检查更新';
+  @override
+  String get save_network => '保存网络设置';
+}
+
+// Path: settings.data_transfer
+class _TranslationsSettingsDataTransferZhHans
+    extends TranslationsSettingsDataTransferEn {
+  _TranslationsSettingsDataTransferZhHans._(TranslationsZhHans root)
+    : this._root = root,
+      super.internal(root);
+
+  final TranslationsZhHans _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get title => '导入导出';
+  @override
+  String get description => '在不同安装之间迁移 LinguaRay 设置与本地数据。';
+  @override
+  String get export_title => '导出备份';
+  @override
+  String get export_description => '把设置、历史、收藏、生词本和术语库保存为一个 ZIP 文件。';
+  @override
+  String get export_action => '导出…';
+  @override
+  String get restore_title => '恢复备份';
+  @override
+  String get restore_description => '使用 LinguaRay 备份替换当前本地数据。';
+  @override
+  String get restore_action => '恢复…';
+  @override
+  String get restore_confirm_title => '恢复这个备份？';
+  @override
+  String get restore_confirm_description => '当前设置和本地记录将被替换；安装失败时会自动回滚。';
+  @override
+  String get secrets_notice => '备份绝不包含 API 密钥或代理凭据；换一台电脑后需要重新填写服务密钥。';
+  @override
+  String get working => '正在处理…';
+  @override
+  String get exported => '备份已导出';
+  @override
+  String get restored => '备份已恢复';
+  @override
+  String get failed => '备份操作失败';
 }
 
 // Path: settings.services
@@ -1380,7 +1467,7 @@ class _TranslationsUiFirstRunZhHans extends TranslationsUiFirstRunEn {
   @override
   String get shortcuts_title => '全局快捷键';
   @override
-  String get shortcuts_body => '四个首版动作已准备好。若有冲突，可稍后在设置中修改。';
+  String get shortcuts_body => '核心翻译与 OCR 动作已准备好。若有冲突，可稍后在设置中修改。';
   @override
   String get services_title => '翻译服务';
   @override
@@ -1452,6 +1539,33 @@ class _TranslationsUiQuickZhHans extends TranslationsUiQuickEn {
   String get recheck => '重新检查';
 }
 
+// Path: ui.ocr
+class _TranslationsUiOcrZhHans extends TranslationsUiOcrEn {
+  _TranslationsUiOcrZhHans._(TranslationsZhHans root)
+    : this._root = root,
+      super.internal(root);
+
+  final TranslationsZhHans _root; // ignore: unused_field
+
+  // Translations
+  @override
+  String get title => 'OCR';
+  @override
+  String get empty_title => '还没有识别结果';
+  @override
+  String get empty_description => '可以框选屏幕区域、选择图片文件，或识别剪贴板中的图片。';
+  @override
+  String get capture => '截图';
+  @override
+  String get file => '图片文件';
+  @override
+  String get clipboard => '剪贴板图片';
+  @override
+  String get continuous => '连续识别';
+  @override
+  String result_count({required Object count}) => '${count} 次结果';
+}
+
 // Path: ui.errors
 class _TranslationsUiErrorsZhHans extends TranslationsUiErrorsEn {
   _TranslationsUiErrorsZhHans._(TranslationsZhHans root)
@@ -1488,6 +1602,8 @@ class _TranslationsUiErrorsZhHans extends TranslationsUiErrorsEn {
   @override
   String get network_failure => '无法连接服务，请检查网络。';
   @override
+  String get proxy_configuration_invalid => '请输入不包含账号密码的 HTTP 或 HTTPS 代理地址。';
+  @override
   String get provider_auth_failed => '认证失败，请在设置中检查服务密钥。';
   @override
   String get translation_failed => '翻译失败，请检查服务后重试。';
@@ -1514,9 +1630,15 @@ class _TranslationsUiErrorsZhHans extends TranslationsUiErrorsEn {
   @override
   String get update_check_failed => '检查更新失败。';
   @override
+  String get update_download_failed => '无法下载更新。';
+  @override
   String get update_checksum_missing => '该更新没有校验和，不会安装。';
   @override
   String get update_checksum_mismatch => '下载的文件与校验和不匹配。';
+  @override
+  String get update_signature_invalid => '更新包没有有效的 LinguaRay 平台签名。';
+  @override
+  String get update_install_failed => '无法启动已经校验的安装程序。';
   @override
   String get protocol_invalid => '这个 LinguaRay 链接无效。';
   @override
@@ -1758,6 +1880,14 @@ class _TranslationsAppTrayContextMenuZhHans
   String get show_translation_window => '显示翻译窗口';
   @override
   String get capture_ocr => '截图 OCR';
+  @override
+  String get silent_capture_ocr => '静默截图 OCR';
+  @override
+  String get file_ocr => '选图 OCR';
+  @override
+  String get clipboard_ocr => '剪贴板 OCR';
+  @override
+  String get show_ocr_window => '显示 OCR 窗口';
   @override
   String get preferences => '偏好设置…';
   @override
@@ -2122,6 +2252,14 @@ class _TranslationsSettingsShortcutsRowZhHans
   @override
   String get capture_ocr => '截图 OCR';
   @override
+  String get silent_capture_ocr => '静默截图 OCR';
+  @override
+  String get file_ocr => '选图 OCR';
+  @override
+  String get clipboard_ocr => '剪贴板 OCR';
+  @override
+  String get show_ocr_window => '显示 OCR 窗口';
+  @override
   String get extract_text_from_clipboard => '剪贴板翻译';
   @override
   String get translate_input => '输入翻译';
@@ -2147,6 +2285,14 @@ class _TranslationsSettingsShortcutsDescriptionZhHans
   String get capture => '选择屏幕区域，识别其中的文字并翻译。';
   @override
   String get capture_ocr => '选择屏幕区域，只显示识别出的文字，不自动翻译。';
+  @override
+  String get silent_capture_ocr => '选择屏幕区域，在后台识别并把文字复制到剪贴板。';
+  @override
+  String get file_ocr => '选择图片文件并识别其中的文字。';
+  @override
+  String get clipboard_ocr => '识别当前剪贴板中的图片。';
+  @override
+  String get show_ocr_window => '直接显示 OCR 窗口，不开始新的识别。';
   @override
   String get clipboard => '翻译当前剪贴板中的文本。';
 }
@@ -2410,6 +2556,8 @@ class _TranslationsSettingsProvidersCatalogZhHans
   String get google_cloud => 'Google Cloud Translation API。';
   @override
   String get baidu => '百度翻译 API。';
+  @override
+  String get baidu_ocr => '百度通用文字识别，返回逐行文字与位置信息。';
   @override
   String get tencent_cloud => '腾讯云机器翻译。';
   @override
@@ -3057,6 +3205,10 @@ extension on TranslationsZhHans {
           'app.tray.context_menu.clipboard_translation' => '剪贴板翻译',
           'app.tray.context_menu.show_translation_window' => '显示翻译窗口',
           'app.tray.context_menu.capture_ocr' => '截图 OCR',
+          'app.tray.context_menu.silent_capture_ocr' => '静默截图 OCR',
+          'app.tray.context_menu.file_ocr' => '选图 OCR',
+          'app.tray.context_menu.clipboard_ocr' => '剪贴板 OCR',
+          'app.tray.context_menu.show_ocr_window' => '显示 OCR 窗口',
           'app.tray.context_menu.preferences' => '偏好设置…',
           'app.tray.context_menu.about' => '关于 LinguaRay',
           'app.tray.context_menu.dev_tools.title' => '开发工具',
@@ -3166,6 +3318,7 @@ extension on TranslationsZhHans {
             required Object count,
           }) => '已选 ${count} 条',
           'workbench.history_page.exit_select' => '退出多选',
+          'workbench.history_page.clear_all' => '清空全部',
           'workbench.history_page.add_to_glossary' => '加入术语库',
           'workbench.history_page.favorite' => '收藏',
           'workbench.history_page.unfavorite' => '取消收藏',
@@ -3192,8 +3345,8 @@ extension on TranslationsZhHans {
           'workbench.not_configured' => '尚未配置',
           'workbench.subtitle.translate' => '工作台 · 多服务对照',
           'workbench.subtitle.settings' => '设置',
-          'workbench.placeholder.history' => '收藏与历史将在后续版本中提供',
-          'workbench.placeholder.glossary' => '术语库管理正在建设中',
+          'workbench.placeholder.history' => '查看、编辑、收藏并复用以往译文',
+          'workbench.placeholder.glossary' => '管理指定译法和禁用译法',
           'workbench.glossary_page.add_entry' => '新增条目',
           'workbench.glossary_page.term' => '原文',
           'workbench.glossary_page.translation' => '指定译法',
@@ -3252,6 +3405,16 @@ extension on TranslationsZhHans {
             required Object format,
           }) => '创建后立即导入 ${format} 文件 · 重复的原文按文件里的译法为准',
           'workbench.glossary_page.choose_file' => '选择文件…',
+          'workbench.glossary_page.import_file' => '导入',
+          'workbench.glossary_page.export_file' => '导出',
+          'workbench.glossary_page.import_success' => ({
+            required Object inserted,
+            required Object updated,
+            required Object skipped,
+          }) => '已新增 ${inserted} 条、更新 ${updated} 条、跳过 ${skipped} 条术语。',
+          'workbench.glossary_page.import_failed' => '无法导入术语库文件，请检查文件格式后重试。',
+          'workbench.glossary_page.export_success' => '术语库已导出。',
+          'workbench.glossary_page.export_failed' => '无法导出术语库，请换一个位置后重试。',
           'workbench.glossary_page.create' => '创建',
           'workbench.glossary_page.add_entry_subtitle' => '术语优先级高于任何服务输出',
           'workbench.glossary_page.book' => '术语库',
@@ -3285,7 +3448,7 @@ extension on TranslationsZhHans {
           'workbench.translation.service_unavailable' => '服务暂不可用',
           'workbench.translation.waiting' => '等待翻译',
           'workbench.translation.copy' => '复制',
-          'workbench.translation.favorite_unavailable' => '收藏功能将在后续版本中提供',
+          'workbench.translation.favorite_unavailable' => '无法更新收藏状态，请重试',
           'workbench.translation.preferred' => '首选译文',
           'workbench.translation.other_services' => '其他服务',
           'workbench.translation.copy_result' => '复制译文',
@@ -3411,6 +3574,10 @@ extension on TranslationsZhHans {
           'settings.shortcuts.row.extract_text_from_screen_selection' => '划词翻译',
           'settings.shortcuts.row.extract_text_from_screen_capture' => '截图翻译',
           'settings.shortcuts.row.capture_ocr' => '截图 OCR',
+          'settings.shortcuts.row.silent_capture_ocr' => '静默截图 OCR',
+          'settings.shortcuts.row.file_ocr' => '选图 OCR',
+          'settings.shortcuts.row.clipboard_ocr' => '剪贴板 OCR',
+          'settings.shortcuts.row.show_ocr_window' => '显示 OCR 窗口',
           'settings.shortcuts.row.extract_text_from_clipboard' => '剪贴板翻译',
           'settings.shortcuts.row.translate_input' => '输入翻译',
           'settings.shortcuts.description.toggle_mini_translator' =>
@@ -3421,6 +3588,12 @@ extension on TranslationsZhHans {
           'settings.shortcuts.description.capture' => '选择屏幕区域，识别其中的文字并翻译。',
           'settings.shortcuts.description.capture_ocr' =>
             '选择屏幕区域，只显示识别出的文字，不自动翻译。',
+          'settings.shortcuts.description.silent_capture_ocr' =>
+            '选择屏幕区域，在后台识别并把文字复制到剪贴板。',
+          'settings.shortcuts.description.file_ocr' => '选择图片文件并识别其中的文字。',
+          'settings.shortcuts.description.clipboard_ocr' => '识别当前剪贴板中的图片。',
+          'settings.shortcuts.description.show_ocr_window' =>
+            '直接显示 OCR 窗口，不开始新的识别。',
           'settings.shortcuts.description.clipboard' => '翻译当前剪贴板中的文本。',
           'settings.shortcuts.reset_dialog.title' => '重置快捷键',
           'settings.shortcuts.reset_dialog.message' => '确定要重置所有快捷键为默认值吗？',
@@ -3445,6 +3618,37 @@ extension on TranslationsZhHans {
           'settings.advanced.port' => '端口',
           'settings.advanced.running_at' => '运行于 {url}',
           'settings.advanced.disabled' => '已关闭',
+          'settings.advanced.network' => '网络',
+          'settings.advanced.proxy_mode' => '代理模式',
+          'settings.advanced.proxy_system' => '使用系统代理',
+          'settings.advanced.proxy_direct' => '直接连接',
+          'settings.advanced.proxy_custom' => '自定义 HTTP 代理',
+          'settings.advanced.proxy_url' => '代理地址',
+          'settings.advanced.proxy_url_hint' => '例如 http://127.0.0.1:7890',
+          'settings.advanced.proxy_bypass' => '不使用代理',
+          'settings.advanced.proxy_bypass_hint' => '用英文逗号分隔域名或 IP 地址',
+          'settings.advanced.check_updates_on_launch' => 'LinguaRay 启动时检查更新',
+          'settings.advanced.save_network' => '保存网络设置',
+          'settings.data_transfer.title' => '导入导出',
+          'settings.data_transfer.description' =>
+            '在不同安装之间迁移 LinguaRay 设置与本地数据。',
+          'settings.data_transfer.export_title' => '导出备份',
+          'settings.data_transfer.export_description' =>
+            '把设置、历史、收藏、生词本和术语库保存为一个 ZIP 文件。',
+          'settings.data_transfer.export_action' => '导出…',
+          'settings.data_transfer.restore_title' => '恢复备份',
+          'settings.data_transfer.restore_description' =>
+            '使用 LinguaRay 备份替换当前本地数据。',
+          'settings.data_transfer.restore_action' => '恢复…',
+          'settings.data_transfer.restore_confirm_title' => '恢复这个备份？',
+          'settings.data_transfer.restore_confirm_description' =>
+            '当前设置和本地记录将被替换；安装失败时会自动回滚。',
+          'settings.data_transfer.secrets_notice' =>
+            '备份绝不包含 API 密钥或代理凭据；换一台电脑后需要重新填写服务密钥。',
+          'settings.data_transfer.working' => '正在处理…',
+          'settings.data_transfer.exported' => '备份已导出',
+          'settings.data_transfer.restored' => '备份已恢复',
+          'settings.data_transfer.failed' => '备份操作失败',
           'settings.services.title' => '服务',
           'settings.services.button.add_service' => '添加服务...',
           'settings.services.button.manage_providers' => '管理供应商...',
@@ -3523,6 +3727,7 @@ extension on TranslationsZhHans {
           'settings.providers.catalog.google_cloud' =>
             'Google Cloud Translation API。',
           'settings.providers.catalog.baidu' => '百度翻译 API。',
+          'settings.providers.catalog.baidu_ocr' => '百度通用文字识别，返回逐行文字与位置信息。',
           'settings.providers.catalog.tencent_cloud' => '腾讯云机器翻译。',
           'settings.providers.catalog.youdao' => '有道智云翻译、词典和 OCR。',
           'settings.providers.catalog.caiyun' => '彩云小译翻译 API。',
@@ -3540,6 +3745,9 @@ extension on TranslationsZhHans {
           'settings.providers.catalog.siliconflow_cn' => '硅基流动国内节点。',
           'settings.providers.catalog.siliconflow_global' => '硅基流动国际节点。',
           'settings.providers.catalog.modelscope' => 'ModelScope 推理 API。',
+          _ => null,
+        } ??
+        switch (path) {
           'settings.providers.catalog.ollama' => '本地 Ollama 服务。',
           'settings.providers.catalog.lm_studio' => '本地 LM Studio 服务。',
           'settings.providers.catalog.localai' => 'LocalAI 服务。',
@@ -3591,9 +3799,6 @@ extension on TranslationsZhHans {
           'settings.providers.detail.section.models' => '模型',
           'settings.providers.detail.models.loading' => '正在加载模型...',
           'settings.providers.detail.models.empty' => '未找到模型。',
-          _ => null,
-        } ??
-        switch (path) {
           'settings.providers.detail.models.retry' => '重试',
           'settings.providers.detail.models.refresh' => '刷新列表',
           'settings.providers.detail.models.default_badge' => '默认',
@@ -3646,7 +3851,7 @@ extension on TranslationsZhHans {
           'ui.first_run.accessibility' => '辅助功能',
           'ui.first_run.screen_recording' => '屏幕录制',
           'ui.first_run.shortcuts_title' => '全局快捷键',
-          'ui.first_run.shortcuts_body' => '四个首版动作已准备好。若有冲突，可稍后在设置中修改。',
+          'ui.first_run.shortcuts_body' => '核心翻译与 OCR 动作已准备好。若有冲突，可稍后在设置中修改。',
           'ui.first_run.services_title' => '翻译服务',
           'ui.first_run.services_body' => '至少启用一个翻译服务。',
           'ui.first_run.granted' => '已授权',
@@ -3676,6 +3881,14 @@ extension on TranslationsZhHans {
           'ui.quick.clipboard_unavailable' => '无法读取剪贴板。',
           'ui.quick.clipboard_restore_failed' => '无法恢复之前的剪贴板内容。',
           'ui.quick.recheck' => '重新检查',
+          'ui.ocr.title' => 'OCR',
+          'ui.ocr.empty_title' => '还没有识别结果',
+          'ui.ocr.empty_description' => '可以框选屏幕区域、选择图片文件，或识别剪贴板中的图片。',
+          'ui.ocr.capture' => '截图',
+          'ui.ocr.file' => '图片文件',
+          'ui.ocr.clipboard' => '剪贴板图片',
+          'ui.ocr.continuous' => '连续识别',
+          'ui.ocr.result_count' => ({required Object count}) => '${count} 次结果',
           'ui.errors.accessibility_denied' => '读取选中文本需要辅助功能权限。',
           'ui.errors.screen_recording_denied' => '截图需要屏幕录制权限。',
           'ui.errors.capture_failed' => '截图失败。',
@@ -3689,6 +3902,8 @@ extension on TranslationsZhHans {
           'ui.errors.unsupported_language_pair' => '当前服务不支持这对语言。',
           'ui.errors.language_pack_missing' => '请在 macOS 语言与地区中安装该语言包后再试。',
           'ui.errors.network_failure' => '无法连接服务，请检查网络。',
+          'ui.errors.proxy_configuration_invalid' =>
+            '请输入不包含账号密码的 HTTP 或 HTTPS 代理地址。',
           'ui.errors.provider_auth_failed' => '认证失败，请在设置中检查服务密钥。',
           'ui.errors.translation_failed' => '翻译失败，请检查服务后重试。',
           'ui.errors.empty_result' => '服务没有返回译文。',
@@ -3702,8 +3917,11 @@ extension on TranslationsZhHans {
           'ui.errors.speech_interrupted' => '朗读被中断。',
           'ui.errors.speech_failed' => '朗读失败。',
           'ui.errors.update_check_failed' => '检查更新失败。',
+          'ui.errors.update_download_failed' => '无法下载更新。',
           'ui.errors.update_checksum_missing' => '该更新没有校验和，不会安装。',
           'ui.errors.update_checksum_mismatch' => '下载的文件与校验和不匹配。',
+          'ui.errors.update_signature_invalid' => '更新包没有有效的 LinguaRay 平台签名。',
+          'ui.errors.update_install_failed' => '无法启动已经校验的安装程序。',
           'ui.errors.protocol_invalid' => '这个 LinguaRay 链接无效。',
           'ui.errors.protocol_too_large' => '链接中的文本过大，无法打开。',
           'ui.errors.api_server_bind_failed' => '本地 API 服务无法绑定该端口。',

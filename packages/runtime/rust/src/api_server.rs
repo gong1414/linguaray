@@ -277,21 +277,15 @@ fn dispatch(request: HttpRequest, runtime: Runtime) -> HttpResponse {
         ("GET", "/config") | ("POST", "/actions/settings") => {
             accept_action(runtime, ExternalActionKind::OpenSettings, None)
         }
-        ("GET", "/selection_translate")
-        | ("POST", "/actions/translate-selection") => accept_action(
-            runtime,
-            ExternalActionKind::TranslateSelection,
-            None,
-        ),
+        ("GET", "/selection_translate") | ("POST", "/actions/translate-selection") => {
+            accept_action(runtime, ExternalActionKind::TranslateSelection, None)
+        }
         ("GET", "/input_translate") | ("POST", "/actions/translate-input") => {
             accept_action(runtime, ExternalActionKind::TranslateInput, None)
         }
-        ("GET", "/clipboard_translate")
-        | ("POST", "/actions/translate-clipboard") => accept_action(
-            runtime,
-            ExternalActionKind::TranslateClipboard,
-            None,
-        ),
+        ("GET", "/clipboard_translate") | ("POST", "/actions/translate-clipboard") => {
+            accept_action(runtime, ExternalActionKind::TranslateClipboard, None)
+        }
         ("GET", "/ocr_translate") | ("POST", "/actions/capture-translate") => {
             accept_action(runtime, ExternalActionKind::CaptureTranslate, None)
         }
@@ -301,12 +295,9 @@ fn dispatch(request: HttpRequest, runtime: Runtime) -> HttpResponse {
         ("GET", "/clipboard_ocr") | ("POST", "/actions/clipboard-ocr") => {
             accept_action(runtime, ExternalActionKind::ClipboardOcr, None)
         }
-        ("GET", "/show_translate")
-        | ("POST", "/actions/show-translation-window") => accept_action(
-            runtime,
-            ExternalActionKind::ShowTranslationWindow,
-            None,
-        ),
+        ("GET", "/show_translate") | ("POST", "/actions/show-translation-window") => {
+            accept_action(runtime, ExternalActionKind::ShowTranslationWindow, None)
+        }
         ("GET", "/show_ocr") | ("POST", "/actions/show-ocr-window") => {
             accept_action(runtime, ExternalActionKind::ShowOcrWindow, None)
         }
@@ -330,26 +321,23 @@ fn dispatch_text_action(body: Vec<u8>, runtime: Runtime, json: bool) -> HttpResp
         match serde_json::from_slice::<TextActionBody>(&body) {
             Ok(body) => body.text,
             Err(error) => {
-                return json_error(ApiError::bad_request(
-                    "INVALID_JSON",
-                    error.to_string(),
-                ));
+                return json_error(ApiError::bad_request("INVALID_JSON", error.to_string()));
             }
         }
     } else {
         match String::from_utf8(body) {
             Ok(text) => text,
             Err(error) => {
-                return json_error(ApiError::bad_request(
-                    "INVALID_REQUEST",
-                    error.to_string(),
-                ));
+                return json_error(ApiError::bad_request("INVALID_REQUEST", error.to_string()));
             }
         }
     };
     let text = text.trim().to_owned();
     if text.is_empty() {
-        return json_error(ApiError::bad_request("INVALID_REQUEST", "`text` is required"));
+        return json_error(ApiError::bad_request(
+            "INVALID_REQUEST",
+            "`text` is required",
+        ));
     }
     if text.len() > MAX_ACTION_TEXT_BYTES {
         return json_error(ApiError::bad_request(
@@ -360,11 +348,7 @@ fn dispatch_text_action(body: Vec<u8>, runtime: Runtime, json: bool) -> HttpResp
     accept_action(runtime, ExternalActionKind::TranslateText, Some(text))
 }
 
-fn accept_action(
-    runtime: Runtime,
-    kind: ExternalActionKind,
-    text: Option<String>,
-) -> HttpResponse {
+fn accept_action(runtime: Runtime, kind: ExternalActionKind, text: Option<String>) -> HttpResponse {
     runtime.emit_external_action(ExternalActionRequest { kind, text });
     HttpResponse {
         status: 202,

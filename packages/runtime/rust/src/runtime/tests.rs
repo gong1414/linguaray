@@ -86,6 +86,10 @@ fn update_shortcuts_persists_all_fields_to_settings_file() {
                     extract_text_from_clipboard: Some("Command+Shift+3".to_owned()),
                     translate_input_content: Some("Option+Z".to_owned()),
                     capture_ocr: Some("Command+Shift+4".to_owned()),
+                    silent_capture_ocr: Some("Command+Shift+5".to_owned()),
+                    file_ocr: Some("Command+Shift+6".to_owned()),
+                    clipboard_ocr: Some("Command+Shift+7".to_owned()),
+                    show_ocr_window: Some("Command+Shift+8".to_owned()),
                 })
                 .await
                 .expect("failed to update shortcuts");
@@ -118,6 +122,22 @@ fn update_shortcuts_persists_all_fields_to_settings_file() {
     assert_eq!(
         json.pointer("/shortcuts/captureOcr").cloned(),
         Some(serde_json::Value::String("Command+Shift+4".to_owned()))
+    );
+    assert_eq!(
+        json.pointer("/shortcuts/silentCaptureOcr").cloned(),
+        Some(serde_json::Value::String("Command+Shift+5".to_owned()))
+    );
+    assert_eq!(
+        json.pointer("/shortcuts/fileOcr").cloned(),
+        Some(serde_json::Value::String("Command+Shift+6".to_owned()))
+    );
+    assert_eq!(
+        json.pointer("/shortcuts/clipboardOcr").cloned(),
+        Some(serde_json::Value::String("Command+Shift+7".to_owned()))
+    );
+    assert_eq!(
+        json.pointer("/shortcuts/showOcrWindow").cloned(),
+        Some(serde_json::Value::String("Command+Shift+8".to_owned()))
     );
 }
 
@@ -229,6 +249,10 @@ fn reset_shortcuts_persists_rust_defaults_to_settings_file() {
                     extract_text_from_clipboard: Some("Command+Shift+3".to_owned()),
                     translate_input_content: Some("Command+Shift+4".to_owned()),
                     capture_ocr: Some("Command+Shift+5".to_owned()),
+                    silent_capture_ocr: Some("Command+Shift+6".to_owned()),
+                    file_ocr: Some("Command+Shift+7".to_owned()),
+                    clipboard_ocr: Some("Command+Shift+8".to_owned()),
+                    show_ocr_window: Some("Command+Shift+9".to_owned()),
                 })
                 .await
                 .expect("failed to update shortcuts");
@@ -467,6 +491,10 @@ fn subscribe_receives_change_for_each_section() {
                     extract_text_from_clipboard: None,
                     translate_input_content: None,
                     capture_ocr: None,
+                    silent_capture_ocr: None,
+                    file_ocr: None,
+                    clipboard_ocr: None,
+                    show_ocr_window: None,
                 })
                 .await
                 .expect("update_shortcuts failed");
@@ -757,7 +785,8 @@ fn prompt_template_substitutes_the_glossary_placeholder() {
     );
 
     assert!(rendered.contains("Translate to zh."));
-    assert!(rendered.contains("\"token\" MUST be translated as \"词元\""));
+    assert!(rendered.contains("Required terminology"));
+    assert!(rendered.contains("- token => 词元"));
     assert!(rendered.trim_end().ends_with("End."));
 }
 
@@ -805,7 +834,8 @@ fn prompt_template_without_a_placeholder_still_gets_the_terms() {
     let rendered = render_prompt_template("Translate {{text}}.", "en", "zh", "token", &terms);
 
     assert!(rendered.starts_with("Translate token."));
-    assert!(rendered.contains("Terminology constraints"));
+    assert!(rendered.contains("Required terminology"));
+    assert!(rendered.contains("- token => 词元"));
 }
 
 #[test]

@@ -42,6 +42,7 @@ void main() {
           final baseTheme = LinguaRayMaterialTheme.forBrightness(brightness);
           final fixedTextTheme = baseTheme.textTheme.apply(
             fontFamily: 'Golden UI',
+            fontFamilyFallback: const ['Golden CJK', 'Golden Symbols'],
           );
           final theme = baseTheme.copyWith(
             platform: target,

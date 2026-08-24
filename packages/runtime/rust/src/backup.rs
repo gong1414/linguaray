@@ -106,12 +106,8 @@ pub fn export_backup(data_dir: &Path, destination: &Path) -> Result<(u64, u32), 
         created_at,
         includes_secrets: false,
     };
-    let file = File::create(&temporary).map_err(|error| {
-        format!(
-            "failed to create backup `{}`: {error}",
-            temporary.display()
-        )
-    })?;
+    let file = File::create(&temporary)
+        .map_err(|error| format!("failed to create backup `{}`: {error}", temporary.display()))?;
     let mut archive = ZipWriter::new(file);
     let options = SimpleFileOptions::default()
         .compression_method(CompressionMethod::Deflated)
@@ -150,12 +146,7 @@ pub fn export_backup(data_dir: &Path, destination: &Path) -> Result<(u64, u32), 
                 .file_name()
                 .and_then(|value| value.to_str())
                 .ok_or_else(|| "glossary file name is not valid UTF-8".to_owned())?;
-            write_file(
-                &mut archive,
-                &path,
-                &format!("glossary/{name}"),
-                options,
-            )?;
+            write_file(&mut archive, &path, &format!("glossary/{name}"), options)?;
             file_count += 1;
         }
     }
@@ -183,8 +174,8 @@ pub fn export_backup(data_dir: &Path, destination: &Path) -> Result<(u64, u32), 
 pub fn stage_backup(source: &Path) -> Result<StagedBackup, String> {
     let file = File::open(source)
         .map_err(|error| format!("failed to open backup `{}`: {error}", source.display()))?;
-    let mut archive = ZipArchive::new(file)
-        .map_err(|error| format!("failed to read backup archive: {error}"))?;
+    let mut archive =
+        ZipArchive::new(file).map_err(|error| format!("failed to read backup archive: {error}"))?;
     if archive.len() > MAX_ARCHIVE_ENTRIES {
         return Err("backup contains too many files".to_owned());
     }
@@ -290,10 +281,7 @@ pub fn stage_backup(source: &Path) -> Result<StagedBackup, String> {
     })
 }
 
-pub fn install_staged_backup(
-    data_dir: &Path,
-    staging: &Path,
-) -> Result<InstalledBackup, String> {
+pub fn install_staged_backup(data_dir: &Path, staging: &Path) -> Result<InstalledBackup, String> {
     fs::create_dir_all(data_dir)
         .map_err(|error| format!("failed to create runtime data directory: {error}"))?;
     let rollback = std::env::temp_dir().join(format!(
@@ -431,8 +419,7 @@ mod tests {
         let root = temporary("round-trip");
         let data = root.join("data");
         fs::create_dir_all(data.join("glossary")).expect("create data");
-        fs::write(data.join("settings.json"), r#"{"advanced":{}}"#)
-            .expect("write settings");
+        fs::write(data.join("settings.json"), r#"{"advanced":{}}"#).expect("write settings");
         fs::write(data.join("history.json"), r#"{"version":1,"entries":[]}"#)
             .expect("write history");
         fs::write(
@@ -496,11 +483,16 @@ mod tests {
         fs::write(data.join("settings.json"), "old").expect("write old data");
         fs::write(staging.join("settings.json"), "new").expect("write new data");
 
-        let transaction =
-            install_staged_backup(&data, &staging).expect("install staged backup");
-        assert_eq!(fs::read_to_string(data.join("settings.json")).unwrap(), "new");
+        let transaction = install_staged_backup(&data, &staging).expect("install staged backup");
+        assert_eq!(
+            fs::read_to_string(data.join("settings.json")).unwrap(),
+            "new"
+        );
         drop(transaction);
-        assert_eq!(fs::read_to_string(data.join("settings.json")).unwrap(), "old");
+        assert_eq!(
+            fs::read_to_string(data.join("settings.json")).unwrap(),
+            "old"
+        );
 
         fs::remove_dir_all(root).expect("remove test data");
     }

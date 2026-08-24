@@ -56,12 +56,14 @@ class _LetterMark extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
-    final background = color ?? switch (type) {
-      'system' => ProductTokens.providerBuiltin,
-      'anthropic' => ProductTokens.providerClaude,
-      'deepl' => ProductTokens.providerDeepl,
-      _ => ProductTokens.providerDict,
-    };
+    final background =
+        color ??
+        switch (type) {
+          'system' => ProductTokens.providerBuiltin,
+          'anthropic' => ProductTokens.providerClaude,
+          'deepl' => ProductTokens.providerDeepl,
+          _ => ProductTokens.providerDict,
+        };
 
     return ExcludeSemantics(
       child: Container(

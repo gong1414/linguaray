@@ -60,11 +60,9 @@ impl BaiduProvider {
         }
         let base_url = config.base_url.clone();
         let translation_http = if has_translation {
-            Some(HttpClient::proxy_aware(
-                base_url
-                    .clone()
-                    .unwrap_or_else(|| "https://fanyi-api.baidu.com".to_owned()),
-            )?)
+            Some(HttpClient::proxy_aware(base_url.clone().unwrap_or_else(
+                || "https://fanyi-api.baidu.com".to_owned(),
+            ))?)
         } else {
             None
         };
@@ -270,7 +268,9 @@ impl OcrService for BaiduOcrService {
         let recognitions = data["words_result"]
             .as_array()
             .ok_or_else(|| {
-                OcrError::SerializationError("missing words_result in Baidu OCR response".to_owned())
+                OcrError::SerializationError(
+                    "missing words_result in Baidu OCR response".to_owned(),
+                )
             })?
             .iter()
             .filter_map(|item| {
@@ -282,7 +282,10 @@ impl OcrService for BaiduOcrService {
                 Some(TextRecognition {
                     text: text.to_owned(),
                     recognized_rect: location.map(|value| RecognizedRect {
-                        x: value.get("left").and_then(Value::as_f64).unwrap_or_default(),
+                        x: value
+                            .get("left")
+                            .and_then(Value::as_f64)
+                            .unwrap_or_default(),
                         y: value.get("top").and_then(Value::as_f64).unwrap_or_default(),
                         width: value
                             .get("width")

@@ -52,6 +52,7 @@ String appErrorMessage(String? code) {
     AppErrorCode.speechInterrupted => errors.speech_interrupted,
     AppErrorCode.speechFailed => errors.speech_failed,
     AppErrorCode.updateCheckFailed => errors.update_check_failed,
+    AppErrorCode.updateDownloadFailed => errors.update_download_failed,
     AppErrorCode.updateChecksumMissing => errors.update_checksum_missing,
     AppErrorCode.updateChecksumMismatch => errors.update_checksum_mismatch,
     AppErrorCode.updateSignatureInvalid => errors.update_signature_invalid,
@@ -60,6 +61,8 @@ String appErrorMessage(String? code) {
     AppErrorCode.protocolTooLarge => errors.protocol_too_large,
     AppErrorCode.apiServerBindFailed => errors.api_server_bind_failed,
     AppErrorCode.invalidPort => errors.invalid_port,
+    AppErrorCode.proxyConfigurationInvalid =>
+      errors.proxy_configuration_invalid,
     AppErrorCode.unknown => errors.unknown,
   };
 }

@@ -43,16 +43,31 @@ void main() {
 
     await tester.runAsync(() async {
       final deadline = DateTime.now().add(const Duration(seconds: 10));
-      while (ShortcutService.instance.bindings.length != 6 &&
+      while (ShortcutService.instance.bindings.length !=
+              TriggerAction.values.length &&
           DateTime.now().isBefore(deadline)) {
         await Future<void>.delayed(const Duration(milliseconds: 100));
       }
     });
-    expect(ShortcutService.instance.bindings, hasLength(6));
+    final shortcutBindings = ShortcutService.instance.bindings;
+    expect(shortcutBindings, hasLength(TriggerAction.values.length));
+    final configuredShortcuts = shortcutBindings
+        .where((binding) => binding.accelerator.isNotEmpty)
+        .toList(growable: false);
+    expect(configuredShortcuts.length, greaterThanOrEqualTo(6));
     expect(
-      ShortcutService.instance.bindings.every(
+      configuredShortcuts.every(
         (binding) => binding.state == ShortcutRegistrationState.registered,
       ),
+      isTrue,
+    );
+    expect(
+      shortcutBindings
+          .where((binding) => binding.accelerator.isEmpty)
+          .every(
+            (binding) =>
+                binding.state == ShortcutRegistrationState.unregistered,
+          ),
       isTrue,
     );
 
