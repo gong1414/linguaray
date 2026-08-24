@@ -101,6 +101,8 @@ QuickTranslateLabels quickTranslateLabels() {
     lookup: t.ui.dictionary.lookup,
     saveVocabulary: t.ui.vocabulary.add,
     vocabularySaved: t.ui.vocabulary.saved,
+    favorite: t.workbench.history_page.favorite,
+    unfavorite: t.workbench.history_page.unfavorite,
     glossaryMatches: t.workbench.translation.terms,
     glossaryWarnings: t.workbench.translation.quality,
   );

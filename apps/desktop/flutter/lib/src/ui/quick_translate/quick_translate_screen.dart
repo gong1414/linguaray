@@ -404,6 +404,9 @@ class _QuickTranslateScreenState extends ConsumerState<QuickTranslateScreen>
       speakingKind: _speakingKind,
       savingVocabulary: _savingVocabulary,
       vocabularySaved: _vocabularySaved,
+      favoriteAvailable: state.selectedHistoryRecord != null,
+      favorite: state.selectedHistoryRecord?.favorite ?? false,
+      updatingFavorite: state.updatingFavorite,
       onSourceTextChanged: (value) {
         _markVocabularyUnsaved();
         ref.read(translationViewModelProvider.notifier).setSourceText(value);
@@ -455,6 +458,7 @@ class _QuickTranslateScreenState extends ConsumerState<QuickTranslateScreen>
       onStopSpeech: () => unawaited(_stopSpeech()),
       onLookup: (word) => unawaited(_lookup(word)),
       onSaveVocabulary: () => unawaited(_saveTranslationVocabulary()),
+      onToggleFavorite: () => unawaited(_toggleFavorite()),
       onTogglePin: () {
         setState(() => _pinned = !_pinned);
         _window.isAlwaysOnTop = _pinned;
@@ -468,6 +472,15 @@ class _QuickTranslateScreenState extends ConsumerState<QuickTranslateScreen>
       onConfigureServices: showSettingsWindow,
       onRecheckPermissions: () => unawaited(permissionController.refresh()),
     );
+  }
+
+  Future<void> _toggleFavorite() async {
+    final updated = await ref
+        .read(translationViewModelProvider.notifier)
+        .toggleSelectedFavorite();
+    if (!updated && mounted) {
+      await _showMessage(t.workbench.translation.favorite_unavailable);
+    }
   }
 }
 

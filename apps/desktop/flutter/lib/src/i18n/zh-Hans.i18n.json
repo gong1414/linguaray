@@ -205,6 +205,7 @@
       "select": "多选",
       "selected_count": "已选 $count 条",
       "exit_select": "退出多选",
+      "clear_all": "清空全部",
       "add_to_glossary": "加入术语库",
       "favorite": "收藏",
       "unfavorite": "取消收藏",
@@ -228,8 +229,8 @@
       "settings": "设置"
     },
     "placeholder": {
-      "history": "收藏与历史将在后续版本中提供",
-      "glossary": "术语库管理正在建设中"
+      "history": "查看、编辑、收藏并复用以往译文",
+      "glossary": "管理指定译法和禁用译法"
     },
     "glossary_page": {
       "add_entry": "新增条目",
@@ -275,6 +276,12 @@
       "seed_blank_note": "建好后可以逐条新增，也可以把 CSV / TBX 拖进列表里合并。",
       "seed_file_note": "创建后立即导入 $format 文件 · 重复的原文按文件里的译法为准",
       "choose_file": "选择文件…",
+      "import_file": "导入",
+      "export_file": "导出",
+      "import_success": "已新增 $inserted 条、更新 $updated 条、跳过 $skipped 条术语。",
+      "import_failed": "无法导入术语库文件，请检查文件格式后重试。",
+      "export_success": "术语库已导出。",
+      "export_failed": "无法导出术语库，请换一个位置后重试。",
       "create": "创建",
       "add_entry_subtitle": "术语优先级高于任何服务输出",
       "book": "术语库",
@@ -304,7 +311,7 @@
       "service_unavailable": "服务暂不可用",
       "waiting": "等待翻译",
       "copy": "复制",
-      "favorite_unavailable": "收藏功能将在后续版本中提供",
+      "favorite_unavailable": "无法更新收藏状态，请重试",
       "preferred": "首选译文",
       "other_services": "其他服务",
       "copy_result": "复制译文",

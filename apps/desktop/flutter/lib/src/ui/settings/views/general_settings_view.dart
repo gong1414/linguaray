@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:linguaray_application/linguaray_application.dart';
 
+import '../../../utils/platform_util.dart';
 import '../settings_labels.dart';
 
 class GeneralSettingsView extends StatelessWidget {
@@ -62,12 +63,13 @@ class GeneralSettingsView extends StatelessWidget {
               value: preferences.launchAtLogin,
               onChanged: onLaunchAtLoginChanged,
             ),
-            SwitchListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-              title: Text(labels.showInMenuBar),
-              value: preferences.showInMenuBar,
-              onChanged: onShowInMenuBarChanged,
-            ),
+            if (!kIsWindows)
+              SwitchListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                title: Text(labels.showInMenuBar),
+                value: preferences.showInMenuBar,
+                onChanged: onShowInMenuBarChanged,
+              ),
           ],
         ),
         const SizedBox(height: 24),

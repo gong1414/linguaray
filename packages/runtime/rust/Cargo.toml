@@ -16,6 +16,8 @@ uniffi-dart = { git = "https://github.com/Uniffi-Dart/uniffi-dart.git", branch =
 aho-corasick.workspace = true
 anyhow = "1"
 camino = "1"
+csv = "1"
+quick-xml = "0.42"
 serde.workspace = true
 serde_json.workspace = true
 serde_yaml.workspace = true

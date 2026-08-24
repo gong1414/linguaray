@@ -98,6 +98,14 @@ pub struct GlossaryEntryInput {
     pub whole_word: bool,
 }
 
+/// Summary returned after merging an external glossary into a book.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, uniffi::Record)]
+pub struct GlossaryImportReport {
+    pub inserted: u32,
+    pub updated: u32,
+    pub skipped: u32,
+}
+
 /// A term found in a source text.
 #[derive(Clone, Debug, PartialEq, uniffi::Record)]
 pub struct GlossaryMatch {
@@ -382,6 +390,42 @@ impl GlossaryStore {
         let entry = self.apply_entry(book_id, input, now_secs())?;
         self.commit(book_id)?;
         Ok(entry)
+    }
+
+    /// Merges many entries and writes the book once. Existing terms are
+    /// matched case-insensitively, which is the same rule used by interactive
+    /// entry editing.
+    pub fn import_entries(
+        &mut self,
+        book_id: &str,
+        entries: Vec<GlossaryEntryInput>,
+    ) -> Result<GlossaryImportReport, String> {
+        validate_book_id(book_id)?;
+        self.require_book(book_id)?;
+        let mut report = GlossaryImportReport::default();
+        let now = now_secs();
+
+        for entry in entries {
+            let term = entry.term.trim();
+            if term.is_empty() || entry.translation.trim().is_empty() {
+                report.skipped += 1;
+                continue;
+            }
+            let existed = self.books[book_id]
+                .entries
+                .iter()
+                .any(|saved| saved.term.eq_ignore_ascii_case(term));
+            match self.apply_entry(book_id, entry, now) {
+                Ok(_) if existed => report.updated += 1,
+                Ok(_) => report.inserted += 1,
+                Err(_) => report.skipped += 1,
+            }
+        }
+
+        if report.inserted > 0 || report.updated > 0 {
+            self.commit(book_id)?;
+        }
+        Ok(report)
     }
 
     /// Removes an entry. Returns `false` if it did not exist.

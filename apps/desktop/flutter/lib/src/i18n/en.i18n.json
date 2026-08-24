@@ -205,6 +205,7 @@
       "select": "Select",
       "selected_count": "$count selected",
       "exit_select": "Exit selection",
+      "clear_all": "Clear all",
       "add_to_glossary": "Add to glossary",
       "favorite": "Favorite",
       "unfavorite": "Unfavorite",
@@ -228,8 +229,8 @@
       "settings": "Settings"
     },
     "placeholder": {
-      "history": "Favorites and history will be available in a future release",
-      "glossary": "Glossary management is being built"
+      "history": "Review, edit, favorite, and reuse previous translations",
+      "glossary": "Manage required terms and forbidden alternatives"
     },
     "glossary_page": {
       "add_entry": "New entry",
@@ -275,6 +276,12 @@
       "seed_blank_note": "Once it exists you can add entries one by one, or drop a CSV / TBX onto the list to merge.",
       "seed_file_note": "Imports the $format file right after creating · duplicates take the file’s translation",
       "choose_file": "Choose file…",
+      "import_file": "Import",
+      "export_file": "Export",
+      "import_success": "Imported $inserted new terms, updated $updated, and skipped $skipped.",
+      "import_failed": "The glossary file could not be imported. Check its format and try again.",
+      "export_success": "The glossary was exported.",
+      "export_failed": "The glossary could not be exported. Try another location.",
       "create": "Create",
       "add_entry_subtitle": "A term outranks anything a service returns",
       "book": "Glossary",
@@ -304,7 +311,7 @@
       "service_unavailable": "Service unavailable",
       "waiting": "Waiting to translate",
       "copy": "Copy",
-      "favorite_unavailable": "Favorites will be available in a future release",
+      "favorite_unavailable": "The favorite could not be updated. Try again.",
       "preferred": "Preferred translation",
       "other_services": "Other services",
       "copy_result": "Copy translation",

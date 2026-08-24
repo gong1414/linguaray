@@ -8,6 +8,7 @@ final class HistoryViewLabels {
     required this.title,
     required this.all,
     required this.favorites,
+    required this.edited,
     required this.search,
     required this.emptyTitle,
     required this.emptyDescription,
@@ -16,17 +17,21 @@ final class HistoryViewLabels {
     required this.retry,
     required this.delete,
     required this.clear,
+    required this.exitSelection,
     required this.clearConfirm,
     required this.select,
     required this.open,
     required this.favorite,
     required this.unfavorite,
+    required this.edit,
+    required this.selectedCount,
     this.errorMessage,
   });
 
   final String title;
   final String all;
   final String favorites;
+  final String edited;
   final String search;
   final String emptyTitle;
   final String emptyDescription;
@@ -35,11 +40,14 @@ final class HistoryViewLabels {
   final String retry;
   final String delete;
   final String clear;
+  final String exitSelection;
   final String clearConfirm;
   final String select;
   final String open;
   final String favorite;
   final String unfavorite;
+  final String edit;
+  final String Function(int count) selectedCount;
   final String Function(String? code)? errorMessage;
 }
 
@@ -52,10 +60,12 @@ class HistoryView extends StatelessWidget {
     required this.onFilterChanged,
     required this.onOpen,
     required this.onFavorite,
+    required this.onEdit,
     required this.onDelete,
     required this.onClear,
     required this.onRetry,
     required this.onToggleSelected,
+    required this.onExitSelection,
     super.key,
     this.showFilter = true,
   });
@@ -67,10 +77,12 @@ class HistoryView extends StatelessWidget {
   final ValueChanged<HistoryFilter> onFilterChanged;
   final ValueChanged<HistoryRecord> onOpen;
   final void Function(HistoryRecord entry, bool favorite) onFavorite;
+  final ValueChanged<HistoryRecord> onEdit;
   final ValueChanged<List<String>> onDelete;
   final VoidCallback onClear;
   final VoidCallback onRetry;
   final ValueChanged<String> onToggleSelected;
+  final VoidCallback onExitSelection;
   final bool showFilter;
 
   @override
@@ -84,9 +96,26 @@ class HistoryView extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
             child: Row(
               children: [
-                Text(labels.title, style: theme.textTheme.headlineMedium),
+                if (selectedIds.isEmpty)
+                  Text(labels.title, style: theme.textTheme.headlineMedium)
+                else
+                  Text(
+                    labels.selectedCount(selectedIds.length),
+                    style: theme.textTheme.titleMedium,
+                  ),
                 const Spacer(),
-                if (snapshot.entries.isNotEmpty)
+                if (selectedIds.isNotEmpty) ...[
+                  TextButton.icon(
+                    onPressed: () => onDelete(selectedIds.toList()),
+                    icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                    label: Text(labels.delete),
+                  ),
+                  IconButton(
+                    tooltip: labels.exitSelection,
+                    onPressed: onExitSelection,
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ] else if (snapshot.entries.isNotEmpty)
                   TextButton(onPressed: onClear, child: Text(labels.clear)),
               ],
             ),
@@ -113,6 +142,10 @@ class HistoryView extends StatelessWidget {
                       ButtonSegment(
                         value: HistoryFilter.favorites,
                         label: Text(labels.favorites),
+                      ),
+                      ButtonSegment(
+                        value: HistoryFilter.edited,
+                        label: Text(labels.edited),
                       ),
                     ],
                     selected: {snapshot.filter},
@@ -164,6 +197,12 @@ class HistoryView extends StatelessWidget {
         final entry = snapshot.entries[index];
         return ListTile(
           selected: selectedIds.contains(entry.id),
+          leading: selectedIds.isEmpty
+              ? null
+              : Checkbox(
+                  value: selectedIds.contains(entry.id),
+                  onChanged: (_) => onToggleSelected(entry.id),
+                ),
           title: Text(
             entry.source,
             maxLines: 1,
@@ -174,14 +213,30 @@ class HistoryView extends StatelessWidget {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
-          trailing: IconButton(
-            tooltip: entry.favorite ? labels.unfavorite : labels.favorite,
-            onPressed: () => onFavorite(entry, !entry.favorite),
-            icon: Icon(
-              entry.favorite ? Icons.star_rounded : Icons.star_outline_rounded,
-            ),
+          trailing: Wrap(
+            spacing: 0,
+            children: [
+              IconButton(
+                tooltip: labels.edit,
+                onPressed: () => onEdit(entry),
+                icon: Icon(
+                  entry.edited ? Icons.edit_rounded : Icons.edit_outlined,
+                ),
+              ),
+              IconButton(
+                tooltip: entry.favorite ? labels.unfavorite : labels.favorite,
+                onPressed: () => onFavorite(entry, !entry.favorite),
+                icon: Icon(
+                  entry.favorite
+                      ? Icons.star_rounded
+                      : Icons.star_outline_rounded,
+                ),
+              ),
+            ],
           ),
-          onTap: () => onOpen(entry),
+          onTap: selectedIds.isEmpty
+              ? () => onOpen(entry)
+              : () => onToggleSelected(entry.id),
           onLongPress: () => onToggleSelected(entry.id),
         );
       },

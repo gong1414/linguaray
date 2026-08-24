@@ -44,6 +44,8 @@ final class QuickTranslateLabels {
     this.lookup = '',
     this.saveVocabulary = '',
     this.vocabularySaved = '',
+    this.favorite = '',
+    this.unfavorite = '',
     this.glossaryMatches = '',
     this.glossaryWarnings = '',
   });
@@ -85,6 +87,8 @@ final class QuickTranslateLabels {
   final String lookup;
   final String saveVocabulary;
   final String vocabularySaved;
+  final String favorite;
+  final String unfavorite;
   final String glossaryMatches;
   final String glossaryWarnings;
 }
@@ -144,11 +148,15 @@ class QuickTranslateView extends StatefulWidget {
     this.speakingKind,
     this.savingVocabulary = false,
     this.vocabularySaved = false,
+    this.favoriteAvailable = false,
+    this.favorite = false,
+    this.updatingFavorite = false,
     this.onSpeakSource,
     this.onSpeakResult,
     this.onStopSpeech,
     this.onLookup,
     this.onSaveVocabulary,
+    this.onToggleFavorite,
   });
 
   final QuickTranslateLabels labels;
@@ -191,11 +199,15 @@ class QuickTranslateView extends StatefulWidget {
   final SpeechUtteranceKind? speakingKind;
   final bool savingVocabulary;
   final bool vocabularySaved;
+  final bool favoriteAvailable;
+  final bool favorite;
+  final bool updatingFavorite;
   final VoidCallback? onSpeakSource;
   final VoidCallback? onSpeakResult;
   final VoidCallback? onStopSpeech;
   final ValueChanged<String>? onLookup;
   final VoidCallback? onSaveVocabulary;
+  final VoidCallback? onToggleFavorite;
 
   @override
   State<QuickTranslateView> createState() => _QuickTranslateViewState();
@@ -479,6 +491,30 @@ class _QuickTranslateViewState extends State<QuickTranslateView> {
                                         widget.vocabularySaved
                                             ? Icons.bookmark_added_rounded
                                             : Icons.bookmark_add_outlined,
+                                        size: 18,
+                                      ),
+                              ),
+                            if (widget.onToggleFavorite != null)
+                              IconButton(
+                                tooltip: widget.favorite
+                                    ? widget.labels.unfavorite
+                                    : widget.labels.favorite,
+                                onPressed:
+                                    widget.favoriteAvailable &&
+                                        !widget.updatingFavorite
+                                    ? widget.onToggleFavorite
+                                    : null,
+                                icon: widget.updatingFavorite
+                                    ? const SizedBox.square(
+                                        dimension: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : Icon(
+                                        widget.favorite
+                                            ? Icons.star_rounded
+                                            : Icons.star_outline_rounded,
                                         size: 18,
                                       ),
                               ),

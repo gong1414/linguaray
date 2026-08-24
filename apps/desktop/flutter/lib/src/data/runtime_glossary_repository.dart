@@ -52,6 +52,41 @@ final class RuntimeGlossaryRepository implements GlossaryRepository {
   }
 
   @override
+  Future<String> exportEntries({
+    required String bookId,
+    required GlossaryExchangeFormat format,
+  }) {
+    return _glossary.exportEntries(
+      bookId: bookId,
+      format: switch (format) {
+        GlossaryExchangeFormat.csv => rt.GlossaryExchangeFormat.csv,
+        GlossaryExchangeFormat.tbx => rt.GlossaryExchangeFormat.tbx,
+      },
+    );
+  }
+
+  @override
+  Future<GlossaryImportSummary> importEntries({
+    required String bookId,
+    required String content,
+    required GlossaryExchangeFormat format,
+  }) async {
+    final report = await _glossary.importEntries(
+      bookId: bookId,
+      content: content,
+      format: switch (format) {
+        GlossaryExchangeFormat.csv => rt.GlossaryExchangeFormat.csv,
+        GlossaryExchangeFormat.tbx => rt.GlossaryExchangeFormat.tbx,
+      },
+    );
+    return GlossaryImportSummary(
+      inserted: report.inserted,
+      updated: report.updated,
+      skipped: report.skipped,
+    );
+  }
+
+  @override
   Future<List<GlossaryBookRecord>> listBooks() async {
     try {
       final books = await _glossary.listBooks();

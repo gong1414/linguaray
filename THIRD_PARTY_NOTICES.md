@@ -7,6 +7,13 @@ project templates and remains under the Flutter project's BSD 3-Clause
 License. Copyright 2014 The Flutter Authors. The license is available at
 <https://github.com/flutter/flutter/blob/master/LICENSE>.
 
+## Flutter file selector
+
+LinguaRay uses the Flutter-maintained `file_selector` plugin for native macOS
+and Windows open/save dialogs. It is distributed under the BSD 3-Clause
+License. Copyright 2013 The Flutter Authors. The license is available at
+<https://github.com/flutter/packages/blob/main/packages/file_selector/file_selector/LICENSE>.
+
 ## Unicode CLDR
 
 The curated language names in `scripts/generate/data/languages.json` are based

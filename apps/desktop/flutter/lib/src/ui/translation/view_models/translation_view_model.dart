@@ -13,6 +13,7 @@ final translationViewModelProvider =
 
 final class TranslationViewModel extends Notifier<TranslationViewState> {
   int _requestId = 0;
+  String? _activeHistorySessionId;
 
   @override
   TranslationViewState build() {
@@ -50,11 +51,13 @@ final class TranslationViewModel extends Notifier<TranslationViewState> {
 
   void clearSourceText() {
     _requestId++;
+    _activeHistorySessionId = null;
     state = state.copyWith(
       sourceText: '',
       submitting: false,
       clearRun: true,
       clearSubmissionError: true,
+      historyByService: const {},
     );
   }
 
@@ -97,10 +100,12 @@ final class TranslationViewModel extends Notifier<TranslationViewState> {
 
     final requestId = ++_requestId;
     final sessionId = newTranslationSessionId();
+    _activeHistorySessionId = sessionId;
     state = state.copyWith(
       submitting: true,
       clearRun: true,
       clearSubmissionError: true,
+      historyByService: const {},
     );
 
     try {
@@ -141,13 +146,42 @@ final class TranslationViewModel extends Notifier<TranslationViewState> {
 
   Future<void> _recordHistory(String sessionId, TranslationRun run) async {
     try {
-      await ref.read(recordCompletedTranslationProvider)(
+      final saved = await ref.read(recordCompletedTranslationProvider)(
         sessionId: sessionId,
         run: run,
+      );
+      if (_activeHistorySessionId != sessionId) return;
+      state = state.copyWith(
+        historyByService: {
+          for (final entry in saved) entry.serviceId: entry,
+        },
       );
     } catch (_) {
       // History persistence must never turn a successful translation into an
       // unhandled asynchronous error.
+    }
+  }
+
+  Future<bool> toggleSelectedFavorite() async {
+    final current = state.selectedHistoryRecord;
+    if (current == null || state.updatingFavorite) return false;
+    state = state.copyWith(updatingFavorite: true);
+    try {
+      final updated = await ref
+          .read(historyRepositoryProvider)
+          .setFavorite(entryId: current.id, favorite: !current.favorite);
+      if (updated == null) return false;
+      state = state.copyWith(
+        historyByService: {
+          ...state.historyByService,
+          updated.serviceId: updated,
+        },
+      );
+      return true;
+    } catch (_) {
+      return false;
+    } finally {
+      state = state.copyWith(updatingFavorite: false);
     }
   }
 
@@ -212,6 +246,8 @@ final class TranslationViewState {
     this.submissionErrorCode,
     this.glossaryMatches = const [],
     this.glossaryWarnings = const [],
+    this.historyByService = const {},
+    this.updatingFavorite = false,
   });
 
   final TranslationCatalog? catalog;
@@ -226,6 +262,8 @@ final class TranslationViewState {
   final String? submissionErrorCode;
   final List<GlossaryMatchHit> glossaryMatches;
   final List<GlossaryComplianceWarning> glossaryWarnings;
+  final Map<String, HistoryRecord> historyByService;
+  final bool updatingFavorite;
 
   List<LanguageOption> get languages => catalog?.languages ?? const [];
   List<TranslationServiceOption> get services => catalog?.services ?? const [];
@@ -237,6 +275,11 @@ final class TranslationViewState {
       if (result.service.id == selectedServiceId) return result;
     }
     return results.first;
+  }
+
+  HistoryRecord? get selectedHistoryRecord {
+    final serviceId = selectedResult?.service.id;
+    return serviceId == null ? null : historyByService[serviceId];
   }
 
   TranslationViewState copyWith({
@@ -252,6 +295,8 @@ final class TranslationViewState {
     Object? submissionErrorCode = _unset,
     List<GlossaryMatchHit>? glossaryMatches,
     List<GlossaryComplianceWarning>? glossaryWarnings,
+    Map<String, HistoryRecord>? historyByService,
+    bool? updatingFavorite,
     bool clearRun = false,
     bool clearCatalogError = false,
     bool clearSubmissionError = false,
@@ -285,6 +330,8 @@ final class TranslationViewState {
           : submissionErrorCode as String?,
       glossaryMatches: glossaryMatches ?? this.glossaryMatches,
       glossaryWarnings: glossaryWarnings ?? this.glossaryWarnings,
+      historyByService: historyByService ?? this.historyByService,
+      updatingFavorite: updatingFavorite ?? this.updatingFavorite,
     );
   }
 }

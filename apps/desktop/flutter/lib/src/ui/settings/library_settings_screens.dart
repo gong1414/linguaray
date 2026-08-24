@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:linguaray_application/linguaray_application.dart';
@@ -365,6 +367,104 @@ class _GlossarySettingsScreenState
     await _reloadEntries();
   }
 
+  Future<void> _importGlossary(
+    GlossaryBookRecord book,
+    GlossaryExchangeFormat format,
+  ) async {
+    final extension = format.name;
+    final file = await openFile(
+      acceptedTypeGroups: [
+        XTypeGroup(
+          label: extension.toUpperCase(),
+          extensions: [extension],
+        ),
+      ],
+    );
+    if (file == null) return;
+    try {
+      final report = await _repository.importEntries(
+        bookId: book.id,
+        content: await file.readAsString(),
+        format: format,
+      );
+      await _reloadBooks(select: book.id);
+      if (!mounted) return;
+      await _showExchangeMessage(
+        t.workbench.glossary_page.import_success(
+          inserted: report.inserted,
+          updated: report.updated,
+          skipped: report.skipped,
+        ),
+      );
+    } catch (_) {
+      if (mounted) {
+        await _showExchangeMessage(
+          t.workbench.glossary_page.import_failed,
+        );
+      }
+    }
+  }
+
+  Future<void> _exportGlossary(
+    GlossaryBookRecord book,
+    GlossaryExchangeFormat format,
+  ) async {
+    final extension = format.name;
+    final safeName = book.name
+        .replaceAll(RegExp(r'[<>:"/\\|?*\x00-\x1F]'), '-')
+        .replaceAll(RegExp(r'^-+|-+$'), '');
+    final location = await getSaveLocation(
+      suggestedName:
+          '${safeName.isEmpty ? 'linguaray-glossary' : safeName}.$extension',
+      acceptedTypeGroups: [
+        XTypeGroup(
+          label: extension.toUpperCase(),
+          extensions: [extension],
+        ),
+      ],
+    );
+    if (location == null) return;
+    try {
+      final content = await _repository.exportEntries(
+        bookId: book.id,
+        format: format,
+      );
+      await XFile.fromData(
+        utf8.encode(content),
+        mimeType: format == GlossaryExchangeFormat.csv
+            ? 'text/csv'
+            : 'application/xml',
+        name: location.path.split(RegExp(r'[/\\]')).last,
+      ).saveTo(location.path);
+      if (mounted) {
+        await _showExchangeMessage(
+          t.workbench.glossary_page.export_success,
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        await _showExchangeMessage(
+          t.workbench.glossary_page.export_failed,
+        );
+      }
+    }
+  }
+
+  Future<void> _showExchangeMessage(String message) {
+    return showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(t.common.ui.button.ok),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final page = t.workbench.glossary_page;
@@ -384,6 +484,41 @@ class _GlossarySettingsScreenState
                   style: Theme.of(context).textTheme.headlineMedium,
                 ),
                 const Spacer(),
+                PopupMenuButton<GlossaryExchangeFormat>(
+                  enabled: selectedBook != null,
+                  tooltip: page.import_file,
+                  icon: const Icon(Icons.file_upload_outlined),
+                  onSelected: (format) =>
+                      unawaited(_importGlossary(selectedBook!, format)),
+                  itemBuilder: (_) => [
+                    PopupMenuItem(
+                      value: GlossaryExchangeFormat.csv,
+                      child: Text('${page.import_file} · CSV'),
+                    ),
+                    PopupMenuItem(
+                      value: GlossaryExchangeFormat.tbx,
+                      child: Text('${page.import_file} · TBX'),
+                    ),
+                  ],
+                ),
+                PopupMenuButton<GlossaryExchangeFormat>(
+                  enabled: selectedBook != null,
+                  tooltip: page.export_file,
+                  icon: const Icon(Icons.file_download_outlined),
+                  onSelected: (format) =>
+                      unawaited(_exportGlossary(selectedBook!, format)),
+                  itemBuilder: (_) => [
+                    PopupMenuItem(
+                      value: GlossaryExchangeFormat.csv,
+                      child: Text('${page.export_file} · CSV'),
+                    ),
+                    PopupMenuItem(
+                      value: GlossaryExchangeFormat.tbx,
+                      child: Text('${page.export_file} · TBX'),
+                    ),
+                  ],
+                ),
+                const SizedBox(width: 8),
                 OutlinedButton.icon(
                   onPressed: () => unawaited(_editBook()),
                   icon: const Icon(Icons.create_new_folder_outlined, size: 18),

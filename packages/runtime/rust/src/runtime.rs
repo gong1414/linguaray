@@ -16,8 +16,9 @@ use tokio::sync::{broadcast, Mutex as AsyncMutex, RwLock};
 use crate::domain::engine;
 use crate::domain::glossary::{
     check_compliance, GlossaryBook, GlossaryBookInput, GlossaryComplianceIssue, GlossaryEntry,
-    GlossaryEntryInput, GlossaryMatch, GlossaryStore,
+    GlossaryEntryInput, GlossaryImportReport, GlossaryMatch, GlossaryStore,
 };
+use crate::domain::glossary_exchange::{self, GlossaryExchangeFormat};
 use crate::domain::history::{
     HistoryCounts, HistoryEntry, HistoryEntryInput, HistoryFilter, HistoryStore,
 };
@@ -493,6 +494,18 @@ impl Runtime {
                     service.provider_id
                 ));
             }
+            let engine_provider = state
+                .engine
+                .require(&service.provider_id)
+                .map_err(|error| error.to_string())?;
+            if !provider_supports_service(engine_provider.as_ref(), expected_type)
+                || !advertises_system_capability(&service.provider_id, expected_type)
+            {
+                return Err(format!(
+                    "provider `{}` does not support {expected_type:?}",
+                    service.provider_id
+                ));
+            }
             let mut entry = service.clone();
             entry.id = service_id.to_owned();
             return Ok(ResolvedService {
@@ -510,15 +523,9 @@ impl Runtime {
             .engine
             .require(service_id)
             .map_err(|error| error.to_string())?;
-        let supported = match expected_type {
-            ServiceType::Dictionary => engine_provider.dictionary().is_some(),
-            ServiceType::Ocr => engine_provider.ocr().is_some(),
-            ServiceType::Translation => {
-                engine_provider.translation().is_some() || engine_provider.llm().is_some()
-            }
-            ServiceType::Llm => engine_provider.llm().is_some(),
-        };
-        if !supported {
+        if !provider_supports_service(engine_provider.as_ref(), expected_type)
+            || !advertises_system_capability(service_id, expected_type)
+        {
             return Err(format!(
                 "provider `{service_id}` does not support {expected_type:?}"
             ));
@@ -869,7 +876,7 @@ impl RuntimeSettings {
         for (provider_id, provider) in &state.settings.providers {
             let entry = normalized_provider_entry(provider_id, provider);
             if let Ok(engine_provider) = state.engine.require(provider_id) {
-                if engine_provider.dictionary().is_some()
+                if provider_supports_service(engine_provider.as_ref(), ServiceType::Dictionary)
                     && advertises_system_capability(provider_id, ServiceType::Dictionary)
                 {
                     let service = service_entry_for_provider_type(
@@ -879,7 +886,7 @@ impl RuntimeSettings {
                     );
                     by_id.insert(service.id.clone(), service);
                 }
-                if (engine_provider.translation().is_some() || engine_provider.llm().is_some())
+                if provider_supports_service(engine_provider.as_ref(), ServiceType::Translation)
                     && advertises_system_capability(provider_id, ServiceType::Translation)
                 {
                     let service = service_entry_for_provider_type(
@@ -889,7 +896,7 @@ impl RuntimeSettings {
                     );
                     by_id.insert(service.id.clone(), service);
                 }
-                if engine_provider.ocr().is_some()
+                if provider_supports_service(engine_provider.as_ref(), ServiceType::Ocr)
                     && advertises_system_capability(provider_id, ServiceType::Ocr)
                 {
                     let service = service_entry_for_provider_type(
@@ -904,6 +911,12 @@ impl RuntimeSettings {
 
         for (service_id, service) in &state.settings.services {
             if !state.settings.providers.contains_key(&service.provider_id) {
+                continue;
+            }
+            let Ok(engine_provider) = state.engine.require(&service.provider_id) else {
+                continue;
+            };
+            if !provider_supports_service(engine_provider.as_ref(), service.r#type) {
                 continue;
             }
             if !advertises_system_capability(&service.provider_id, service.r#type) {
@@ -1193,6 +1206,26 @@ impl RuntimeSettings {
             .duration_since(UNIX_EPOCH)
             .map(|d| d.as_secs())
             .ok();
+
+        {
+            let state = self.runtime.inner.state.read().await;
+            if !state.settings.providers.contains_key(&provider_id) {
+                return Err(RuntimeError::from(format!(
+                    "provider `{provider_id}` does not exist"
+                )));
+            }
+            let engine_provider = state
+                .engine
+                .require(&provider_id)
+                .map_err(|error| RuntimeError::from(error.to_string()))?;
+            if !provider_supports_service(engine_provider.as_ref(), service_type)
+                || !advertises_system_capability(&provider_id, service_type)
+            {
+                return Err(RuntimeError::from(format!(
+                    "provider `{provider_id}` does not support {service_type:?}"
+                )));
+            }
+        }
 
         self.commit_settings(SettingsChange::Providers, move |settings| {
             if !settings.providers.contains_key(&provider_id) {
@@ -1586,6 +1619,44 @@ impl RuntimeGlossary {
         entry_id: String,
     ) -> Result<bool, RuntimeError> {
         self.commit(|store| store.delete_entry(&book_id, &entry_id))
+            .await
+            .map_err(Into::into)
+    }
+
+    /// Exports a complete book as UTF-8 CSV or TBX.
+    pub async fn export_entries(
+        &self,
+        book_id: String,
+        format: GlossaryExchangeFormat,
+    ) -> Result<String, RuntimeError> {
+        let store = self.runtime.inner.glossary.read().await;
+        let book = store
+            .get_book(&book_id)
+            .ok_or_else(|| RuntimeError::from(format!("glossary book `{book_id}` does not exist")))?;
+        let entries = store
+            .list_entries(&book_id, None, 0, 0)
+            .map_err(RuntimeError::from)?;
+        glossary_exchange::encode(&book, &entries, format).map_err(Into::into)
+    }
+
+    /// Merges UTF-8 CSV or TBX into a book. A matching source term updates the
+    /// existing row; malformed or empty rows are counted as skipped.
+    pub async fn import_entries(
+        &self,
+        book_id: String,
+        content: String,
+        format: GlossaryExchangeFormat,
+    ) -> Result<GlossaryImportReport, RuntimeError> {
+        let book = self
+            .runtime
+            .inner
+            .glossary
+            .read()
+            .await
+            .get_book(&book_id)
+            .ok_or_else(|| RuntimeError::from(format!("glossary book `{book_id}` does not exist")))?;
+        let entries = glossary_exchange::decode(&content, &book, format).map_err(RuntimeError::from)?;
+        self.commit(|store| store.import_entries(&book_id, entries))
             .await
             .map_err(Into::into)
     }
@@ -2522,6 +2593,18 @@ fn service_type_rank(service_type: ServiceType) -> u8 {
         ServiceType::Dictionary => 1,
         ServiceType::Ocr => 2,
         ServiceType::Llm => 3,
+    }
+}
+
+fn provider_supports_service(
+    provider: &dyn linguaray_core::Provider,
+    service_type: ServiceType,
+) -> bool {
+    match service_type {
+        ServiceType::Dictionary => provider.dictionary().is_some(),
+        ServiceType::Ocr => provider.ocr().is_some(),
+        ServiceType::Translation => provider.translation().is_some() || provider.llm().is_some(),
+        ServiceType::Llm => provider.llm().is_some(),
     }
 }
 

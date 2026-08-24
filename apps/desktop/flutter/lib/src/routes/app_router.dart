@@ -197,7 +197,7 @@ class _RootBodyViewState extends State<_RootBodyView>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _showInMenuBar = settingsStore.general.showInMenuBar;
+    _showInMenuBar = _effectiveTrayVisibility;
     settingsStore.addListener(_handleChanged);
     _setupTrayIcon();
     MacAppPresentation.setHandlers(
@@ -254,7 +254,7 @@ class _RootBodyViewState extends State<_RootBodyView>
     }
 
     // Handle show in menu bar toggle
-    final newShowInMenuBar = settingsStore.general.showInMenuBar;
+    final newShowInMenuBar = _effectiveTrayVisibility;
     if (newShowInMenuBar != _showInMenuBar) {
       _showInMenuBar = newShowInMenuBar;
       _trayIcon.isVisible = newShowInMenuBar;
@@ -267,6 +267,12 @@ class _RootBodyViewState extends State<_RootBodyView>
     // column as well as the registered global shortcuts.
     _trayIcon.contextMenu = _buildContextMenu();
   }
+
+  /// Windows has no Dock-style fallback for a resident application. Keeping
+  /// the notification-area icon visible guarantees there is always a way to
+  /// reopen settings even when every window is closed.
+  bool get _effectiveTrayVisibility =>
+      kIsWindows || settingsStore.general.showInMenuBar;
 
   // ────────────────────────────────────────────────────────────────────────────
   // Tray icon

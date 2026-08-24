@@ -603,6 +603,7 @@ class HistoryCatalogPreview extends StatelessWidget {
         title: '历史',
         all: '全部',
         favorites: '收藏',
+        edited: '我改过的',
         search: '搜索',
         emptyTitle: '还没有翻译历史',
         emptyDescription: '成功的翻译会保存在这里。',
@@ -611,11 +612,14 @@ class HistoryCatalogPreview extends StatelessWidget {
         retry: '重试',
         delete: '删除',
         clear: '清空',
+        exitSelection: '退出多选',
         clearConfirm: '确定清空？',
         select: '选择',
         open: '打开',
         favorite: '收藏',
         unfavorite: '取消收藏',
+        edit: '编辑',
+        selectedCount: _historySelectedCount,
       ),
       snapshot: HistorySnapshot(
         entries: empty
@@ -648,13 +652,19 @@ class HistoryCatalogPreview extends StatelessWidget {
       onFilterChanged: (_) {},
       onOpen: (_) {},
       onFavorite: (_, _) {},
+      onEdit: (_) {},
       onDelete: (_) {},
       onClear: () {},
       onRetry: () {},
       onToggleSelected: (_) {},
+      onExitSelection: _noop,
     );
   }
 }
+
+String _historySelectedCount(int count) => '已选 $count 条';
+
+void _noop() {}
 
 class UpdatesCatalogPreview extends StatelessWidget {
   const UpdatesCatalogPreview({super.key});
