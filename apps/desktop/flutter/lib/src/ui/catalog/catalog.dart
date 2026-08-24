@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:linguaray_application/linguaray_application.dart';
 
+import '../../platform/ocr_controller.dart';
+import '../../platform/platform_types.dart';
 import '../history/history_view.dart';
+import '../ocr/ocr_view.dart';
 import '../quick_translate/widgets/quick_translate_view.dart';
 import '../settings/settings_labels.dart';
 import '../settings/settings_shell_view.dart';
@@ -27,6 +30,8 @@ enum CatalogQuickScenario {
   longResult,
 }
 
+enum CatalogOcrScenario { empty, recognizing, success, continuous, error }
+
 Map<String, Widget> buildCatalogGoldenStates({
   TargetPlatform platform = TargetPlatform.macOS,
 }) {
@@ -43,6 +48,13 @@ Map<String, Widget> buildCatalogGoldenStates({
     'quick_long_result': const QuickTranslateCatalogPreview(
       scenario: CatalogQuickScenario.longResult,
     ),
+    'ocr_empty': const OcrCatalogPreview(scenario: CatalogOcrScenario.empty),
+    'ocr_success': const OcrCatalogPreview(
+      scenario: CatalogOcrScenario.success,
+    ),
+    'ocr_continuous': const OcrCatalogPreview(
+      scenario: CatalogOcrScenario.continuous,
+    ),
     'settings_translation': const SettingsCatalogPreview(
       section: SettingsSection.translation,
     ),
@@ -58,6 +70,65 @@ Map<String, Widget> buildCatalogGoldenStates({
     ),
   };
 }
+
+class OcrCatalogPreview extends StatelessWidget {
+  const OcrCatalogPreview({required this.scenario, super.key});
+
+  final CatalogOcrScenario scenario;
+
+  @override
+  Widget build(BuildContext context) {
+    final result = const OcrRecognitionResult(
+      text: 'LinguaRay keeps OCR independent from translation.',
+      source: OcrInputSource.screenRegion,
+    );
+    final continuous = scenario == CatalogOcrScenario.continuous;
+    final populated = scenario == CatalogOcrScenario.success || continuous;
+    return SizedBox(
+      width: 600,
+      height: 520,
+      child: OcrView(
+        labels: const OcrViewLabels(
+          title: 'OCR',
+          emptyTitle: '还没有识别结果',
+          emptyDescription: '可以框选屏幕区域、选择图片文件，或识别剪贴板中的图片。',
+          capture: '截图',
+          file: '图片文件',
+          clipboard: '剪贴板图片',
+          continuous: '连续识别',
+          copy: '复制',
+          clear: '清空',
+          close: '关闭',
+          resultCount: _ocrResultCount,
+          errorMessage: _catalogError,
+        ),
+        state: OcrViewState(
+          results: populated ? [result, if (continuous) result] : const [],
+          text: continuous
+              ? '${result.text}\n\n第二次识别结果会继续追加。'
+              : populated
+              ? result.text
+              : '',
+          busy: scenario == CatalogOcrScenario.recognizing,
+          continuous: continuous,
+          errorCode: scenario == CatalogOcrScenario.error ? 'ocr_empty' : null,
+        ),
+        onTextChanged: (_) {},
+        onCapture: _noop,
+        onFile: _noop,
+        onClipboard: _noop,
+        onContinuousChanged: (_) {},
+        onCopy: _noop,
+        onClear: _noop,
+        onClose: _noop,
+      ),
+    );
+  }
+}
+
+String _ocrResultCount(int count) => '$count 次结果';
+
+String _catalogError(String? code) => code ?? '识别失败';
 
 class QuickTranslateCatalogPreview extends StatelessWidget {
   const QuickTranslateCatalogPreview({required this.scenario, super.key});
@@ -254,6 +325,30 @@ class SettingsCatalogPreview extends StatelessWidget {
                     labelKey: '截图 OCR',
                     accelerator: '⌥⇧W',
                     status: ShortcutStatus.registered,
+                  ),
+                  ShortcutRecord(
+                    actionId: 'silentCaptureOcr',
+                    labelKey: '静默截图 OCR',
+                    accelerator: '',
+                    status: ShortcutStatus.unregistered,
+                  ),
+                  ShortcutRecord(
+                    actionId: 'fileOcr',
+                    labelKey: '选图 OCR',
+                    accelerator: '',
+                    status: ShortcutStatus.unregistered,
+                  ),
+                  ShortcutRecord(
+                    actionId: 'clipboardOcr',
+                    labelKey: '剪贴板 OCR',
+                    accelerator: '',
+                    status: ShortcutStatus.unregistered,
+                  ),
+                  ShortcutRecord(
+                    actionId: 'showOcrWindow',
+                    labelKey: '显示 OCR 窗口',
+                    accelerator: '',
+                    status: ShortcutStatus.unregistered,
                   ),
                 ]
               : [

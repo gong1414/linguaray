@@ -86,6 +86,10 @@
         "clipboard_translation": "剪贴板翻译",
         "show_translation_window": "显示翻译窗口",
         "capture_ocr": "截图 OCR",
+        "silent_capture_ocr": "静默截图 OCR",
+        "file_ocr": "选图 OCR",
+        "clipboard_ocr": "剪贴板 OCR",
+        "show_ocr_window": "显示 OCR 窗口",
         "preferences": "偏好设置…",
         "about": "关于 LinguaRay",
         "dev_tools": {
@@ -452,6 +456,10 @@
         "extract_text_from_screen_selection": "划词翻译",
         "extract_text_from_screen_capture": "截图翻译",
         "capture_ocr": "截图 OCR",
+        "silent_capture_ocr": "静默截图 OCR",
+        "file_ocr": "选图 OCR",
+        "clipboard_ocr": "剪贴板 OCR",
+        "show_ocr_window": "显示 OCR 窗口",
         "extract_text_from_clipboard": "剪贴板翻译",
         "translate_input": "输入翻译"
       },
@@ -461,6 +469,10 @@
         "input": "清空内容并显示翻译窗口，用于手动输入需要翻译的文本。",
         "capture": "选择屏幕区域，识别其中的文字并翻译。",
         "capture_ocr": "选择屏幕区域，只显示识别出的文字，不自动翻译。",
+        "silent_capture_ocr": "选择屏幕区域，在后台识别并把文字复制到剪贴板。",
+        "file_ocr": "选择图片文件并识别其中的文字。",
+        "clipboard_ocr": "识别当前剪贴板中的图片。",
+        "show_ocr_window": "直接显示 OCR 窗口，不开始新的识别。",
         "clipboard": "翻译当前剪贴板中的文本。"
       },
       "reset_dialog": {
@@ -760,7 +772,7 @@
       "accessibility": "辅助功能",
       "screen_recording": "屏幕录制",
       "shortcuts_title": "全局快捷键",
-      "shortcuts_body": "四个首版动作已准备好。若有冲突，可稍后在设置中修改。",
+      "shortcuts_body": "核心翻译与 OCR 动作已准备好。若有冲突，可稍后在设置中修改。",
       "services_title": "翻译服务",
       "services_body": "至少启用一个翻译服务。",
       "granted": "已授权",
@@ -792,6 +804,16 @@
       "clipboard_unavailable": "无法读取剪贴板。",
       "clipboard_restore_failed": "无法恢复之前的剪贴板内容。",
       "recheck": "重新检查"
+    },
+    "ocr": {
+      "title": "OCR",
+      "empty_title": "还没有识别结果",
+      "empty_description": "可以框选屏幕区域、选择图片文件，或识别剪贴板中的图片。",
+      "capture": "截图",
+      "file": "图片文件",
+      "clipboard": "剪贴板图片",
+      "continuous": "连续识别",
+      "result_count": "$count 次结果"
     },
     "errors": {
       "accessibility_denied": "读取选中文本需要辅助功能权限。",

@@ -1,10 +1,9 @@
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import 'package:nativeapi/nativeapi.dart';
 
 import '../services/app_windows.dart';
-import '../services/settings_store.dart';
 import 'capture_controller.dart';
+import 'ocr_controller.dart';
 import 'permission_controller.dart';
 import 'platform_types.dart';
 import 'selection_controller.dart';
@@ -25,13 +24,16 @@ class TriggerController {
   TriggerController({
     SelectionController? selection,
     CaptureController? capture,
+    OcrController? ocr,
     PermissionController? permissions,
   }) : _selection = selection ?? selectionController,
        _capture = capture ?? captureController,
+       _ocr = ocr ?? OcrController(capture: capture ?? captureController),
        _permissions = permissions ?? permissionController;
 
   final SelectionController _selection;
   final CaptureController _capture;
+  final OcrController _ocr;
   final PermissionController _permissions;
 
   final ValueNotifier<QuickWindowRequest?> quickWindowRequest = ValueNotifier(
@@ -112,22 +114,44 @@ class TriggerController {
           );
           break;
         case TriggerAction.captureAndTranslate:
-          await _captureAndOpen(autoSubmit: true);
+          await _captureAndTranslate();
           break;
         case TriggerAction.captureOcr:
-          await _captureAndOpen(autoSubmit: false);
+          await _captureOcr(silent: false);
+          break;
+        case TriggerAction.silentCaptureOcr:
+          await _captureOcr(silent: true);
+          break;
+        case TriggerAction.fileOcr:
+          await _fileOcr();
+          break;
+        case TriggerAction.clipboardOcr:
+          await _ocr.recognizeClipboard();
+          await showOcrWindow(position: ocrWindowPositionNearCursor());
+          break;
+        case TriggerAction.showOcrWindow:
+          await showOcrWindow(position: ocrWindowPositionNearCursor());
           break;
       }
     } on PlatformOperationException catch (error) {
       lastError.value = error;
-      final captureAction =
+      final dismissibleAction =
           action == TriggerAction.captureAndTranslate ||
-          action == TriggerAction.captureOcr;
-      if (!captureAction ||
-          error.code != 'capture_cancelled' && error.code != 'cancelled') {
-        await showMiniTranslatorWindow(
-          position: miniTranslatorPositionNearCursor(),
-        );
+          action == TriggerAction.captureOcr ||
+          action == TriggerAction.silentCaptureOcr ||
+          action == TriggerAction.fileOcr;
+      final cancelled =
+          error.code == 'capture_cancelled' ||
+          error.code == 'cancelled' ||
+          error.code == 'file_cancelled';
+      if (!dismissibleAction || !cancelled) {
+        if (_isOcrAction(action)) {
+          await showOcrWindow(position: ocrWindowPositionNearCursor());
+        } else {
+          await showMiniTranslatorWindow(
+            position: miniTranslatorPositionNearCursor(),
+          );
+        }
       }
     } catch (error) {
       lastError.value = PlatformOperationException(
@@ -135,53 +159,125 @@ class TriggerController {
         code: 'operationFailed',
         message: error.toString(),
       );
-      await showMiniTranslatorWindow(
-        position: miniTranslatorPositionNearCursor(),
-      );
+      if (_isOcrAction(action)) {
+        await showOcrWindow(position: ocrWindowPositionNearCursor());
+      } else {
+        await showMiniTranslatorWindow(
+          position: miniTranslatorPositionNearCursor(),
+        );
+      }
     } finally {
       await _permissions.refresh();
     }
   }
 
-  Future<void> _captureAndOpen({required bool autoSubmit}) async {
+  Future<void> _captureAndTranslate() async {
     final position = DisplayManager.instance.getCursorPosition();
     final wasSettingsVisible = isSettingsWindowOpen;
     final wasMiniVisible = isMiniTranslatorWindowVisible;
+    final wasOcrVisible = isOcrWindowVisible;
     hideMiniTranslatorWindow();
     hideSettingsWindow();
+    hideOcrWindow();
     final capture = await _capture.captureRegion();
     if (capture.cancelled) {
-      if (wasSettingsVisible) {
-        focusSettingsWindow();
-      } else if (wasMiniVisible) {
-        await showMiniTranslatorWindow(position: position);
-      }
+      await _restoreSurface(
+        position: position,
+        settings: wasSettingsVisible,
+        mini: wasMiniVisible,
+        ocr: wasOcrVisible,
+      );
       return;
     }
-    final action = autoSubmit
-        ? TriggerAction.captureAndTranslate
-        : TriggerAction.captureOcr;
-    final text = await _capture.recognize(capture, action: action);
+    final result = await _capture.recognize(
+      capture,
+      action: TriggerAction.captureAndTranslate,
+    );
     quickWindowRequest.value = QuickWindowRequest(
-      text: text,
-      submit: autoSubmit,
+      text: result.text,
+      submit: true,
       clearExisting: true,
     );
-    if (!autoSubmit && settingsStore.autoCopyDetectedText) {
-      try {
-        await Clipboard.setData(ClipboardData(text: text));
-      } catch (_) {
-        throw PlatformOperationException(
-          action: action,
-          code: 'clipboard_unavailable',
-          message: 'Recognized text could not be copied to the clipboard.',
-        );
-      }
-    }
     await showMiniTranslatorWindow(
       position: miniTranslatorPositionNearPoint(position),
     );
   }
+
+  Future<void> _captureOcr({required bool silent}) async {
+    final position = DisplayManager.instance.getCursorPosition();
+    final wasSettingsVisible = isSettingsWindowOpen;
+    final wasMiniVisible = isMiniTranslatorWindowVisible;
+    final wasOcrVisible = isOcrWindowVisible;
+    hideMiniTranslatorWindow();
+    hideSettingsWindow();
+    hideOcrWindow();
+    final capture = await _ocr.captureRegion();
+    if (capture.cancelled) {
+      await _restoreSurface(
+        position: position,
+        settings: wasSettingsVisible,
+        mini: wasMiniVisible,
+        ocr: wasOcrVisible,
+      );
+      return;
+    }
+    await _ocr.recognizeCapture(
+      capture,
+      action: silent
+          ? TriggerAction.silentCaptureOcr
+          : TriggerAction.captureOcr,
+      forceCopy: silent,
+    );
+    if (silent) {
+      await _restoreSurface(
+        position: position,
+        settings: wasSettingsVisible,
+        mini: wasMiniVisible,
+        ocr: wasOcrVisible,
+      );
+      return;
+    }
+    await showOcrWindow(position: ocrWindowPositionNearPoint(position));
+  }
+
+  Future<void> _fileOcr() async {
+    final wasOcrVisible = isOcrWindowVisible;
+    try {
+      await _ocr.recognizeFile();
+      await showOcrWindow(position: ocrWindowPositionNearCursor());
+    } on PlatformOperationException catch (error) {
+      if (error.code == 'file_cancelled' && wasOcrVisible) {
+        await showOcrWindow(position: ocrWindowPositionNearCursor());
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> _restoreSurface({
+    required Offset position,
+    required bool settings,
+    required bool mini,
+    required bool ocr,
+  }) async {
+    if (settings) {
+      focusSettingsWindow();
+    } else if (mini) {
+      await showMiniTranslatorWindow(
+        position: miniTranslatorPositionNearPoint(position),
+      );
+    } else if (ocr) {
+      await showOcrWindow(position: ocrWindowPositionNearPoint(position));
+    }
+  }
+
+  bool _isOcrAction(TriggerAction action) => switch (action) {
+    TriggerAction.captureOcr ||
+    TriggerAction.silentCaptureOcr ||
+    TriggerAction.fileOcr ||
+    TriggerAction.clipboardOcr ||
+    TriggerAction.showOcrWindow => true,
+    _ => false,
+  };
 }
 
-final triggerController = TriggerController();
+final triggerController = TriggerController(ocr: ocrController);

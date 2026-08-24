@@ -909,7 +909,13 @@ class OcrSettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => _ShortcutsSettingsScreen(
     title: t.settings.navigation.ocr_settings,
-    actionIds: const {'captureOcr'},
+    actionIds: const {
+      'captureOcr',
+      'silentCaptureOcr',
+      'fileOcr',
+      'clipboardOcr',
+      'showOcrWindow',
+    },
     preferenceKind: _PreferenceKind.ocr,
   );
 }

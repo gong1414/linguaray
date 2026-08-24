@@ -61,6 +61,10 @@ class SettingsStore extends ChangeNotifier {
     extractTextFromScreenSelection: '',
     extractTextFromScreenCapture: '',
     captureOcr: '',
+    silentCaptureOcr: '',
+    fileOcr: '',
+    clipboardOcr: '',
+    showOcrWindow: '',
     extractTextFromClipboard: '',
     translateInputContent: '',
   );

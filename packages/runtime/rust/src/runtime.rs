@@ -2437,6 +2437,22 @@ impl RuntimeOcr {
     ) -> Result<RecognizeTextResponse, RuntimeError> {
         self.recognize_text_impl(request).await.map_err(Into::into)
     }
+
+    /// Recognizes an image currently stored in the system clipboard.
+    pub async fn recognize_clipboard_image(
+        &self,
+    ) -> Result<RecognizeTextResponse, RuntimeError> {
+        let image = text_extractor::extract_image_from_clipboard()
+            .map_err(|error| RuntimeError::Error {
+                msg: error.to_string(),
+            })?;
+        self.recognize_text_impl(RecognizeTextRequest {
+            image_path: None,
+            base64_image: Some(image),
+        })
+        .await
+        .map_err(Into::into)
+    }
 }
 
 #[uniffi::export(async_runtime = "tokio")]
@@ -2493,87 +2509,6 @@ impl RuntimeTextExtractor {
         text_extractor::extract_from_screen_selection_detailed()
             .map_err(|e| RuntimeError::Error { msg: e.to_string() })
     }
-
-    /// Capture a screenshot and recognize text using the default OCR service.
-    ///
-    /// 1. Interactively captures a screen region with the legacy macOS
-    ///    `screencapture` path. The Flutter platform layer owns the current
-    ///    cross-platform capture workflow.
-    /// 2. Sends the captured image to the configured default OCR service.
-    /// 3. Returns the recognized text.
-    ///
-    /// The user must have a default OCR service configured in settings.
-    pub async fn extract_from_screen_capture(&self) -> Result<String, RuntimeError> {
-        let runtime = self.runtime.clone();
-
-        // 1. Take a screenshot to a temporary file.
-        let image_path =
-            capture_screenshot().map_err(|e| RuntimeError::Error { msg: e.to_string() })?;
-
-        // 2. Read settings to get the default OCR service ID.
-        let service_id = {
-            let state = runtime.inner.state.read().await;
-            let ocr_service_id = state.settings.general.default_ocr_service.clone();
-            if ocr_service_id.is_empty() {
-                return Err(RuntimeError::Error {
-                    msg: "no default OCR service configured".into(),
-                });
-            }
-            ocr_service_id
-        };
-
-        // 3. Run OCR on the worker thread.
-        let result = run_on_worker_thread(move || async move {
-            let resolved = runtime
-                .resolve_service(&service_id, ServiceType::Ocr)
-                .await?;
-            let provider_id = resolved.provider_id;
-            let provider = {
-                let state = runtime.inner.state.read().await;
-                state
-                    .engine
-                    .require(&provider_id)
-                    .map_err(|error| error.to_string())?
-                    .clone()
-            };
-            let ocr_service = provider
-                .ocr()
-                .ok_or_else(|| format!("provider `{provider_id}` does not support ocr"))?;
-
-            let request = RecognizeTextRequest {
-                image_path: Some(image_path),
-                base64_image: None,
-            };
-
-            let response = ocr_service
-                .recognize_text(request)
-                .await
-                .map_err(|error| error.to_string())?;
-
-            Ok(response.text)
-        })
-        .await;
-
-        result.map_err(|e| RuntimeError::Error { msg: e })
-    }
-}
-
-/// Capture a screenshot of a selected screen region and return the path.
-///
-/// Creates a temporary PNG file, invokes the platform-specific screen
-/// capture command, and returns the path to the saved image.
-fn capture_screenshot() -> Result<String, String> {
-    let timestamp = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis();
-    let file_name = format!("linguaray-screenshot-{timestamp}.png");
-    let path = std::env::temp_dir().join(&file_name);
-    let path_str = path
-        .to_str()
-        .ok_or_else(|| "failed to convert screenshot path to string".to_owned())?;
-
-    text_extractor::capture_screen(path_str).map_err(|e| format!("screen capture failed: {e}"))
 }
 
 fn normalized_provider_entry(

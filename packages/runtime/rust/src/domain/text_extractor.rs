@@ -10,6 +10,8 @@
 
 use std::fmt;
 
+use base64::Engine as _;
+
 #[derive(Clone, Debug, uniffi::Record)]
 pub struct SelectionExtraction {
     pub text: String,
@@ -43,6 +45,52 @@ impl fmt::Display for TextExtractorError {
 
 impl std::error::Error for TextExtractorError {}
 
+/// Returns the current clipboard image as a base64-encoded PNG. The public
+/// OCR boundary deals in ordinary encoded images rather than platform-native
+/// BGRA/RGBA buffers.
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+pub fn extract_image_from_clipboard() -> Result<String, TextExtractorError> {
+    let mut clipboard = arboard::Clipboard::new()
+        .map_err(|error| TextExtractorError::OperationFailed(error.to_string()))?;
+    let image = clipboard
+        .get_image()
+        .map_err(|error| TextExtractorError::OperationFailed(error.to_string()))?;
+    encode_rgba_png(image.width, image.height, image.bytes.as_ref())
+}
+
+fn encode_rgba_png(
+    width: usize,
+    height: usize,
+    bytes: &[u8],
+) -> Result<String, TextExtractorError> {
+    let expected = width.saturating_mul(height).saturating_mul(4);
+    if width == 0 || height == 0 || bytes.len() != expected {
+        return Err(TextExtractorError::OperationFailed(
+            "clipboard image has invalid RGBA dimensions".to_owned(),
+        ));
+    }
+    let mut encoded = Vec::new();
+    {
+        let mut encoder = png::Encoder::new(&mut encoded, width as u32, height as u32);
+        encoder.set_color(png::ColorType::Rgba);
+        encoder.set_depth(png::BitDepth::Eight);
+        let mut writer = encoder
+            .write_header()
+            .map_err(|error| TextExtractorError::OperationFailed(error.to_string()))?;
+        writer
+            .write_image_data(bytes)
+            .map_err(|error| TextExtractorError::OperationFailed(error.to_string()))?;
+    }
+    Ok(base64::engine::general_purpose::STANDARD.encode(encoded))
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+pub fn extract_image_from_clipboard() -> Result<String, TextExtractorError> {
+    Err(TextExtractorError::UnsupportedMethod(
+        "clipboard image OCR is supported on macOS and Windows".to_owned(),
+    ))
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 //  macOS
 // ═══════════════════════════════════════════════════════════════════════════
@@ -51,7 +99,6 @@ impl std::error::Error for TextExtractorError {}
 mod platform {
     use std::borrow::Cow;
     use std::ffi::{c_char, c_void, CStr, CString};
-    use std::process::Command;
     use std::ptr::null_mut;
     use std::thread;
     use std::time::{Duration, Instant};
@@ -253,32 +300,6 @@ mod platform {
         })
     }
 
-    /// Capture a screenshot of a selected screen region.
-    ///
-    /// Uses the built-in `screencapture` CLI tool in interactive mode.
-    /// The user selects a region, and the image is saved to `path`.
-    /// Returns the path on success.
-    pub fn capture_screen(path: &str) -> Result<String, TextExtractorError> {
-        let output = Command::new("screencapture")
-            .args(["-i", "-x", path])
-            .output()
-            .map_err(|e| {
-                TextExtractorError::OperationFailed(format!("failed to run screencapture: {e}"))
-            })?;
-
-        if output.status.success() && std::path::Path::new(path).exists() {
-            Ok(path.to_owned())
-        } else {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            if stderr.contains("canceled") || stderr.contains("Cancelled") {
-                Err(TextExtractorError::NoTextSelected)
-            } else {
-                Err(TextExtractorError::OperationFailed(format!(
-                    "screencapture failed: {stderr}"
-                )))
-            }
-        }
-    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -595,26 +616,6 @@ pub fn extract_from_clipboard() -> Result<String, TextExtractorError> {
     }
 }
 
-/// Capture a screenshot of a selected screen region and return the image path.
-///
-/// **macOS:** Uses `screencapture -i` (interactive region selection).
-/// **Windows:** Not supported (returns [`TextExtractorError::UnsupportedMethod`]).
-///
-/// The user interactively selects a screen region. The resulting image is
-/// saved to `path`, which is then returned on success.
-pub fn capture_screen(path: &str) -> Result<String, TextExtractorError> {
-    #[cfg(target_os = "macos")]
-    {
-        platform::capture_screen(path)
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-        let _ = path;
-        Err(TextExtractorError::UnsupportedMethod(
-            "screen capture is not supported on this platform".into(),
-        ))
-    }
-}
 
 /// Extract text from the current screen selection.
 ///
@@ -635,5 +636,26 @@ pub fn extract_from_screen_selection_detailed() -> Result<SelectionExtraction, T
         Err(TextExtractorError::UnsupportedMethod(
             "screen text extraction is not supported on this platform".into(),
         ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use base64::Engine as _;
+
+    use super::encode_rgba_png;
+
+    #[test]
+    fn clipboard_rgba_is_encoded_as_png() {
+        let encoded = encode_rgba_png(1, 1, &[255, 0, 0, 255]).unwrap();
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(encoded)
+            .unwrap();
+        assert_eq!(&bytes[..8], b"\x89PNG\r\n\x1a\n");
+    }
+
+    #[test]
+    fn clipboard_rgba_rejects_invalid_dimensions() {
+        assert!(encode_rgba_png(2, 1, &[0; 4]).is_err());
     }
 }

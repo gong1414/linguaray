@@ -11,6 +11,10 @@ enum TriggerAction {
   translateInput,
   captureAndTranslate,
   captureOcr,
+  silentCaptureOcr,
+  fileOcr,
+  clipboardOcr,
+  showOcrWindow,
 }
 
 enum ShortcutRegistrationState { unregistered, registered, conflict, invalid }
@@ -64,6 +68,29 @@ class CaptureResult {
 
   bool get succeeded =>
       !cancelled && failureReason == null && imagePath?.isNotEmpty == true;
+}
+
+enum OcrInputSource { screenRegion, file, clipboard }
+
+class OcrTextBlock {
+  const OcrTextBlock({required this.text, this.bounds});
+
+  final String text;
+  final Rect? bounds;
+}
+
+class OcrRecognitionResult {
+  const OcrRecognitionResult({
+    required this.text,
+    required this.source,
+    this.blocks = const [],
+    this.imagePath,
+  });
+
+  final String text;
+  final OcrInputSource source;
+  final List<OcrTextBlock> blocks;
+  final String? imagePath;
 }
 
 abstract interface class SecretStore {

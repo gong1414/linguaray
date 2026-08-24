@@ -86,6 +86,10 @@
         "clipboard_translation": "Clipboard Translation",
         "show_translation_window": "Show Translation Window",
         "capture_ocr": "Screenshot OCR",
+        "silent_capture_ocr": "Silent Screenshot OCR",
+        "file_ocr": "Image File OCR",
+        "clipboard_ocr": "Clipboard OCR",
+        "show_ocr_window": "Show OCR Window",
         "preferences": "Preferences...",
         "about": "About LinguaRay",
         "dev_tools": {
@@ -452,6 +456,10 @@
         "extract_text_from_screen_selection": "Selection Translation",
         "extract_text_from_screen_capture": "Screenshot Translation",
         "capture_ocr": "Screenshot OCR",
+        "silent_capture_ocr": "Silent Screenshot OCR",
+        "file_ocr": "Image File OCR",
+        "clipboard_ocr": "Clipboard OCR",
+        "show_ocr_window": "Show OCR Window",
         "extract_text_from_clipboard": "Clipboard Translation",
         "translate_input": "Input Translation"
       },
@@ -461,6 +469,10 @@
         "input": "Clear the translation window and open it for manual input.",
         "capture": "Select a screen region, recognize its text, and translate it.",
         "capture_ocr": "Select a screen region and show only the recognized text.",
+        "silent_capture_ocr": "Select a screen region, recognize it in the background, and copy the text.",
+        "file_ocr": "Choose an image file and recognize its text.",
+        "clipboard_ocr": "Recognize an image currently stored in the clipboard.",
+        "show_ocr_window": "Show the OCR window without starting a new recognition.",
         "clipboard": "Translate text currently stored in the clipboard."
       },
       "reset_dialog": {
@@ -760,7 +772,7 @@
       "accessibility": "Accessibility",
       "screen_recording": "Screen Recording",
       "shortcuts_title": "Global shortcuts",
-      "shortcuts_body": "The four first-release actions are ready. Conflicts can be fixed later in Settings.",
+      "shortcuts_body": "Core translation and OCR actions are ready. Conflicts can be fixed later in Settings.",
       "services_title": "Translation services",
       "services_body": "Enable at least one translation service.",
       "granted": "Granted",
@@ -792,6 +804,16 @@
       "clipboard_unavailable": "The clipboard could not be read.",
       "clipboard_restore_failed": "The previous clipboard contents could not be restored.",
       "recheck": "Recheck"
+    },
+    "ocr": {
+      "title": "OCR",
+      "empty_title": "No recognized text yet",
+      "empty_description": "Capture a region, choose an image, or recognize an image from the clipboard.",
+      "capture": "Capture",
+      "file": "Image file",
+      "clipboard": "Clipboard image",
+      "continuous": "Continuous",
+      "result_count": "$count results"
     },
     "errors": {
       "accessibility_denied": "Accessibility permission is required to read selected text.",

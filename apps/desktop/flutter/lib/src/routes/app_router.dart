@@ -20,6 +20,7 @@ import '../services/runtime.dart' show runtimeDataDirectory;
 import '../services/settings_store.dart';
 import '../services/shortcut_service/shortcut_service.dart';
 import '../ui/quick_translate/quick_translate_screen.dart';
+import '../ui/ocr/ocr_screen.dart';
 import '../utils/env.dart';
 import '../utils/language_util.dart';
 import '../widgets/toast_host.dart';
@@ -130,6 +131,44 @@ class MiniTranslatorApp extends StatefulWidget {
 
   @override
   State<MiniTranslatorApp> createState() => _MiniTranslatorAppState();
+}
+
+class OcrApp extends StatefulWidget {
+  const OcrApp({super.key});
+
+  @override
+  State<OcrApp> createState() => _OcrAppState();
+}
+
+class _OcrAppState extends State<OcrApp> {
+  @override
+  void initState() {
+    super.initState();
+    settingsStore.addListener(_onSettingsChanged);
+  }
+
+  @override
+  void dispose() {
+    settingsStore.removeListener(_onSettingsChanged);
+    super.dispose();
+  }
+
+  void _onSettingsChanged() => setState(() {});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: kOcrWindowTitle,
+      theme: LinguaRayMaterialTheme.light(),
+      darkTheme: LinguaRayMaterialTheme.dark(),
+      themeMode: settingsStore.themeMode,
+      localizationsDelegates: context.localizationDelegates,
+      supportedLocales: context.supportedLocales,
+      locale: context.locale,
+      home: const OcrScreen(),
+    );
+  }
 }
 
 class _MiniTranslatorAppState extends State<MiniTranslatorApp> {
@@ -338,6 +377,30 @@ class _RootBodyViewState extends State<_RootBodyView>
       () => triggerController.trigger(TriggerAction.captureOcr),
       shortcut: shortcuts.captureOcr,
     );
+    _addTrayAction(
+      menu,
+      labels.silent_capture_ocr,
+      () => triggerController.trigger(TriggerAction.silentCaptureOcr),
+      shortcut: shortcuts.silentCaptureOcr,
+    );
+    _addTrayAction(
+      menu,
+      labels.file_ocr,
+      () => triggerController.trigger(TriggerAction.fileOcr),
+      shortcut: shortcuts.fileOcr,
+    );
+    _addTrayAction(
+      menu,
+      labels.clipboard_ocr,
+      () => triggerController.trigger(TriggerAction.clipboardOcr),
+      shortcut: shortcuts.clipboardOcr,
+    );
+    _addTrayAction(
+      menu,
+      labels.show_ocr_window,
+      () => triggerController.trigger(TriggerAction.showOcrWindow),
+      shortcut: shortcuts.showOcrWindow,
+    );
 
     menu.addSeparator();
     _addTrayAction(
@@ -415,6 +478,7 @@ class _RootBodyViewState extends State<_RootBodyView>
         AppSurface.miniTranslator => const MiniTranslatorApp(
           key: ValueKey(AppSurface.miniTranslator),
         ),
+        AppSurface.ocr => const OcrApp(key: ValueKey(AppSurface.ocr)),
       },
     );
   }

@@ -81,6 +81,10 @@ class ShortcutService extends ChangeNotifier {
           shortcuts.extractTextFromScreenSelection,
       TriggerAction.captureAndTranslate: shortcuts.extractTextFromScreenCapture,
       TriggerAction.captureOcr: shortcuts.captureOcr,
+      TriggerAction.silentCaptureOcr: shortcuts.silentCaptureOcr,
+      TriggerAction.fileOcr: shortcuts.fileOcr,
+      TriggerAction.clipboardOcr: shortcuts.clipboardOcr,
+      TriggerAction.showOcrWindow: shortcuts.showOcrWindow,
       TriggerAction.translateInput: shortcuts.extractTextFromClipboard,
       TriggerAction.openInputWindow: shortcuts.translateInputContent,
     };

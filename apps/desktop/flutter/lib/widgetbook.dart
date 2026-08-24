@@ -58,6 +58,13 @@ void main() {
             pixelRatio: 2,
             platform: TargetPlatform.macOS,
           ),
+          ViewportData(
+            name: 'OCR window',
+            width: 600,
+            height: 520,
+            pixelRatio: 2,
+            platform: TargetPlatform.macOS,
+          ),
         ]),
       ],
     ),
@@ -91,6 +98,16 @@ final _catalog = WidgetbookCategory(
           WidgetbookUseCase(
             name: scenario.name,
             builder: (_) => QuickTranslateCatalogPreview(scenario: scenario),
+          ),
+      ],
+    ),
+    WidgetbookComponent(
+      name: 'OCR',
+      useCases: [
+        for (final scenario in CatalogOcrScenario.values)
+          WidgetbookUseCase(
+            name: scenario.name,
+            builder: (_) => OcrCatalogPreview(scenario: scenario),
           ),
       ],
     ),

@@ -246,6 +246,10 @@ String shortcutActionLabel(String actionId) => switch (actionId) {
   'captureAndTranslate' =>
     t.settings.shortcuts.row.extract_text_from_screen_capture,
   'captureOcr' => t.settings.shortcuts.row.capture_ocr,
+  'silentCaptureOcr' => t.settings.shortcuts.row.silent_capture_ocr,
+  'fileOcr' => t.settings.shortcuts.row.file_ocr,
+  'clipboardOcr' => t.settings.shortcuts.row.clipboard_ocr,
+  'showOcrWindow' => t.settings.shortcuts.row.show_ocr_window,
   'translateInput' => t.settings.shortcuts.row.extract_text_from_clipboard,
   _ => actionId,
 };
@@ -257,6 +261,10 @@ String shortcutActionDescription(String actionId) => switch (actionId) {
   'openInputWindow' => t.settings.shortcuts.description.input,
   'captureAndTranslate' => t.settings.shortcuts.description.capture,
   'captureOcr' => t.settings.shortcuts.description.capture_ocr,
+  'silentCaptureOcr' => t.settings.shortcuts.description.silent_capture_ocr,
+  'fileOcr' => t.settings.shortcuts.description.file_ocr,
+  'clipboardOcr' => t.settings.shortcuts.description.clipboard_ocr,
+  'showOcrWindow' => t.settings.shortcuts.description.show_ocr_window,
   'translateInput' => t.settings.shortcuts.description.clipboard,
   _ => '',
 };

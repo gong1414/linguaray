@@ -16,10 +16,13 @@ import 'dock_icon_controller.dart';
 
 const kSettingsWindowTitle = 'LinguaRay';
 const kMiniTranslatorWindowTitle = 'LinguaRay Quick Translate';
+const kOcrWindowTitle = 'LinguaRay OCR';
 const _kSettingsWindowSize = Size(1000, 700);
 const _kSettingsWindowMinimumSize = Size(780, 520);
 const _kMiniTranslatorInitialSize = Size(396, 420);
 const _kMiniTranslatorMinimumSize = Size(396, 180);
+const _kOcrWindowSize = Size(600, 520);
+const _kOcrWindowMinimumSize = Size(440, 300);
 const _kMiniTranslatorTrayGap = 10.0;
 const _kMiniTranslatorCursorGap = 12.0;
 
@@ -28,7 +31,7 @@ String _pendingSettingsLocation = '/settings/translation';
 bool _settingsWindowConfigured = false;
 int _surfaceSwitchGeneration = 0;
 
-enum AppSurface { settings, miniTranslator }
+enum AppSurface { settings, miniTranslator, ocr }
 
 AppSurface _requestedSurface = AppSurface.settings;
 
@@ -63,6 +66,7 @@ class AppWindowController {
 
 const settingsWindowController = AppWindowController();
 const miniTranslatorWindowController = AppWindowController();
+const ocrWindowController = AppWindowController();
 
 enum SettingsDestination {
   settingsTranslation('/settings/translation'),
@@ -238,6 +242,55 @@ bool get isMiniTranslatorWindowVisible =>
     appSurface.value == AppSurface.miniTranslator &&
     miniTranslatorWindowController.window.isVisible;
 
+Future<void> showOcrWindow({Offset? position, Rect? trayBounds}) async {
+  final window = ocrWindowController.window;
+  _surfaceSwitchGeneration++;
+  _requestedSurface = AppSurface.ocr;
+  final switchedSurface = appSurface.value != AppSurface.ocr;
+  if (switchedSurface) {
+    window.opacity = 0;
+    if (!window.isVisible) window.showInactive();
+    appSurface.value = AppSurface.ocr;
+    WidgetsBinding.instance.scheduleFrame();
+    await WidgetsBinding.instance.endOfFrame;
+  }
+
+  window.title = kOcrWindowTitle;
+  window.titleBarStyle = TitleBarStyle.hidden;
+  window.windowControlButtonsVisible = false;
+  window.isResizable = true;
+  window.setMinimumSize(
+    _kOcrWindowMinimumSize.width,
+    _kOcrWindowMinimumSize.height,
+  );
+  if (switchedSurface) {
+    window.setSize(_kOcrWindowSize.width, _kOcrWindowSize.height);
+  }
+  final newPosition =
+      position ??
+      (trayBounds != null
+          ? _miniTranslatorPositionBelowTray(
+              trayBounds,
+              windowSize: _kOcrWindowSize,
+            )
+          : null);
+  if (newPosition != null) {
+    window.setPosition(newPosition.dx, newPosition.dy);
+  }
+  window.opacity = 1;
+  window.show();
+  window.focus();
+  dockIconController.setSettingsWindowVisible(false);
+}
+
+void hideOcrWindow() {
+  if (appSurface.value != AppSurface.ocr) return;
+  ocrWindowController.window.hide();
+}
+
+bool get isOcrWindowVisible =>
+    appSurface.value == AppSurface.ocr && ocrWindowController.window.isVisible;
+
 Offset? _miniTranslatorPositionBelowTray(Rect trayBounds, {Size? windowSize}) {
   final size = windowSize ?? _kMiniTranslatorInitialSize;
   final anchor = _resolveTrayAnchor(trayBounds);
@@ -289,6 +342,12 @@ Offset? miniTranslatorPositionNearCursor({Size? windowSize}) =>
       DisplayManager.instance.getCursorPosition(),
       windowSize: windowSize,
     );
+
+Offset? ocrWindowPositionNearPoint(Offset point) =>
+    miniTranslatorPositionNearPoint(point, windowSize: _kOcrWindowSize);
+
+Offset? ocrWindowPositionNearCursor() =>
+    ocrWindowPositionNearPoint(DisplayManager.instance.getCursorPosition());
 
 /// Compatibility alias retained for upstream callers.
 Offset? miniTranslatorPositionAtCursorScreenTopRight({Size? windowSize}) =>

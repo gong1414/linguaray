@@ -11,6 +11,10 @@ const kShortcutSelection = 'translateSelection';
 const kShortcutInput = 'openInputWindow';
 const kShortcutCapture = 'captureAndTranslate';
 const kShortcutCaptureOcr = 'captureOcr';
+const kShortcutSilentCaptureOcr = 'silentCaptureOcr';
+const kShortcutFileOcr = 'fileOcr';
+const kShortcutClipboardOcr = 'clipboardOcr';
+const kShortcutShowOcrWindow = 'showOcrWindow';
 const kShortcutClipboard = 'translateInput';
 
 final class RuntimeShortcutRepository implements ShortcutRepository {
@@ -63,6 +67,26 @@ final class RuntimeShortcutRepository implements ShortcutRepository {
         kShortcutCaptureOcr,
         _store.shortcuts.captureOcr,
         byAction[TriggerAction.captureOcr],
+      ),
+      _record(
+        kShortcutSilentCaptureOcr,
+        _store.shortcuts.silentCaptureOcr,
+        byAction[TriggerAction.silentCaptureOcr],
+      ),
+      _record(
+        kShortcutFileOcr,
+        _store.shortcuts.fileOcr,
+        byAction[TriggerAction.fileOcr],
+      ),
+      _record(
+        kShortcutClipboardOcr,
+        _store.shortcuts.clipboardOcr,
+        byAction[TriggerAction.clipboardOcr],
+      ),
+      _record(
+        kShortcutShowOcrWindow,
+        _store.shortcuts.showOcrWindow,
+        byAction[TriggerAction.showOcrWindow],
       ),
     ];
   }
@@ -117,6 +141,14 @@ final class RuntimeShortcutRepository implements ShortcutRepository {
         extractTextFromScreenCapture: accelerator,
       ),
       kShortcutCaptureOcr => ShortcutSettingsPatch(captureOcr: accelerator),
+      kShortcutSilentCaptureOcr => ShortcutSettingsPatch(
+        silentCaptureOcr: accelerator,
+      ),
+      kShortcutFileOcr => ShortcutSettingsPatch(fileOcr: accelerator),
+      kShortcutClipboardOcr => ShortcutSettingsPatch(clipboardOcr: accelerator),
+      kShortcutShowOcrWindow => ShortcutSettingsPatch(
+        showOcrWindow: accelerator,
+      ),
       kShortcutClipboard => ShortcutSettingsPatch(
         extractTextFromClipboard: accelerator,
       ),

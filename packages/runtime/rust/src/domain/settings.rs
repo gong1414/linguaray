@@ -32,6 +32,14 @@ pub struct ShortcutSettings {
     pub extract_text_from_screen_capture: String,
     #[serde(default = "default_capture_ocr_shortcut", rename = "captureOcr")]
     pub capture_ocr: String,
+    #[serde(default, rename = "silentCaptureOcr")]
+    pub silent_capture_ocr: String,
+    #[serde(default, rename = "fileOcr")]
+    pub file_ocr: String,
+    #[serde(default, rename = "clipboardOcr")]
+    pub clipboard_ocr: String,
+    #[serde(default, rename = "showOcrWindow")]
+    pub show_ocr_window: String,
     #[serde(
         default = "default_extract_text_from_clipboard_shortcut",
         rename = "extractTextFromClipboard",
@@ -53,6 +61,10 @@ impl Default for ShortcutSettings {
             ),
             extract_text_from_screen_capture: default_extract_text_from_screen_capture_shortcut(),
             capture_ocr: default_capture_ocr_shortcut(),
+            silent_capture_ocr: String::new(),
+            file_ocr: String::new(),
+            clipboard_ocr: String::new(),
+            show_ocr_window: String::new(),
             extract_text_from_clipboard: default_extract_text_from_clipboard_shortcut(),
             translate_input_content: default_translate_input_content_shortcut(),
         }

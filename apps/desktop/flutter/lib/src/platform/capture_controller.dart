@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:file_selector/file_selector.dart';
 import 'package:nativeapi/nativeapi.dart';
 import 'package:screen_capturer/screen_capturer.dart';
 
@@ -54,7 +55,7 @@ class CaptureController {
     }
   }
 
-  Future<String> recognize(
+  Future<OcrRecognitionResult> recognize(
     CaptureResult capture, {
     TriggerAction action = TriggerAction.captureAndTranslate,
   }) async {
@@ -67,36 +68,16 @@ class CaptureController {
     }
 
     try {
-      final configured = settingsStore.defaultOcrService.trim();
-      String? fallback;
-      for (final service in settingsStore.services) {
-        if (service.type == ServiceType.ocr) {
-          fallback = service.id;
-          break;
-        }
-      }
-      final serviceId = configured.isNotEmpty ? configured : fallback;
-      if (serviceId == null || serviceId.isEmpty) {
-        throw PlatformOperationException(
-          action: action,
-          code: 'ocr_not_configured',
-          message: 'No OCR service is configured.',
-        );
-      }
-
       final response = await runtime
-          .ocr(providerId: serviceId)
+          .ocr(providerId: _ocrServiceId(action))
           .recognizeText(
             request: RecognizeTextRequest(imagePath: capture.imagePath),
           );
-      if (response.text.trim().isEmpty) {
-        throw PlatformOperationException(
-          action: action,
-          code: 'ocr_empty',
-          message: 'No text was found in the selected region.',
-        );
-      }
-      return response.text;
+      return _result(
+        response,
+        action: action,
+        source: OcrInputSource.screenRegion,
+      );
     } finally {
       final imagePath = capture.imagePath;
       if (imagePath != null) {
@@ -107,6 +88,123 @@ class CaptureController {
         }
       }
     }
+  }
+
+  Future<OcrRecognitionResult> recognizeImageFile({
+    required TriggerAction action,
+  }) async {
+    final file = await openFile(
+      acceptedTypeGroups: const [
+        XTypeGroup(
+          label: 'Images',
+          extensions: [
+            'png',
+            'jpg',
+            'jpeg',
+            'webp',
+            'bmp',
+            'gif',
+            'tif',
+            'tiff',
+            'heic',
+          ],
+        ),
+      ],
+    );
+    if (file == null) {
+      throw PlatformOperationException(
+        action: action,
+        code: 'file_cancelled',
+        message: 'Image selection was cancelled.',
+      );
+    }
+    final response = await runtime
+        .ocr(providerId: _ocrServiceId(action))
+        .recognizeText(request: RecognizeTextRequest(imagePath: file.path));
+    return _result(
+      response,
+      action: action,
+      source: OcrInputSource.file,
+      imagePath: file.path,
+    );
+  }
+
+  Future<OcrRecognitionResult> recognizeClipboardImage({
+    required TriggerAction action,
+  }) async {
+    try {
+      final response = await runtime
+          .ocr(providerId: _ocrServiceId(action))
+          .recognizeClipboardImage();
+      return _result(
+        response,
+        action: action,
+        source: OcrInputSource.clipboard,
+      );
+    } on PlatformOperationException {
+      rethrow;
+    } catch (error) {
+      throw PlatformOperationException(
+        action: action,
+        code: 'clipboard_unavailable',
+        message: error.toString(),
+      );
+    }
+  }
+
+  String _ocrServiceId(TriggerAction action) {
+    final configured = settingsStore.defaultOcrService.trim();
+    String? fallback;
+    for (final service in settingsStore.services) {
+      if (service.type == ServiceType.ocr) {
+        fallback = service.id;
+        break;
+      }
+    }
+    final serviceId = configured.isNotEmpty ? configured : fallback;
+    if (serviceId == null || serviceId.isEmpty) {
+      throw PlatformOperationException(
+        action: action,
+        code: 'ocr_not_configured',
+        message: 'No OCR service is configured.',
+      );
+    }
+    return serviceId;
+  }
+
+  OcrRecognitionResult _result(
+    RecognizeTextResponse response, {
+    required TriggerAction action,
+    required OcrInputSource source,
+    String? imagePath,
+  }) {
+    final text = response.text.trim();
+    if (text.isEmpty) {
+      throw PlatformOperationException(
+        action: action,
+        code: 'ocr_empty',
+        message: 'No text was found in the image.',
+      );
+    }
+    return OcrRecognitionResult(
+      text: text,
+      source: source,
+      imagePath: imagePath,
+      blocks: [
+        for (final recognition in response.recognitions ?? const [])
+          OcrTextBlock(
+            text: recognition.text,
+            bounds: recognition.recognizedRect == null
+                ? null
+                : Rect.fromLTWH(
+                    recognition.recognizedRect!.x,
+                    recognition.recognizedRect!.y,
+                    recognition.recognizedRect!.width,
+                    recognition.recognizedRect!.height,
+                  ),
+          ),
+      ],
+    );
   }
 
   Display? _displayAt(Offset position) {
