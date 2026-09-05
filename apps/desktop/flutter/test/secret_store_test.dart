@@ -1,6 +1,8 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:linguaray_desktop/src/app/dependencies.dart';
+import 'package:linguaray_desktop/src/platform/credentials/secret_store.dart';
 import 'package:linguaray_desktop/src/platform/platform_types.dart';
-import 'package:linguaray_desktop/src/platform/secret_store.dart';
 
 class _MemorySecretStore implements SecretStore {
   final values = <String, String>{};
@@ -8,35 +10,35 @@ class _MemorySecretStore implements SecretStore {
   String _key(String providerId, String field) => '$providerId::$field';
 
   @override
-  void delete({required String providerId, required String field}) {
+  Future<void> delete({
+    required String providerId,
+    required String field,
+  }) async {
     values.remove(_key(providerId, field));
   }
 
   @override
-  void deleteProvider(String providerId) {
-    values.removeWhere((key, _) => key.startsWith('$providerId::'));
-  }
+  Future<String?> read({
+    required String providerId,
+    required String field,
+  }) async => values[_key(providerId, field)];
 
   @override
-  String? read({required String providerId, required String field}) =>
-      values[_key(providerId, field)];
-
-  @override
-  void write({
+  Future<void> write({
     required String providerId,
     required String field,
     required String value,
-  }) {
+  }) async {
     values[_key(providerId, field)] = value;
   }
 }
 
 void main() {
-  test('replaces provider secrets with opaque references', () {
+  test('replaces provider secrets with opaque references', () async {
     final store = _MemorySecretStore();
     final controller = ProviderCredentialsController(store: store);
 
-    final fields = controller.protectFields(
+    final fields = await controller.protectFields(
       providerId: 'openai',
       fields: const {
         'apiKey': 'sk-plaintext',
@@ -50,13 +52,13 @@ void main() {
     expect(fields['baseUrl'], 'https://example.test');
   });
 
-  test('blank edit preserves the existing secret reference', () {
+  test('blank edit preserves the existing secret reference', () async {
     final controller = ProviderCredentialsController(
       store: _MemorySecretStore(),
     );
     const reference = 'linguaray-secret://openai/apiKey';
 
-    final fields = controller.protectFields(
+    final fields = await controller.protectFields(
       providerId: 'openai',
       fields: const {'apiKey': ''},
       existingFields: const {'apiKey': reference},
@@ -65,13 +67,13 @@ void main() {
     expect(fields['apiKey'], reference);
   });
 
-  test('untouched edit preserves a secret omitted from the draft', () {
+  test('untouched edit preserves a secret omitted from the draft', () async {
     final controller = ProviderCredentialsController(
       store: _MemorySecretStore(),
     );
     const reference = 'linguaray-secret://openai/apiKey';
 
-    final fields = controller.protectFields(
+    final fields = await controller.protectFields(
       providerId: 'openai',
       fields: const {'baseUrl': 'https://example.test'},
       existingFields: const {'apiKey': reference},
@@ -81,35 +83,64 @@ void main() {
     expect(fields['baseUrl'], 'https://example.test');
   });
 
-  test('provider deletion removes only its own secrets', () {
+  test('provider deletion removes only its own secrets', () async {
     final store = _MemorySecretStore()
       ..values.addAll({'openai::apiKey': 'one', 'deepl::apiKey': 'two'});
     final controller = ProviderCredentialsController(store: store);
 
-    controller.deleteProvider('openai');
+    await controller.deleteProvider('openai', fields: ['apiKey', 'baseUrl']);
 
     expect(store.values, {'deepl::apiKey': 'two'});
   });
 
-  test('materializes a draft for testing without writing secure storage', () {
-    final store = _MemorySecretStore()
-      ..values['openai::apiKey'] = 'stored-secret';
-    final controller = ProviderCredentialsController(store: store);
-    final before = Map<String, String>.of(store.values);
+  test(
+    'materializes a draft for testing without writing secure storage',
+    () async {
+      final store = _MemorySecretStore()
+        ..values['openai::apiKey'] = 'stored-secret';
+      final controller = ProviderCredentialsController(store: store);
+      final before = Map<String, String>.of(store.values);
 
-    final existing = controller.materializeFields(
-      providerId: 'openai',
-      fields: const {'baseUrl': 'https://example.test'},
-      existingFields: const {'apiKey': 'linguaray-secret://openai/apiKey'},
-    );
-    final unsaved = controller.materializeFields(
-      providerId: 'draft',
-      fields: const {'apiKey': 'temporary-secret'},
-    );
+      final existing = await controller.materializeFields(
+        providerId: 'openai',
+        fields: const {'baseUrl': 'https://example.test'},
+        existingFields: const {'apiKey': 'linguaray-secret://openai/apiKey'},
+      );
+      final unsaved = await controller.materializeFields(
+        providerId: 'draft',
+        fields: const {'apiKey': 'temporary-secret'},
+      );
 
-    expect(existing['apiKey'], 'stored-secret');
-    expect(existing['baseUrl'], 'https://example.test');
-    expect(unsaved['apiKey'], 'temporary-secret');
-    expect(store.values, before);
+      expect(existing['apiKey'], 'stored-secret');
+      expect(existing['baseUrl'], 'https://example.test');
+      expect(unsaved['apiKey'], 'temporary-secret');
+      expect(store.values, before);
+    },
+  );
+
+  test('credentials provider exposes the composition-root instance', () {
+    initProviderCredentialsController();
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    expect(
+      container.read(providerCredentialsControllerProvider),
+      same(providerCredentialsController),
+    );
+  });
+
+  test('credentials provider can be overridden', () {
+    final controller = ProviderCredentialsController(
+      store: _MemorySecretStore(),
+    );
+    final container = ProviderContainer(
+      overrides: [
+        providerCredentialsControllerProvider.overrideWithValue(controller),
+      ],
+    );
+    addTearDown(container.dispose);
+    expect(
+      container.read(providerCredentialsControllerProvider),
+      same(controller),
+    );
   });
 }

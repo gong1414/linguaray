@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <key>Actions</key>
+    <array>
+      <dict>
+        <key>Shell Script File</key>
+        <string>LinguaRay.sh</string>
+        <key>Image File</key>
+        <string>LinguaRay.png</string>
+        <key>Title</key>
+        <string>LinguaRay</string>
+      </dict>
+    </array>
+    <key>Apps</key>
+    <dict>
+      <key>Bundle Identifier</key>
+      <string>io.github.gong1414.linguaray</string>
+      <key>Check Installed</key>
+      <true/>
+      <key>Link</key>
+      <string>https://github.com/gong1414/linguaray/releases</string>
+      <key>Name</key>
+      <string>LinguaRay</string>
+    </dict>
+    <key>Extension Description</key>
+    <string>Translate selected text with LinguaRay.</string>
+    <key>Extension Identifier</key>
+    <string>io.github.gong1414.linguaray.popclip</string>
+    <key>Extension Image File</key>
+    <string>LinguaRay.png</string>
+    <key>Extension Name</key>
+    <string>LinguaRay</string>
+    <key>Required OS Version</key>
+    <string>13.0</string>
+  </dict>
+</plist>

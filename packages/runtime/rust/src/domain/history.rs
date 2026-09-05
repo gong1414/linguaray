@@ -79,6 +79,25 @@ pub struct HistoryStore {
 }
 
 impl HistoryStore {
+    pub(crate) fn validate_backup(data_dir: impl AsRef<Path>) -> Result<(), String> {
+        let path = data_dir.as_ref().join(HISTORY_FILE);
+        if !path.exists() {
+            return Ok(());
+        }
+        let content = fs::read_to_string(&path)
+            .map_err(|error| format!("failed to read `{}`: {error}", path.display()))?;
+        let file = serde_json::from_str::<HistoryFile>(&content)
+            .map_err(|error| format!("failed to parse `{}`: {error}", path.display()))?;
+        if file.version != HISTORY_VERSION {
+            return Err(format!(
+                "unsupported history version {} in `{}`",
+                file.version,
+                path.display()
+            ));
+        }
+        Ok(())
+    }
+
     pub fn load(data_dir: impl AsRef<Path>) -> Self {
         let path = data_dir.as_ref().join(HISTORY_FILE);
         let mut file = match fs::read_to_string(&path) {
@@ -293,39 +312,12 @@ impl HistoryStore {
     }
 
     fn persist(&self) -> Result<(), String> {
-        let parent = self
-            .path
-            .parent()
-            .ok_or_else(|| "history path has no parent".to_owned())?;
-        fs::create_dir_all(parent).map_err(|error| {
-            format!(
-                "failed to create history directory `{}`: {error}",
-                parent.display()
-            )
-        })?;
         let content = serde_json::to_string_pretty(&HistoryFile {
             version: HISTORY_VERSION,
             entries: self.entries.clone(),
         })
         .map_err(|error| format!("failed to encode history: {error}"))?;
-        let temporary = self.path.with_extension("json.tmp");
-        fs::write(&temporary, content).map_err(|error| {
-            format!("failed to write history `{}`: {error}", temporary.display())
-        })?;
-        if self.path.exists() {
-            fs::remove_file(&self.path).map_err(|error| {
-                format!(
-                    "failed to replace history `{}`: {error}",
-                    self.path.display()
-                )
-            })?;
-        }
-        fs::rename(&temporary, &self.path).map_err(|error| {
-            format!(
-                "failed to commit history `{}`: {error}",
-                self.path.display()
-            )
-        })
+        crate::storage::write_bytes(&self.path, content.as_bytes())
     }
 }
 
@@ -374,13 +366,20 @@ fn now_millis() -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    static TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
     fn temp_data_dir() -> PathBuf {
         let unique = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("time went backwards")
             .as_nanos();
-        std::env::temp_dir().join(format!("linguaray-history-{unique}"))
+        let sequence = TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+        std::env::temp_dir().join(format!(
+            "linguaray-history-{}-{unique}-{sequence}",
+            std::process::id()
+        ))
     }
 
     fn input(source: &str, translation: &str) -> HistoryEntryInput {

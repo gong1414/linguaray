@@ -1,6 +1,6 @@
 use super::models::{
     field, AuthScheme, NetworkPolicy, ProviderCategory, ProviderPreset, Stability, BOTH_DESKTOPS,
-    DICTIONARY_ONLY, LLM_TRANSLATION, SYSTEM_CAPABILITIES, TRANSLATION_ONLY,
+    DICTIONARY_ONLY, LLM_TRANSLATION, OCR_ONLY, SYSTEM_CAPABILITIES, TRANSLATION_ONLY,
 };
 use crate::engine::ProviderType;
 
@@ -312,6 +312,41 @@ pub const PRESETS: &[ProviderPreset] = &[
         stability: Stability::Stable,
     },
     ProviderPreset {
+        id: "baidu-ocr",
+        engine_type: ProviderType::Baidu,
+        protocol: "baidu_ocr",
+        category: ProviderCategory::TraditionalApi,
+        name: "Baidu OCR",
+        description_key: "settings.providers.catalog.baidu_ocr",
+        homepage_url: Some("https://ai.baidu.com/tech/ocr"),
+        api_key_url: Some("https://console.bce.baidu.com/ai/#/ai/ocr/overview/index"),
+        base_url: "https://aip.baidubce.com",
+        models_url: "",
+        fields: &[
+            field(
+                "apiKey",
+                "settings.providers.fields.api_key",
+                true,
+                true,
+                false,
+                None,
+            ),
+            field(
+                "secretKey",
+                "settings.providers.fields.secret_key",
+                true,
+                true,
+                false,
+                None,
+            ),
+        ],
+        capabilities: OCR_ONLY,
+        auth_scheme: AuthScheme::Custom,
+        supported_platforms: BOTH_DESKTOPS,
+        network_policy: NetworkPolicy::OfficialApi,
+        stability: Stability::Stable,
+    },
+    ProviderPreset {
         id: "tencent-cloud-tmt",
         engine_type: ProviderType::Tencent,
         protocol: "tencent",
@@ -506,6 +541,108 @@ pub const PRESETS: &[ProviderPreset] = &[
         "https://console.groq.com/keys",
         "https://api.groq.com/openai/v1",
     ),
+    ProviderPreset {
+        category: ProviderCategory::LlmOfficial,
+        ..llm_preset(
+            "minimax",
+            ProviderType::Anthropic,
+            "MiniMax",
+            "settings.providers.catalog.minimax",
+            "https://platform.minimax.io",
+            "https://platform.minimax.io/user-center/basic-information/interface-key",
+            "https://api.minimax.io/anthropic",
+        )
+    },
+    ProviderPreset {
+        category: ProviderCategory::LlmOfficial,
+        ..llm_preset(
+            "stepfun",
+            ProviderType::OpenAiCompatible,
+            "StepFun",
+            "settings.providers.catalog.stepfun",
+            "https://platform.stepfun.ai",
+            "https://platform.stepfun.ai",
+            "https://api.stepfun.ai/v1",
+        )
+    },
+    ProviderPreset {
+        category: ProviderCategory::LlmOfficial,
+        ..llm_preset(
+            "mistral",
+            ProviderType::OpenAiCompatible,
+            "Mistral",
+            "settings.providers.catalog.mistral",
+            "https://mistral.ai",
+            "https://console.mistral.ai/api-keys",
+            "https://api.mistral.ai/v1",
+        )
+    },
+    ProviderPreset {
+        category: ProviderCategory::Aggregator,
+        ..llm_preset(
+            "together",
+            ProviderType::OpenAiCompatible,
+            "Together AI",
+            "settings.providers.catalog.together",
+            "https://www.together.ai",
+            "https://api.together.ai/settings/api-keys",
+            "https://api.together.ai/v1",
+        )
+    },
+    ProviderPreset {
+        category: ProviderCategory::Aggregator,
+        ..llm_preset(
+            "fireworks",
+            ProviderType::OpenAiCompatible,
+            "Fireworks AI",
+            "settings.providers.catalog.fireworks",
+            "https://fireworks.ai",
+            "https://app.fireworks.ai/settings/users/api-keys",
+            "https://api.fireworks.ai/inference/v1",
+        )
+    },
+    ProviderPreset {
+        fields: &[
+            field(
+                "baseUrl",
+                "settings.providers.fields.base_url",
+                false,
+                true,
+                false,
+                None,
+            ),
+            field(
+                "apiKey",
+                "settings.providers.fields.api_key",
+                true,
+                false,
+                false,
+                None,
+            ),
+            field(
+                "defaultModel",
+                "settings.providers.fields.default_model",
+                false,
+                true,
+                false,
+                None,
+            ),
+            field(
+                "modelsUrl",
+                "settings.providers.fields.models_url",
+                false,
+                false,
+                true,
+                None,
+            ),
+        ],
+        ..local_llm(
+            "openai-compatible",
+            "OpenAI Compatible",
+            "settings.providers.catalog.custom",
+            "",
+        )
+    },
     llm_preset(
         "openrouter",
         ProviderType::OpenAiCompatible,

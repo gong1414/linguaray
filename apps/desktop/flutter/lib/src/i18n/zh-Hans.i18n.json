@@ -86,6 +86,10 @@
         "clipboard_translation": "剪贴板翻译",
         "show_translation_window": "显示翻译窗口",
         "capture_ocr": "截图 OCR",
+        "silent_capture_ocr": "静默截图 OCR",
+        "file_ocr": "选图 OCR",
+        "clipboard_ocr": "剪贴板 OCR",
+        "show_ocr_window": "显示 OCR 窗口",
         "preferences": "偏好设置…",
         "about": "关于 LinguaRay",
         "dev_tools": {
@@ -205,6 +209,7 @@
       "select": "多选",
       "selected_count": "已选 $count 条",
       "exit_select": "退出多选",
+      "clear_all": "清空全部",
       "add_to_glossary": "加入术语库",
       "favorite": "收藏",
       "unfavorite": "取消收藏",
@@ -228,8 +233,8 @@
       "settings": "设置"
     },
     "placeholder": {
-      "history": "收藏与历史将在后续版本中提供",
-      "glossary": "术语库管理正在建设中"
+      "history": "查看、编辑、收藏并复用以往译文",
+      "glossary": "管理指定译法和禁用译法"
     },
     "glossary_page": {
       "add_entry": "新增条目",
@@ -275,6 +280,12 @@
       "seed_blank_note": "建好后可以逐条新增，也可以把 CSV / TBX 拖进列表里合并。",
       "seed_file_note": "创建后立即导入 $format 文件 · 重复的原文按文件里的译法为准",
       "choose_file": "选择文件…",
+      "import_file": "导入",
+      "export_file": "导出",
+      "import_success": "已新增 $inserted 条、更新 $updated 条、跳过 $skipped 条术语。",
+      "import_failed": "无法导入术语库文件，请检查文件格式后重试。",
+      "export_success": "术语库已导出。",
+      "export_failed": "无法导出术语库，请换一个位置后重试。",
       "create": "创建",
       "add_entry_subtitle": "术语优先级高于任何服务输出",
       "book": "术语库",
@@ -304,7 +315,7 @@
       "service_unavailable": "服务暂不可用",
       "waiting": "等待翻译",
       "copy": "复制",
-      "favorite_unavailable": "收藏功能将在后续版本中提供",
+      "favorite_unavailable": "无法更新收藏状态，请重试",
       "preferred": "首选译文",
       "other_services": "其他服务",
       "copy_result": "复制译文",
@@ -353,7 +364,8 @@
       "ocr_settings": "OCR 设置",
       "ocr_services": "服务",
       "general_group": "通用",
-      "general_settings": "通用设置"
+      "general_settings": "通用设置",
+      "library_group": "资料库"
     },
     "general": {
       "title": "常规",
@@ -445,6 +457,10 @@
         "extract_text_from_screen_selection": "划词翻译",
         "extract_text_from_screen_capture": "截图翻译",
         "capture_ocr": "截图 OCR",
+        "silent_capture_ocr": "静默截图 OCR",
+        "file_ocr": "选图 OCR",
+        "clipboard_ocr": "剪贴板 OCR",
+        "show_ocr_window": "显示 OCR 窗口",
         "extract_text_from_clipboard": "剪贴板翻译",
         "translate_input": "输入翻译"
       },
@@ -454,6 +470,10 @@
         "input": "清空内容并显示翻译窗口，用于手动输入需要翻译的文本。",
         "capture": "选择屏幕区域，识别其中的文字并翻译。",
         "capture_ocr": "选择屏幕区域，只显示识别出的文字，不自动翻译。",
+        "silent_capture_ocr": "选择屏幕区域，在后台识别并把文字复制到剪贴板。",
+        "file_ocr": "选择图片文件并识别其中的文字。",
+        "clipboard_ocr": "识别当前剪贴板中的图片。",
+        "show_ocr_window": "直接显示 OCR 窗口，不开始新的识别。",
         "clipboard": "翻译当前剪贴板中的文本。"
       },
       "reset_dialog": {
@@ -485,7 +505,35 @@
       "enable": "启用",
       "port": "端口",
       "running_at": "运行于 {url}",
-      "disabled": "已关闭"
+      "disabled": "已关闭",
+      "network": "网络",
+      "proxy_mode": "代理模式",
+      "proxy_system": "使用系统代理",
+      "proxy_direct": "直接连接",
+      "proxy_custom": "自定义 HTTP 代理",
+      "proxy_url": "代理地址",
+      "proxy_url_hint": "例如 http://127.0.0.1:7890",
+      "proxy_bypass": "不使用代理",
+      "proxy_bypass_hint": "用英文逗号分隔域名或 IP 地址",
+      "check_updates_on_launch": "自动检查更新（启动时及每 6 小时）",
+      "save_network": "保存网络设置"
+    },
+    "data_transfer": {
+      "title": "导入导出",
+      "description": "在不同安装之间迁移 LinguaRay 设置与本地数据。",
+      "export_title": "导出备份",
+      "export_description": "把设置、历史、收藏、生词本和术语库保存为一个 ZIP 文件。",
+      "export_action": "导出…",
+      "restore_title": "恢复备份",
+      "restore_description": "使用 LinguaRay 备份替换当前本地数据。",
+      "restore_action": "恢复…",
+      "restore_confirm_title": "恢复这个备份？",
+      "restore_confirm_description": "当前设置和本地记录将被替换；安装失败时会自动回滚。",
+      "secrets_notice": "备份绝不包含 API 密钥或代理凭据；换一台电脑后需要重新填写服务密钥。",
+      "working": "正在处理…",
+      "exported": "备份已导出",
+      "restored": "备份已恢复",
+      "failed": "备份操作失败"
     },
     "services": {
       "title": "服务",
@@ -554,8 +602,8 @@
       "verify": "验证连接",
       "save_without_verify": "保存",
       "model_manual": "手动输入模型 ID",
-      "model_empty": "还没有模型。可以从供应商获取，或手动输入。",
-      "model_failed": "无法获取模型。你仍可手动输入模型 ID 并保存。",
+      "model_empty": "没有匹配的模型，也可手动填写模型 ID。",
+      "model_failed": "模型获取失败，请检查接口地址、代理及响应格式。",
       "add_directly": "添加",
       "switch_to_google_web": "切换到 Google Web",
       "fields": {
@@ -583,6 +631,7 @@
         "deepl_pro": "DeepL API Pro。",
         "google_cloud": "Google Cloud Translation API。",
         "baidu": "百度翻译 API。",
+        "baidu_ocr": "百度通用文字识别，返回逐行文字与位置信息。",
         "tencent_cloud": "腾讯云机器翻译。",
         "youdao": "有道智云翻译、词典和 OCR。",
         "caiyun": "彩云小译翻译 API。",
@@ -607,7 +656,13 @@
         "llama_cpp": "本地 llama.cpp 服务。",
         "litellm": "本地 LiteLLM 代理。",
         "libretranslate": "自托管 LibreTranslate。默认 http://127.0.0.1:5000。不会调用公共实例。",
-        "mtranserver": "自托管 MTranServer。默认 http://127.0.0.1:8989。"
+        "mtranserver": "自托管 MTranServer。默认 http://127.0.0.1:8989。",
+        "minimax": "MiniMax 官方接口，使用 Anthropic 兼容协议。",
+        "stepfun": "StepFun 官方接口，使用 OpenAI 兼容协议。",
+        "mistral": "Mistral 官方接口，使用 OpenAI 兼容协议。",
+        "together": "Together AI 官方接口，使用 OpenAI 兼容协议。",
+        "fireworks": "Fireworks AI 官方接口，使用 OpenAI 兼容协议。",
+        "custom": "连接自定义网关或其他 OpenAI 兼容服务。"
       },
       "item": {
         "empty": "暂无已配置的提供商。添加一个提供商以启用翻译服务。",
@@ -701,7 +756,21 @@
       "delete_dialog": {
         "title": "删除「{}」？",
         "message": "此操作无法撤销。"
-      }
+      },
+      "model_auto_hint": "凭证完整后自动获取模型，也可手动填写模型 ID。列表不代表已验证翻译权限。",
+      "model_auth_failed": "鉴权失败（401/403），请检查该供应商的 API Key 和权限。",
+      "model_rate_limited": "供应商请求限流，请稍后重试。",
+      "model_unsupported": "此接口不提供模型列表（404/405）。请手动填写模型 ID，或配置模型列表地址。",
+      "model_timeout": "模型查询超时，请检查接口地址或代理后重试。",
+      "model_reference": "离线参考目录 · 未验证权限",
+      "model_live": "供应商接口返回的模型",
+      "model_search": "搜索全部模型 ID",
+      "model_updated": "查询时间",
+      "test": "测试连接",
+      "test_passed": "连接成功",
+      "test_model": "测试所选模型",
+      "test_model_passed": "所选模型已响应",
+      "test_model_hint": "发送简短测试文本，验证所选模型能否回复。"
     },
     "layout": {
       "title": "设置",
@@ -753,7 +822,7 @@
       "accessibility": "辅助功能",
       "screen_recording": "屏幕录制",
       "shortcuts_title": "全局快捷键",
-      "shortcuts_body": "四个首版动作已准备好。若有冲突，可稍后在设置中修改。",
+      "shortcuts_body": "核心翻译与 OCR 动作已准备好。若有冲突，可稍后在设置中修改。",
       "services_title": "翻译服务",
       "services_body": "至少启用一个翻译服务。",
       "granted": "已授权",
@@ -784,7 +853,34 @@
       "empty_selection": "没有选中文本。",
       "clipboard_unavailable": "无法读取剪贴板。",
       "clipboard_restore_failed": "无法恢复之前的剪贴板内容。",
-      "recheck": "重新检查"
+      "recheck": "重新检查",
+      "source_label": "原文",
+      "result_label": "译文",
+      "result_placeholder": "译文将在这里呈现",
+      "close": "关闭",
+      "collapse_source": "折叠原文",
+      "show_source": "展开原文",
+      "expand_reading": "展开双栏阅读",
+      "compact_reading": "紧凑小窗",
+      "font_larger": "放大字体",
+      "font_smaller": "缩小字体",
+      "font_reset": "还原字号",
+      "stop": "停止翻译",
+      "stopped": "翻译已停止",
+      "replace": "替换原文",
+      "replace_changed": "原文或选区已变化，请重新划词翻译。",
+      "replace_unsupported": "当前应用不支持替换原文，可以复制译文。",
+      "service_hint": "点击服务后按需翻译"
+    },
+    "ocr": {
+      "title": "OCR",
+      "empty_title": "还没有识别结果",
+      "empty_description": "可以框选屏幕区域、选择图片文件，或识别剪贴板中的图片。",
+      "capture": "截图",
+      "file": "图片文件",
+      "clipboard": "剪贴板图片",
+      "continuous": "连续识别",
+      "result_count": "$count 次结果"
     },
     "errors": {
       "accessibility_denied": "读取选中文本需要辅助功能权限。",
@@ -800,6 +896,7 @@
       "unsupported_language_pair": "当前服务不支持这对语言。",
       "language_pack_missing": "请在 macOS 语言与地区中安装该语言包后再试。",
       "network_failure": "无法连接服务，请检查网络。",
+      "proxy_configuration_invalid": "请输入不包含账号密码的 HTTP 或 HTTPS 代理地址。",
       "provider_auth_failed": "认证失败，请在设置中检查服务密钥。",
       "translation_failed": "翻译失败，请检查服务后重试。",
       "empty_result": "服务没有返回译文。",
@@ -813,13 +910,17 @@
       "speech_interrupted": "朗读被中断。",
       "speech_failed": "朗读失败。",
       "update_check_failed": "检查更新失败。",
+      "update_download_failed": "无法下载更新。",
       "update_checksum_missing": "该更新没有校验和，不会安装。",
       "update_checksum_mismatch": "下载的文件与校验和不匹配。",
+      "update_signature_invalid": "更新签名无效，或发布者身份发生变化。",
+      "update_install_failed": "无法启动已经校验的安装程序。",
       "protocol_invalid": "这个 LinguaRay 链接无效。",
       "protocol_too_large": "链接中的文本过大，无法打开。",
       "api_server_bind_failed": "本地 API 服务无法绑定该端口。",
       "invalid_port": "请输入 0（自动分配）或 1 到 65535 之间的端口。",
-      "unknown": "出现了问题，请重试。"
+      "unknown": "出现了问题，请重试。",
+      "translation_incomplete": "输出未完整结束。已保留收到的文本，请调整输出长度或更换模型后重试。"
     },
     "recovery": {
       "retry": "重试",

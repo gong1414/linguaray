@@ -6,7 +6,7 @@ use linguaray_core::{
     TranslationService,
 };
 
-use crate::common::http_client::HttpClient;
+use crate::common::{ClassifyHttpResponse, HttpClient};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
@@ -20,8 +20,6 @@ pub struct CaiyunProviderConfig {
 }
 
 pub struct CaiyunProvider {
-    #[allow(dead_code)]
-    config: CaiyunProviderConfig,
     translation_service: CaiyunTranslationService,
 }
 
@@ -40,16 +38,14 @@ impl CaiyunProvider {
             return Err("request_id must not be empty".to_owned());
         }
         Ok(Self {
-            config: config.clone(),
             translation_service: CaiyunTranslationService {
                 token: config.token,
                 request_id: config.request_id,
-                http: HttpClient::new(
+                http: HttpClient::proxy_aware(
                     config
                         .base_url
                         .unwrap_or_else(|| "http://api.interpreter.caiyunai.com".to_owned()),
-                    Default::default(),
-                ),
+                )?,
             },
         })
     }

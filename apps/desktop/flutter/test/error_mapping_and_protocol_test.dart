@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:linguaray_application/linguaray_application.dart';
-import 'package:linguaray_desktop/src/platform/protocol_controller.dart';
+import 'package:linguaray_desktop/src/platform/protocol/protocol_controller.dart';
 
 void main() {
   test('legacy and canonical error identifiers share recovery', () {

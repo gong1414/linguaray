@@ -1,12 +1,19 @@
-use std::sync::{mpsc, Arc};
+#[cfg(feature = "ollama")]
+use std::sync::Arc;
 
+#[cfg(feature = "ollama")]
 use async_trait::async_trait;
+#[cfg(feature = "ollama")]
 use linguaray_core::{
     ChatChoice, ChatMessage, ChatRequest, ChatResponse, ChatRole, LlmError, LlmService,
-    LlmStreamReceiver, Provider, ResponseFormat, StreamChunk,
+    LlmStreamReceiver, Provider, ResponseFormat,
 };
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "ollama")]
 use serde_json::Value;
+
+#[cfg(feature = "ollama")]
+use super::configured_default_model;
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -18,22 +25,14 @@ pub struct OllamaProviderConfig {
     pub default_model: String,
 }
 
-fn configured_default_model(default_model: &str) -> Result<String, String> {
-    let default_model = default_model.trim().to_string();
-    if default_model.is_empty() {
-        return Err("default_model must be configured".to_owned());
-    }
-    Ok(default_model)
-}
-
 // ── Provider ──────────────────────────────────────────────────────────────────
 
+#[cfg(feature = "ollama")]
 pub struct OllamaProvider {
-    #[allow(dead_code)]
-    config: OllamaProviderConfig,
     llm_service: Arc<OllamaLlmService>,
 }
 
+#[cfg(feature = "ollama")]
 impl OllamaProvider {
     pub fn new(config: OllamaProviderConfig) -> Result<Self, String> {
         let base_url = config
@@ -41,7 +40,7 @@ impl OllamaProvider {
             .clone()
             .unwrap_or_else(|| "http://127.0.0.1:11434".to_string());
 
-        let http = HttpClient::new(&base_url);
+        let http = HttpClient::new(&base_url)?;
         let default_model = configured_default_model(&config.default_model)?;
 
         let llm_service = Arc::new(OllamaLlmService {
@@ -49,13 +48,11 @@ impl OllamaProvider {
             http: http.clone(),
         });
 
-        Ok(Self {
-            config: config.clone(),
-            llm_service: llm_service.clone(),
-        })
+        Ok(Self { llm_service })
     }
 }
 
+#[cfg(feature = "ollama")]
 #[async_trait]
 impl Provider for OllamaProvider {
     fn name(&self) -> &'static str {
@@ -73,18 +70,20 @@ impl Provider for OllamaProvider {
 
 // ── HTTP Client ───────────────────────────────────────────────────────────────
 
+#[cfg(feature = "ollama")]
 #[derive(Clone)]
 struct HttpClient {
     base_url: String,
     client: reqwest::Client,
 }
 
+#[cfg(feature = "ollama")]
 impl HttpClient {
-    fn new(base_url: &str) -> Self {
-        Self {
+    fn new(base_url: &str) -> Result<Self, String> {
+        Ok(Self {
             base_url: base_url.to_string(),
-            client: reqwest::Client::new(),
-        }
+            client: crate::common::build_http_client()?,
+        })
     }
 
     fn join_url(&self, path: &str) -> String {
@@ -94,11 +93,13 @@ impl HttpClient {
 
 // ── LLM Service (core) ────────────────────────────────────────────────────────
 
+#[cfg(feature = "ollama")]
 pub struct OllamaLlmService {
     default_model: String,
     http: HttpClient,
 }
 
+#[cfg(feature = "ollama")]
 impl OllamaLlmService {
     fn build_ollama_body(&self, request: &ChatRequest, stream: bool) -> Value {
         let messages: Vec<Value> = request
@@ -195,12 +196,14 @@ impl OllamaLlmService {
     }
 }
 
+#[cfg(feature = "ollama")]
 impl OllamaLlmService {
     async fn list_models(&self) -> Result<Vec<String>, LlmError> {
         let response = self
             .http
             .client
             .get(self.http.join_url("/api/tags"))
+            .timeout(crate::catalog::MODELS_FETCH_TIMEOUT)
             .header("Content-Type", "application/json")
             .send()
             .await
@@ -225,12 +228,15 @@ impl OllamaLlmService {
                     .filter_map(|m| m["name"].as_str().map(String::from))
                     .collect::<Vec<_>>()
             })
-            .unwrap_or_default();
+            .ok_or_else(|| {
+                LlmError::SerializationError("invalid models response: missing models array".into())
+            })?;
 
         Ok(models)
     }
 }
 
+#[cfg(feature = "ollama")]
 #[async_trait]
 impl LlmService for OllamaLlmService {
     fn provider_name(&self) -> &'static str {
@@ -297,72 +303,10 @@ impl LlmService for OllamaLlmService {
             });
         }
 
-        let (tx, rx) = mpsc::channel();
-
-        tokio::spawn(async move {
-            use futures_util::StreamExt;
-            let mut byte_stream = response.bytes_stream();
-            let mut buffer = String::new();
-
-            while let Some(chunk_result) = byte_stream.next().await {
-                match chunk_result {
-                    Ok(bytes) => {
-                        buffer.push_str(&String::from_utf8_lossy(&bytes));
-                        while let Some(line_end) = buffer.find('\n') {
-                            let line = buffer[..line_end].trim().to_string();
-                            buffer = buffer[line_end + 1..].to_string();
-
-                            if line.is_empty() {
-                                continue;
-                            }
-
-                            match serde_json::from_str::<Value>(&line) {
-                                Ok(parsed) => {
-                                    let content = parsed["message"]["content"]
-                                        .as_str()
-                                        .unwrap_or("")
-                                        .to_string();
-
-                                    let done = parsed["done"].as_bool().unwrap_or(false);
-                                    let finish_reason = if done {
-                                        parsed["done_reason"]
-                                            .as_str()
-                                            .map(|s| s.to_string())
-                                            .or(Some("stop".to_string()))
-                                    } else {
-                                        None
-                                    };
-
-                                    if !content.is_empty() || finish_reason.is_some() {
-                                        let _ = tx.send(StreamChunk {
-                                            content,
-                                            index: 0,
-                                            finish_reason,
-                                        });
-                                    }
-
-                                    if done {
-                                        return;
-                                    }
-                                }
-                                Err(_) => {
-                                    // Skip unparseable lines
-                                }
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        let _ = tx.send(StreamChunk {
-                            content: format!("Stream error: {e}"),
-                            index: 0,
-                            finish_reason: Some("error".to_string()),
-                        });
-                        return;
-                    }
-                }
-            }
-        });
-
-        Ok(LlmStreamReceiver { rx })
+        Ok(super::streaming::receive(
+            response,
+            super::streaming::WireFormat::Ollama,
+            Vec::new(),
+        ))
     }
 }

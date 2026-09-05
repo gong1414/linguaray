@@ -7,25 +7,30 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
-GENERATORS = [
-    REPO_ROOT / "scripts/generate/runtime_bindings.py",
-    REPO_ROOT / "scripts/generate/languages.py",
-]
-FORMATTER = REPO_ROOT / "scripts/format.py"
+PYTHON_STEPS = (
+    "scripts/generate/runtime_bindings.py",
+    "scripts/generate/languages.py",
+)
 
 
 def main() -> int:
-    for script in GENERATORS:
-        exit_code = run_script(script)
-        if exit_code != 0:
-            return exit_code
-
-    return run_script(FORMATTER)
+    for relative_path in PYTHON_STEPS:
+        result = run_script(REPO_ROOT / relative_path)
+        if result:
+            return result
+    translations = subprocess.run(
+        ["dart", "run", "slang"],
+        cwd=REPO_ROOT / "apps/desktop/flutter",
+        check=False,
+    ).returncode
+    if translations:
+        return translations
+    return run_script(REPO_ROOT / "scripts/format.py")
 
 
 def run_script(script: Path) -> int:
-    result = subprocess.run([sys.executable, str(script)], cwd=REPO_ROOT, check=False)
-    return result.returncode
+    command = [sys.executable, str(script)]
+    return subprocess.run(command, cwd=REPO_ROOT, check=False).returncode
 
 
 if __name__ == "__main__":

@@ -18,7 +18,8 @@
 
 > [!IMPORTANT]
 > LinguaRay is in active pre-release development. The core workflows and
-> desktop builds are tested in CI, but there is no signed stable release yet.
+> desktop builds are tested in CI. Releases use an authenticated update feed;
+> platform signing and notarization depend on the configured release certificates.
 > For evaluation, run the application from source.
 
 ## Why LinguaRay?
@@ -52,14 +53,15 @@ tray menu and global shortcuts; Preferences is the only persistent window.
 | Translation history, favourites, glossaries, and vocabulary | Implemented |
 | Dictionary lookup and text-to-speech | Offline ECDICT is built in; Apple system translation and platform speech are available on supported macOS versions |
 | Configurable input behaviour and common-language ordering | Implemented |
-| Local API integration and verified update checks | Implemented |
+| Local API, URL-scheme, PopClip, SnipDo, and Raycast integration | Implemented |
+| Local backup/restore, proxy modes, and verified update checks | Implemented |
 | macOS and Windows desktop builds | Built and exercised by CI |
-| Signed installers and stable releases | Not published yet |
+| Desktop updates | Automatic checks, verified downloads, and installer handoff; see [release setup](docs/RELEASING.md) |
 
-Linux packages, migration from the retired Tauri prototype, and automatic
-replacement of selected source text are intentionally outside the current
-scope. Half-finished entry points stay hidden until they meet the same test and
-platform requirements as the core workflows.
+Migration from the retired Tauri prototype and automatic replacement of
+selected source text are intentionally outside the current scope. Half-finished
+entry points stay hidden until they meet the same test and platform requirements
+as the core workflows.
 
 ## Platform support
 
@@ -67,8 +69,6 @@ platform requirements as the core workflows.
 | --- | --- | --- |
 | macOS | 13.0 | Supported in CI |
 | Windows | Windows 10 | Supported in CI |
-
-Linux is not currently supported.
 
 ## Run from source
 
@@ -125,6 +125,7 @@ Rust runtime (UniFFI) + typed desktop platform services
 
 Read [the architecture guide](docs/ARCHITECTURE.md) for the dependency rules,
 data flow, and storage model.
+Release maintainers should also read [the release guide](docs/RELEASING.md).
 
 ## Development and testing
 
@@ -138,6 +139,7 @@ dart run melos run dependency_validator
 cargo fmt --all -- --check
 cargo clippy --locked --workspace --all-targets -- -D warnings
 cargo test --locked --workspace
+python3 scripts/check_uniffi_surface.py
 ```
 
 Cross-layer changes should pass the complete set. UI changes should include

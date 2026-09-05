@@ -82,7 +82,8 @@ def read_languages(path: Path) -> list[dict[str, Any]]:
         raise ValueError(f"{path} must contain a JSON object keyed by language code")
 
     languages: list[dict[str, Any]] = []
-    for code in sorted(raw, key=str.casefold):
+    language_codes = [key for key in raw if not key.startswith("_")]
+    for code in sorted(language_codes, key=str.casefold):
         entry = raw[code]
         if not isinstance(code, str) or not code.strip():
             raise ValueError("language code keys must be non-empty strings")

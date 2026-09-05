@@ -52,22 +52,19 @@ macOS, and Windows resource locations.
 
 ## Regeneration
 
-The generator uses the repository's MiSans Semibold font only to produce the
-outlined wordmark; the distributed SVG does not require the font at runtime.
-From this directory, run:
+The canonical wordmark outline is stored in `build/wordmark-outline.json`.
+The shipped SVG and application assets contain vector paths and do not bundle
+or load a font at runtime. From this directory, run:
 
 ```bash
 npm install
 python3 -m pip install -r requirements.txt
-swift tools/outline_wordmark.swift \
-  ../../../apps/desktop/flutter/resources/fonts/MiSans-Semibold.ttf \
-  build/wordmark-outline.json
 npm run generate
 python3 tools/make_ico.py
 iconutil -c icns dist/macos/LinguaRay.iconset \
   -o dist/macos/LinguaRay.icns
 ```
 
-`iconutil` and the Swift outline step require macOS. The Node generator also
-installs the generated Flutter and macOS resources into their application
-locations; the ICO builder installs the Windows icon.
+`iconutil` requires macOS. The Node generator also installs the generated
+Flutter and macOS resources into their application locations; the ICO builder
+installs the Windows icon.

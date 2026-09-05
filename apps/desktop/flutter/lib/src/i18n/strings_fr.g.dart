@@ -678,10 +678,9 @@ class _TranslationsWorkbenchPlaceholderFr
   // Translations
   @override
   String get history =>
-      'Les favoris et l’historique seront disponibles ultérieurement';
+      'Consultez, modifiez, ajoutez aux favoris et réutilisez vos traductions';
   @override
-  String get glossary =>
-      'La gestion du glossaire est en cours de développement';
+  String get glossary => 'Gérez les termes imposés et les variantes interdites';
 }
 
 // Path: workbench.glossary_page
@@ -800,7 +799,7 @@ class _TranslationsWorkbenchTranslationFr
   String get copy => 'Copier';
   @override
   String get favorite_unavailable =>
-      'Les favoris seront disponibles ultérieurement';
+      'Impossible de mettre à jour le favori. Réessayez.';
   @override
   String get preferred => 'Traduction préférée';
   @override
@@ -2385,10 +2384,9 @@ extension on TranslationsFr {
       'workbench.not_configured' => 'Non configuré',
       'workbench.subtitle.translate' => 'Atelier · Comparaison des services',
       'workbench.subtitle.settings' => 'Réglages',
-      'workbench.placeholder.history' =>
-        'Les favoris et l’historique seront disponibles ultérieurement',
+      'workbench.placeholder.history' => 'Consultez, modifiez, ajoutez aux favoris et réutilisez vos traductions',
       'workbench.placeholder.glossary' =>
-        'La gestion du glossaire est en cours de développement',
+        'Gérez les termes imposés et les variantes interdites',
       'workbench.glossary_page.add_entry' => 'Nouvelle entrée',
       'workbench.glossary_page.term' => 'Source',
       'workbench.glossary_page.translation' => 'Traduction imposée',
@@ -2448,7 +2446,7 @@ extension on TranslationsFr {
       'workbench.translation.waiting' => 'En attente',
       'workbench.translation.copy' => 'Copier',
       'workbench.translation.favorite_unavailable' =>
-        'Les favoris seront disponibles ultérieurement',
+        'Impossible de mettre à jour le favori. Réessayez.',
       'workbench.translation.preferred' => 'Traduction préférée',
       'workbench.translation.other_services' => 'Autres services',
       'workbench.translation.copy_result' => 'Copier la traduction',

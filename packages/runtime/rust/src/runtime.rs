@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use base64::Engine as _;
 use linguaray_core::{
     ChatMessage, DetectLanguageRequest, DetectLanguageResponse, LanguageInfo, LanguagePair,
     LookUpRequest, LookUpResponse, RecognizeTextRequest, RecognizeTextResponse, TranslateRequest,
@@ -13,15 +14,17 @@ use linguaray_core::{
 use struct_patch::Patch as ApplyPatch;
 use tokio::sync::{broadcast, Mutex as AsyncMutex, RwLock};
 
+use crate::backup;
 use crate::domain::engine;
 use crate::domain::glossary::{
     check_compliance, GlossaryBook, GlossaryBookInput, GlossaryComplianceIssue, GlossaryEntry,
-    GlossaryEntryInput, GlossaryMatch, GlossaryStore,
+    GlossaryEntryInput, GlossaryImportReport, GlossaryMatch, GlossaryStore,
 };
+use crate::domain::glossary_exchange::{self, GlossaryExchangeFormat};
 use crate::domain::history::{
     HistoryCounts, HistoryEntry, HistoryEntryInput, HistoryFilter, HistoryStore,
 };
-use crate::domain::permission;
+use crate::domain::permissions as permission;
 use crate::domain::settings::{
     append_translation_service_order, apply_catalog_seed, effective_translation_service_order,
     provider_entry_from_config, remove_provider_from_translation_order,
@@ -72,6 +75,41 @@ pub enum SettingsChange {
     History,
     /// A vocabulary book entry was created, edited, favorited or deleted.
     Vocabulary,
+}
+
+/// A UI action requested by a loopback API client. The runtime transports
+/// intent only; Flutter remains responsible for windows and platform input.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, uniffi::Enum)]
+pub enum ExternalActionKind {
+    TranslateText,
+    TranslateSelection,
+    TranslateInput,
+    TranslateClipboard,
+    CaptureTranslate,
+    CaptureOcr,
+    ClipboardOcr,
+    ShowTranslationWindow,
+    ShowOcrWindow,
+    OpenSettings,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, uniffi::Record)]
+pub struct ExternalActionRequest {
+    pub kind: ExternalActionKind,
+    pub text: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, uniffi::Record)]
+pub struct BackupSummary {
+    pub created_at: u64,
+    pub file_count: u32,
+    pub includes_secrets: bool,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, uniffi::Record)]
+pub struct RestoreSummary {
+    pub created_at: u64,
+    pub includes_secrets: bool,
 }
 
 /// Callback invoked by the Rust runtime as LLM streaming chunks arrive.
@@ -142,6 +180,9 @@ struct RuntimeInner {
     /// see [`broadcast::error::RecvError::Closed`] once the runtime itself
     /// is dropped (i.e. process shutdown).
     events: broadcast::Sender<SettingsChange>,
+    /// Loopback API actions are independent from settings notifications so a
+    /// slow settings observer cannot delay a user-visible command.
+    action_events: broadcast::Sender<ExternalActionRequest>,
 }
 
 /// Process-wide registry mapping a canonical `data_dir` path to the
@@ -215,6 +256,11 @@ pub struct RuntimeVocabulary {
 }
 
 #[derive(uniffi::Object)]
+pub struct RuntimeBackup {
+    runtime: Runtime,
+}
+
+#[derive(uniffi::Object)]
 pub struct RuntimePermission;
 
 /// Rust-native screen text extractor.
@@ -223,7 +269,7 @@ pub struct RuntimePermission;
 /// and screen capture with OCR across all supported platforms.
 #[derive(uniffi::Object)]
 pub struct RuntimeTextExtractor {
-    runtime: Runtime,
+    _runtime: Runtime,
 }
 
 /// Foreign-language handle for observing [`SettingsChange`] events.
@@ -240,6 +286,11 @@ pub struct RuntimeTextExtractor {
 #[derive(uniffi::Object)]
 pub struct SettingsSubscription {
     receiver: AsyncMutex<broadcast::Receiver<SettingsChange>>,
+}
+
+#[derive(uniffi::Object)]
+pub struct ExternalActionSubscription {
+    receiver: AsyncMutex<broadcast::Receiver<ExternalActionRequest>>,
 }
 
 impl Runtime {
@@ -266,6 +317,7 @@ impl Runtime {
         let history = HistoryStore::load(&key);
         let vocabulary = VocabularyStore::load(&key);
         let (events, _) = broadcast::channel(EVENT_CHANNEL_CAPACITY);
+        let (action_events, _) = broadcast::channel(EVENT_CHANNEL_CAPACITY);
         let inner = Arc::new(RuntimeInner {
             settings_file_path: Arc::from(settings_file_path.to_string_lossy().into_owned()),
             state: RwLock::new(state),
@@ -273,6 +325,7 @@ impl Runtime {
             history: RwLock::new(history),
             vocabulary: RwLock::new(vocabulary),
             events,
+            action_events,
         });
         registry.insert(key, inner.clone());
         Ok(Self { inner })
@@ -336,7 +389,7 @@ impl Runtime {
 
     pub fn text_extractor(self: Arc<Self>) -> Arc<RuntimeTextExtractor> {
         Arc::new(RuntimeTextExtractor {
-            runtime: (*self).clone(),
+            _runtime: (*self).clone(),
         })
     }
 
@@ -358,6 +411,12 @@ impl Runtime {
         })
     }
 
+    pub fn backup(self: Arc<Self>) -> Arc<RuntimeBackup> {
+        Arc::new(RuntimeBackup {
+            runtime: (*self).clone(),
+        })
+    }
+
     pub fn permission(self: Arc<Self>) -> Arc<RuntimePermission> {
         Arc::new(RuntimePermission)
     }
@@ -368,6 +427,12 @@ impl Runtime {
         port: u16,
     ) -> Result<Arc<RuntimeApiServer>, RuntimeError> {
         RuntimeApiServer::start((*self).clone(), host, port)
+    }
+
+    pub fn subscribe_actions(&self) -> Arc<ExternalActionSubscription> {
+        Arc::new(ExternalActionSubscription {
+            receiver: AsyncMutex::new(self.inner.action_events.subscribe()),
+        })
     }
 
     /// Returns the curated language list supported by the app.
@@ -382,6 +447,12 @@ impl Runtime {
 }
 
 impl Runtime {
+    pub(crate) fn emit_external_action(&self, request: ExternalActionRequest) {
+        // No receiver means the UI is still starting or already shutting
+        // down. The API request remains safe and does not retain user text.
+        let _ = self.inner.action_events.send(request);
+    }
+
     pub(crate) async fn api_translate(
         &self,
         provider_id: String,
@@ -493,6 +564,18 @@ impl Runtime {
                     service.provider_id
                 ));
             }
+            let engine_provider = state
+                .engine
+                .require(&service.provider_id)
+                .map_err(|error| error.to_string())?;
+            if !provider_supports_service(engine_provider.as_ref(), expected_type)
+                || !advertises_system_capability(&service.provider_id, expected_type)
+            {
+                return Err(format!(
+                    "provider `{}` does not support {expected_type:?}",
+                    service.provider_id
+                ));
+            }
             let mut entry = service.clone();
             entry.id = service_id.to_owned();
             return Ok(ResolvedService {
@@ -510,15 +593,9 @@ impl Runtime {
             .engine
             .require(service_id)
             .map_err(|error| error.to_string())?;
-        let supported = match expected_type {
-            ServiceType::Dictionary => engine_provider.dictionary().is_some(),
-            ServiceType::Ocr => engine_provider.ocr().is_some(),
-            ServiceType::Translation => {
-                engine_provider.translation().is_some() || engine_provider.llm().is_some()
-            }
-            ServiceType::Llm => engine_provider.llm().is_some(),
-        };
-        if !supported {
+        if !provider_supports_service(engine_provider.as_ref(), expected_type)
+            || !advertises_system_capability(service_id, expected_type)
+        {
             return Err(format!(
                 "provider `{service_id}` does not support {expected_type:?}"
             ));
@@ -573,2039 +650,25 @@ impl Runtime {
     }
 }
 
-impl RuntimeSettings {
-    async fn get_json_impl(&self) -> Result<String, String> {
-        let state = self.runtime.inner.state.read().await;
-        state.settings.to_pretty_json()
-    }
+// Kept in this module via include! so UniFFI export paths remain stable.
+include!("runtime/settings_api.rs");
 
-    async fn get_section<T: Clone>(&self, select: impl FnOnce(&Settings) -> &T) -> T {
-        select(&self.runtime.inner.state.read().await.settings).clone()
-    }
+// Kept in this module via include! so UniFFI export paths remain stable.
+include!("runtime/backup_api.rs");
 
-    async fn update_section<T, P>(
-        &self,
-        change: SettingsChange,
-        patch: P,
-        select: impl FnOnce(&mut Settings) -> &mut T + Send + 'static,
-    ) -> Result<T, String>
-    where
-        T: Clone + ApplyPatch<P>,
-        P: Send + 'static,
-    {
-        self.commit_settings(change, move |settings| {
-            let section = select(settings);
-            section.apply(patch);
-            Ok(section.clone())
-        })
-        .await
-    }
+// Kept in this module via include! so UniFFI export paths remain stable.
+include!("runtime/library_api.rs");
 
-    async fn commit_settings<F, T>(&self, change: SettingsChange, update: F) -> Result<T, String>
-    where
-        F: FnOnce(&mut Settings) -> Result<T, String>,
-    {
-        let mut state = self.runtime.inner.state.write().await;
-        let mut next_settings = state.settings.clone();
-        let result = update(&mut next_settings)?;
-        next_settings.touch_last_updated()?;
+// Kept in this module via include! so UniFFI export paths remain stable.
+include!("runtime/translation_api.rs");
 
-        let engine_changed = next_settings.providers != state.settings.providers;
+// Kept in this module via include! so UniFFI export paths remain stable.
+include!("runtime/llm_api.rs");
 
-        let settings_file_path = self.runtime.inner.settings_file_path.as_ref();
-        if engine_changed {
-            state
-                .provider_secrets
-                .retain(|provider_id, _| next_settings.providers.contains_key(provider_id));
-            let next_engine =
-                engine::build_from_settings_with_secrets(&next_settings, &state.provider_secrets)?;
-            next_settings.save(settings_file_path)?;
-            *state = RuntimeState {
-                settings: next_settings,
-                engine: next_engine,
-                provider_secrets: state.provider_secrets.clone(),
-            };
-        } else {
-            next_settings.save(settings_file_path)?;
-            state.settings = next_settings;
-        }
+// Kept in this module via include! so UniFFI export paths remain stable.
+include!("runtime/platform_api.rs");
 
-        // Release the write lock before broadcasting so a subscriber that
-        // immediately re-reads doesn't block on the same lock.
-        drop(state);
-
-        // `send` only fails when there are zero active receivers, which is
-        // a benign condition (no one is listening yet); ignore it.
-        let _ = self.runtime.inner.events.send(change);
-
-        Ok(result)
-    }
-}
-
-#[derive(Clone)]
-struct ResolvedService {
-    provider_id: String,
-    entry: ServiceConfigEntry,
-}
-
-impl ResolvedService {
-    fn field(&self, key: &str) -> Option<&str> {
-        self.entry
-            .fields
-            .get(key)
-            .map(|value| value.trim())
-            .filter(|value| !value.is_empty())
-    }
-}
-
-fn service_entry_for_provider_type(
-    service_id: &str,
-    provider: &ProviderConfigEntry,
-    service_type: ServiceType,
-) -> ServiceConfigEntry {
-    let name = provider.id.clone();
-    ServiceConfigEntry {
-        id: service_id.to_owned(),
-        provider_id: provider.id.clone(),
-        r#type: service_type,
-        name,
-        fields: HashMap::new(),
-        created_at: provider.created_at,
-    }
-}
-
-fn render_prompt_template(
-    template: &str,
-    source_language: &str,
-    target_language: &str,
-    text: &str,
-    glossary: &[GlossaryTerm],
-) -> String {
-    const GLOSSARY_PLACEHOLDER: &str = "{{glossary}}";
-
-    let rendered = template
-        .replace("{{sourceLanguage}}", source_language)
-        .replace("{{targetLanguage}}", target_language)
-        .replace("{{text}}", text);
-    let block = linguaray_engine::prompt::glossary_constraints(glossary);
-
-    if rendered.contains(GLOSSARY_PLACEHOLDER) {
-        return rendered.replace(GLOSSARY_PLACEHOLDER, block.as_deref().unwrap_or_default());
-    }
-    // A custom template written before glossaries existed has nowhere to put
-    // the terms, and dropping them silently would break the promise that
-    // glossary entries outrank engine output. Append instead.
-    match block {
-        Some(block) => format!("{rendered}\n\n{block}"),
-        None => rendered,
-    }
-}
-
-/// Flattens matches into the shape the prompt builder wants.
-fn glossary_terms(matches: &[GlossaryMatch]) -> Vec<GlossaryTerm> {
-    matches
-        .iter()
-        .map(|hit| GlossaryTerm {
-            term: hit.term.clone(),
-            translation: hit.translation.clone(),
-            forbidden: hit.forbidden.clone(),
-        })
-        .collect()
-}
-
-#[uniffi::export(async_runtime = "tokio")]
-impl RuntimeSettings {
-    /// Returns the active subset of translation targets based on the
-    /// detected source language.
-    ///
-    /// * `Always` targets are always included.
-    /// * `AutoDetect` targets are included only when their source matches
-    ///   the detected language (or when no detected language is available).
-    pub async fn get_active_translation_targets(
-        &self,
-        targets: Vec<TranslationTarget>,
-        detected_language: Option<String>,
-    ) -> Vec<TranslationTarget> {
-        TranslationTarget::filter_active(&targets, detected_language.as_deref())
-    }
-
-    pub async fn get_json(&self) -> Result<String, RuntimeError> {
-        self.get_json_impl().await.map_err(Into::into)
-    }
-
-    pub async fn get_general(&self) -> Result<GeneralSettings, RuntimeError> {
-        Ok(self.get_section(|s| &s.general).await)
-    }
-
-    pub async fn update_general(
-        &self,
-        patch: GeneralSettingsPatch,
-    ) -> Result<GeneralSettings, RuntimeError> {
-        self.update_section(SettingsChange::General, patch, |s| &mut s.general)
-            .await
-            .map_err(Into::into)
-    }
-
-    pub async fn get_appearance(&self) -> Result<AppearanceSettings, RuntimeError> {
-        Ok(self.get_section(|s| &s.appearance).await)
-    }
-
-    pub async fn update_appearance(
-        &self,
-        patch: AppearanceSettingsPatch,
-    ) -> Result<AppearanceSettings, RuntimeError> {
-        self.update_section(SettingsChange::Appearance, patch, |s| &mut s.appearance)
-            .await
-            .map_err(Into::into)
-    }
-
-    pub async fn get_shortcuts(&self) -> Result<ShortcutSettings, RuntimeError> {
-        Ok(self.get_section(|s| &s.shortcuts).await)
-    }
-
-    pub async fn update_shortcuts(
-        &self,
-        patch: ShortcutSettingsPatch,
-    ) -> Result<ShortcutSettings, RuntimeError> {
-        self.update_section(SettingsChange::Shortcuts, patch, |s| &mut s.shortcuts)
-            .await
-            .map_err(Into::into)
-    }
-
-    pub async fn reset_shortcuts(&self) -> Result<ShortcutSettings, RuntimeError> {
-        self.commit_settings(SettingsChange::Shortcuts, |settings| {
-            settings.shortcuts = ShortcutSettings::default();
-            Ok(settings.shortcuts.clone())
-        })
-        .await
-        .map_err(Into::into)
-    }
-
-    pub async fn get_advanced(&self) -> Result<AdvancedSettings, RuntimeError> {
-        Ok(self.get_section(|s| &s.advanced).await)
-    }
-
-    pub async fn update_advanced(
-        &self,
-        patch: AdvancedSettingsPatch,
-    ) -> Result<AdvancedSettings, RuntimeError> {
-        self.update_section(SettingsChange::Advanced, patch, |s| &mut s.advanced)
-            .await
-            .map_err(Into::into)
-    }
-
-    pub async fn generate_provider_id(
-        &self,
-        provider_type: String,
-    ) -> Result<String, RuntimeError> {
-        let base_id = provider_type.trim().to_lowercase();
-        if base_id.is_empty() {
-            return Err(RuntimeError::from("provider_type is required".to_owned()));
-        }
-
-        let state = self.runtime.inner.state.read().await;
-        let existing_ids: Vec<&String> = state.settings.providers.keys().collect();
-
-        // If the base ID is free, use it as-is
-        if !existing_ids.contains(&&base_id) {
-            return Ok(base_id);
-        }
-
-        // Find the first available numeric suffix starting from 1
-        for suffix in 1.. {
-            let candidate = format!("{base_id}{suffix}");
-            if !existing_ids.contains(&&candidate) {
-                return Ok(candidate);
-            }
-        }
-
-        unreachable!()
-    }
-
-    pub async fn list_providers(&self) -> Result<Vec<ProviderConfigEntry>, RuntimeError> {
-        let state = self.runtime.inner.state.read().await;
-        Ok(state
-            .settings
-            .providers
-            .iter()
-            .map(|(provider_id, provider)| normalized_provider_entry(provider_id, provider))
-            .collect())
-    }
-
-    /// Hydrates one provider with credentials read by Flutter from the OS
-    /// secure store. Values live only in process memory and are never written
-    /// to settings or returned by `list_providers` / `get_json`.
-    pub async fn set_provider_secrets(
-        &self,
-        provider_id: String,
-        secrets: HashMap<String, String>,
-    ) -> Result<(), RuntimeError> {
-        let provider_id = validate_provider_id(provider_id).map_err(RuntimeError::from)?;
-        let mut state = self.runtime.inner.state.write().await;
-        if !state.settings.providers.contains_key(&provider_id) {
-            return Err(RuntimeError::from(format!(
-                "provider `{provider_id}` does not exist"
-            )));
-        }
-
-        let secrets = secrets
-            .into_iter()
-            .filter(|(key, value)| !key.trim().is_empty() && !value.is_empty())
-            .collect::<HashMap<_, _>>();
-        if secrets.is_empty() {
-            state.provider_secrets.remove(&provider_id);
-        } else {
-            state.provider_secrets.insert(provider_id, secrets);
-        }
-        state.engine =
-            engine::build_from_settings_with_secrets(&state.settings, &state.provider_secrets)?;
-        Ok(())
-    }
-
-    pub async fn list_services(&self) -> Result<Vec<ServiceConfigEntry>, RuntimeError> {
-        let state = self.runtime.inner.state.read().await;
-        let mut by_id: HashMap<String, ServiceConfigEntry> = HashMap::new();
-
-        for (provider_id, provider) in &state.settings.providers {
-            let entry = normalized_provider_entry(provider_id, provider);
-            if let Ok(engine_provider) = state.engine.require(provider_id) {
-                if engine_provider.dictionary().is_some()
-                    && advertises_system_capability(provider_id, ServiceType::Dictionary)
-                {
-                    let service = service_entry_for_provider_type(
-                        &format!("{provider_id}+dictionary"),
-                        &entry,
-                        ServiceType::Dictionary,
-                    );
-                    by_id.insert(service.id.clone(), service);
-                }
-                if (engine_provider.translation().is_some() || engine_provider.llm().is_some())
-                    && advertises_system_capability(provider_id, ServiceType::Translation)
-                {
-                    let service = service_entry_for_provider_type(
-                        &format!("{provider_id}+translation"),
-                        &entry,
-                        ServiceType::Translation,
-                    );
-                    by_id.insert(service.id.clone(), service);
-                }
-                if engine_provider.ocr().is_some()
-                    && advertises_system_capability(provider_id, ServiceType::Ocr)
-                {
-                    let service = service_entry_for_provider_type(
-                        &format!("{provider_id}+ocr"),
-                        &entry,
-                        ServiceType::Ocr,
-                    );
-                    by_id.insert(service.id.clone(), service);
-                }
-            }
-        }
-
-        for (service_id, service) in &state.settings.services {
-            if !state.settings.providers.contains_key(&service.provider_id) {
-                continue;
-            }
-            if !advertises_system_capability(&service.provider_id, service.r#type) {
-                continue;
-            }
-            let mut entry = service.clone();
-            entry.id = service_id.clone();
-            by_id.insert(service_id.clone(), entry);
-        }
-
-        let mut services: Vec<ServiceConfigEntry> = by_id.into_values().collect();
-        let translation_ids: Vec<String> = services
-            .iter()
-            .filter(|service| service.r#type == ServiceType::Translation)
-            .map(|service| service.id.clone())
-            .collect();
-        let created_at = services
-            .iter()
-            .map(|service| (service.id.clone(), service.created_at))
-            .collect::<HashMap<_, _>>();
-        let order = effective_translation_service_order(
-            &state.settings.general.translation_service_order,
-            &translation_ids,
-            &created_at,
-        );
-        services.sort_by(|a, b| {
-            let translation_rank = |service: &ServiceConfigEntry| {
-                if service.r#type == ServiceType::Translation {
-                    order
-                        .iter()
-                        .position(|id| id == &service.id)
-                        .unwrap_or(usize::MAX)
-                } else {
-                    usize::MAX
-                }
-            };
-            translation_rank(a)
-                .cmp(&translation_rank(b))
-                .then_with(|| service_type_rank(a.r#type).cmp(&service_type_rank(b.r#type)))
-                .then_with(|| a.created_at.cmp(&b.created_at))
-                .then_with(|| a.id.cmp(&b.id))
-        });
-        Ok(services)
-    }
-
-    pub async fn list_models(&self, provider_id: String) -> Result<Vec<String>, RuntimeError> {
-        let provider_id = validate_provider_id(provider_id).map_err(RuntimeError::from)?;
-        let runtime = self.runtime.clone();
-        run_on_worker_thread(move || async move {
-            let provider = {
-                let state = runtime.inner.state.read().await;
-                state
-                    .engine
-                    .require(&provider_id)
-                    .map_err(|e| e.to_string())?
-                    .clone()
-            };
-            provider.list_models().await.map_err(|e| e.to_string())
-        })
-        .await
-        .map_err(|e: String| RuntimeError::from(e))
-    }
-
-    /// Validates and probes a provider without changing persisted settings or
-    /// the process-wide runtime engine. The caller supplies credentials read
-    /// from secure storage; they live only in this temporary provider object.
-    ///
-    /// LLM providers are probed by listing models. Traditional translation
-    /// providers translate a small fixed phrase. The returned number is the
-    /// model count for LLM providers and zero for traditional providers.
-    pub async fn test_provider(
-        &self,
-        provider_id: String,
-        provider_type: String,
-        fields: HashMap<String, String>,
-    ) -> Result<u32, RuntimeError> {
-        let provider_id = validate_provider_id(provider_id).map_err(RuntimeError::from)?;
-        let provider_type =
-            validate_required("provider_type", provider_type).map_err(RuntimeError::from)?;
-        let provider_type = crate::domain::settings::parse_provider_type(&provider_type)
-            .map_err(RuntimeError::from)?;
-        let entry = ProviderConfigEntry {
-            id: provider_id.clone(),
-            r#type: provider_type,
-            fields,
-            created_at: None,
-            preset_id: None,
-        };
-        let config = crate::domain::settings::provider_config_from_settings(&entry)
-            .map_err(RuntimeError::from)?;
-        let mut providers = std::collections::BTreeMap::new();
-        providers.insert(provider_id.clone(), config);
-        let engine = engine::build_from_engine_config(linguaray_engine::EngineConfig { providers })
-            .map_err(RuntimeError::from)?;
-        let provider = engine
-            .require(&provider_id)
-            .map_err(|error| RuntimeError::from(error.to_string()))?
-            .clone();
-
-        run_on_worker_thread(move || async move {
-            if provider.llm().is_some() {
-                let models = provider
-                    .list_models()
-                    .await
-                    .map_err(|error| error.to_string())?;
-                return u32::try_from(models.len())
-                    .map_err(|_| "provider returned too many models".to_owned());
-            }
-
-            if matches!(provider.name(), "libretranslate" | "mtranserver") {
-                provider
-                    .list_models()
-                    .await
-                    .map_err(|error| error.to_string())?;
-                return Ok(0);
-            }
-
-            let translation = provider
-                .translation()
-                .ok_or_else(|| "provider does not support translation".to_owned())?;
-            translation
-                .translate(TranslateRequest {
-                    source_language: Some("en".to_owned()),
-                    target_language: Some("zh-Hans".to_owned()),
-                    text: "Hello".to_owned(),
-                })
-                .await
-                .map_err(|error| error.to_string())?;
-            Ok(0)
-        })
-        .await
-        .map_err(RuntimeError::from)
-    }
-
-    /// Discovers models using an in-memory provider draft. Unlike
-    /// `list_models`, this does not require the provider to be saved first and
-    /// never writes credentials or provisional settings to disk.
-    pub async fn discover_provider_models(
-        &self,
-        provider_id: String,
-        provider_type: String,
-        fields: HashMap<String, String>,
-    ) -> Result<Vec<String>, RuntimeError> {
-        let provider_id = validate_provider_id(provider_id).map_err(RuntimeError::from)?;
-        let provider_type =
-            validate_required("provider_type", provider_type).map_err(RuntimeError::from)?;
-        let provider_type = crate::domain::settings::parse_provider_type(&provider_type)
-            .map_err(RuntimeError::from)?;
-        let entry = ProviderConfigEntry {
-            id: provider_id.clone(),
-            r#type: provider_type,
-            fields,
-            created_at: None,
-            preset_id: None,
-        };
-        let config = crate::domain::settings::provider_config_from_settings(&entry)
-            .map_err(RuntimeError::from)?;
-        let mut providers = std::collections::BTreeMap::new();
-        providers.insert(provider_id.clone(), config);
-        let engine = engine::build_from_engine_config(linguaray_engine::EngineConfig { providers })
-            .map_err(RuntimeError::from)?;
-        let provider = engine
-            .require(&provider_id)
-            .map_err(|error| RuntimeError::from(error.to_string()))?
-            .clone();
-
-        run_on_worker_thread(move || async move {
-            provider
-                .list_models()
-                .await
-                .map_err(|error| error.to_string())
-        })
-        .await
-        .map_err(RuntimeError::from)
-    }
-
-    pub async fn get_service(
-        &self,
-        service_id: String,
-    ) -> Result<Option<ServiceConfigEntry>, RuntimeError> {
-        let service_id = validate_provider_id(service_id).map_err(RuntimeError::from)?;
-        let state = self.runtime.inner.state.read().await;
-        if let Some(service) = state.settings.services.get(&service_id) {
-            let mut entry = service.clone();
-            entry.id = service_id;
-            return Ok(Some(entry));
-        }
-
-        let Some(provider) = state.settings.providers.get(&service_id) else {
-            return Ok(None);
-        };
-        let entry = normalized_provider_entry(&service_id, provider);
-        let service_type = state.engine.require(&service_id).ok().and_then(|provider| {
-            if provider.translation().is_some() || provider.llm().is_some() {
-                Some(ServiceType::Translation)
-            } else if provider.dictionary().is_some() {
-                Some(ServiceType::Dictionary)
-            } else if provider.ocr().is_some() {
-                Some(ServiceType::Ocr)
-            } else {
-                None
-            }
-        });
-
-        Ok(service_type
-            .map(|service_type| service_entry_for_provider_type(&service_id, &entry, service_type)))
-    }
-
-    pub async fn get_provider(
-        &self,
-        provider_id: String,
-    ) -> Result<Option<ProviderConfigEntry>, RuntimeError> {
-        let provider_id = validate_provider_id(provider_id).map_err(RuntimeError::from)?;
-        let state = self.runtime.inner.state.read().await;
-        Ok(state
-            .settings
-            .providers
-            .get(&provider_id)
-            .map(|provider| normalized_provider_entry(&provider_id, provider)))
-    }
-
-    pub async fn update_provider(
-        &self,
-        provider_id: String,
-        provider_type: String,
-        fields: HashMap<String, String>,
-        preset_id: Option<String>,
-    ) -> Result<ProviderConfigEntry, RuntimeError> {
-        let provider_id = validate_provider_id(provider_id).map_err(RuntimeError::from)?;
-        let provider_type =
-            validate_required("provider_type", provider_type).map_err(RuntimeError::from)?;
-        let provider_type = crate::domain::settings::parse_provider_type(&provider_type)
-            .map_err(RuntimeError::from)?;
-        let entry = ProviderConfigEntry {
-            id: provider_id.clone(),
-            r#type: provider_type,
-            fields,
-            created_at: None,
-            preset_id: preset_id.clone(),
-        };
-        let config = crate::domain::settings::provider_config_from_settings(&entry)
-            .map_err(RuntimeError::from)?;
-
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .ok();
-
-        self.commit_settings(SettingsChange::Providers, move |settings| {
-            let mut entry = provider_entry_from_config(&provider_id, &config)?;
-            entry.preset_id = preset_id.clone().or_else(|| {
-                settings
-                    .providers
-                    .get(&provider_id)
-                    .and_then(|existing| existing.preset_id.clone())
-            });
-            let implicit_translation = format!("{provider_id}+translation");
-            if let Some(existing) = settings.providers.get_mut(&provider_id) {
-                existing.id = provider_id.clone();
-                existing.r#type = entry.r#type;
-                existing.fields = entry.fields.clone();
-                existing.preset_id = entry.preset_id.clone();
-            } else {
-                let mut new_entry = entry.clone();
-                new_entry.created_at = now;
-                settings.providers.insert(provider_id.clone(), new_entry);
-                append_translation_service_order(settings, &implicit_translation);
-            }
-            Ok(entry)
-        })
-        .await
-        .map_err(Into::into)
-    }
-
-    pub async fn update_service(
-        &self,
-        service_id: String,
-        provider_id: String,
-        service_type: ServiceType,
-        name: String,
-        fields: HashMap<String, String>,
-    ) -> Result<ServiceConfigEntry, RuntimeError> {
-        let service_id = validate_provider_id(service_id).map_err(RuntimeError::from)?;
-        let provider_id = validate_provider_id(provider_id).map_err(RuntimeError::from)?;
-        let name = name.trim().to_owned();
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .ok();
-
-        self.commit_settings(SettingsChange::Providers, move |settings| {
-            if !settings.providers.contains_key(&provider_id) {
-                return Err(format!("provider `{provider_id}` does not exist"));
-            }
-            if service_id == provider_id {
-                return Err("custom service id must be different from provider id".to_owned());
-            }
-
-            let mut entry = ServiceConfigEntry {
-                id: service_id.clone(),
-                provider_id,
-                r#type: service_type,
-                name,
-                fields,
-                created_at: None,
-            };
-            if let Some(existing) = settings.services.get(&service_id) {
-                entry.created_at = existing.created_at.or(now);
-            } else {
-                entry.created_at = now;
-            }
-            let is_new = !settings.services.contains_key(&service_id);
-            settings.services.insert(service_id.clone(), entry.clone());
-            if is_new && service_type == ServiceType::Translation {
-                append_translation_service_order(settings, &service_id);
-            }
-            Ok(entry)
-        })
-        .await
-        .map_err(Into::into)
-    }
-
-    pub async fn delete_provider(
-        &self,
-        provider_id: String,
-    ) -> Result<Option<ProviderConfigEntry>, RuntimeError> {
-        let provider_id = validate_provider_id(provider_id).map_err(RuntimeError::from)?;
-        self.commit_settings(SettingsChange::Providers, move |settings| {
-            let removed = settings
-                .providers
-                .remove(&provider_id)
-                .map(|provider| normalized_provider_entry(&provider_id, &provider));
-            let removed_service_ids = settings
-                .services
-                .values()
-                .filter(|service| service.provider_id == provider_id)
-                .map(|service| service.id.clone())
-                .collect::<std::collections::HashSet<_>>();
-            settings
-                .services
-                .retain(|_, service| service.provider_id != provider_id);
-            remove_provider_from_translation_order(settings, &provider_id);
-            if removed_service_ids.contains(&settings.general.default_translation_service) {
-                settings.general.default_translation_service.clear();
-            }
-            if removed_service_ids.contains(&settings.general.default_ocr_service) {
-                settings.general.default_ocr_service.clear();
-            }
-            if removed_service_ids.contains(&settings.general.default_directory_service) {
-                settings.general.default_directory_service.clear();
-            }
-            Ok(removed)
-        })
-        .await
-        .map_err(Into::into)
-    }
-
-    pub async fn delete_service(
-        &self,
-        service_id: String,
-    ) -> Result<Option<ServiceConfigEntry>, RuntimeError> {
-        let service_id = validate_provider_id(service_id).map_err(RuntimeError::from)?;
-        self.commit_settings(SettingsChange::Providers, move |settings| {
-            let removed = settings.services.remove(&service_id).map(|mut service| {
-                service.id = service_id.clone();
-                service
-            });
-            remove_translation_service_order(settings, &service_id);
-            if settings.general.default_translation_service == service_id {
-                settings.general.default_translation_service.clear();
-            }
-            if settings.general.default_ocr_service == service_id {
-                settings.general.default_ocr_service.clear();
-            }
-            if settings.general.default_directory_service == service_id {
-                settings.general.default_directory_service.clear();
-            }
-            Ok(removed)
-        })
-        .await
-        .map_err(Into::into)
-    }
-
-    pub async fn set_translation_service_order(
-        &self,
-        order: Vec<String>,
-    ) -> Result<Vec<String>, RuntimeError> {
-        self.commit_settings(SettingsChange::General, move |settings| {
-            settings.general.translation_service_order = order.clone();
-            Ok(settings.general.translation_service_order.clone())
-        })
-        .await
-        .map_err(Into::into)
-    }
-
-    /// Returns a fresh subscription that starts receiving
-    /// [`SettingsChange`] events emitted **after** this call. Existing
-    /// state should be loaded eagerly via the corresponding `get_*`
-    /// methods; subscriptions are intentionally not replayed.
-    pub fn subscribe(&self) -> Arc<SettingsSubscription> {
-        Arc::new(SettingsSubscription {
-            receiver: AsyncMutex::new(self.runtime.inner.events.subscribe()),
-        })
-    }
-}
-
-#[uniffi::export(async_runtime = "tokio")]
-impl SettingsSubscription {
-    /// Awaits the next [`SettingsChange`] event. Returns `None` when the
-    /// owning [`Runtime`] has been dropped (no further events will arrive).
-    /// If this subscription falls behind, missed events are silently
-    /// skipped and the next available event is returned.
-    pub async fn next(&self) -> Result<Option<SettingsChange>, RuntimeError> {
-        let mut rx = self.receiver.lock().await;
-        loop {
-            match rx.recv().await {
-                Ok(change) => return Ok(Some(change)),
-                Err(broadcast::error::RecvError::Closed) => return Ok(None),
-                Err(broadcast::error::RecvError::Lagged(_)) => continue,
-            }
-        }
-    }
-}
-
-impl Runtime {
-    /// Terms from the enabled books that occur in `text`. Used by the
-    /// translation path to constrain the model and by the UI to highlight.
-    pub(crate) async fn glossary_matches(
-        &self,
-        text: &str,
-        source_language: Option<&str>,
-        target_language: Option<&str>,
-    ) -> Vec<GlossaryMatch> {
-        self.inner
-            .glossary
-            .read()
-            .await
-            .match_text(text, source_language, target_language)
-    }
-
-    /// Counts one use of each matched term. Failures here are never worth
-    /// failing a translation over, so they stay inside the store.
-    pub(crate) async fn record_glossary_hits(&self, matches: &[GlossaryMatch]) {
-        if matches.is_empty() {
-            return;
-        }
-        self.inner.glossary.write().await.record_hits(matches);
-    }
-}
-
-impl RuntimeGlossary {
-    /// Applies a change, persists it and tells subscribers the glossary moved.
-    async fn commit<T>(
-        &self,
-        update: impl FnOnce(&mut GlossaryStore) -> Result<T, String>,
-    ) -> Result<T, String> {
-        let result = {
-            let mut store = self.runtime.inner.glossary.write().await;
-            update(&mut store)?
-        };
-        // `send` only fails when nobody is subscribed yet, which is benign.
-        let _ = self.runtime.inner.events.send(SettingsChange::Glossary);
-        Ok(result)
-    }
-}
-
-impl RuntimeHistory {
-    async fn commit<T>(
-        &self,
-        update: impl FnOnce(&mut HistoryStore) -> Result<T, String>,
-    ) -> Result<T, String> {
-        let result = {
-            let mut store = self.runtime.inner.history.write().await;
-            update(&mut store)?
-        };
-        let _ = self.runtime.inner.events.send(SettingsChange::History);
-        Ok(result)
-    }
-}
-
-#[uniffi::export(async_runtime = "tokio")]
-impl RuntimeHistory {
-    pub async fn list_entries(
-        &self,
-        filter: HistoryFilter,
-        query: Option<String>,
-    ) -> Result<Vec<HistoryEntry>, RuntimeError> {
-        self.runtime
-            .inner
-            .history
-            .write()
-            .await
-            .list_entries(filter, query.as_deref())
-            .map_err(Into::into)
-    }
-
-    pub async fn counts(&self) -> Result<HistoryCounts, RuntimeError> {
-        self.runtime
-            .inner
-            .history
-            .write()
-            .await
-            .counts()
-            .map_err(Into::into)
-    }
-
-    pub async fn upsert_entry(
-        &self,
-        input: HistoryEntryInput,
-    ) -> Result<HistoryEntry, RuntimeError> {
-        self.commit(|store| store.upsert_entry(input))
-            .await
-            .map_err(Into::into)
-    }
-
-    pub async fn set_favorite(
-        &self,
-        entry_id: String,
-        favorite: bool,
-    ) -> Result<Option<HistoryEntry>, RuntimeError> {
-        self.commit(|store| store.set_favorite(&entry_id, favorite))
-            .await
-            .map_err(Into::into)
-    }
-
-    pub async fn delete_entries(&self, entry_ids: Vec<String>) -> Result<u32, RuntimeError> {
-        self.commit(|store| store.delete_entries(&entry_ids))
-            .await
-            .map_err(Into::into)
-    }
-
-    pub async fn clear(&self) -> Result<u32, RuntimeError> {
-        self.commit(|store| store.clear()).await.map_err(Into::into)
-    }
-}
-
-impl RuntimeVocabulary {
-    async fn commit<T>(
-        &self,
-        update: impl FnOnce(&mut VocabularyStore) -> Result<T, String>,
-    ) -> Result<T, String> {
-        let result = {
-            let mut store = self.runtime.inner.vocabulary.write().await;
-            update(&mut store)?
-        };
-        let _ = self.runtime.inner.events.send(SettingsChange::Vocabulary);
-        Ok(result)
-    }
-}
-
-#[uniffi::export(async_runtime = "tokio")]
-impl RuntimeVocabulary {
-    pub async fn list_entries(
-        &self,
-        filter: VocabularyFilter,
-        query: Option<String>,
-    ) -> Result<Vec<VocabularyEntry>, RuntimeError> {
-        Ok(self
-            .runtime
-            .inner
-            .vocabulary
-            .read()
-            .await
-            .list_entries(filter, query.as_deref()))
-    }
-
-    pub async fn upsert_entry(
-        &self,
-        input: VocabularyEntryInput,
-    ) -> Result<VocabularyEntry, RuntimeError> {
-        self.commit(|store| store.upsert_entry(input))
-            .await
-            .map_err(Into::into)
-    }
-
-    pub async fn set_favorite(
-        &self,
-        entry_id: String,
-        favorite: bool,
-    ) -> Result<Option<VocabularyEntry>, RuntimeError> {
-        self.commit(|store| store.set_favorite(&entry_id, favorite))
-            .await
-            .map_err(Into::into)
-    }
-
-    pub async fn set_note(
-        &self,
-        entry_id: String,
-        note: Option<String>,
-    ) -> Result<Option<VocabularyEntry>, RuntimeError> {
-        self.commit(|store| store.set_note(&entry_id, note))
-            .await
-            .map_err(Into::into)
-    }
-
-    pub async fn delete_entries(&self, entry_ids: Vec<String>) -> Result<u32, RuntimeError> {
-        self.commit(|store| store.delete_entries(&entry_ids))
-            .await
-            .map_err(Into::into)
-    }
-}
-
-#[uniffi::export(async_runtime = "tokio")]
-impl RuntimeGlossary {
-    pub async fn list_books(&self) -> Result<Vec<GlossaryBook>, RuntimeError> {
-        Ok(self.runtime.inner.glossary.read().await.list_books())
-    }
-
-    pub async fn get_book(&self, book_id: String) -> Result<Option<GlossaryBook>, RuntimeError> {
-        Ok(self.runtime.inner.glossary.read().await.get_book(&book_id))
-    }
-
-    /// Creates a book when `input.id` is empty, otherwise replaces the named
-    /// book's metadata.
-    pub async fn upsert_book(
-        &self,
-        input: GlossaryBookInput,
-    ) -> Result<GlossaryBook, RuntimeError> {
-        self.commit(|store| store.upsert_book(input))
-            .await
-            .map_err(Into::into)
-    }
-
-    /// Returns `false` when the book was already gone.
-    pub async fn delete_book(&self, book_id: String) -> Result<bool, RuntimeError> {
-        self.commit(|store| store.delete_book(&book_id))
-            .await
-            .map_err(Into::into)
-    }
-
-    /// Terms in a book, newest first. `query` filters on term, translation,
-    /// forbidden list and note; `limit` of 0 means no limit.
-    pub async fn list_entries(
-        &self,
-        book_id: String,
-        query: Option<String>,
-        offset: u32,
-        limit: u32,
-    ) -> Result<Vec<GlossaryEntry>, RuntimeError> {
-        self.runtime
-            .inner
-            .glossary
-            .read()
-            .await
-            .list_entries(&book_id, query.as_deref(), offset, limit)
-            .map_err(Into::into)
-    }
-
-    /// How many terms `list_entries` would return with the same `query`.
-    pub async fn count_entries(
-        &self,
-        book_id: String,
-        query: Option<String>,
-    ) -> Result<u32, RuntimeError> {
-        self.runtime
-            .inner
-            .glossary
-            .read()
-            .await
-            .count_entries(&book_id, query.as_deref())
-            .map_err(Into::into)
-    }
-
-    /// Creates a term when `input.id` is empty, otherwise replaces it. An
-    /// empty id whose term already exists updates that term in place.
-    pub async fn upsert_entry(
-        &self,
-        book_id: String,
-        input: GlossaryEntryInput,
-    ) -> Result<GlossaryEntry, RuntimeError> {
-        self.commit(|store| store.upsert_entry(&book_id, input))
-            .await
-            .map_err(Into::into)
-    }
-
-    /// Returns `false` when the term was already gone.
-    pub async fn delete_entry(
-        &self,
-        book_id: String,
-        entry_id: String,
-    ) -> Result<bool, RuntimeError> {
-        self.commit(|store| store.delete_entry(&book_id, &entry_id))
-            .await
-            .map_err(Into::into)
-    }
-
-    /// Terms present in `text`, for highlighting the source before or during
-    /// a translation.
-    pub async fn match_text(
-        &self,
-        text: String,
-        source_language: Option<String>,
-        target_language: Option<String>,
-    ) -> Result<Vec<GlossaryMatch>, RuntimeError> {
-        Ok(self
-            .runtime
-            .glossary_matches(
-                &text,
-                source_language.as_deref(),
-                target_language.as_deref(),
-            )
-            .await)
-    }
-
-    /// Which glossary rules `translated` breaks. Engines that cannot be
-    /// constrained up front are checked here instead, so the result can be
-    /// flagged rather than silently rewritten.
-    pub async fn check(
-        &self,
-        source: String,
-        translated: String,
-        source_language: Option<String>,
-        target_language: Option<String>,
-    ) -> Result<Vec<GlossaryComplianceIssue>, RuntimeError> {
-        let matches = self
-            .runtime
-            .glossary_matches(
-                &source,
-                source_language.as_deref(),
-                target_language.as_deref(),
-            )
-            .await;
-        Ok(check_compliance(&matches, &translated))
-    }
-
-    /// Writes any hit counts still held in memory. Worth calling before the
-    /// app quits; everything else flushes on its own schedule.
-    pub async fn flush_hits(&self) -> Result<(), RuntimeError> {
-        self.runtime
-            .inner
-            .glossary
-            .write()
-            .await
-            .flush_hits()
-            .map_err(Into::into)
-    }
-}
-
-impl RuntimeTranslation {
-    async fn translate_impl(&self, request: TranslateRequest) -> Result<TranslateResponse, String> {
-        let service_id = self.service_id.clone();
-        let runtime = self.runtime.clone();
-        run_on_worker_thread(move || async move {
-            let target_language =
-                validate_optional_required("target_language", request.target_language)?;
-            let text = validate_required("text", request.text)?;
-            let source_language = optional_trimmed(request.source_language);
-            let resolved = runtime
-                .resolve_service(&service_id, ServiceType::Translation)
-                .await?;
-            let provider_id = resolved.provider_id.clone();
-            let provider = {
-                let state = runtime.inner.state.read().await;
-                state
-                    .engine
-                    .require(&provider_id)
-                    .map_err(|error| error.to_string())?
-                    .clone()
-            };
-
-            // Terms are looked up once for both branches: an LLM gets them as
-            // constraints, and either way their use is counted.
-            let matches = runtime
-                .glossary_matches(&text, source_language.as_deref(), Some(&target_language))
-                .await;
-            runtime.record_glossary_hits(&matches).await;
-
-            if let Some(translation_service) = provider.translation() {
-                // Use the dedicated translation service.
-                translation_service
-                    .translate(TranslateRequest {
-                        source_language,
-                        target_language: Some(target_language),
-                        text,
-                    })
-                    .await
-                    .map_err(|error| error.to_string())
-            } else if let Some(llm_service) = provider.llm() {
-                // LLM-based translation via prompts.
-                let model = resolved
-                    .field("model")
-                    .map(str::to_owned)
-                    .or_else(|| llm_service.available_models().into_iter().next())
-                    .ok_or_else(|| "llm default model must be configured".to_owned())?;
-                let terms = glossary_terms(&matches);
-                let system_prompt = if let Some(system_prompt) = resolved.field("systemPrompt") {
-                    render_prompt_template(
-                        system_prompt,
-                        source_language.as_deref().unwrap_or("auto"),
-                        &target_language,
-                        &text,
-                        &terms,
-                    )
-                } else {
-                    linguaray_engine::prompt::translate_text_system_prompt(
-                        source_language.as_deref().unwrap_or("auto"),
-                        &target_language,
-                        None,
-                        &terms,
-                    )
-                };
-                let user_prompt = linguaray_engine::prompt::translate_text_user_prompt(&text);
-                let response = llm_service
-                    .chat(linguaray_core::ChatRequest {
-                        model,
-                        messages: vec![
-                            ChatMessage::system(system_prompt),
-                            ChatMessage::user(user_prompt),
-                        ],
-                        temperature: Some(0.3),
-                        max_tokens: Some(4096),
-                        stream: None,
-                        response_format: None,
-                    })
-                    .await
-                    .map_err(|error| error.to_string())?;
-                let content = response
-                    .choices
-                    .first()
-                    .map(|choice| choice.message.content.clone())
-                    .ok_or_else(|| "no response from llm".to_owned())?;
-                Ok(TranslateResponse {
-                    translations: vec![linguaray_core::TextTranslation {
-                        text: content,
-                        detected_source_language: None,
-                        audio_url: None,
-                    }],
-                })
-            } else {
-                Err(format!(
-                    "provider `{provider_id}` does not support translation"
-                ))
-            }
-        })
-        .await
-    }
-}
-
-impl RuntimeTranslation {
-    async fn detect_language_impl(
-        &self,
-        request: DetectLanguageRequest,
-    ) -> Result<DetectLanguageResponse, String> {
-        let service_id = self.service_id.clone();
-        let runtime = self.runtime.clone();
-        run_on_worker_thread(move || async move {
-            let texts = request
-                .texts
-                .into_iter()
-                .map(|text| text.trim().to_string())
-                .filter(|text| !text.is_empty())
-                .collect::<Vec<_>>();
-            if texts.is_empty() {
-                return Err("texts must not be empty".to_owned());
-            }
-            let resolved = runtime
-                .resolve_service(&service_id, ServiceType::Translation)
-                .await?;
-            let provider_id = resolved.provider_id.clone();
-            let provider = {
-                let state = runtime.inner.state.read().await;
-                state
-                    .engine
-                    .require(&provider_id)
-                    .map_err(|error| error.to_string())?
-                    .clone()
-            };
-            if let Some(translation_service) = provider.translation() {
-                translation_service
-                    .detect_language(DetectLanguageRequest { texts })
-                    .await
-                    .map_err(|error| error.to_string())
-            } else if let Some(llm_service) = provider.llm() {
-                // LLM-based language detection.
-                let model = resolved
-                    .field("model")
-                    .map(str::to_owned)
-                    .or_else(|| llm_service.available_models().into_iter().next())
-                    .ok_or_else(|| "llm default model must be configured".to_owned())?;
-
-                let text = texts.join(" ");
-                let system_prompt = concat!(
-                        "You are a language detection expert. ",
-                        "Identify the language of the following text. ",
-                        "Return ONLY the ISO 639-1 language code (e.g. \"en\", \"zh\", \"ja\", \"fr\", \"de\", \"es\"). ",
-                        "If unsure, return \"auto\"."
-                    )
-                    .to_string();
-                let user_prompt = format!("Detect the language of this text:\n\n{text}");
-
-                let response = llm_service
-                    .chat(linguaray_core::ChatRequest {
-                        model,
-                        messages: vec![
-                            linguaray_core::ChatMessage::system(system_prompt),
-                            linguaray_core::ChatMessage::user(user_prompt),
-                        ],
-                        temperature: Some(0.0),
-                        max_tokens: Some(16),
-                        stream: None,
-                        response_format: None,
-                    })
-                    .await
-                    .map_err(|error| error.to_string())?;
-
-                let detected = response
-                    .choices
-                    .first()
-                    .map(|choice| choice.message.content.trim().to_lowercase())
-                    .filter(|code| !code.is_empty())
-                    .unwrap_or_else(|| "auto".to_string());
-
-                // Validate the detected code is a reasonable ISO 639-1 code
-                let code = if detected.len() == 2 && detected.chars().all(|c| c.is_ascii_alphabetic()) {
-                    detected
-                } else {
-                    "auto".to_string()
-                };
-
-                let detections: Vec<linguaray_core::TextDetection> = texts
-                    .iter()
-                    .map(|t| linguaray_core::TextDetection {
-                        detected_language: code.clone(),
-                        text: t.clone(),
-                    })
-                    .collect();
-
-                Ok(DetectLanguageResponse {
-                    detections: Some(detections),
-                })
-            } else {
-                Err(format!(
-                    "provider `{provider_id}` does not support translation"
-                ))
-            }
-        })
-        .await
-    }
-}
-
-impl RuntimeDictionary {
-    async fn lookup_impl(&self, request: LookUpRequest) -> Result<LookUpResponse, String> {
-        let service_id = self.service_id.clone();
-        let runtime = self.runtime.clone();
-        run_on_worker_thread(move || async move {
-            let source_language = validate_required("source_language", request.source_language)?;
-            let target_language = validate_required("target_language", request.target_language)?;
-            let word = validate_required("word", request.word)?;
-            let resolved = runtime
-                .resolve_service(&service_id, ServiceType::Dictionary)
-                .await?;
-            let provider_id = resolved.provider_id.clone();
-            let provider = {
-                let state = runtime.inner.state.read().await;
-                state
-                    .engine
-                    .require(&provider_id)
-                    .map_err(|error| error.to_string())?
-                    .clone()
-            };
-            let dictionary_service = provider
-                .dictionary()
-                .ok_or_else(|| format!("provider `{provider_id}` does not support dictionary"))?;
-
-            dictionary_service
-                .look_up(LookUpRequest {
-                    source_language,
-                    target_language,
-                    word,
-                })
-                .await
-                .map_err(|error| error.to_string())
-        })
-        .await
-    }
-}
-
-#[uniffi::export(async_runtime = "tokio")]
-impl RuntimeTranslation {
-    pub async fn translate(
-        &self,
-        request: TranslateRequest,
-    ) -> Result<TranslateResponse, RuntimeError> {
-        self.translate_impl(request).await.map_err(Into::into)
-    }
-
-    pub async fn detect_language(
-        &self,
-        request: DetectLanguageRequest,
-    ) -> Result<DetectLanguageResponse, RuntimeError> {
-        self.detect_language_impl(request).await.map_err(Into::into)
-    }
-}
-
-#[uniffi::export(async_runtime = "tokio")]
-impl RuntimeDictionary {
-    pub async fn lookup(&self, request: LookUpRequest) -> Result<LookUpResponse, RuntimeError> {
-        self.lookup_impl(request).await.map_err(Into::into)
-    }
-}
-
-impl RuntimeLlm {
-    async fn chat_impl(
-        &self,
-        model: String,
-        messages: Vec<linguaray_core::ChatMessage>,
-    ) -> Result<linguaray_core::ChatResponse, String> {
-        let service_id = self.service_id.clone();
-        let runtime = self.runtime.clone();
-        run_on_worker_thread(move || async move {
-            let model = validate_required("model", model)?;
-            if messages.is_empty() {
-                return Err("messages must not be empty".to_owned());
-            }
-            let resolved = runtime.resolve_llm_service(&service_id).await?;
-            let provider_id = resolved.provider_id;
-            let provider = {
-                let state = runtime.inner.state.read().await;
-                state
-                    .engine
-                    .require(&provider_id)
-                    .map_err(|error| error.to_string())?
-                    .clone()
-            };
-            let llm_service = provider
-                .llm()
-                .ok_or_else(|| format!("provider `{provider_id}` does not support llm"))?;
-
-            llm_service
-                .chat(linguaray_core::ChatRequest {
-                    model,
-                    messages,
-                    temperature: None,
-                    max_tokens: None,
-                    stream: None,
-                    response_format: None,
-                })
-                .await
-                .map_err(|error| error.to_string())
-        })
-        .await
-    }
-
-    async fn polish_impl(&self, text: String, style: String) -> Result<String, String> {
-        let service_id = self.service_id.clone();
-        let runtime = self.runtime.clone();
-        run_on_worker_thread(move || async move {
-            let text = validate_required("text", text)?;
-            let style = validate_required("style", style)?;
-            let resolved = runtime.resolve_llm_service(&service_id).await?;
-            let provider_id = resolved.provider_id.clone();
-            let provider = {
-                let state = runtime.inner.state.read().await;
-                state
-                    .engine
-                    .require(&provider_id)
-                    .map_err(|error| error.to_string())?
-                    .clone()
-            };
-            let llm_service = provider
-                .llm()
-                .ok_or_else(|| format!("provider `{provider_id}` does not support llm"))?;
-
-            let model = resolved
-                .field("model")
-                .map(str::to_owned)
-                .or_else(|| llm_service.available_models().into_iter().next())
-                .ok_or_else(|| "llm default model must be configured".to_owned())?;
-            let system_prompt = linguaray_engine::prompt::polish_translation_system_prompt(&style);
-
-            let response = llm_service
-                .chat(linguaray_core::ChatRequest {
-                    model,
-                    messages: vec![
-                        linguaray_core::ChatMessage::system(system_prompt),
-                        linguaray_core::ChatMessage::user(text),
-                    ],
-                    temperature: None,
-                    max_tokens: None,
-                    stream: None,
-                    response_format: None,
-                })
-                .await
-                .map_err(|error| error.to_string())?;
-
-            response
-                .choices
-                .first()
-                .map(|c| c.message.content.clone())
-                .ok_or_else(|| "no response from llm".to_owned())
-        })
-        .await
-    }
-
-    async fn explain_impl(&self, source: String, translation: String) -> Result<String, String> {
-        let service_id = self.service_id.clone();
-        let runtime = self.runtime.clone();
-        run_on_worker_thread(move || async move {
-            let source = validate_required("source", source)?;
-            let translation = validate_required("translation", translation)?;
-            let resolved = runtime.resolve_llm_service(&service_id).await?;
-            let provider_id = resolved.provider_id.clone();
-            let provider = {
-                let state = runtime.inner.state.read().await;
-                state
-                    .engine
-                    .require(&provider_id)
-                    .map_err(|error| error.to_string())?
-                    .clone()
-            };
-            let llm_service = provider
-                .llm()
-                .ok_or_else(|| format!("provider `{provider_id}` does not support llm"))?;
-
-            let model = resolved
-                .field("model")
-                .map(str::to_owned)
-                .or_else(|| llm_service.available_models().into_iter().next())
-                .ok_or_else(|| "llm default model must be configured".to_owned())?;
-            let system_prompt = linguaray_engine::prompt::explain_translation_system_prompt();
-            let user_prompt = format!("Source text: {source}\n\nTranslation: {translation}");
-
-            let response = llm_service
-                .chat(linguaray_core::ChatRequest {
-                    model,
-                    messages: vec![
-                        linguaray_core::ChatMessage::system(system_prompt),
-                        linguaray_core::ChatMessage::user(user_prompt),
-                    ],
-                    temperature: None,
-                    max_tokens: None,
-                    stream: None,
-                    response_format: None,
-                })
-                .await
-                .map_err(|error| error.to_string())?;
-
-            response
-                .choices
-                .first()
-                .map(|c| c.message.content.clone())
-                .ok_or_else(|| "no response from llm".to_owned())
-        })
-        .await
-    }
-
-    async fn alternatives_impl(
-        &self,
-        text: String,
-        source_lang: String,
-        target_lang: String,
-        count: u32,
-        style: Option<String>,
-    ) -> Result<Vec<String>, String> {
-        let service_id = self.service_id.clone();
-        let runtime = self.runtime.clone();
-        run_on_worker_thread(move || async move {
-            let text = validate_required("text", text)?;
-            let source_lang = validate_required("source_lang", source_lang)?;
-            let target_lang = validate_required("target_lang", target_lang)?;
-            if count == 0 {
-                return Err("count must be greater than 0".to_owned());
-            }
-            let resolved = runtime.resolve_llm_service(&service_id).await?;
-            let provider_id = resolved.provider_id.clone();
-            let provider = {
-                let state = runtime.inner.state.read().await;
-                state
-                    .engine
-                    .require(&provider_id)
-                    .map_err(|error| error.to_string())?
-                    .clone()
-            };
-            let llm_service = provider
-                .llm()
-                .ok_or_else(|| format!("provider `{provider_id}` does not support llm"))?;
-
-            let model = resolved
-                .field("model")
-                .map(str::to_owned)
-                .or_else(|| llm_service.available_models().into_iter().next())
-                .ok_or_else(|| "llm default model must be configured".to_owned())?;
-            let system_prompt = linguaray_engine::prompt::alternative_translations_system_prompt(
-                count,
-                style.as_deref(),
-            );
-            let user_prompt = format!(
-                "Source language: {source_lang}\nTarget language: {target_lang}\nText: {text}"
-            );
-
-            let response = llm_service
-                .chat(linguaray_core::ChatRequest {
-                    model,
-                    messages: vec![
-                        linguaray_core::ChatMessage::system(system_prompt),
-                        linguaray_core::ChatMessage::user(user_prompt),
-                    ],
-                    temperature: None,
-                    max_tokens: None,
-                    stream: None,
-                    response_format: None,
-                })
-                .await
-                .map_err(|error| error.to_string())?;
-
-            let content = response
-                .choices
-                .first()
-                .map(|c| c.message.content.clone())
-                .ok_or_else(|| "no response from llm".to_owned())?;
-
-            parse_alternatives_json(&content)
-        })
-        .await
-    }
-
-    async fn translate_stream_impl(
-        &self,
-        source_lang: String,
-        target_lang: String,
-        text: String,
-        callback: Arc<dyn StreamCallback>,
-    ) -> Result<(), String> {
-        let service_id = self.service_id.clone();
-        let runtime = self.runtime.clone();
-        run_on_worker_thread(move || async move {
-            let text = validate_required("text", text)?;
-            let resolved = match runtime
-                .resolve_service(&service_id, ServiceType::Translation)
-                .await
-            {
-                Ok(service) => service,
-                Err(_) => runtime.resolve_llm_service(&service_id).await?,
-            };
-            let provider_id = resolved.provider_id.clone();
-            let provider = {
-                let state = runtime.inner.state.read().await;
-                state
-                    .engine
-                    .require(&provider_id)
-                    .map_err(|error| error.to_string())?
-                    .clone()
-            };
-            let matches = runtime
-                .glossary_matches(&text, Some(&source_lang), Some(&target_lang))
-                .await;
-            runtime.record_glossary_hits(&matches).await;
-
-            if let Some(llm_service) = provider.llm() {
-                // LLM-based streaming translation
-                let model = resolved
-                    .field("model")
-                    .map(str::to_owned)
-                    .or_else(|| llm_service.available_models().into_iter().next())
-                    .ok_or_else(|| "llm default model must be configured".to_owned())?;
-                let terms = glossary_terms(&matches);
-                let system_prompt = if let Some(system_prompt) = resolved.field("systemPrompt") {
-                    render_prompt_template(system_prompt, &source_lang, &target_lang, &text, &terms)
-                } else {
-                    linguaray_engine::prompt::translate_text_system_prompt(
-                        &source_lang,
-                        &target_lang,
-                        None,
-                        &terms,
-                    )
-                };
-                let user_prompt = linguaray_engine::prompt::translate_text_user_prompt(&text);
-
-                let receiver = llm_service
-                    .chat_stream(linguaray_core::ChatRequest {
-                        model,
-                        messages: vec![
-                            linguaray_core::ChatMessage::system(system_prompt),
-                            linguaray_core::ChatMessage::user(user_prompt),
-                        ],
-                        temperature: Some(0.3),
-                        max_tokens: Some(4096),
-                        stream: Some(true),
-                        response_format: None,
-                    })
-                    .await
-                    .map_err(|error| error.to_string())?;
-
-                loop {
-                    match receiver.rx.recv() {
-                        Ok(chunk) => {
-                            if let Some(reason) = chunk.finish_reason {
-                                if reason == "error" {
-                                    callback.on_error(chunk.content);
-                                } else {
-                                    callback.on_finish(reason);
-                                }
-                                break;
-                            }
-                            callback.on_chunk(chunk.content);
-                        }
-                        Err(_) => {
-                            callback.on_finish("stop".to_string());
-                            break;
-                        }
-                    }
-                }
-            } else {
-                // Fallback to non-streaming translation via the translation service
-                let translation_service = provider.translation().ok_or_else(|| {
-                    format!("provider `{provider_id}` does not support translation")
-                })?;
-                let response = translation_service
-                    .translate(linguaray_core::TranslateRequest {
-                        source_language: Some(source_lang.clone()),
-                        target_language: Some(target_lang),
-                        text: text.clone(),
-                    })
-                    .await
-                    .map_err(|error| error.to_string())?;
-                for translation in response.translations {
-                    callback.on_chunk(translation.text);
-                }
-                callback.on_finish("stop".to_string());
-            }
-
-            Ok(())
-        })
-        .await
-    }
-}
-
-#[uniffi::export(async_runtime = "tokio")]
-impl RuntimeLlm {
-    pub async fn chat(
-        &self,
-        model: String,
-        messages: Vec<linguaray_core::ChatMessage>,
-    ) -> Result<linguaray_core::ChatResponse, RuntimeError> {
-        self.chat_impl(model, messages).await.map_err(Into::into)
-    }
-
-    pub async fn polish(&self, text: String, style: String) -> Result<String, RuntimeError> {
-        self.polish_impl(text, style).await.map_err(Into::into)
-    }
-
-    pub async fn explain(
-        &self,
-        source: String,
-        translation: String,
-    ) -> Result<String, RuntimeError> {
-        self.explain_impl(source, translation)
-            .await
-            .map_err(Into::into)
-    }
-
-    pub async fn alternatives(
-        &self,
-        text: String,
-        source_lang: String,
-        target_lang: String,
-        count: u32,
-        style: Option<String>,
-    ) -> Result<Vec<String>, RuntimeError> {
-        self.alternatives_impl(text, source_lang, target_lang, count, style)
-            .await
-            .map_err(Into::into)
-    }
-}
-
-#[uniffi::export]
-impl RuntimeLlm {
-    pub fn translate_stream(
-        &self,
-        source_lang: String,
-        target_lang: String,
-        text: String,
-        callback: Box<dyn StreamCallback>,
-    ) {
-        let this = self.clone();
-        let callback: Arc<dyn StreamCallback> = callback.into();
-        let callback_for_worker = callback.clone();
-
-        if let Err(error) = thread::Builder::new()
-            .name("linguaray-engine-bridge".to_owned())
-            .spawn(move || {
-                let result = tokio::runtime::Builder::new_current_thread()
-                    .enable_all()
-                    .build()
-                    .map_err(|error| format!("failed to build tokio runtime: {error}"))
-                    .and_then(|runtime| {
-                        runtime.block_on(this.translate_stream_impl(
-                            source_lang,
-                            target_lang,
-                            text,
-                            callback_for_worker.clone(),
-                        ))
-                    });
-
-                if let Err(error) = result {
-                    callback_for_worker.on_error(error);
-                }
-            })
-        {
-            callback.on_error(format!("failed to spawn runtime worker thread: {error}"));
-        }
-    }
-}
-
-fn parse_alternatives_json(content: &str) -> Result<Vec<String>, String> {
-    #[derive(serde::Deserialize)]
-    struct AlternativesContainer {
-        alternatives: Vec<AlternativeEntry>,
-    }
-
-    #[derive(serde::Deserialize)]
-    struct AlternativeEntry {
-        text: String,
-    }
-
-    let parsed: AlternativesContainer = serde_json::from_str(content)
-        .map_err(|error| format!("failed to parse alternatives response: {error}"))?;
-
-    Ok(parsed.alternatives.into_iter().map(|a| a.text).collect())
-}
-
-impl RuntimeOcr {
-    async fn recognize_text_impl(
-        &self,
-        request: RecognizeTextRequest,
-    ) -> Result<RecognizeTextResponse, String> {
-        let service_id = self.service_id.clone();
-        let runtime = self.runtime.clone();
-        run_on_worker_thread(move || async move {
-            let resolved = runtime
-                .resolve_service(&service_id, ServiceType::Ocr)
-                .await?;
-            let provider_id = resolved.provider_id;
-            let provider = {
-                let state = runtime.inner.state.read().await;
-                state
-                    .engine
-                    .require(&provider_id)
-                    .map_err(|error| error.to_string())?
-                    .clone()
-            };
-            let ocr_service = provider
-                .ocr()
-                .ok_or_else(|| format!("provider `{provider_id}` does not support ocr"))?;
-
-            ocr_service
-                .recognize_text(request)
-                .await
-                .map_err(|error| error.to_string())
-        })
-        .await
-    }
-}
-
-#[uniffi::export(async_runtime = "tokio")]
-impl RuntimeOcr {
-    pub async fn recognize_text(
-        &self,
-        request: RecognizeTextRequest,
-    ) -> Result<RecognizeTextResponse, RuntimeError> {
-        self.recognize_text_impl(request).await.map_err(Into::into)
-    }
-}
-
-#[uniffi::export(async_runtime = "tokio")]
-impl RuntimePermission {
-    /// macOS only: check if Screen Recording permission is granted.
-    /// Returns `true` on other platforms.
-    pub async fn is_screen_recording_permission_granted(&self) -> bool {
-        permission::is_screen_recording_permission_granted()
-    }
-
-    /// macOS only: request Screen Recording permission.
-    /// If `only_open_system_settings` is true, just opens System Settings.
-    /// No-op on other platforms.
-    pub async fn request_screen_recording_permission(&self, only_open_system_settings: bool) {
-        permission::request_screen_recording_permission(only_open_system_settings);
-    }
-
-    /// macOS only: check if Accessibility permission is granted.
-    /// Returns `true` on other platforms.
-    pub async fn is_accessibility_permission_granted(&self) -> bool {
-        permission::is_accessibility_permission_granted()
-    }
-
-    /// macOS only: request Accessibility permission.
-    /// If `only_open_system_settings` is true, just opens System Settings.
-    /// No-op on other platforms.
-    pub async fn request_accessibility_permission(&self, only_open_system_settings: bool) {
-        permission::request_accessibility_permission(only_open_system_settings);
-    }
-}
-
-#[uniffi::export(async_runtime = "tokio")]
-impl RuntimeTextExtractor {
-    /// Read the current clipboard text.
-    pub async fn extract_from_clipboard(&self) -> Result<String, RuntimeError> {
-        text_extractor::extract_from_clipboard()
-            .map_err(|e| RuntimeError::Error { msg: e.to_string() })
-    }
-
-    /// Extract text from the current screen selection.
-    ///
-    /// **macOS / Windows:** Simulates Cmd+C / Ctrl+C, polls the clipboard
-    /// until content changes (or 3s timeout), then returns the text.
-    ///
-    /// **Linux:** Reads the PRIMARY selection directly via `xclip`.
-    pub async fn extract_from_screen_selection(&self) -> Result<String, RuntimeError> {
-        text_extractor::extract_from_screen_selection()
-            .map_err(|e| RuntimeError::Error { msg: e.to_string() })
-    }
-
-    /// Detailed selection extraction with method and non-fatal recovery
-    /// warnings. The clipboard is restored before this future completes.
-    pub async fn extract_from_screen_selection_detailed(
-        &self,
-    ) -> Result<text_extractor::SelectionExtraction, RuntimeError> {
-        text_extractor::extract_from_screen_selection_detailed()
-            .map_err(|e| RuntimeError::Error { msg: e.to_string() })
-    }
-
-    /// Capture a screenshot and recognize text using the default OCR service.
-    ///
-    /// 1. Interactively captures a screen region (via `screencapture` on macOS
-    ///    or `import` on Linux; unsupported on Windows).
-    /// 2. Sends the captured image to the configured default OCR service.
-    /// 3. Returns the recognized text.
-    ///
-    /// The user must have a default OCR service configured in settings.
-    pub async fn extract_from_screen_capture(&self) -> Result<String, RuntimeError> {
-        let runtime = self.runtime.clone();
-
-        // 1. Take a screenshot to a temporary file.
-        let image_path =
-            capture_screenshot().map_err(|e| RuntimeError::Error { msg: e.to_string() })?;
-
-        // 2. Read settings to get the default OCR service ID.
-        let service_id = {
-            let state = runtime.inner.state.read().await;
-            let ocr_service_id = state.settings.general.default_ocr_service.clone();
-            if ocr_service_id.is_empty() {
-                return Err(RuntimeError::Error {
-                    msg: "no default OCR service configured".into(),
-                });
-            }
-            ocr_service_id
-        };
-
-        // 3. Run OCR on the worker thread.
-        let result = run_on_worker_thread(move || async move {
-            let resolved = runtime
-                .resolve_service(&service_id, ServiceType::Ocr)
-                .await?;
-            let provider_id = resolved.provider_id;
-            let provider = {
-                let state = runtime.inner.state.read().await;
-                state
-                    .engine
-                    .require(&provider_id)
-                    .map_err(|error| error.to_string())?
-                    .clone()
-            };
-            let ocr_service = provider
-                .ocr()
-                .ok_or_else(|| format!("provider `{provider_id}` does not support ocr"))?;
-
-            let request = RecognizeTextRequest {
-                image_path: Some(image_path),
-                base64_image: None,
-            };
-
-            let response = ocr_service
-                .recognize_text(request)
-                .await
-                .map_err(|error| error.to_string())?;
-
-            Ok(response.text)
-        })
-        .await;
-
-        result.map_err(|e| RuntimeError::Error { msg: e })
-    }
-}
-
-/// Capture a screenshot of a selected screen region and return the path.
-///
-/// Creates a temporary PNG file, invokes the platform-specific screen
-/// capture command, and returns the path to the saved image.
-fn capture_screenshot() -> Result<String, String> {
-    let timestamp = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis();
-    let file_name = format!("linguaray-screenshot-{timestamp}.png");
-    let path = std::env::temp_dir().join(&file_name);
-    let path_str = path
-        .to_str()
-        .ok_or_else(|| "failed to convert screenshot path to string".to_owned())?;
-
-    text_extractor::capture_screen(path_str).map_err(|e| format!("screen capture failed: {e}"))
-}
-
-fn normalized_provider_entry(
-    provider_id: &str,
-    provider: &ProviderConfigEntry,
-) -> ProviderConfigEntry {
-    let mut provider = provider.clone();
-    if provider.id.trim().is_empty() {
-        provider.id = provider_id.to_owned();
-    }
-    provider
-}
-
-fn service_type_rank(service_type: ServiceType) -> u8 {
-    match service_type {
-        ServiceType::Translation => 0,
-        ServiceType::Dictionary => 1,
-        ServiceType::Ocr => 2,
-        ServiceType::Llm => 3,
-    }
-}
-
-fn advertises_system_capability(provider_id: &str, service_type: ServiceType) -> bool {
-    if provider_id != "system" {
-        return true;
-    }
-    match service_type {
-        ServiceType::Ocr => true,
-        ServiceType::Translation | ServiceType::Dictionary | ServiceType::Llm => {
-            cfg!(target_os = "macos")
-        }
-    }
-}
-
-fn validate_provider_id(provider_id: String) -> Result<String, String> {
-    validate_required("provider_id", provider_id)
-}
-
-fn validate_service_provider_id(provider_id: String, suffix: &str) -> Result<String, String> {
-    let provider_id = validate_provider_id(provider_id)?;
-    // Try to strip the expected suffix first. If that doesn't match, also try
-    // common alternative suffixes for backward compatibility (e.g. a stored
-    // default service ID like "openai+llm" passed to translation()).
-    Ok(provider_id
-        .strip_suffix(suffix)
-        .or_else(|| {
-            let alternatives: &[&str] = match suffix {
-                "+translation" => &["+llm"],
-                "+llm" => &["+translation"],
-                _ => &[],
-            };
-            alternatives
-                .iter()
-                .find_map(|alt| provider_id.strip_suffix(alt))
-        })
-        .unwrap_or(&provider_id)
-        .to_owned())
-}
-
-fn validate_optional_required(name: &str, value: Option<String>) -> Result<String, String> {
-    validate_required(name, value.unwrap_or_default())
-}
-
-fn validate_required(name: &str, value: String) -> Result<String, String> {
-    let value = value.trim().to_owned();
-    if value.is_empty() {
-        return Err(format!("{name} is required"));
-    }
-    Ok(value)
-}
-
-fn optional_trimmed(value: Option<String>) -> Option<String> {
-    value
-        .map(|value| value.trim().to_owned())
-        .filter(|value| !value.is_empty())
-}
-
-async fn run_on_worker_thread<F, Fut, T>(task: F) -> Result<T, String>
-where
-    F: FnOnce() -> Fut + Send + 'static,
-    Fut: Future<Output = Result<T, String>> + 'static,
-    T: Send + 'static,
-{
-    let (sender, receiver) = tokio::sync::oneshot::channel();
-
-    thread::Builder::new()
-        .name("linguaray-engine-bridge".to_owned())
-        .spawn(move || {
-            let result = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .map_err(|error| format!("failed to build tokio runtime: {error}"))
-                .and_then(|runtime| runtime.block_on(task()));
-
-            let _ = sender.send(result);
-        })
-        .map_err(|error| format!("failed to spawn runtime worker thread: {error}"))?;
-
-    receiver
-        .await
-        .map_err(|error| format!("runtime worker thread ended unexpectedly: {error}"))?
-}
+include!("runtime/support.rs");
 
 #[cfg(test)]
 mod tests;

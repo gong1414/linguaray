@@ -1,7 +1,11 @@
+mod capability;
 mod model;
-mod provider;
-mod service;
+mod provider_contract;
 
+pub use capability::{
+    DictionaryError, DictionaryService, LlmError, LlmService, LlmStreamReceiver, OcrError,
+    OcrService, TranslationError, TranslationService,
+};
 pub use model::{
     ChatChoice, ChatMessage, ChatRequest, ChatResponse, ChatRole, ChatUsage, DetectLanguageRequest,
     DetectLanguageResponse, LanguageInfo, LanguagePair, LookUpRequest, LookUpResponse,
@@ -10,8 +14,4 @@ pub use model::{
     TranslateResponse, TranslationTarget, WordDefinition, WordEtymology, WordImage, WordPhrase,
     WordPronunciation, WordSentence, WordSynonym, WordTag, WordTense,
 };
-pub use provider::Provider;
-pub use service::{
-    DictionaryError, DictionaryService, LlmError, LlmService, LlmStreamReceiver, OcrError,
-    OcrService, TranslationError, TranslationService,
-};
+pub use provider_contract::Provider;

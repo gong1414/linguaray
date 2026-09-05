@@ -677,9 +677,10 @@ class _TranslationsWorkbenchPlaceholderEs
   // Translations
   @override
   String get history =>
-      'Favoritos e historial estarán disponibles más adelante';
+      'Revisa, edita, guarda y reutiliza traducciones anteriores';
   @override
-  String get glossary => 'La gestión del glosario está en desarrollo';
+  String get glossary =>
+      'Gestiona términos obligatorios y alternativas prohibidas';
 }
 
 // Path: workbench.glossary_page
@@ -798,7 +799,8 @@ class _TranslationsWorkbenchTranslationEs
   @override
   String get copy => 'Copiar';
   @override
-  String get favorite_unavailable => 'Favoritos estará disponible más adelante';
+  String get favorite_unavailable =>
+      'No se pudo actualizar el favorito. Inténtalo de nuevo.';
   @override
   String get preferred => 'Traducción preferida';
   @override
@@ -2383,9 +2385,9 @@ extension on TranslationsEs {
         'Mesa de trabajo · Comparación de servicios',
       'workbench.subtitle.settings' => 'Ajustes',
       'workbench.placeholder.history' =>
-        'Favoritos e historial estarán disponibles más adelante',
+        'Revisa, edita, guarda y reutiliza traducciones anteriores',
       'workbench.placeholder.glossary' =>
-        'La gestión del glosario está en desarrollo',
+        'Gestiona términos obligatorios y alternativas prohibidas',
       'workbench.glossary_page.add_entry' => 'Nueva entrada',
       'workbench.glossary_page.term' => 'Origen',
       'workbench.glossary_page.translation' => 'Traducción obligatoria',
@@ -2445,7 +2447,7 @@ extension on TranslationsEs {
       'workbench.translation.waiting' => 'Esperando traducción',
       'workbench.translation.copy' => 'Copiar',
       'workbench.translation.favorite_unavailable' =>
-        'Favoritos estará disponible más adelante',
+        'No se pudo actualizar el favorito. Inténtalo de nuevo.',
       'workbench.translation.preferred' => 'Traducción preferida',
       'workbench.translation.other_services' => 'Otros servicios',
       'workbench.translation.copy_result' => 'Copiar traducción',

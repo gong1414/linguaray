@@ -1,6 +1,6 @@
 #![cfg_attr(not(feature = "tencent"), allow(dead_code))]
 
-use crate::common::http_client::HttpClient;
+use crate::common::{ClassifyHttpResponse, HttpClient};
 use async_trait::async_trait;
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use hmac::{Hmac, Mac};
@@ -29,8 +29,6 @@ pub struct TencentProviderConfig {
 }
 
 pub struct TencentProvider {
-    #[allow(dead_code)]
-    config: TencentProviderConfig,
     translation_service: TencentTranslationService,
 }
 
@@ -49,16 +47,14 @@ impl TencentProvider {
             return Err("secret_key must not be empty".to_owned());
         }
         Ok(Self {
-            config: config.clone(),
             translation_service: TencentTranslationService {
                 secret_id: config.secret_id,
                 secret_key: config.secret_key,
-                http: HttpClient::new(
+                http: HttpClient::proxy_aware(
                     config
                         .base_url
                         .unwrap_or_else(|| "https://tmt.tencentcloudapi.com".to_owned()),
-                    Default::default(),
-                ),
+                )?,
             },
         })
     }

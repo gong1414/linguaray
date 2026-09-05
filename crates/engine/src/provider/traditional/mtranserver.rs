@@ -8,7 +8,7 @@ use linguaray_core::{
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-use crate::common::http_client::HttpClient;
+use crate::common::{ClassifyHttpResponse, HttpClient};
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 #[serde(default)]
@@ -37,7 +37,7 @@ impl MTranServerProvider {
         Ok(Self {
             translation_service: MTranServerTranslationService {
                 token: config.token.trim().to_owned(),
-                http: HttpClient::new(base_url, Default::default()),
+                http: HttpClient::proxy_aware(base_url)?,
             },
         })
     }

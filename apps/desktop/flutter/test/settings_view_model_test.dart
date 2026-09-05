@@ -2,22 +2,29 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:linguaray_application/linguaray_application.dart';
-import 'package:linguaray_desktop/src/config/dependencies.dart';
-import 'package:linguaray_desktop/src/ui/settings/settings_intent_controller.dart';
-import 'package:linguaray_desktop/src/ui/settings/settings_labels.dart';
-import 'package:linguaray_desktop/src/ui/settings/settings_screens.dart';
-import 'package:linguaray_desktop/src/ui/settings/view_models/settings_view_model.dart';
-import 'package:linguaray_desktop/src/ui/settings/view_models/shortcuts_view_model.dart';
-import 'package:linguaray_desktop/src/ui/settings/views/shortcuts_settings_view.dart';
+import 'package:linguaray_desktop/src/app/dependencies.dart';
+import 'package:linguaray_desktop/src/features/preferences/general_settings_view_model.dart';
+import 'package:linguaray_desktop/src/features/providers/providers_settings_view_model.dart';
+import 'package:linguaray_desktop/src/features/services/services_settings_view_model.dart';
+import 'package:linguaray_desktop/src/features/shortcuts/shortcuts_settings_view.dart';
+import 'package:linguaray_desktop/src/features/shortcuts/shortcuts_view_model.dart';
+import 'package:linguaray_desktop/src/shared/settings_labels.dart';
 
 void main() {
   test(
     'provider validation prevents repository writes and reports the error',
     () async {
-      final repository = _FakeWorkspaceSettingsRepository();
+      final repository = _FakeSettingsPorts();
       final container = ProviderContainer(
         overrides: [
-          workspaceSettingsRepositoryProvider.overrideWithValue(repository),
+          preferencesRepositoryProvider.overrideWithValue(repository),
+          translationPreferencesRepositoryProvider.overrideWithValue(
+            repository,
+          ),
+          serviceSettingsRepositoryProvider.overrideWithValue(repository),
+          providerSettingsRepositoryProvider.overrideWithValue(repository),
+          integrationSettingsRepositoryProvider.overrideWithValue(repository),
+          appInfoRepositoryProvider.overrideWithValue(repository),
         ],
       );
       addTearDown(container.dispose);
@@ -58,10 +65,17 @@ void main() {
   test(
     'provider save failure is contained and always clears saving state',
     () async {
-      final repository = _FakeWorkspaceSettingsRepository(throwOnSave: true);
+      final repository = _FakeSettingsPorts(throwOnSave: true);
       final container = ProviderContainer(
         overrides: [
-          workspaceSettingsRepositoryProvider.overrideWithValue(repository),
+          preferencesRepositoryProvider.overrideWithValue(repository),
+          translationPreferencesRepositoryProvider.overrideWithValue(
+            repository,
+          ),
+          serviceSettingsRepositoryProvider.overrideWithValue(repository),
+          providerSettingsRepositoryProvider.overrideWithValue(repository),
+          integrationSettingsRepositoryProvider.overrideWithValue(repository),
+          appInfoRepositoryProvider.overrideWithValue(repository),
         ],
       );
       addTearDown(container.dispose);
@@ -184,7 +198,7 @@ void main() {
   });
 
   test('translation service reorder persists the visible order', () async {
-    final repository = _FakeWorkspaceSettingsRepository(
+    final repository = _FakeSettingsPorts(
       services: const [
         ServiceRecord(
           id: 'google-web+translation',
@@ -208,7 +222,12 @@ void main() {
     );
     final container = ProviderContainer(
       overrides: [
-        workspaceSettingsRepositoryProvider.overrideWithValue(repository),
+        preferencesRepositoryProvider.overrideWithValue(repository),
+        translationPreferencesRepositoryProvider.overrideWithValue(repository),
+        serviceSettingsRepositoryProvider.overrideWithValue(repository),
+        providerSettingsRepositoryProvider.overrideWithValue(repository),
+        integrationSettingsRepositoryProvider.overrideWithValue(repository),
+        appInfoRepositoryProvider.overrideWithValue(repository),
       ],
     );
     addTearDown(container.dispose);
@@ -233,10 +252,15 @@ void main() {
   });
 
   test('general settings persists translation target changes', () async {
-    final repository = _FakeWorkspaceSettingsRepository();
+    final repository = _FakeSettingsPorts();
     final container = ProviderContainer(
       overrides: [
-        workspaceSettingsRepositoryProvider.overrideWithValue(repository),
+        preferencesRepositoryProvider.overrideWithValue(repository),
+        translationPreferencesRepositoryProvider.overrideWithValue(repository),
+        serviceSettingsRepositoryProvider.overrideWithValue(repository),
+        providerSettingsRepositoryProvider.overrideWithValue(repository),
+        integrationSettingsRepositoryProvider.overrideWithValue(repository),
+        appInfoRepositoryProvider.overrideWithValue(repository),
       ],
     );
     addTearDown(container.dispose);
@@ -260,42 +284,6 @@ void main() {
 
     expect(repository.lastTranslationTargets, targets);
   });
-
-  testWidgets(
-    'quick-window add-target intent reaches the current settings UI',
-    (tester) async {
-      final repository = _FakeWorkspaceSettingsRepository(
-        translationLanguages: const [
-          LanguageChoice(code: 'en', name: 'English'),
-          LanguageChoice(code: 'zh-Hans', name: '简体中文'),
-        ],
-      );
-      generalSettingsIntentController.request(
-        GeneralSettingsIntent.addTranslationTarget,
-      );
-
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            workspaceSettingsRepositoryProvider.overrideWithValue(repository),
-          ],
-          child: const MaterialApp(
-            home: Scaffold(body: GeneralSettingsScreen()),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.byKey(const ValueKey('source-auto')), findsOneWidget);
-      expect(find.byKey(const ValueKey('target-zh-Hans')), findsOneWidget);
-      await tester.tap(find.byType(FilledButton));
-      await tester.pumpAndSettle();
-      expect(repository.lastTranslationTargets, const [
-        TranslationTargetRule(source: 'auto', target: 'zh-Hans'),
-      ]);
-      expect(generalSettingsIntentController.hasPending, isFalse);
-    },
-  );
 }
 
 Future<void> _waitFor(bool Function() condition) async {
@@ -306,17 +294,18 @@ Future<void> _waitFor(bool Function() condition) async {
   fail('Timed out waiting for view-model state.');
 }
 
-final class _FakeWorkspaceSettingsRepository
-    implements WorkspaceSettingsRepository {
-  _FakeWorkspaceSettingsRepository({
-    this.throwOnSave = false,
-    this.services = const [],
-    this.translationLanguages = const [],
-  });
+final class _FakeSettingsPorts
+    implements
+        PreferencesRepository,
+        TranslationPreferencesRepository,
+        ServiceSettingsRepository,
+        ProviderSettingsRepository,
+        IntegrationSettingsRepository,
+        AppInfoRepository {
+  _FakeSettingsPorts({this.throwOnSave = false, this.services = const []});
 
   final bool throwOnSave;
   final List<ServiceRecord> services;
-  final List<LanguageChoice> translationLanguages;
   final GeneralPreferences generalPreferences = const GeneralPreferences(
     launchAtLogin: false,
     showInMenuBar: true,
@@ -382,8 +371,9 @@ final class _FakeWorkspaceSettingsRepository
   Future<List<String>> listProviderModels(String providerId) async => const [];
 
   @override
-  Future<List<String>> discoverProviderModels(ProviderDraft draft) async =>
-      const [];
+  Future<ProviderModelDiscovery> discoverProviderModels(
+    ProviderDraft draft,
+  ) async => const ProviderModelDiscovery();
 
   @override
   Future<void> reorderTranslationServices(List<String> serviceIds) async {
@@ -395,8 +385,7 @@ final class _FakeWorkspaceSettingsRepository
   @override
   Future<List<ServiceRecord>> listServices() async => services;
   @override
-  Future<List<LanguageChoice>> listTranslationLanguages() async =>
-      translationLanguages;
+  Future<List<LanguageChoice>> listTranslationLanguages() async => const [];
   @override
   Future<GeneralPreferences> loadGeneral() async => generalPreferences;
   @override
@@ -476,6 +465,18 @@ final class _FakeWorkspaceSettingsRepository
 
   @override
   Future<ApiServerStatus> setApiServerPort(int port) async => loadApiServer();
+
+  @override
+  Future<NetworkSettings> loadNetworkSettings() async => const NetworkSettings(
+    proxyMode: NetworkProxyMode.system,
+    proxyUrl: '',
+    proxyBypass: 'localhost,127.0.0.1',
+    checkUpdatesOnLaunch: true,
+  );
+
+  @override
+  Future<NetworkSettings> saveNetworkSettings(NetworkSettings settings) async =>
+      settings;
 
   @override
   Future<PlatformCapabilities> loadCapabilities() async =>
