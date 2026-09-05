@@ -10,6 +10,10 @@ import '../../providers/data/provider_util.dart';
 import 'llm_stream.dart';
 
 final class RuntimeTranslationRepository implements TranslationRepository {
+  RuntimeTranslationRepository({SettingsStore? store})
+    : _store = store ?? settingsStore;
+
+  final SettingsStore _store;
   final Map<String, ProviderType> _providerTypesById = {};
 
   @override
@@ -56,7 +60,7 @@ final class RuntimeTranslationRepository implements TranslationRepository {
         })
         .toList();
 
-    final preferred = settingsStore.general.defaultTranslationService;
+    final preferred = _store.general.defaultTranslationService;
     final preferredIndex = translationServices.indexWhere(
       (service) => service.id == preferred,
     );
@@ -67,7 +71,7 @@ final class RuntimeTranslationRepository implements TranslationRepository {
       );
     }
 
-    final configuredTargets = settingsStore.general.translationTargets
+    final configuredTargets = _store.general.translationTargets
         .where((target) => target.enabled)
         .toList(growable: false);
     final defaultTarget = configuredTargets.isNotEmpty
@@ -110,7 +114,7 @@ final class RuntimeTranslationRepository implements TranslationRepository {
       return selectedTarget;
     }
 
-    final configuredTargets = settingsStore.general.translationTargets
+    final configuredTargets = _store.general.translationTargets
         .where((target) => target.enabled)
         .toList(growable: false);
     if (configuredTargets.isEmpty) return fallbackTarget;

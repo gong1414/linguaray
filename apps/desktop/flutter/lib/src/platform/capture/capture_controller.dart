@@ -10,10 +10,12 @@ import '../permissions/permission_controller.dart';
 import '../platform_types.dart';
 
 class CaptureController {
-  CaptureController({PermissionController? permissions})
-    : _permissions = permissions ?? permissionController;
+  CaptureController({PermissionController? permissions, SettingsStore? store})
+    : _permissions = permissions ?? permissionController,
+      _store = store ?? settingsStore;
 
   final PermissionController _permissions;
+  final SettingsStore _store;
 
   Future<CaptureResult> captureRegion() async {
     final permission = await _permissions.refresh();
@@ -153,9 +155,9 @@ class CaptureController {
   }
 
   String _ocrServiceId(TriggerAction action) {
-    final configured = settingsStore.defaultOcrService.trim();
+    final configured = _store.defaultOcrService.trim();
     String? fallback;
-    for (final service in settingsStore.services) {
+    for (final service in _store.services) {
       if (service.type == ServiceType.ocr) {
         fallback = service.id;
         break;

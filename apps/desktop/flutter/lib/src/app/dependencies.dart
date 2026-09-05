@@ -22,8 +22,11 @@ import 'env.dart';
 import 'settings/settings_section.dart';
 import 'settings/settings_store.dart';
 
+final settingsStoreProvider = Provider<SettingsStore>((ref) => settingsStore);
+
 final translationRepositoryProvider = Provider<TranslationRepository>(
-  (ref) => RuntimeTranslationRepository(),
+  (ref) =>
+      RuntimeTranslationRepository(store: ref.watch(settingsStoreProvider)),
 );
 
 final loadTranslationCatalogProvider = Provider<LoadTranslationCatalog>(
@@ -35,28 +38,28 @@ final translateTextProvider = Provider<TranslateText>(
 );
 
 final preferencesRepositoryProvider = Provider<PreferencesRepository>(
-  (ref) => RuntimeGeneralSettingsAdapter(settingsStore),
+  (ref) => RuntimeGeneralSettingsAdapter(ref.watch(settingsStoreProvider)),
 );
 final translationPreferencesRepositoryProvider =
     Provider<TranslationPreferencesRepository>(
-      (ref) => RuntimeGeneralSettingsAdapter(settingsStore),
+      (ref) => RuntimeGeneralSettingsAdapter(ref.watch(settingsStoreProvider)),
     );
 final appInfoRepositoryProvider = Provider<AppInfoRepository>(
-  (ref) => RuntimeSystemSettingsAdapter(settingsStore),
+  (ref) => RuntimeSystemSettingsAdapter(ref.watch(settingsStoreProvider)),
 );
 final integrationSettingsRepositoryProvider =
     Provider<IntegrationSettingsRepository>(
-      (ref) => RuntimeSystemSettingsAdapter(settingsStore),
+      (ref) => RuntimeSystemSettingsAdapter(ref.watch(settingsStoreProvider)),
     );
 final providerSettingsRepositoryProvider = Provider<ProviderSettingsRepository>(
   (ref) => RuntimeProviderSettingsAdapter(
-    settingsStore,
+    ref.watch(settingsStoreProvider),
     providerCredentialsController,
   ),
 );
 final serviceSettingsRepositoryProvider = Provider<ServiceSettingsRepository>(
   (ref) => RuntimeServiceSettingsAdapter(
-    settingsStore,
+    ref.watch(settingsStoreProvider),
     ref.watch(appInfoRepositoryProvider).loadCapabilities,
   ),
 );
@@ -66,7 +69,7 @@ final permissionRepositoryProvider = Provider<PermissionRepository>(
 );
 
 final shortcutRepositoryProvider = Provider<ShortcutRepository>(
-  (ref) => RuntimeShortcutRepository(),
+  (ref) => RuntimeShortcutRepository(store: ref.watch(settingsStoreProvider)),
 );
 
 final historyRepositoryProvider = Provider<HistoryRepository>(
@@ -82,7 +85,7 @@ final glossaryRepositoryProvider = Provider<GlossaryRepository>(
 );
 
 final dictionaryRepositoryProvider = Provider<DictionaryRepository>(
-  (ref) => RuntimeDictionaryRepository(),
+  (ref) => RuntimeDictionaryRepository(store: ref.watch(settingsStoreProvider)),
 );
 
 final lookUpWordProvider = Provider<LookUpWord>(
@@ -100,7 +103,10 @@ final speechServiceProvider = Provider<SpeechService>((ref) {
 });
 
 final updateRepositoryProvider = Provider<UpdateRepository>((ref) {
-  final repository = GitHubUpdateRepository(client: createNetworkHttpClient());
+  final store = ref.watch(settingsStoreProvider);
+  final repository = GitHubUpdateRepository(
+    client: createNetworkHttpClient(readAdvanced: () => store.advanced),
+  );
   ref.onDispose(repository.close);
   return repository;
 });
@@ -131,14 +137,15 @@ final updateCurrentVersionProvider = Provider<String>(
 final translationInteractionPreferencesProvider = Provider<GeneralPreferences>((
   ref,
 ) {
-  final listenable = settingsStore.listenablesFor(const [
+  final store = ref.watch(settingsStoreProvider);
+  final listenable = store.listenablesFor(const [
     SettingsSection.general,
     SettingsSection.appearance,
   ]);
   void changed() => ref.invalidateSelf();
   listenable.addListener(changed);
   ref.onDispose(() => listenable.removeListener(changed));
-  return RuntimeGeneralSettingsAdapter(settingsStore).currentPreferences;
+  return RuntimeGeneralSettingsAdapter(store).currentPreferences;
 });
 
 final glossaryExchangeControllerProvider = Provider<GlossaryExchangeController>(

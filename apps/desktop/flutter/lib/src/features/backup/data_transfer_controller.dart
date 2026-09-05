@@ -16,6 +16,10 @@ enum DataTransferOperation {
 }
 
 class DataTransferController extends ChangeNotifier {
+  DataTransferController({SettingsStore? store})
+    : _store = store ?? settingsStore;
+
+  final SettingsStore _store;
   DataTransferOperation operation = DataTransferOperation.idle;
   String? selectedPath;
   String? error;
@@ -62,12 +66,12 @@ class DataTransferController extends ChangeNotifier {
       await runtime.backup().restoreFrom(sourcePath: source.path);
       await providerCredentialsController.hydrateAll();
       await Future.wait([
-        settingsStore.reloadAppearance(),
-        settingsStore.reloadGeneral(),
-        settingsStore.reloadShortcuts(),
-        settingsStore.reloadAdvanced(),
-        settingsStore.reloadProviders(),
-        settingsStore.reloadServices(),
+        _store.reloadAppearance(),
+        _store.reloadGeneral(),
+        _store.reloadShortcuts(),
+        _store.reloadAdvanced(),
+        _store.reloadProviders(),
+        _store.reloadServices(),
       ]);
       await initializeSystemProxy();
       operation = DataTransferOperation.restored;

@@ -11,18 +11,21 @@ import '../platform_types.dart';
 typedef TriggerActionHandler = Future<void> Function(TriggerAction action);
 
 class ShortcutService extends ChangeNotifier {
-  ShortcutService._();
+  ShortcutService({SettingsStore? store})
+    : _store = store ?? settingsStore,
+      _shortcutSettings = (store ?? settingsStore).listenableFor(
+        SettingsSection.shortcuts,
+      );
 
-  static final ShortcutService instance = ShortcutService._();
+  static final ShortcutService instance = ShortcutService();
 
+  final SettingsStore _store;
   TriggerActionHandler? _handler;
   bool _started = false;
   bool _registrationSuspended = false;
   int _registrationGeneration = 0;
   List<ShortcutBinding> _bindings = const [];
-  final Listenable _shortcutSettings = settingsStore.listenableFor(
-    SettingsSection.shortcuts,
-  );
+  final Listenable _shortcutSettings;
 
   List<ShortcutBinding> get bindings => List.unmodifiable(_bindings);
 
@@ -78,7 +81,7 @@ class ShortcutService extends ChangeNotifier {
       return;
     }
 
-    final shortcuts = settingsStore.shortcuts;
+    final shortcuts = _store.shortcuts;
     final requested = <TriggerAction, String>{
       TriggerAction.toggleQuickWindow: shortcuts.toggleMiniTranslator,
       TriggerAction.translateSelection:

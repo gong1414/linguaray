@@ -17,8 +17,10 @@ import 'settings/settings_store.dart';
 import 'windows/app_windows.dart';
 
 final class AppTrayController {
-  AppTrayController({required this._readUpdate});
+  AppTrayController({required this._readUpdate, SettingsStore? store})
+    : _store = store ?? settingsStore;
   final UpdateState Function() _readUpdate;
+  final SettingsStore _store;
   late final TrayIcon _trayIcon;
 
   void initialize({required bool visible}) {
@@ -53,7 +55,7 @@ final class AppTrayController {
   Menu _buildContextMenu() {
     final menu = Menu();
     final labels = t.app.tray.context_menu;
-    final shortcuts = settingsStore.shortcuts;
+    final shortcuts = _store.shortcuts;
 
     _addAction(
       menu,

@@ -45,10 +45,12 @@ final class OcrViewState {
 class OcrController extends ChangeNotifier {
   OcrController({
     CaptureController? capture,
+    SettingsStore? store,
     bool Function()? autoCopy,
     OcrClipboardWriter? writeClipboard,
   }) : _capture = capture ?? captureController,
-       _autoCopy = autoCopy ?? (() => settingsStore.autoCopyDetectedText),
+       _autoCopy =
+           autoCopy ?? (() => (store ?? settingsStore).autoCopyDetectedText),
        _writeClipboard =
            writeClipboard ??
            ((text) => Clipboard.setData(ClipboardData(text: text)));

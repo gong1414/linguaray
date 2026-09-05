@@ -67,6 +67,7 @@ class _RootBodyViewState extends ConsumerState<_RootBodyView>
     _hostSettings.addListener(_handleChanged);
     _tray = AppTrayController(
       readUpdate: () => ref.read(updateCoordinatorProvider),
+      store: settingsStore,
     );
     _tray.initialize(visible: _showInMenuBar);
     _updateSubscription = ref.listenManual(
