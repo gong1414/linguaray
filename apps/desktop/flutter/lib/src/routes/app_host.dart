@@ -1,8 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:linguaray_application/linguaray_application.dart'
-    show UpdateStatus;
 
 import '../i18n/i18n.dart';
 import '../platform/external_action_controller.dart';
@@ -64,17 +62,11 @@ class _RootBodyViewState extends State<_RootBodyView>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (debugInitialDestination == null) {
         initializeResidentApp();
-        unawaited(_checkForUpdatesOnLaunch());
+        unawaited(startupUpdateController.check());
       } else {
         showSettingsWindow(destination: debugInitialDestination);
       }
     });
-  }
-
-  Future<void> _checkForUpdatesOnLaunch() async {
-    final state = await startupUpdateController.check();
-    if (!mounted || state?.status != UpdateStatus.available) return;
-    showSettingsWindow(destination: SettingsDestination.settingsUpdates);
   }
 
   @override

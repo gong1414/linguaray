@@ -20,6 +20,7 @@ class OcrScreen extends StatefulWidget {
 
 class _OcrScreenState extends State<OcrScreen> {
   int? _windowBlurredListenerId;
+  bool _pinned = false;
 
   @override
   void initState() {
@@ -28,7 +29,8 @@ class _OcrScreenState extends State<OcrScreen> {
     _windowBlurredListenerId = nativeapi.WindowManager.instance
         .on<nativeapi.WindowBlurredEvent>((event) {
           if (event.windowId == ocrWindowController.window.id &&
-              !ocrController.state.busy) {
+              !ocrController.state.busy &&
+              !_pinned) {
             hideOcrWindow();
           }
         });
@@ -51,7 +53,14 @@ class _OcrScreenState extends State<OcrScreen> {
   Widget build(BuildContext context) {
     final labels = t.ui.ocr;
     return OcrView(
+      pinned: _pinned,
+      onTogglePin: () {
+        setState(() => _pinned = !_pinned);
+        ocrWindowController.window.isAlwaysOnTop = _pinned;
+      },
       labels: OcrViewLabels(
+        pin: t.ui.quick.pin,
+        unpin: t.ui.quick.unpin,
         title: labels.title,
         emptyTitle: labels.empty_title,
         emptyDescription: labels.empty_description,

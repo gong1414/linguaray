@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -12,6 +13,7 @@ import 'package:linguaray_desktop/src/platform/permission_controller.dart';
 import 'package:linguaray_desktop/src/platform/platform_types.dart';
 import 'package:linguaray_desktop/src/platform/trigger_controller.dart';
 import 'package:linguaray_desktop/src/services/app_windows.dart';
+import 'package:linguaray_desktop/src/services/llm_stream.dart';
 import 'package:linguaray_desktop/src/services/runtime.dart';
 import 'package:linguaray_desktop/src/services/shortcut_service/shortcut_service.dart';
 import 'package:linguaray_desktop/src/ui/quick_translate/quick_translate_screen.dart';
@@ -69,6 +71,57 @@ void main() {
                 binding.state == ShortcutRegistrationState.unregistered,
           ),
       isTrue,
+    );
+
+    await tester.runAsync(() async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      server.listen((request) async {
+        await request.drain<void>();
+        request.response.headers.contentType = ContentType(
+          'text',
+          'event-stream',
+          charset: 'utf-8',
+        );
+        request.response.write(
+          'data: {"choices":[{"index":0,"delta":{"content":"本地测试译文"},"finish_reason":"stop"}]}\n\n',
+        );
+        await request.response.close();
+      });
+      try {
+        await runtime.settings().updateProvider(
+          providerId: 'resident-smoke',
+          providerType: 'openai_compatible',
+          presetId: null,
+          fields: {
+            'baseUrl': 'http://127.0.0.1:${server.port}/v1',
+            'defaultModel': 'local-test',
+          },
+        );
+        final chunks = await LlmStream.translate(
+          providerId: 'resident-smoke',
+          sourceLang: 'en',
+          targetLang: 'zh-Hans',
+          text: 'Public smoke test',
+        ).toList().timeout(const Duration(seconds: 8));
+        expect(chunks.map((chunk) => chunk.content).join(), '本地测试译文');
+        expect(chunks.last.finishReason, 'stop');
+        final pending = runtime
+            .llm(providerId: 'resident-smoke')
+            .startTranslation(
+              sourceLang: 'en',
+              targetLang: 'zh-Hans',
+              text: 'Cancel smoke test',
+            );
+        final next = pending.next();
+        pending.cancel();
+        expect(await next.timeout(const Duration(seconds: 3)), isNull);
+      } finally {
+        await runtime.settings().deleteProvider(providerId: 'resident-smoke');
+        await server.close(force: true);
+      }
+    });
+    debugPrint(
+      '[smoke] Dart to Rust cancellable stream delivered local response',
     );
 
     final permissions = await permissionController.refresh();
@@ -183,9 +236,24 @@ void main() {
     final resultPane = tester.getRect(
       find.byKey(const ValueKey('quick-result-pane')),
     );
-    expect(resultPane.left, greaterThanOrEqualTo(sourcePane.right));
-    expect(resultPane.top, sourcePane.top);
-    expect(miniTranslatorWindowController.window.contentSize.width, 720);
+    expect(resultPane.top, greaterThanOrEqualTo(sourcePane.bottom));
+    expect(miniTranslatorWindowController.window.contentSize.width, 460);
+    expect(miniTranslatorWindowController.window.isResizable, isTrue);
+    if (Platform.isMacOS) {
+      expect(
+        await const MethodChannel('linguaray/mac_app_presentation')
+            .invokeMethod<bool>('isDockIconVisible'),
+        isFalse,
+      );
+    }
+    miniTranslatorWindowController.window.setContentSize(760, 420);
+    await tester.pumpAndSettle();
+    expect(
+      tester.getRect(find.byKey(const ValueKey('quick-result-pane'))).left,
+      greaterThanOrEqualTo(
+        tester.getRect(find.byKey(const ValueKey('quick-source-pane'))).right,
+      ),
+    );
     debugPrint(
       '[smoke] native quick window uses the two-column reading layout',
     );
@@ -196,6 +264,13 @@ void main() {
     expect(appSurface.value, AppSurface.settings);
     expect(find.byType(ErrorWidget), findsNothing);
     expect(settingsWindowController.window.isVisible, isTrue);
+    if (Platform.isMacOS) {
+      expect(
+        await const MethodChannel('linguaray/mac_app_presentation')
+            .invokeMethod<bool>('isDockIconVisible'),
+        isFalse,
+      );
+    }
     expect(
       settingsWindowController.window.size.width,
       greaterThanOrEqualTo(840),

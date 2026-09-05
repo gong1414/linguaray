@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:linguaray_ui/linguaray_ui.dart' show LinguaRayMaterialTheme;
 
@@ -48,7 +49,18 @@ class _SettingsAppState extends State<SettingsApp> {
       theme: LinguaRayMaterialTheme.light(),
       darkTheme: LinguaRayMaterialTheme.dark(),
       themeMode: settingsStore.themeMode,
-      builder: (context, child) => ToastHost(child: child!),
+      builder: (context, child) {
+        final mac = Theme.of(context).platform == TargetPlatform.macOS;
+        return CallbackShortcuts(
+          bindings: {
+            SingleActivator(LogicalKeyboardKey.keyW, meta: mac, control: !mac):
+                hideSettingsWindow,
+            const SingleActivator(LogicalKeyboardKey.escape):
+                hideSettingsWindow,
+          },
+          child: ToastHost(child: child!),
+        );
+      },
       routerConfig: _router,
       localizationsDelegates: context.localizationDelegates,
       supportedLocales: context.supportedLocales,

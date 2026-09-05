@@ -1,3 +1,94 @@
+/// One event read on the caller's async executor; no foreign-thread Dart callbacks.
+#[derive(Clone, uniffi::Record)]
+pub struct TranslationEvent {
+    pub content: String,
+    pub finish_reason: Option<String>,
+    pub error: Option<String>,
+}
+
+#[derive(uniffi::Object)]
+pub struct TranslationTask {
+    cancelled: std::sync::atomic::AtomicBool,
+    wake: tokio::sync::Notify,
+    events: tokio::sync::Mutex<tokio::sync::mpsc::UnboundedReceiver<TranslationEvent>>,
+}
+
+#[uniffi::export]
+impl TranslationTask {
+    pub fn cancel(&self) {
+        self.cancelled
+            .store(true, std::sync::atomic::Ordering::Release);
+        self.wake.notify_waiters();
+    }
+}
+
+#[uniffi::export(async_runtime = "tokio")]
+impl TranslationTask {
+    pub async fn next(&self) -> Option<TranslationEvent> {
+        let mut events = self.events.lock().await;
+        tokio::select! {
+            biased;
+            _ = self.wait_cancelled() => None,
+            event = events.recv() => event,
+        }
+    }
+}
+
+impl TranslationTask {
+    fn new() -> (
+        Arc<Self>,
+        tokio::sync::mpsc::UnboundedSender<TranslationEvent>,
+    ) {
+        let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
+        (
+            Arc::new(Self {
+                cancelled: std::sync::atomic::AtomicBool::new(false),
+                wake: tokio::sync::Notify::new(),
+                events: tokio::sync::Mutex::new(receiver),
+            }),
+            sender,
+        )
+    }
+
+    fn is_cancelled(&self) -> bool {
+        self.cancelled.load(std::sync::atomic::Ordering::Acquire)
+    }
+
+    async fn wait_cancelled(&self) {
+        let notified = self.wake.notified();
+        tokio::pin!(notified);
+        notified.as_mut().enable();
+        if !self.is_cancelled() {
+            notified.await;
+        }
+    }
+}
+
+struct TranslationQueueCallback(tokio::sync::mpsc::UnboundedSender<TranslationEvent>);
+impl StreamCallback for TranslationQueueCallback {
+    fn on_chunk(&self, content: String) {
+        let _ = self.0.send(TranslationEvent {
+            content,
+            finish_reason: None,
+            error: None,
+        });
+    }
+    fn on_finish(&self, reason: String) {
+        let _ = self.0.send(TranslationEvent {
+            content: String::new(),
+            finish_reason: Some(reason),
+            error: None,
+        });
+    }
+    fn on_error(&self, error: String) {
+        let _ = self.0.send(TranslationEvent {
+            content: String::new(),
+            finish_reason: None,
+            error: Some(error),
+        });
+    }
+}
+
 impl RuntimeLlm {
     async fn chat_impl(
         &self,
@@ -219,108 +310,133 @@ impl RuntimeLlm {
         target_lang: String,
         text: String,
         callback: Arc<dyn StreamCallback>,
+        cancellation: Arc<TranslationTask>,
     ) -> Result<(), String> {
         let service_id = self.service_id.clone();
         let runtime = self.runtime.clone();
         run_on_worker_thread(move || async move {
-            let text = validate_required("text", text)?;
-            let resolved = match runtime
-                .resolve_service(&service_id, ServiceType::Translation)
-                .await
-            {
-                Ok(service) => service,
-                Err(_) => runtime.resolve_llm_service(&service_id).await?,
-            };
-            let provider_id = resolved.provider_id.clone();
-            let provider = {
-                let state = runtime.inner.state.read().await;
-                state
-                    .engine
-                    .require(&provider_id)
-                    .map_err(|error| error.to_string())?
-                    .clone()
-            };
-            let matches = runtime
-                .glossary_matches(&text, Some(&source_lang), Some(&target_lang))
-                .await;
-            runtime.record_glossary_hits(&matches).await;
-
-            if let Some(llm_service) = provider.llm() {
-                // LLM-based streaming translation
-                let model = resolved
-                    .field("model")
-                    .map(str::to_owned)
-                    .or_else(|| llm_service.available_models().into_iter().next())
-                    .ok_or_else(|| "llm default model must be configured".to_owned())?;
-                let terms = glossary_terms(&matches);
-                let system_prompt = if let Some(system_prompt) = resolved.field("systemPrompt") {
-                    render_prompt_template(system_prompt, &source_lang, &target_lang, &text, &terms)
-                } else {
-                    linguaray_engine::prompt::translate_text_system_prompt(
-                        &source_lang,
-                        &target_lang,
-                        None,
-                        &terms,
-                    )
-                };
-                let user_prompt = linguaray_engine::prompt::translate_text_user_prompt(&text);
-
-                let receiver = llm_service
-                    .chat_stream(linguaray_core::ChatRequest {
-                        model,
-                        messages: vec![
-                            linguaray_core::ChatMessage::system(system_prompt),
-                            linguaray_core::ChatMessage::user(user_prompt),
-                        ],
-                        temperature: Some(0.3),
-                        max_tokens: Some(4096),
-                        stream: Some(true),
-                        response_format: None,
-                    })
+            let worker_cancellation = cancellation.clone();
+            let operation = async move {
+                let text = validate_required("text", text)?;
+                let resolved = match runtime
+                    .resolve_service(&service_id, ServiceType::Translation)
                     .await
-                    .map_err(|error| error.to_string())?;
+                {
+                    Ok(service) => service,
+                    Err(_) => runtime.resolve_llm_service(&service_id).await?,
+                };
+                let provider_id = resolved.provider_id.clone();
+                let provider = {
+                    let state = runtime.inner.state.read().await;
+                    state
+                        .engine
+                        .require(&provider_id)
+                        .map_err(|error| error.to_string())?
+                        .clone()
+                };
+                let matches = runtime
+                    .glossary_matches(&text, Some(&source_lang), Some(&target_lang))
+                    .await;
+                runtime.record_glossary_hits(&matches).await;
 
-                tokio::task::spawn_blocking(move || {
-                    loop {
-                        match receiver.rx.recv() {
+                if let Some(llm_service) = provider.llm() {
+                    // LLM-based streaming translation
+                    let model = resolved
+                        .field("model")
+                        .map(str::to_owned)
+                        .or_else(|| llm_service.available_models().into_iter().next())
+                        .ok_or_else(|| "llm default model must be configured".to_owned())?;
+                    let terms = glossary_terms(&matches);
+                    let system_prompt = if let Some(system_prompt) = resolved.field("systemPrompt")
+                    {
+                        render_prompt_template(
+                            system_prompt,
+                            &source_lang,
+                            &target_lang,
+                            &text,
+                            &terms,
+                        )
+                    } else {
+                        linguaray_engine::prompt::translate_text_system_prompt(
+                            &source_lang,
+                            &target_lang,
+                            None,
+                            &terms,
+                        )
+                    };
+                    let user_prompt = linguaray_engine::prompt::translate_text_user_prompt(&text);
+
+                    let receiver = llm_service
+                        .chat_stream(linguaray_core::ChatRequest {
+                            model,
+                            messages: vec![
+                                linguaray_core::ChatMessage::system(system_prompt),
+                                linguaray_core::ChatMessage::user(user_prompt),
+                            ],
+                            temperature: Some(0.3),
+                            max_tokens: Some(4096),
+                            stream: Some(true),
+                            response_format: None,
+                        })
+                        .await
+                        .map_err(|error| error.to_string())?;
+
+                    tokio::task::spawn_blocking(move || loop {
+                        if worker_cancellation.is_cancelled() {
+                            break;
+                        }
+                        match receiver
+                            .rx
+                            .recv_timeout(std::time::Duration::from_millis(40))
+                        {
                             Ok(chunk) => {
                                 if chunk.finish_reason.as_deref() == Some("error") {
                                     callback.on_error(chunk.content);
                                     break;
                                 }
-                                if !chunk.content.is_empty() { callback.on_chunk(chunk.content); }
+                                if !chunk.content.is_empty() {
+                                    callback.on_chunk(chunk.content);
+                                }
                                 if let Some(reason) = chunk.finish_reason {
                                     callback.on_finish(reason);
                                     break;
                                 }
                             }
-                            Err(_) => {
+                            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => continue,
+                            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
                                 callback.on_error("stream ended before completion".into());
                                 break;
                             }
                         }
-                    }
-                }).await.map_err(|error| format!("stream worker failed: {error}"))?;
-            } else {
-                // Fallback to non-streaming translation via the translation service
-                let translation_service = provider.translation().ok_or_else(|| {
-                    format!("provider `{provider_id}` does not support translation")
-                })?;
-                let response = translation_service
-                    .translate(linguaray_core::TranslateRequest {
-                        source_language: Some(source_lang.clone()),
-                        target_language: Some(target_lang),
-                        text: text.clone(),
                     })
                     .await
-                    .map_err(|error| error.to_string())?;
-                for translation in response.translations {
-                    callback.on_chunk(translation.text);
+                    .map_err(|error| format!("stream worker failed: {error}"))?;
+                } else {
+                    // Fallback to non-streaming translation via the translation service
+                    let translation_service = provider.translation().ok_or_else(|| {
+                        format!("provider `{provider_id}` does not support translation")
+                    })?;
+                    let response = translation_service
+                        .translate(linguaray_core::TranslateRequest {
+                            source_language: (source_lang != "auto").then_some(source_lang.clone()),
+                            target_language: Some(target_lang),
+                            text: text.clone(),
+                        })
+                        .await
+                        .map_err(|error| error.to_string())?;
+                    for translation in response.translations {
+                        callback.on_chunk(translation.text);
+                    }
+                    callback.on_finish("stop".to_string());
                 }
-                callback.on_finish("stop".to_string());
-            }
 
-            Ok(())
+                Ok(())
+            };
+            tokio::select! {
+                biased;
+                _ = cancellation.wait_cancelled() => Ok(()),
+                result = operation => result,
+            }
         })
         .await
     }
@@ -366,6 +482,8 @@ impl RuntimeLlm {
 
 #[uniffi::export]
 impl RuntimeLlm {
+    /// Legacy callback API retained for existing native clients.
+    /// Dart clients must use start_translation and TranslationTask.next.
     pub fn translate_stream(
         &self,
         source_lang: String,
@@ -373,33 +491,69 @@ impl RuntimeLlm {
         text: String,
         callback: Box<dyn StreamCallback>,
     ) {
-        let this = self.clone();
-        let callback: Arc<dyn StreamCallback> = callback.into();
-        let callback_for_worker = callback.clone();
+        let (task, _) = TranslationTask::new();
+        spawn_translation_task(
+            self.clone(),
+            task,
+            source_lang,
+            target_lang,
+            text,
+            callback.into(),
+        );
+    }
 
-        if let Err(error) = thread::Builder::new()
-            .name("linguaray-engine-bridge".to_owned())
-            .spawn(move || {
-                let result = tokio::runtime::Builder::new_current_thread()
-                    .enable_all()
-                    .build()
-                    .map_err(|error| format!("failed to build tokio runtime: {error}"))
-                    .and_then(|runtime| {
-                        runtime.block_on(this.translate_stream_impl(
-                            source_lang,
-                            target_lang,
-                            text,
-                            callback_for_worker.clone(),
-                        ))
-                    });
+    pub fn start_translation(
+        &self,
+        source_lang: String,
+        target_lang: String,
+        text: String,
+    ) -> Arc<TranslationTask> {
+        let (task, sender) = TranslationTask::new();
+        spawn_translation_task(
+            self.clone(),
+            task.clone(),
+            source_lang,
+            target_lang,
+            text,
+            Arc::new(TranslationQueueCallback(sender)),
+        );
+        task
+    }
+}
 
+fn spawn_translation_task(
+    this: RuntimeLlm,
+    cancellation: Arc<TranslationTask>,
+    source_lang: String,
+    target_lang: String,
+    text: String,
+    callback: Arc<dyn StreamCallback>,
+) {
+    let callback_for_worker = callback.clone();
+    if let Err(error) = thread::Builder::new()
+        .name("linguaray-translation".to_owned())
+        .spawn(move || {
+            let result = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|error| format!("failed to build tokio runtime: {error}"))
+                .and_then(|runtime| {
+                    runtime.block_on(this.translate_stream_impl(
+                        source_lang,
+                        target_lang,
+                        text,
+                        callback_for_worker.clone(),
+                        cancellation.clone(),
+                    ))
+                });
+            if !cancellation.is_cancelled() {
                 if let Err(error) = result {
                     callback_for_worker.on_error(error);
                 }
-            })
-        {
-            callback.on_error(format!("failed to spawn runtime worker thread: {error}"));
-        }
+            }
+        })
+    {
+        callback.on_error(format!("failed to spawn runtime worker thread: {error}"));
     }
 }
 

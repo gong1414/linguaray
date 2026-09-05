@@ -3,6 +3,7 @@ import 'package:nativeapi/nativeapi.dart';
 import '../services/runtime.dart';
 import 'permission_controller.dart';
 import 'platform_types.dart';
+import 'selection_replacement_controller.dart';
 
 class SelectionController {
   SelectionController({PermissionController? permissions})
@@ -21,11 +22,13 @@ class SelectionController {
       );
     }
 
+    final target = await selectionReplacementController.capture();
     final result = await runtime
         .textExtractor()
         .extractFromScreenSelectionDetailed();
     return SelectionResult(
       text: result.text,
+      replacementTarget: target?.text == result.text ? target : null,
       triggerPosition: triggerPosition,
       readMethod: switch (result.readMethod) {
         'primarySelection' => SelectionReadMethod.primarySelection,

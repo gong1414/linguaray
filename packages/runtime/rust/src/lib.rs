@@ -18,7 +18,7 @@ pub use runtime::{
     BackupSummary, RestoreSummary, Runtime, RuntimeBackup, RuntimeDictionary, RuntimeError,
     RuntimeGlossary, RuntimeHistory, RuntimeLlm, RuntimeOcr, RuntimePermission, RuntimeSettings,
     RuntimeTextExtractor, RuntimeTranslation, RuntimeVocabulary, SettingsChange,
-    SettingsSubscription, StreamCallback,
+    SettingsSubscription, StreamCallback, TranslationEvent, TranslationTask,
 };
 
 use linguaray_core::{

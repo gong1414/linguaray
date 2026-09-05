@@ -1994,6 +1994,12 @@ public protocol RuntimeLlmProtocol: AnyObject, Sendable {
 
   func polish(text: String, style: String) async throws -> String
 
+  func startTranslation(sourceLang: String, targetLang: String, text: String) -> TranslationTask
+
+  /**
+   * Legacy callback API retained for existing native clients.
+   * Dart clients must use start_translation and TranslationTask.next.
+   */
   func translateStream(
     sourceLang: String, targetLang: String, text: String, callback: StreamCallback)
 
@@ -2120,6 +2126,24 @@ open class RuntimeLlm: RuntimeLlmProtocol, @unchecked Sendable {
       )
   }
 
+  open func startTranslation(sourceLang: String, targetLang: String, text: String)
+    -> TranslationTask
+  {
+    return try! FfiConverterTypeTranslationTask_lift(
+      try! rustCall {
+        uniffi_linguaray_runtime_fn_method_runtimellm_start_translation(
+          self.uniffiCloneHandle(),
+          FfiConverterString.lower(sourceLang),
+          FfiConverterString.lower(targetLang),
+          FfiConverterString.lower(text), $0
+        )
+      })
+  }
+
+  /**
+   * Legacy callback API retained for existing native clients.
+   * Dart clients must use start_translation and TranslationTask.next.
+   */
   open func translateStream(
     sourceLang: String, targetLang: String, text: String, callback: StreamCallback
   ) {
@@ -3864,6 +3888,132 @@ public func FfiConverterTypeSettingsSubscription_lift(_ handle: UInt64) throws
 #endif
 public func FfiConverterTypeSettingsSubscription_lower(_ value: SettingsSubscription) -> UInt64 {
   return FfiConverterTypeSettingsSubscription.lower(value)
+}
+
+public protocol TranslationTaskProtocol: AnyObject, Sendable {
+
+  func cancel()
+
+  func next() async -> TranslationEvent?
+
+}
+open class TranslationTask: TranslationTaskProtocol, @unchecked Sendable {
+  fileprivate let handle: UInt64
+
+  /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
+  #if swift(>=5.8)
+    @_documentation(visibility: private)
+  #endif
+  public struct NoHandle {
+    public init() {}
+  }
+
+  // TODO: We'd like this to be `private` but for Swifty reasons,
+  // we can't implement `FfiConverter` without making this `required` and we can't
+  // make it `required` without making it `public`.
+  #if swift(>=5.8)
+    @_documentation(visibility: private)
+  #endif
+  required public init(unsafeFromHandle handle: UInt64) {
+    self.handle = handle
+  }
+
+  // This constructor can be used to instantiate a fake object.
+  // - Parameter noHandle: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+  //
+  // - Warning:
+  //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing handle the FFI lower functions will crash.
+  #if swift(>=5.8)
+    @_documentation(visibility: private)
+  #endif
+  public init(noHandle: NoHandle) {
+    self.handle = 0
+  }
+
+  #if swift(>=5.8)
+    @_documentation(visibility: private)
+  #endif
+  public func uniffiCloneHandle() -> UInt64 {
+    return try! rustCall { uniffi_linguaray_runtime_fn_clone_translationtask(self.handle, $0) }
+  }
+  // No primary constructor declared for this class.
+
+  deinit {
+    if handle == 0 {
+      // Mock objects have handle=0 don't try to free them
+      return
+    }
+
+    try! rustCall { uniffi_linguaray_runtime_fn_free_translationtask(handle, $0) }
+  }
+
+  open func cancel() {
+    try! rustCall {
+      uniffi_linguaray_runtime_fn_method_translationtask_cancel(
+        self.uniffiCloneHandle(), $0
+      )
+    }
+  }
+
+  open func next() async -> TranslationEvent? {
+    return
+      try! await uniffiRustCallAsync(
+        rustFutureFunc: {
+          uniffi_linguaray_runtime_fn_method_translationtask_next(
+            self.uniffiCloneHandle()
+
+          )
+        },
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
+        liftFunc: FfiConverterOptionTypeTranslationEvent.lift,
+        errorHandler: nil
+
+      )
+  }
+
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeTranslationTask: FfiConverter {
+  typealias FfiType = UInt64
+  typealias SwiftType = TranslationTask
+
+  public static func lift(_ handle: UInt64) throws -> TranslationTask {
+    return TranslationTask(unsafeFromHandle: handle)
+  }
+
+  public static func lower(_ value: TranslationTask) -> UInt64 {
+    return value.uniffiCloneHandle()
+  }
+
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws
+    -> TranslationTask
+  {
+    let handle: UInt64 = try readInt(&buf)
+    return try lift(handle)
+  }
+
+  public static func write(_ value: TranslationTask, into buf: inout [UInt8]) {
+    writeInt(&buf, lower(value))
+  }
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTranslationTask_lift(_ handle: UInt64) throws -> TranslationTask {
+  return try FfiConverterTypeTranslationTask.lift(handle)
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTranslationTask_lower(_ value: TranslationTask) -> UInt64 {
+  return FfiConverterTypeTranslationTask.lower(value)
 }
 
 public struct AdvancedSettings: Equatable, Hashable {
@@ -7041,6 +7191,62 @@ public func FfiConverterTypeTranslateResponse_lower(_ value: TranslateResponse) 
   return FfiConverterTypeTranslateResponse.lower(value)
 }
 
+/// One event read on the caller's async executor; no foreign-thread Dart callbacks.
+public struct TranslationEvent: Equatable, Hashable {
+  public var content: String
+  public var finishReason: String?
+  public var error: String?
+
+  // Default memberwise initializers are never public by default, so we
+  // declare one manually.
+  public init(content: String, finishReason: String?, error: String?) {
+    self.content = content
+    self.finishReason = finishReason
+    self.error = error
+  }
+
+}
+
+#if compiler(>=6)
+  extension TranslationEvent: Sendable {}
+#endif
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeTranslationEvent: FfiConverterRustBuffer {
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws
+    -> TranslationEvent
+  {
+    return
+      try TranslationEvent(
+        content: FfiConverterString.read(from: &buf),
+        finishReason: FfiConverterOptionString.read(from: &buf),
+        error: FfiConverterOptionString.read(from: &buf)
+      )
+  }
+
+  public static func write(_ value: TranslationEvent, into buf: inout [UInt8]) {
+    FfiConverterString.write(value.content, into: &buf)
+    FfiConverterOptionString.write(value.finishReason, into: &buf)
+    FfiConverterOptionString.write(value.error, into: &buf)
+  }
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTranslationEvent_lift(_ buf: RustBuffer) throws -> TranslationEvent {
+  return try FfiConverterTypeTranslationEvent.lift(buf)
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTranslationEvent_lower(_ value: TranslationEvent) -> RustBuffer {
+  return FfiConverterTypeTranslationEvent.lower(value)
+}
+
 public struct TranslationTarget: Equatable, Hashable {
   public var source: String
   public var target: String
@@ -9373,6 +9579,30 @@ private struct FfiConverterOptionTypeServiceConfigEntry: FfiConverterRustBuffer 
 #if swift(>=5.8)
   @_documentation(visibility: private)
 #endif
+private struct FfiConverterOptionTypeTranslationEvent: FfiConverterRustBuffer {
+  typealias SwiftType = TranslationEvent?
+
+  public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+    guard let value = value else {
+      writeInt(&buf, Int8(0))
+      return
+    }
+    writeInt(&buf, Int8(1))
+    FfiConverterTypeTranslationEvent.write(value, into: &buf)
+  }
+
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+    switch try readInt(&buf) as Int8 {
+    case 0: return nil
+    case 1: return try FfiConverterTypeTranslationEvent.read(from: &buf)
+    default: throw UniffiInternalError.unexpectedOptionalTag
+    }
+  }
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
 private struct FfiConverterOptionTypeVocabularyEntry: FfiConverterRustBuffer {
   typealias SwiftType = VocabularyEntry?
 
@@ -10980,7 +11210,10 @@ private let initializationResult: InitializationResult = {
   if uniffi_linguaray_runtime_checksum_method_runtimellm_polish() != 54993 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_linguaray_runtime_checksum_method_runtimellm_translate_stream() != 19511 {
+  if uniffi_linguaray_runtime_checksum_method_runtimellm_start_translation() != 35918 {
+    return InitializationResult.apiChecksumMismatch
+  }
+  if uniffi_linguaray_runtime_checksum_method_runtimellm_translate_stream() != 18453 {
     return InitializationResult.apiChecksumMismatch
   }
   if uniffi_linguaray_runtime_checksum_method_runtimeocr_recognize_clipboard_image() != 5310 {
@@ -11127,6 +11360,12 @@ private let initializationResult: InitializationResult = {
     return InitializationResult.apiChecksumMismatch
   }
   if uniffi_linguaray_runtime_checksum_method_settingssubscription_next() != 52040 {
+    return InitializationResult.apiChecksumMismatch
+  }
+  if uniffi_linguaray_runtime_checksum_method_translationtask_cancel() != 18760 {
+    return InitializationResult.apiChecksumMismatch
+  }
+  if uniffi_linguaray_runtime_checksum_method_translationtask_next() != 55434 {
     return InitializationResult.apiChecksumMismatch
   }
   if uniffi_linguaray_runtime_checksum_constructor_runtime_new() != 29932 {

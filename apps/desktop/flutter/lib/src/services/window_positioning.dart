@@ -3,7 +3,7 @@ import 'package:nativeapi/nativeapi.dart';
 
 import '../utils/platform_util.dart';
 
-const miniTranslatorInitialSize = Size(720, 420);
+const miniTranslatorInitialSize = Size(460, 360);
 const ocrWindowSize = Size(600, 520);
 const _kMiniTranslatorTrayGap = 10.0;
 const _kMiniTranslatorCursorGap = 12.0;

@@ -17,6 +17,7 @@ class QuickTranslateInput extends StatelessWidget {
     required this.onTranslate,
     super.key,
     this.speakingKind,
+    this.onStop,
     this.onSpeakSource,
     this.onStopSpeech,
   });
@@ -32,6 +33,7 @@ class QuickTranslateInput extends StatelessWidget {
   final ValueChanged<String> onSourceTextChanged;
   final VoidCallback onClear;
   final VoidCallback onTranslate;
+  final VoidCallback? onStop;
   final VoidCallback? onSpeakSource;
   final VoidCallback? onStopSpeech;
 
@@ -72,8 +74,8 @@ class QuickTranslateInput extends StatelessWidget {
           key: const ValueKey('quick-source-input'),
           controller: controller,
           autofocus: true,
-          minLines: 5,
-          maxLines: 7,
+          minLines: 2,
+          maxLines: 6,
           style: theme.textTheme.bodyLarge?.copyWith(
             fontSize: 16,
             height: 1.65,
@@ -119,7 +121,9 @@ class QuickTranslateInput extends StatelessWidget {
             ),
             const SizedBox(width: 10),
             FilledButton(
-              onPressed: canTranslate ? onTranslate : null,
+              onPressed: submitting
+                  ? onStop
+                  : (canTranslate ? onTranslate : null),
               style: FilledButton.styleFrom(
                 minimumSize: const Size(0, 30),
                 padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -127,7 +131,7 @@ class QuickTranslateInput extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(submitting ? labels.translating : labels.translate),
+                  Text(submitting ? labels.stop : labels.translate),
                   const SizedBox(width: 8),
                   if (submitting)
                     const SizedBox.square(

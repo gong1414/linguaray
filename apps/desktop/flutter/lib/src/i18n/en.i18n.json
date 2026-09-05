@@ -856,7 +856,21 @@
       "recheck": "Recheck",
       "source_label": "Original",
       "result_label": "Translation",
-      "result_placeholder": "Your translation appears here"
+      "result_placeholder": "Your translation appears here",
+      "close": "Close",
+      "collapse_source": "Hide source",
+      "show_source": "Show source",
+      "expand_reading": "Expand to two columns",
+      "compact_reading": "Compact window",
+      "font_larger": "Larger text",
+      "font_smaller": "Smaller text",
+      "font_reset": "Reset text size",
+      "stop": "Stop translation",
+      "stopped": "Translation stopped",
+      "replace": "Replace original",
+      "replace_changed": "The original text or selection has changed. Select it again to translate.",
+      "replace_unsupported": "This app cannot replace the original selection. Copy the translation instead.",
+      "service_hint": "Choose a service to translate on demand"
     },
     "ocr": {
       "title": "OCR",

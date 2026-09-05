@@ -24,6 +24,20 @@ final class QuickTranslateLabels {
     required this.serviceError,
     required this.noServices,
     required this.failureMessage,
+    this.close = 'Close',
+    this.collapseSource = 'Hide source',
+    this.showSource = 'Show source',
+    this.expandReading = 'Expand to two columns',
+    this.compactReading = 'Compact window',
+    this.fontLarger = 'Larger text',
+    this.fontSmaller = 'Smaller text',
+    this.fontReset = 'Reset text size',
+    this.stop = 'Stop translation',
+    this.stopped = 'Translation stopped',
+    this.replace = 'Replace original',
+    this.replaceChanged = 'The original text or selection has changed. Select it again to translate.',
+    this.replaceUnsupported = 'This app cannot replace the original selection. Copy the translation instead.',
+    this.serviceHint = 'Choose a service to translate on demand',
     this.sourceLabel = '',
     this.resultLabel = '',
     this.resultPlaceholder = '',
@@ -46,6 +60,20 @@ final class QuickTranslateLabels {
     this.glossaryWarnings = '',
   });
 
+  final String close;
+  final String collapseSource;
+  final String showSource;
+  final String expandReading;
+  final String compactReading;
+  final String fontLarger;
+  final String fontSmaller;
+  final String fontReset;
+  final String stop;
+  final String stopped;
+  final String replace;
+  final String replaceChanged;
+  final String replaceUnsupported;
+  final String serviceHint;
   final String sourceLabel;
   final String resultLabel;
   final String resultPlaceholder;

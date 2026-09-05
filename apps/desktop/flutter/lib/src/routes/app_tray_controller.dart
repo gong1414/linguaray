@@ -2,11 +2,14 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:linguaray_application/linguaray_application.dart'
+    show UpdateStatus;
 import 'package:nativeapi/nativeapi.dart';
 
 import '../i18n/i18n.dart';
 import '../platform/menu_accelerator.dart';
 import '../platform/platform_types.dart';
+import '../platform/startup_update_controller.dart';
 import '../platform/trigger_controller.dart';
 import '../services/app_windows.dart';
 import '../services/dock_icon_controller.dart';
@@ -23,6 +26,7 @@ final class AppTrayController {
     if (icon != null) _trayIcon.icon = icon;
     _trayIcon.isVisible = visible;
     dockIconController.setTrayIconVisible(visible);
+    startupUpdateController.result.addListener(rebuildMenu);
     rebuildMenu();
     _trayIcon.contextMenuTrigger = ContextMenuTrigger.none;
     _trayIcon.on<TrayIconClickedEvent>((_) => _openMenuAfterEvent());
@@ -38,7 +42,10 @@ final class AppTrayController {
     _trayIcon.contextMenu = _buildContextMenu();
   }
 
-  void dispose() => _trayIcon.dispose();
+  void dispose() {
+    startupUpdateController.result.removeListener(rebuildMenu);
+    _trayIcon.dispose();
+  }
 
   void _openMenuAfterEvent() {
     scheduleMicrotask(_trayIcon.openContextMenu);
@@ -114,6 +121,16 @@ final class AppTrayController {
     );
 
     menu.addSeparator();
+    final update = startupUpdateController.result.value;
+    if (update?.status == UpdateStatus.available) {
+      _addAction(
+        menu,
+        t.ui.updates.available(version: update?.manifest?.version ?? ''),
+        () async => showSettingsWindow(
+          destination: SettingsDestination.settingsUpdates,
+        ),
+      );
+    }
     _addAction(
       menu,
       labels.preferences,

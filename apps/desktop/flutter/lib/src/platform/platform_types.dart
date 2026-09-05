@@ -1,5 +1,7 @@
 import 'dart:ui';
 
+import 'selection_replacement_controller.dart';
+
 /// Normalized permission state exposed to controllers and widgets.
 enum PermissionState { granted, denied, notRequired, unknown }
 
@@ -41,12 +43,14 @@ class SelectionResult {
     required this.triggerPosition,
     required this.readMethod,
     this.recoverableError,
+    this.replacementTarget,
   });
 
   final String text;
   final Offset triggerPosition;
   final SelectionReadMethod readMethod;
   final String? recoverableError;
+  final SelectionTarget? replacementTarget;
 }
 
 class CaptureResult {

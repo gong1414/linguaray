@@ -54,7 +54,18 @@ final class RuntimeTranslationRepository implements TranslationRepository {
             omitsSourceLanguage: capabilities.omitsSourceLanguage,
           );
         })
-        .toList(growable: false);
+        .toList();
+
+    final preferred = settingsStore.general.defaultTranslationService;
+    final preferredIndex = translationServices.indexWhere(
+      (service) => service.id == preferred,
+    );
+    if (preferredIndex > 0) {
+      translationServices.insert(
+        0,
+        translationServices.removeAt(preferredIndex),
+      );
+    }
 
     final configuredTargets = settingsStore.general.translationTargets
         .where((target) => target.enabled)
@@ -117,55 +128,26 @@ final class RuntimeTranslationRepository implements TranslationRepository {
     required String text,
     required String sourceLanguage,
     required String targetLanguage,
-  }) async* {
-    if (service.isStreaming) {
-      try {
-        await for (final chunk in LlmStream.translate(
+  }) {
+    return LlmStream.translate(
           providerId: service.id,
           sourceLang: sourceLanguage,
           targetLang: targetLanguage,
           text: text,
-        )) {
-          if (chunk.content.isNotEmpty) yield chunk.content;
+        )
+        .map((chunk) {
           if (chunk.isDone &&
               chunk.finishReason != 'stop' &&
               chunk.finishReason != 'end_turn') {
             throw const TranslationFailure('translation_incomplete');
           }
-        }
-      } on TranslationFailure {
-        rethrow;
-      } catch (error) {
-        throw _translationFailure(error);
-      }
-      return;
-    }
-
-    try {
-      final response = await runtime
-          .translation(providerId: service.id)
-          .translate(
-            request: TranslateRequest(
-              sourceLanguage: sourceLanguage == autoLanguageCode
-                  ? null
-                  : sourceLanguage,
-              targetLanguage: targetLanguage,
-              text: text,
-            ),
-          );
-      if (response.translations.isEmpty) {
-        throw const TranslationFailure('empty_result');
-      }
-      final translated = response.translations.first.text;
-      if (translated.trim().isEmpty) {
-        throw const TranslationFailure('empty_result');
-      }
-      yield translated;
-    } on TranslationFailure {
-      rethrow;
-    } catch (error) {
-      throw _translationFailure(error);
-    }
+          return chunk.content;
+        })
+        .where((text) => text.isNotEmpty)
+        .handleError((Object error) {
+          if (error is TranslationFailure) throw error;
+          throw _translationFailure(error);
+        });
   }
 
   String _fallbackTarget(List<LanguageOption> languages) {

@@ -4,6 +4,24 @@ import 'package:linguaray_application/linguaray_application.dart';
 import 'package:test/test.dart';
 
 void main() {
+  test('cancellation reaches all silent service subscriptions', () async {
+    final repository = _SilentRepository();
+    final stream = TranslateText(repository)(
+      query: const TranslationQuery(
+        text: 'hello',
+        sourceLanguage: 'en',
+        targetLanguage: 'zh-Hans',
+      ),
+      catalog: await repository.loadCatalog(),
+    );
+    final subscription = stream.listen((_) {});
+    while (repository.started < 2) {
+      await Future<void>.delayed(Duration.zero);
+    }
+    await subscription.cancel().timeout(const Duration(seconds: 1));
+    expect(repository.cancelled, 2);
+  });
+
   test('explicit language pair does not wait for language detection', () async {
     final repository = _FakeTranslationRepository(pendingDetection: true);
     final result = await TranslateText(repository)(
@@ -145,5 +163,22 @@ final class _FakeTranslationRepository implements TranslationRepository {
       yield '好';
       if (incomplete) throw const TranslationFailure('translation_incomplete');
     }
+  }
+}
+
+final class _SilentRepository extends _FakeTranslationRepository {
+  int started = 0;
+  int cancelled = 0;
+  @override
+  Stream<String> translate({
+    required TranslationServiceOption service,
+    required String text,
+    required String sourceLanguage,
+    required String targetLanguage,
+  }) {
+    return StreamController<String>(
+      onListen: () => started++,
+      onCancel: () => cancelled++,
+    ).stream;
   }
 }

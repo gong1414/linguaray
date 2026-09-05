@@ -14,10 +14,48 @@ final translationViewModelProvider =
 final class TranslationViewModel extends Notifier<TranslationViewState> {
   int _requestId = 0;
   String? _activeHistorySessionId;
+  StreamSubscription<TranslationRun>? _subscription;
+  Completer<void>? _completion;
+  String? _queryKey;
+
+  String get _currentQueryKey =>
+      '${state.sourceText.trim()}\u0000${state.sourceLanguage}\u0000${state.targetLanguage}';
+
+  void cancel() {
+    _requestId++;
+    unawaited(_subscription?.cancel());
+    _subscription = null;
+    if (_completion?.isCompleted == false) _completion!.complete();
+    final run = state.run;
+    state = state.copyWith(
+      submitting: false,
+      run: run == null
+          ? null
+          : TranslationRun(
+              sourceText: run.sourceText,
+              sourceLanguage: run.sourceLanguage,
+              targetLanguage: run.targetLanguage,
+              detectedLanguage: run.detectedLanguage,
+              complete: true,
+              results: [
+                for (final result in run.results)
+                  result.status == TranslationResultStatus.translating
+                      ? result.copyWith(
+                          status: TranslationResultStatus.cancelled,
+                        )
+                      : result,
+              ],
+            ),
+    );
+  }
 
   @override
   TranslationViewState build() {
-    ref.onDispose(() => _requestId++);
+    ref.onDispose(() {
+      _requestId++;
+      unawaited(_subscription?.cancel());
+      if (_completion?.isCompleted == false) _completion!.complete();
+    });
     scheduleMicrotask(initialize);
     return const TranslationViewState();
   }
@@ -46,11 +84,13 @@ final class TranslationViewModel extends Notifier<TranslationViewState> {
   }
 
   void setSourceText(String value) {
+    if (value != state.sourceText && state.submitting) cancel();
     state = state.copyWith(sourceText: value);
   }
 
   void clearSourceText() {
-    _requestId++;
+    cancel();
+    _queryKey = null;
     _activeHistorySessionId = null;
     state = state.copyWith(
       sourceText: '',
@@ -62,17 +102,27 @@ final class TranslationViewModel extends Notifier<TranslationViewState> {
   }
 
   void setSourceLanguage(String value) {
+    if (value != state.sourceLanguage && state.submitting) cancel();
     state = state.copyWith(sourceLanguage: value);
   }
 
   void setTargetLanguage(String value) {
+    if (value != state.targetLanguage && state.submitting) cancel();
     state = state.copyWith(targetLanguage: value);
   }
 
   void selectService(String serviceId) {
+    if (!state.services.any((service) => service.id == serviceId)) return;
     state = state.copyWith(selectedServiceId: serviceId);
-    final run = state.run;
-    if (run != null && run.complete) unawaited(_refreshGlossary(run));
+    final cached = state.run?.results
+        .where((result) => result.service.id == serviceId)
+        .firstOrNull;
+    if (_queryKey == _currentQueryKey &&
+        cached?.status == TranslationResultStatus.completed) {
+      unawaited(_refreshGlossary(state.run!));
+    } else if (state.sourceText.trim().isNotEmpty) {
+      unawaited(submit(reuseResults: true));
+    }
   }
 
   void swapLanguages() {
@@ -93,55 +143,95 @@ final class TranslationViewModel extends Notifier<TranslationViewState> {
     );
   }
 
-  Future<void> submit() async {
+  Future<void> submit({bool reuseResults = false}) async {
     final catalog = state.catalog;
     final text = state.sourceText.trim();
-    if (catalog == null || text.isEmpty || state.loadingCatalog) return;
-
+    if (catalog == null ||
+        text.isEmpty ||
+        state.loadingCatalog ||
+        catalog.services.isEmpty) {
+      return;
+    }
+    final service =
+        catalog.services
+            .where((item) => item.id == state.selectedServiceId)
+            .firstOrNull ??
+        catalog.services.first;
+    final keep = reuseResults && _queryKey == _currentQueryKey;
+    cancel();
+    final previous = keep
+        ? state.run?.results ?? const <ServiceTranslationResult>[]
+        : const <ServiceTranslationResult>[];
     final requestId = ++_requestId;
-    final sessionId = newTranslationSessionId();
+    final sessionId = keep
+        ? _activeHistorySessionId ?? newTranslationSessionId()
+        : newTranslationSessionId();
+    final comparisonTarget = keep ? state.run?.targetLanguage : null;
     _activeHistorySessionId = sessionId;
+    _queryKey = _currentQueryKey;
+    final completion = Completer<void>();
+    _completion = completion;
     state = state.copyWith(
       submitting: true,
-      clearRun: true,
+      clearRun: !keep,
       clearSubmissionError: true,
-      historyByService: const {},
+      selectedServiceId: service.id,
+      historyByService: keep ? state.historyByService : const {},
     );
-
-    try {
-      await for (final run in ref.read(translateTextProvider)(
-        query: TranslationQuery(
-          text: text,
-          sourceLanguage: state.sourceLanguage,
-          targetLanguage: state.targetLanguage == automaticTargetCode
-              ? null
-              : state.targetLanguage,
-        ),
-        catalog: catalog,
-      )) {
-        if (requestId != _requestId) return;
-        final selectedId = _selectedServiceFor(run);
-        state = state.copyWith(
-          run: run,
-          selectedServiceId: selectedId,
-          submitting: !run.complete,
+    _subscription = ref
+        .read(translateTextProvider)(
+          query: TranslationQuery(
+            text: text,
+            sourceLanguage: state.sourceLanguage,
+            targetLanguage: state.targetLanguage == automaticTargetCode
+                ? comparisonTarget
+                : state.targetLanguage,
+          ),
+          catalog: TranslationCatalog(
+            languages: catalog.languages,
+            services: [service],
+            defaultSourceLanguage: catalog.defaultSourceLanguage,
+            defaultTargetLanguage: catalog.defaultTargetLanguage,
+          ),
+        )
+        .listen(
+          (run) {
+            if (requestId != _requestId) return;
+            final merged = TranslationRun(
+              sourceText: run.sourceText,
+              sourceLanguage: run.sourceLanguage,
+              targetLanguage: run.targetLanguage,
+              detectedLanguage: run.detectedLanguage,
+              complete: run.complete,
+              results: [
+                ...previous.where((result) => result.service.id != service.id),
+                ...run.results,
+              ],
+            );
+            state = state.copyWith(run: merged, submitting: !run.complete);
+            if (run.complete) {
+              unawaited(_recordHistory(sessionId, run));
+              unawaited(_refreshGlossary(merged));
+            }
+          },
+          onError: (Object error) {
+            if (requestId == _requestId) {
+              state = state.copyWith(
+                submitting: false,
+                submissionErrorCode: 'translation_failed',
+              );
+            }
+            if (!completion.isCompleted) completion.complete();
+          },
+          onDone: () {
+            if (requestId == _requestId) {
+              state = state.copyWith(submitting: false);
+            }
+            if (!completion.isCompleted) completion.complete();
+          },
+          cancelOnError: true,
         );
-      }
-      if (requestId == _requestId) {
-        final run = state.run;
-        state = state.copyWith(submitting: false);
-        if (run != null && run.complete) {
-          unawaited(_recordHistory(sessionId, run));
-          unawaited(_refreshGlossary(run));
-        }
-      }
-    } catch (_) {
-      if (requestId != _requestId) return;
-      state = state.copyWith(
-        submitting: false,
-        submissionErrorCode: 'translation_failed',
-      );
-    }
+    await completion.future;
   }
 
   Future<void> _recordHistory(String sessionId, TranslationRun run) async {
@@ -152,7 +242,10 @@ final class TranslationViewModel extends Notifier<TranslationViewState> {
       );
       if (_activeHistorySessionId != sessionId) return;
       state = state.copyWith(
-        historyByService: {for (final entry in saved) entry.serviceId: entry},
+        historyByService: {
+          ...state.historyByService,
+          for (final entry in saved) entry.serviceId: entry,
+        },
       );
     } catch (_) {
       // History persistence must never turn a successful translation into an
@@ -183,19 +276,9 @@ final class TranslationViewModel extends Notifier<TranslationViewState> {
     }
   }
 
-  String? _selectedServiceFor(TranslationRun run) {
-    final standing = state.selectedServiceId;
-    if (standing != null &&
-        run.results.any((result) => result.service.id == standing)) {
-      return standing;
-    }
-    for (final result in run.results) {
-      if (result.hasText) return result.service.id;
-    }
-    return run.results.isEmpty ? null : run.results.first.service.id;
-  }
-
   Future<void> _refreshGlossary(TranslationRun run) async {
+    final request = _requestId;
+    final selectedId = state.selectedServiceId;
     try {
       final matches = await ref
           .read(glossaryRepositoryProvider)
@@ -204,6 +287,9 @@ final class TranslationViewModel extends Notifier<TranslationViewState> {
             sourceLanguage: run.detectedLanguage ?? run.sourceLanguage,
             targetLanguage: run.targetLanguage,
           );
+      if (request != _requestId || selectedId != state.selectedServiceId) {
+        return;
+      }
       final selected = state.selectedResult?.text ?? '';
       final warnings = selected.trim().isEmpty
           ? const <GlossaryComplianceWarning>[]
@@ -215,6 +301,9 @@ final class TranslationViewModel extends Notifier<TranslationViewState> {
                   sourceLanguage: run.detectedLanguage ?? run.sourceLanguage,
                   targetLanguage: run.targetLanguage,
                 );
+      if (request != _requestId || selectedId != state.selectedServiceId) {
+        return;
+      }
       state = state.copyWith(
         glossaryMatches: matches,
         glossaryWarnings: warnings,
@@ -272,7 +361,7 @@ final class TranslationViewState {
     for (final result in results) {
       if (result.service.id == selectedServiceId) return result;
     }
-    return results.first;
+    return selectedServiceId == null ? results.first : null;
   }
 
   HistoryRecord? get selectedHistoryRecord {

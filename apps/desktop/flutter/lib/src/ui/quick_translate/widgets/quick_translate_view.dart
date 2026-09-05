@@ -35,6 +35,12 @@ class QuickTranslateView extends StatefulWidget {
     required this.onConfigureServices,
     required this.onRecheckPermissions,
     super.key,
+    this.onClose,
+    this.onStartDragging,
+    this.onStop,
+    this.onReplace,
+    this.onLayoutChanged,
+    this.onToggleReading,
     this.results = const [],
     this.selectedResult,
     this.detectedLanguage,
@@ -65,6 +71,12 @@ class QuickTranslateView extends StatefulWidget {
     this.onToggleFavorite,
   });
 
+  final VoidCallback? onClose;
+  final VoidCallback? onStartDragging;
+  final VoidCallback? onStop;
+  final VoidCallback? onReplace;
+  final VoidCallback? onLayoutChanged;
+  final VoidCallback? onToggleReading;
   final QuickTranslateLabels labels;
   final List<LanguageOption> languages;
   final List<TranslationServiceOption> services;
@@ -120,6 +132,19 @@ class QuickTranslateView extends StatefulWidget {
 }
 
 class _QuickTranslateViewState extends State<QuickTranslateView> {
+  bool _sourceVisible = true;
+  double _fontScale = 1;
+
+  void _toggleSource() {
+    setState(() => _sourceVisible = !_sourceVisible);
+    widget.onLayoutChanged?.call();
+  }
+
+  void _scaleFont(double value) {
+    setState(() => _fontScale = value.clamp(.85, 1.5));
+    widget.onLayoutChanged?.call();
+  }
+
   late final TextEditingController _controller = TextEditingController(
     text: widget.sourceText,
   );
@@ -127,6 +152,9 @@ class _QuickTranslateViewState extends State<QuickTranslateView> {
   @override
   void didUpdateWidget(covariant QuickTranslateView oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.sourceText.isEmpty && oldWidget.sourceText.isNotEmpty) {
+      _sourceVisible = true;
+    }
     if (widget.sourceText != _controller.text) {
       _controller
         ..text = widget.sourceText
@@ -163,6 +191,34 @@ class _QuickTranslateViewState extends State<QuickTranslateView> {
             },
           };
 
+    final mac = theme.platform == TargetPlatform.macOS;
+    SingleActivator command(LogicalKeyboardKey key, {bool shift = false}) =>
+        SingleActivator(
+          key,
+          meta: mac,
+          control: !mac,
+          shift: shift,
+          includeRepeats: false,
+        );
+    submitBindings.addAll({
+      const SingleActivator(LogicalKeyboardKey.escape): () =>
+          widget.onClose?.call(),
+      command(LogicalKeyboardKey.keyW): () => widget.onClose?.call(),
+      command(LogicalKeyboardKey.keyP): widget.onTogglePin,
+      command(LogicalKeyboardKey.keyR): () {
+        if (canTranslate) widget.onTranslate();
+      },
+      command(LogicalKeyboardKey.keyS): () {
+        if (widget.favoriteAvailable && !widget.updatingFavorite) {
+          widget.onToggleFavorite?.call();
+        }
+      },
+      command(LogicalKeyboardKey.equal): () => _scaleFont(_fontScale + .1),
+      command(LogicalKeyboardKey.equal, shift: true): () =>
+          _scaleFont(_fontScale + .1),
+      command(LogicalKeyboardKey.minus): () => _scaleFont(_fontScale - .1),
+      command(LogicalKeyboardKey.digit0): () => _scaleFont(1),
+    });
     final input = QuickTranslateInput(
       labels: widget.labels,
       controller: _controller,
@@ -173,6 +229,7 @@ class _QuickTranslateViewState extends State<QuickTranslateView> {
       canTranslate: canTranslate,
       speakingKind: widget.speakingKind,
       onSourceTextChanged: widget.onSourceTextChanged,
+      onStop: widget.onStop,
       onClear: widget.onClear,
       onTranslate: widget.onTranslate,
       onSpeakSource: widget.onSpeakSource,
@@ -180,6 +237,9 @@ class _QuickTranslateViewState extends State<QuickTranslateView> {
     );
     final result = QuickTranslateResultPanel(
       labels: widget.labels,
+      services: widget.services,
+      onReplace: widget.onReplace,
+      submitting: widget.submitting,
       results: widget.results,
       selectedResult: widget.selectedResult,
       selectedServiceId: widget.selectedServiceId,
@@ -204,129 +264,206 @@ class _QuickTranslateViewState extends State<QuickTranslateView> {
       onSpeakResult: widget.onSpeakResult,
       onStopSpeech: widget.onStopSpeech,
     );
-    return CallbackShortcuts(
-      bindings: submitBindings,
-      child: Material(
-        color: theme.colorScheme.surfaceContainerLowest,
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                KeyedSubtree(
-                  key: widget.toolbarKey,
-                  child: QuickTranslateCommandHeader(
-                    labels: widget.labels,
-                    pinned: widget.pinned,
-                    languages: widget.languages,
-                    sourceLanguage: widget.sourceLanguage,
-                    targetLanguage: widget.targetLanguage,
-                    onTogglePin: widget.onTogglePin,
-                    onCapture: widget.onCapture,
-                    onClipboard: widget.onClipboard,
-                    onOpenSettings: widget.onOpenSettings,
-                    onSourceLanguageChanged: widget.onSourceLanguageChanged,
-                    onTargetLanguageChanged: widget.onTargetLanguageChanged,
-                    onSwapLanguages: widget.onSwapLanguages,
+    return MediaQuery(
+      data: MediaQuery.of(context).copyWith(
+        textScaler: TextScaler.linear(
+          MediaQuery.textScalerOf(context).scale(1) * _fontScale,
+        ),
+      ),
+      child: CallbackShortcuts(
+        bindings: submitBindings,
+        child: Material(
+          color: theme.colorScheme.surfaceContainerLowest,
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  KeyedSubtree(
+                    key: widget.toolbarKey,
+                    child: QuickTranslateCommandHeader(
+                      labels: widget.labels,
+                      onClose: widget.onClose,
+                      onStartDragging: widget.onStartDragging,
+                      menuItems: [
+                        PopupMenuItem(
+                          value: 'source',
+                          child: Text(
+                            _sourceVisible
+                                ? widget.labels.collapseSource
+                                : widget.labels.showSource,
+                          ),
+                        ),
+                        if (widget.onToggleReading != null)
+                          PopupMenuItem(
+                            value: 'reading',
+                            child: Text(
+                              MediaQuery.sizeOf(context).width >= 600
+                                  ? widget.labels.compactReading
+                                  : widget.labels.expandReading,
+                            ),
+                          ),
+                        PopupMenuItem(
+                          value: 'larger',
+                          child: Text(widget.labels.fontLarger),
+                        ),
+                        PopupMenuItem(
+                          value: 'smaller',
+                          child: Text(widget.labels.fontSmaller),
+                        ),
+                        PopupMenuItem(
+                          value: 'reset',
+                          child: Text(widget.labels.fontReset),
+                        ),
+                        const PopupMenuDivider(),
+                      ],
+                      onMenuSelected: (value) {
+                        switch (value) {
+                          case 'source':
+                            _toggleSource();
+                          case 'reading':
+                            widget.onToggleReading?.call();
+                          case 'larger':
+                            _scaleFont(_fontScale + .1);
+                          case 'smaller':
+                            _scaleFont(_fontScale - .1);
+                          case 'reset':
+                            _scaleFont(1);
+                        }
+                      },
+                      pinned: widget.pinned,
+                      languages: widget.languages,
+                      sourceLanguage: widget.sourceLanguage,
+                      targetLanguage: widget.targetLanguage,
+                      onTogglePin: widget.onTogglePin,
+                      onCapture: widget.onCapture,
+                      onClipboard: widget.onClipboard,
+                      onOpenSettings: widget.onOpenSettings,
+                      onSourceLanguageChanged: widget.onSourceLanguageChanged,
+                      onTargetLanguageChanged: widget.onTargetLanguageChanged,
+                      onSwapLanguages: widget.onSwapLanguages,
+                    ),
                   ),
-                ),
-                KeyedSubtree(
-                  key: widget.contentKey,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const SizedBox(height: 12),
-                      LayoutBuilder(
-                        builder: (context, constraints) {
-                          final wide = constraints.maxWidth >= 568;
-                          final sourcePane = Container(
-                            key: const ValueKey('quick-source-pane'),
-                            constraints: BoxConstraints(
-                              minHeight: wide ? 248 : 0,
-                            ),
-                            padding: const EdgeInsets.all(20),
-                            child: input,
-                          );
-                          final resultPane = Container(
-                            key: const ValueKey('quick-result-pane'),
-                            constraints: BoxConstraints(
-                              minHeight: wide ? 248 : 0,
-                            ),
-                            padding: const EdgeInsets.all(20),
-                            color: theme.colorScheme.surface,
-                            child: result,
-                          );
-                          return DecoratedBox(
-                            decoration: BoxDecoration(
-                              border: Border.all(
-                                color: theme.colorScheme.outlineVariant,
-                              ),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(16),
-                              child: wide
-                                  ? IntrinsicHeight(
+                  KeyedSubtree(
+                    key: widget.contentKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const SizedBox(height: 12),
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            final wide =
+                                constraints.maxWidth >= 568 && _sourceVisible;
+                            final sourcePane = Container(
+                              key: const ValueKey('quick-source-pane'),
+                              constraints: const BoxConstraints(minHeight: 0),
+                              padding: const EdgeInsets.all(12),
+                              child: _sourceVisible
+                                  ? input
+                                  : InkWell(
+                                      onTap: _toggleSource,
                                       child: Row(
+                                        children: [
+                                          Icon(
+                                            Icons.unfold_more_rounded,
+                                            size: 16,
+                                            semanticLabel:
+                                                widget.labels.showSource,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              widget.sourceText.isEmpty
+                                                  ? widget.labels.inputHint
+                                                  : widget.sourceText,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: theme.textTheme.bodySmall,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                            );
+                            final resultPane = Container(
+                              key: const ValueKey('quick-result-pane'),
+                              constraints: const BoxConstraints(minHeight: 0),
+                              padding: const EdgeInsets.all(12),
+                              color: theme.colorScheme.surface,
+                              child: result,
+                            );
+                            return DecoratedBox(
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: theme.colorScheme.outlineVariant,
+                                ),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(16),
+                                child: wide
+                                    ? IntrinsicHeight(
+                                        child: Row(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.stretch,
+                                          children: [
+                                            Expanded(child: sourcePane),
+                                            VerticalDivider(
+                                              width: 1,
+                                              color: theme
+                                                  .colorScheme
+                                                  .outlineVariant,
+                                            ),
+                                            Expanded(child: resultPane),
+                                          ],
+                                        ),
+                                      )
+                                    : Column(
+                                        mainAxisSize: MainAxisSize.min,
                                         crossAxisAlignment:
                                             CrossAxisAlignment.stretch,
                                         children: [
-                                          Expanded(child: sourcePane),
-                                          VerticalDivider(
-                                            width: 1,
-                                            color: theme
-                                                .colorScheme
-                                                .outlineVariant,
-                                          ),
-                                          Expanded(child: resultPane),
+                                          sourcePane,
+                                          const Divider(),
+                                          resultPane,
                                         ],
                                       ),
-                                    )
-                                  : Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.stretch,
-                                      children: [
-                                        sourcePane,
-                                        const Divider(),
-                                        resultPane,
-                                      ],
-                                    ),
-                            ),
-                          );
-                        },
-                      ),
-                      if (widget.notice != QuickTranslateNotice.none)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 12),
-                          child: QuickTranslateNoticeMessage(
-                            labels: widget.labels,
-                            notice: widget.notice,
-                            onRecheck: widget.onRecheckPermissions,
-                            onConfigureOcr: widget.onConfigureOcr,
-                            onConfigureServices: widget.onConfigureServices,
-                            onRetryCapture: widget.onCapture,
-                          ),
+                              ),
+                            );
+                          },
                         ),
-                      if (widget.services.isEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 12),
-                          child: StatusMessage(
-                            kind: StatusKind.warning,
-                            title: widget.labels.noServices,
-                            action: OutlinedButton(
-                              onPressed: widget.onConfigureServices,
-                              child: Text(widget.labels.configureServices),
+                        if (widget.notice != QuickTranslateNotice.none)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 12),
+                            child: QuickTranslateNoticeMessage(
+                              labels: widget.labels,
+                              notice: widget.notice,
+                              onRecheck: widget.onRecheckPermissions,
+                              onConfigureOcr: widget.onConfigureOcr,
+                              onConfigureServices: widget.onConfigureServices,
+                              onRetryCapture: widget.onCapture,
                             ),
                           ),
-                        ),
-                    ],
+                        if (widget.services.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 12),
+                            child: StatusMessage(
+                              kind: StatusKind.warning,
+                              title: widget.labels.noServices,
+                              action: OutlinedButton(
+                                onPressed: widget.onConfigureServices,
+                                child: Text(widget.labels.configureServices),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

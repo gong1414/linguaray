@@ -6020,6 +6020,81 @@ class FfiConverterRestoreSummary {
   }
 }
 
+class TranslationEvent {
+  final String content;
+  final String? finishReason;
+  final String? error;
+  TranslationEvent({required this.content, this.finishReason, this.error});
+}
+
+class FfiConverterTranslationEvent {
+  static TranslationEvent lift(RustBuffer buf) {
+    return FfiConverterTranslationEvent.read(buf.asUint8List()).value;
+  }
+
+  static LiftRetVal<TranslationEvent> read(Uint8List buf) {
+    int new_offset = buf.offsetInBytes;
+    final content_lifted = FfiConverterString.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final content = content_lifted.value;
+    new_offset += content_lifted.bytesRead;
+    final finishReason_lifted = FfiConverterOptionalString.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final finishReason = finishReason_lifted.value;
+    new_offset += finishReason_lifted.bytesRead;
+    final error_lifted = FfiConverterOptionalString.read(
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    final error = error_lifted.value;
+    new_offset += error_lifted.bytesRead;
+    return LiftRetVal(
+      TranslationEvent(
+        content: content,
+        finishReason: finishReason,
+        error: error,
+      ),
+      new_offset - buf.offsetInBytes,
+    );
+  }
+
+  static RustBuffer lower(TranslationEvent value) {
+    final total_length =
+        FfiConverterString.allocationSize(value.content) +
+        FfiConverterOptionalString.allocationSize(value.finishReason) +
+        FfiConverterOptionalString.allocationSize(value.error) +
+        0;
+    final buf = Uint8List(total_length);
+    write(value, buf);
+    return toRustBuffer(buf);
+  }
+
+  static int write(TranslationEvent value, Uint8List buf) {
+    int new_offset = buf.offsetInBytes;
+    new_offset += FfiConverterString.write(
+      value.content,
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    new_offset += FfiConverterOptionalString.write(
+      value.finishReason,
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    new_offset += FfiConverterOptionalString.write(
+      value.error,
+      Uint8List.view(buf.buffer, new_offset),
+    );
+    return new_offset - buf.offsetInBytes;
+  }
+
+  static int allocationSize(TranslationEvent value) {
+    return FfiConverterString.allocationSize(value.content) +
+        FfiConverterOptionalString.allocationSize(value.finishReason) +
+        FfiConverterOptionalString.allocationSize(value.error) +
+        0;
+  }
+}
+
 enum CatalogCategory {
   builtIn,
   traditionalApi,
@@ -7747,6 +7822,11 @@ abstract class RuntimeLlmInterface {
   });
   Future<String> explain({required String source, required String translation});
   Future<String> polish({required String text, required String style});
+  TranslationTask startTranslation({
+    required String sourceLang,
+    required String targetLang,
+    required String text,
+  });
   void translateStream({
     required String sourceLang,
     required String targetLang,
@@ -7874,6 +7954,25 @@ class RuntimeLlm implements RuntimeLlmInterface {
       ffi_linguaray_runtime_rust_future_free_rust_buffer,
       FfiConverterString.lift,
       runtimeExceptionErrorHandler,
+    );
+  }
+
+  TranslationTask startTranslation({
+    required String sourceLang,
+    required String targetLang,
+    required String text,
+  }) {
+    return rustCallWithLifter(
+      (status) =>
+          uniffi_linguaray_runtime_fn_method_runtimellm_start_translation(
+            uniffiClonePointer(),
+            FfiConverterString.lower(sourceLang),
+            FfiConverterString.lower(targetLang),
+            FfiConverterString.lower(text),
+            status,
+          ),
+      TranslationTask.lift,
+      null,
     );
   }
 
@@ -9022,6 +9121,83 @@ class SettingsSubscription implements SettingsSubscriptionInterface {
       ffi_linguaray_runtime_rust_future_free_rust_buffer,
       FfiConverterOptionalSettingsChange.lift,
       runtimeExceptionErrorHandler,
+    );
+  }
+}
+
+abstract class TranslationTaskInterface {
+  void cancel();
+  Future<TranslationEvent?> next();
+}
+
+final _TranslationTaskFinalizer = Finalizer<Pointer<Void>>((ptr) {
+  rustCall(
+    (status) => uniffi_linguaray_runtime_fn_free_translationtask(ptr, status),
+  );
+});
+
+class TranslationTask implements TranslationTaskInterface {
+  late final Pointer<Void> _ptr;
+  TranslationTask._(this._ptr) {
+    _TranslationTaskFinalizer.attach(this, _ptr, detach: this);
+  }
+  factory TranslationTask.lift(Pointer<Void> ptr) {
+    return TranslationTask._(ptr);
+  }
+  static Pointer<Void> lower(TranslationTask value) {
+    return value.uniffiClonePointer();
+  }
+
+  Pointer<Void> uniffiClonePointer() {
+    return rustCall(
+      (status) =>
+          uniffi_linguaray_runtime_fn_clone_translationtask(_ptr, status),
+    );
+  }
+
+  static int allocationSize(TranslationTask value) {
+    return 8;
+  }
+
+  static LiftRetVal<TranslationTask> read(Uint8List buf) {
+    final handle = buf.buffer.asByteData(buf.offsetInBytes).getInt64(0);
+    final pointer = Pointer<Void>.fromAddress(handle);
+    return LiftRetVal(TranslationTask.lift(pointer), 8);
+  }
+
+  static int write(TranslationTask value, Uint8List buf) {
+    final handle = lower(value);
+    buf.buffer.asByteData(buf.offsetInBytes).setInt64(0, handle.address);
+    return 8;
+  }
+
+  void dispose() {
+    _TranslationTaskFinalizer.detach(this);
+    rustCall(
+      (status) =>
+          uniffi_linguaray_runtime_fn_free_translationtask(_ptr, status),
+    );
+  }
+
+  void cancel() {
+    return rustCall((status) {
+      uniffi_linguaray_runtime_fn_method_translationtask_cancel(
+        uniffiClonePointer(),
+        status,
+      );
+    }, null);
+  }
+
+  Future<TranslationEvent?> next() {
+    return uniffiRustCallAsync(
+      () => uniffi_linguaray_runtime_fn_method_translationtask_next(
+        uniffiClonePointer(),
+      ),
+      ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+      ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+      ffi_linguaray_runtime_rust_future_free_rust_buffer,
+      FfiConverterOptionalTranslationEvent.lift,
+      null,
     );
   }
 }
@@ -10863,6 +11039,56 @@ class FfiConverterOptionalString {
     }
     buf[0] = 1;
     return FfiConverterString.write(
+          value,
+          Uint8List.view(buf.buffer, buf.offsetInBytes + 1),
+        ) +
+        1;
+  }
+}
+
+class FfiConverterOptionalTranslationEvent {
+  static TranslationEvent? lift(RustBuffer buf) {
+    return FfiConverterOptionalTranslationEvent.read(buf.asUint8List()).value;
+  }
+
+  static LiftRetVal<TranslationEvent?> read(Uint8List buf) {
+    if (ByteData.view(buf.buffer, buf.offsetInBytes).getInt8(0) == 0) {
+      return LiftRetVal(null, 1);
+    }
+    final result = FfiConverterTranslationEvent.read(
+      Uint8List.view(buf.buffer, buf.offsetInBytes + 1),
+    );
+    return LiftRetVal<TranslationEvent?>(result.value, result.bytesRead + 1);
+  }
+
+  static int allocationSize([TranslationEvent? value]) {
+    if (value == null) {
+      return 1;
+    }
+    return FfiConverterTranslationEvent.allocationSize(value) + 1;
+  }
+
+  static RustBuffer lower(TranslationEvent? value) {
+    if (value == null) {
+      return toRustBuffer(Uint8List.fromList([0]));
+    }
+    final length = FfiConverterOptionalTranslationEvent.allocationSize(value);
+    final Pointer<Uint8> frameData = calloc<Uint8>(length);
+    final buf = frameData.asTypedList(length);
+    FfiConverterOptionalTranslationEvent.write(value, buf);
+    final bytes = calloc<ForeignBytes>();
+    bytes.ref.len = length;
+    bytes.ref.data = frameData;
+    return RustBuffer.fromBytes(bytes.ref);
+  }
+
+  static int write(TranslationEvent? value, Uint8List buf) {
+    if (value == null) {
+      buf[0] = 0;
+      return 1;
+    }
+    buf[0] = 1;
+    return FfiConverterTranslationEvent.write(
           value,
           Uint8List.view(buf.buffer, buf.offsetInBytes + 1),
         ) +
@@ -13330,6 +13556,24 @@ external Pointer<Void> uniffi_linguaray_runtime_fn_method_runtimellm_polish(
 );
 
 @Native<
+  Pointer<Void> Function(
+    Pointer<Void>,
+    RustBuffer,
+    RustBuffer,
+    RustBuffer,
+    Pointer<RustCallStatus>,
+  )
+>(assetId: _uniffiAssetId)
+external Pointer<Void>
+uniffi_linguaray_runtime_fn_method_runtimellm_start_translation(
+  Pointer<Void> ptr,
+  RustBuffer source_lang,
+  RustBuffer target_lang,
+  RustBuffer text,
+  Pointer<RustCallStatus> uniffiStatus,
+);
+
+@Native<
   Void Function(
     Pointer<Void>,
     RustBuffer,
@@ -13822,6 +14066,35 @@ external void uniffi_linguaray_runtime_fn_free_settingssubscription(
 @Native<Pointer<Void> Function(Pointer<Void>)>(assetId: _uniffiAssetId)
 external Pointer<Void>
 uniffi_linguaray_runtime_fn_method_settingssubscription_next(Pointer<Void> ptr);
+
+@Native<Pointer<Void> Function(Pointer<Void>, Pointer<RustCallStatus>)>(
+  assetId: _uniffiAssetId,
+)
+external Pointer<Void> uniffi_linguaray_runtime_fn_clone_translationtask(
+  Pointer<Void> handle,
+  Pointer<RustCallStatus> uniffiStatus,
+);
+
+@Native<Void Function(Pointer<Void>, Pointer<RustCallStatus>)>(
+  assetId: _uniffiAssetId,
+)
+external void uniffi_linguaray_runtime_fn_free_translationtask(
+  Pointer<Void> handle,
+  Pointer<RustCallStatus> uniffiStatus,
+);
+
+@Native<Void Function(Pointer<Void>, Pointer<RustCallStatus>)>(
+  assetId: _uniffiAssetId,
+)
+external void uniffi_linguaray_runtime_fn_method_translationtask_cancel(
+  Pointer<Void> ptr,
+  Pointer<RustCallStatus> uniffiStatus,
+);
+
+@Native<Pointer<Void> Function(Pointer<Void>)>(assetId: _uniffiAssetId)
+external Pointer<Void> uniffi_linguaray_runtime_fn_method_translationtask_next(
+  Pointer<Void> ptr,
+);
 
 @Native<Void Function(Pointer<UniffiVTableCallbackInterfaceStreamCallback>)>(
   assetId: _uniffiAssetId,
@@ -14636,6 +14909,10 @@ external int uniffi_linguaray_runtime_checksum_method_runtimellm_polish();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
+uniffi_linguaray_runtime_checksum_method_runtimellm_start_translation();
+
+@Native<Uint16 Function()>(assetId: _uniffiAssetId)
+external int
 uniffi_linguaray_runtime_checksum_method_runtimellm_translate_stream();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
@@ -14809,6 +15086,12 @@ uniffi_linguaray_runtime_checksum_method_runtimevocabulary_upsert_entry();
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int
 uniffi_linguaray_runtime_checksum_method_settingssubscription_next();
+
+@Native<Uint16 Function()>(assetId: _uniffiAssetId)
+external int uniffi_linguaray_runtime_checksum_method_translationtask_cancel();
+
+@Native<Uint16 Function()>(assetId: _uniffiAssetId)
+external int uniffi_linguaray_runtime_checksum_method_translationtask_next();
 
 @Native<Uint16 Function()>(assetId: _uniffiAssetId)
 external int uniffi_linguaray_runtime_checksum_constructor_runtime_new();
@@ -15080,8 +15363,12 @@ void _checkApiChecksums() {
   if (uniffi_linguaray_runtime_checksum_method_runtimellm_polish() != 54993) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
+  if (uniffi_linguaray_runtime_checksum_method_runtimellm_start_translation() !=
+      35918) {
+    throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
+  }
   if (uniffi_linguaray_runtime_checksum_method_runtimellm_translate_stream() !=
-      19511) {
+      18453) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
   if (uniffi_linguaray_runtime_checksum_method_runtimeocr_recognize_clipboard_image() !=
@@ -15254,6 +15541,14 @@ void _checkApiChecksums() {
   }
   if (uniffi_linguaray_runtime_checksum_method_settingssubscription_next() !=
       52040) {
+    throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
+  }
+  if (uniffi_linguaray_runtime_checksum_method_translationtask_cancel() !=
+      18760) {
+    throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
+  }
+  if (uniffi_linguaray_runtime_checksum_method_translationtask_next() !=
+      55434) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
   if (uniffi_linguaray_runtime_checksum_constructor_runtime_new() != 29932) {

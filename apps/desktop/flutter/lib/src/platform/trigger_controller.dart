@@ -7,15 +7,18 @@ import 'ocr_controller.dart';
 import 'permission_controller.dart';
 import 'platform_types.dart';
 import 'selection_controller.dart';
+import 'selection_replacement_controller.dart';
 
 class QuickWindowRequest {
   const QuickWindowRequest({
     this.text,
+    this.replacementTarget,
     this.submit = false,
     this.clearExisting = false,
   });
 
   final String? text;
+  final SelectionTarget? replacementTarget;
   final bool submit;
   final bool clearExisting;
 }
@@ -84,6 +87,7 @@ class TriggerController {
           }
           quickWindowRequest.value = QuickWindowRequest(
             text: result.text,
+            replacementTarget: result.replacementTarget,
             submit: true,
             clearExisting: true,
           );

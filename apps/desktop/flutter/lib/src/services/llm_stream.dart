@@ -4,7 +4,7 @@ import 'package:linguaray_runtime/linguaray_runtime.dart';
 
 import 'runtime.dart';
 
-/// Wraps a uniffi [StreamCallback] as a Dart [Stream] of [StreamChunkData].
+/// Reads native translation events through asynchronous UniFFI methods.
 ///
 /// Usage:
 /// ```dart
@@ -29,45 +29,53 @@ class LlmStream {
     required String targetLang,
     required String text,
   }) {
-    final controller = StreamController<StreamChunkData>();
-
-    final callback = _StreamCallbackImpl(
-      onChunk: (content) {
-        if (!controller.isClosed) {
-          controller.add(StreamChunkData(content: content, isDone: false));
-        }
-      },
-      onFinish: (reason) {
-        if (!controller.isClosed) {
-          controller.add(
-            StreamChunkData(content: '', isDone: true, finishReason: reason),
-          );
-          controller.close();
-        }
-      },
-      onError: (error) {
-        if (!controller.isClosed) {
-          controller.addError(Exception(error));
-          controller.close();
-        }
+    TranslationTask? task;
+    var cancelled = false;
+    final controller = StreamController<StreamChunkData>(
+      onCancel: () {
+        cancelled = true;
+        task?.cancel();
       },
     );
 
-    try {
-      runtime
-          .llm(providerId: providerId)
-          .translateStream(
-            sourceLang: sourceLang,
-            targetLang: targetLang,
-            text: text,
-            callback: callback,
+    Future<void> read() async {
+      try {
+        final active = runtime
+            .llm(providerId: providerId)
+            .startTranslation(
+              sourceLang: sourceLang,
+              targetLang: targetLang,
+              text: text,
+            );
+        task = active;
+        if (cancelled) {
+          active.cancel();
+          return;
+        }
+        while (!cancelled) {
+          final event = await active.next();
+          if (cancelled) return;
+          if (event == null) {
+            throw const FormatException('stream ended before completion');
+          }
+          if (event.error != null) throw Exception(event.error);
+          controller.add(
+            StreamChunkData(
+              content: event.content,
+              isDone: event.finishReason != null,
+              finishReason: event.finishReason,
+            ),
           );
-    } catch (e, st) {
-      if (!controller.isClosed) {
-        controller.addError(e, st);
-        controller.close();
+          if (event.finishReason != null) break;
+        }
+      } catch (error, stack) {
+        if (!cancelled) controller.addError(error, stack);
+      } finally {
+        if (!controller.isClosed) unawaited(controller.close());
       }
     }
+
+    controller.onListen = () => unawaited(read());
 
     return controller.stream;
   }
@@ -84,26 +92,4 @@ class StreamChunkData {
     required this.isDone,
     this.finishReason,
   });
-}
-
-/// Implements the uniffi-generated [StreamCallback] abstract class.
-class _StreamCallbackImpl extends StreamCallback {
-  final void Function(String content) _onChunk;
-  final void Function(String reason) _onFinish;
-  final void Function(String error) _onError;
-
-  _StreamCallbackImpl({
-    required this._onChunk,
-    required this._onFinish,
-    required this._onError,
-  });
-
-  @override
-  void onChunk(String content) => _onChunk(content);
-
-  @override
-  void onFinish(String finishReason) => _onFinish(finishReason);
-
-  @override
-  void onError(String error) => _onError(error);
 }

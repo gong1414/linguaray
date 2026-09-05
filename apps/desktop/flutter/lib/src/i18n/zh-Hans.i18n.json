@@ -856,7 +856,21 @@
       "recheck": "重新检查",
       "source_label": "原文",
       "result_label": "译文",
-      "result_placeholder": "译文将在这里呈现"
+      "result_placeholder": "译文将在这里呈现",
+      "close": "关闭",
+      "collapse_source": "折叠原文",
+      "show_source": "展开原文",
+      "expand_reading": "展开双栏阅读",
+      "compact_reading": "紧凑小窗",
+      "font_larger": "放大字体",
+      "font_smaller": "缩小字体",
+      "font_reset": "还原字号",
+      "stop": "停止翻译",
+      "stopped": "翻译已停止",
+      "replace": "替换原文",
+      "replace_changed": "原文或选区已变化，请重新划词翻译。",
+      "replace_unsupported": "当前应用不支持替换原文，可以复制译文。",
+      "service_hint": "点击服务后按需翻译"
     },
     "ocr": {
       "title": "OCR",

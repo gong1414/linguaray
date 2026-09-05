@@ -1833,6 +1833,50 @@ class TranslationsUiQuickEn {
 
   /// en: 'Your translation appears here'
   String get result_placeholder => 'Your translation appears here';
+
+  /// en: 'Close'
+  String get close => 'Close';
+
+  /// en: 'Hide source'
+  String get collapse_source => 'Hide source';
+
+  /// en: 'Show source'
+  String get show_source => 'Show source';
+
+  /// en: 'Expand to two columns'
+  String get expand_reading => 'Expand to two columns';
+
+  /// en: 'Compact window'
+  String get compact_reading => 'Compact window';
+
+  /// en: 'Larger text'
+  String get font_larger => 'Larger text';
+
+  /// en: 'Smaller text'
+  String get font_smaller => 'Smaller text';
+
+  /// en: 'Reset text size'
+  String get font_reset => 'Reset text size';
+
+  /// en: 'Stop translation'
+  String get stop => 'Stop translation';
+
+  /// en: 'Translation stopped'
+  String get stopped => 'Translation stopped';
+
+  /// en: 'Replace original'
+  String get replace => 'Replace original';
+
+  /// en: 'The original text or selection has changed. Select it again to translate.'
+  String get replace_changed =>
+      'The original text or selection has changed. Select it again to translate.';
+
+  /// en: 'This app cannot replace the original selection. Copy the translation instead.'
+  String get replace_unsupported =>
+      'This app cannot replace the original selection. Copy the translation instead.';
+
+  /// en: 'Choose a service to translate on demand'
+  String get service_hint => 'Choose a service to translate on demand';
 }
 
 // Path: ui.ocr
@@ -4539,6 +4583,20 @@ extension on Translations {
           'ui.quick.source_label' => 'Original',
           'ui.quick.result_label' => 'Translation',
           'ui.quick.result_placeholder' => 'Your translation appears here',
+          'ui.quick.close' => 'Close',
+          'ui.quick.collapse_source' => 'Hide source',
+          'ui.quick.show_source' => 'Show source',
+          'ui.quick.expand_reading' => 'Expand to two columns',
+          'ui.quick.compact_reading' => 'Compact window',
+          'ui.quick.font_larger' => 'Larger text',
+          'ui.quick.font_smaller' => 'Smaller text',
+          'ui.quick.font_reset' => 'Reset text size',
+          'ui.quick.stop' => 'Stop translation',
+          'ui.quick.stopped' => 'Translation stopped',
+          'ui.quick.replace' => 'Replace original',
+          'ui.quick.replace_changed' => 'The original text or selection has changed. Select it again to translate.',
+          'ui.quick.replace_unsupported' => 'This app cannot replace the original selection. Copy the translation instead.',
+          'ui.quick.service_hint' => 'Choose a service to translate on demand',
           'ui.ocr.title' => 'OCR',
           'ui.ocr.empty_title' => 'No recognized text yet',
           'ui.ocr.empty_description' => 'Capture a region, choose an image, or recognize an image from the clipboard.',

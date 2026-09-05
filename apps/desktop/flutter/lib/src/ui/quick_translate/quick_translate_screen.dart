@@ -10,6 +10,7 @@ import '../../config/dependencies.dart';
 import '../../i18n/i18n.dart';
 import '../../platform/permission_controller.dart';
 import '../../platform/platform_types.dart';
+import '../../platform/selection_replacement_controller.dart';
 import '../../platform/trigger_controller.dart';
 import '../../services/app_windows.dart';
 import '../../services/settings_store.dart';
@@ -30,6 +31,8 @@ class QuickTranslateScreen extends ConsumerStatefulWidget {
 class _QuickTranslateScreenState extends ConsumerState<QuickTranslateScreen>
     with WidgetsBindingObserver {
   bool _pinned = false;
+  SelectionTarget? _replacementTarget;
+  bool _replacing = false;
   bool _copied = false;
   bool _speechAvailable = false;
   bool _dictionaryAvailable = false;
@@ -56,6 +59,7 @@ class _QuickTranslateScreenState extends ConsumerState<QuickTranslateScreen>
     _windowCoordinator = QuickTranslateWindowCoordinator(
       () => miniTranslatorWindowController.window,
       () => mounted,
+      onDismiss: () => ref.read(translationViewModelProvider.notifier).cancel(),
     );
     _speechSubscription = _speechService.states.listen(_handleSpeechState);
     WidgetsBinding.instance.addObserver(this);
@@ -95,7 +99,10 @@ class _QuickTranslateScreenState extends ConsumerState<QuickTranslateScreen>
     if (request == null) return;
     triggerController.quickWindowRequest.value = null;
     final viewModel = ref.read(translationViewModelProvider.notifier);
-    if (request.clearExisting) viewModel.clearSourceText();
+    if (request.clearExisting) {
+      _replacementTarget = request.replacementTarget;
+      viewModel.clearSourceText();
+    }
     final text = request.text;
     if (text != null) viewModel.setSourceText(text);
     if (request.submit && text != null && text.trim().isNotEmpty) {
@@ -328,6 +335,29 @@ class _QuickTranslateScreenState extends ConsumerState<QuickTranslateScreen>
 
     return QuickTranslateView(
       labels: quickTranslateLabels(),
+      onLayoutChanged: _scheduleWindowResize,
+      onStartDragging: _windowCoordinator.startDragging,
+      onClose: () {
+        ref.read(translationViewModelProvider.notifier).cancel();
+        hideMiniTranslatorWindow();
+      },
+      onStop: ref.read(translationViewModelProvider.notifier).cancel,
+      onToggleReading: () {
+        _window.setContentSize(
+          _window.contentSize.width >= 600 ? 460 : 760,
+          _window.contentSize.height,
+        );
+        _scheduleWindowResize();
+      },
+      onReplace:
+          !_replacing &&
+              _replacementTarget != null &&
+              state.run?.sourceText == _replacementTarget!.text.trim() &&
+              state.sourceText.trim() == _replacementTarget!.text.trim() &&
+              state.selectedResult?.status == TranslationResultStatus.completed
+          ? () => unawaited(_replaceSelection(state.selectedResult!.text))
+          : null,
+
       toolbarKey: _windowCoordinator.toolbarKey,
       contentKey: _windowCoordinator.contentKey,
       languages: languages,
@@ -420,6 +450,26 @@ class _QuickTranslateScreenState extends ConsumerState<QuickTranslateScreen>
       onConfigureServices: showSettingsWindow,
       onRecheckPermissions: () => unawaited(permissionController.refresh()),
     );
+  }
+
+  Future<void> _replaceSelection(String text) async {
+    final target = _replacementTarget;
+    if (target == null || _replacing) return;
+    setState(() => _replacing = true);
+    await permissionController.refresh();
+    final result = await selectionReplacementController.replace(target, text);
+    if (!mounted) return;
+    setState(() => _replacing = false);
+    if (result == SelectionReplacementResult.replaced) {
+      _replacementTarget = null;
+      hideMiniTranslatorWindow();
+    } else {
+      await _showMessage(switch (result) {
+        SelectionReplacementResult.changed => t.ui.quick.replace_changed,
+        SelectionReplacementResult.denied => t.ui.quick.permission_denied,
+        _ => t.ui.quick.replace_unsupported,
+      });
+    }
   }
 
   Future<void> _toggleFavorite() async {

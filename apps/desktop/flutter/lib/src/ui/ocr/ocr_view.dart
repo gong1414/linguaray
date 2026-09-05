@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../platform/ocr_controller.dart';
 import '../shared/status_message.dart';
@@ -17,8 +18,12 @@ final class OcrViewLabels {
     required this.close,
     required this.resultCount,
     required this.errorMessage,
+    this.pin = 'Pin window',
+    this.unpin = 'Unpin window',
   });
 
+  final String pin;
+  final String unpin;
   final String title;
   final String emptyTitle;
   final String emptyDescription;
@@ -46,8 +51,12 @@ class OcrView extends StatefulWidget {
     required this.onClear,
     required this.onClose,
     super.key,
+    this.pinned = false,
+    this.onTogglePin,
   });
 
+  final bool pinned;
+  final VoidCallback? onTogglePin;
   final OcrViewLabels labels;
   final OcrViewState state;
   final ValueChanged<String> onTextChanged;
@@ -156,96 +165,129 @@ class _OcrViewState extends State<OcrView> {
               ),
             ),
     );
-    return Scaffold(
-      backgroundColor: theme.colorScheme.surfaceContainerLowest,
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 18, 12, 18),
-              child: Row(
-                children: [
-                  Text(labels.title, style: theme.textTheme.titleLarge),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      state.results.isNotEmpty
-                          ? labels.resultCount(state.results.length)
-                          : '',
-                      style: theme.textTheme.labelMedium,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: labels.copy,
-                    onPressed: state.text.trim().isEmpty ? null : widget.onCopy,
-                    icon: const Icon(Icons.copy_rounded, size: 18),
-                  ),
-                  IconButton(
-                    tooltip: labels.clear,
-                    onPressed: state.text.isEmpty ? null : widget.onClear,
-                    icon: const Icon(Icons.delete_outline_rounded, size: 18),
-                  ),
-                  IconButton(
-                    tooltip: labels.close,
-                    onPressed: widget.onClose,
-                    icon: const Icon(Icons.close_rounded, size: 18),
-                  ),
-                ],
-              ),
-            ),
-            const Divider(),
-            if (state.busy) const LinearProgressIndicator(minHeight: 2),
-            if (state.errorCode != null)
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: StatusMessage(
-                  kind: StatusKind.error,
-                  title: labels.errorMessage(state.errorCode),
-                ),
-              ),
-            Expanded(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  if (constraints.maxWidth < 560) {
-                    return Column(
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Wrap(
-                            spacing: 8,
-                            runSpacing: 6,
-                            children: sources,
-                          ),
-                        ),
-                        Expanded(child: editor),
-                      ],
-                    );
-                  }
-                  return Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+    final mac = theme.platform == TargetPlatform.macOS;
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.escape): widget.onClose,
+        SingleActivator(LogicalKeyboardKey.keyW, meta: mac, control: !mac):
+            widget.onClose,
+        SingleActivator(
+          LogicalKeyboardKey.keyP,
+          meta: mac,
+          control: !mac,
+        ): () =>
+            widget.onTogglePin?.call(),
+      },
+      child: Focus(
+        autofocus: true,
+        child: Scaffold(
+          backgroundColor: theme.colorScheme.surfaceContainerLowest,
+          body: SafeArea(
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 18, 12, 18),
+                  child: Row(
                     children: [
-                      Container(
-                        width: 166,
-                        color: theme.colorScheme.surface,
-                        child: ListView(
-                          padding: const EdgeInsets.all(16),
-                          children: [
-                            for (final source in sources)
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 12),
-                                child: source,
-                              ),
-                          ],
+                      Text(labels.title, style: theme.textTheme.titleLarge),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          state.results.isNotEmpty
+                              ? labels.resultCount(state.results.length)
+                              : '',
+                          style: theme.textTheme.labelMedium,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      Expanded(child: editor),
+                      if (widget.onTogglePin != null)
+                        IconButton(
+                          tooltip: widget.pinned ? labels.unpin : labels.pin,
+                          onPressed: widget.onTogglePin,
+                          icon: Icon(
+                            widget.pinned
+                                ? Icons.push_pin
+                                : Icons.push_pin_outlined,
+                            size: 18,
+                          ),
+                        ),
+                      IconButton(
+                        tooltip: labels.copy,
+                        onPressed: state.text.trim().isEmpty
+                            ? null
+                            : widget.onCopy,
+                        icon: const Icon(Icons.copy_rounded, size: 18),
+                      ),
+                      IconButton(
+                        tooltip: labels.clear,
+                        onPressed: state.text.isEmpty ? null : widget.onClear,
+                        icon: const Icon(
+                          Icons.delete_outline_rounded,
+                          size: 18,
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: labels.close,
+                        onPressed: widget.onClose,
+                        icon: const Icon(Icons.close_rounded, size: 18),
+                      ),
                     ],
-                  );
-                },
-              ),
+                  ),
+                ),
+                const Divider(),
+                if (state.busy) const LinearProgressIndicator(minHeight: 2),
+                if (state.errorCode != null)
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: StatusMessage(
+                      kind: StatusKind.error,
+                      title: labels.errorMessage(state.errorCode),
+                    ),
+                  ),
+                Expanded(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      if (constraints.maxWidth < 560) {
+                        return Column(
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Wrap(
+                                spacing: 8,
+                                runSpacing: 6,
+                                children: sources,
+                              ),
+                            ),
+                            Expanded(child: editor),
+                          ],
+                        );
+                      }
+                      return Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Container(
+                            width: 166,
+                            color: theme.colorScheme.surface,
+                            child: ListView(
+                              padding: const EdgeInsets.all(16),
+                              children: [
+                                for (final source in sources)
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 12),
+                                    child: source,
+                                  ),
+                              ],
+                            ),
+                          ),
+                          Expanded(child: editor),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

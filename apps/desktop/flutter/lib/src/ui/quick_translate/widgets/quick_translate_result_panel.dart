@@ -26,6 +26,9 @@ class QuickTranslateResultPanel extends StatefulWidget {
     required this.onCopy,
     required this.onServiceSelected,
     super.key,
+    this.services = const [],
+    this.onReplace,
+    this.submitting = false,
     this.selectedResult,
     this.speakingKind,
     this.onLookup,
@@ -35,6 +38,9 @@ class QuickTranslateResultPanel extends StatefulWidget {
     this.onStopSpeech,
   });
 
+  final List<TranslationServiceOption> services;
+  final VoidCallback? onReplace;
+  final bool submitting;
   final QuickTranslateLabels labels;
   final List<ServiceTranslationResult> results;
   final ServiceTranslationResult? selectedResult;
@@ -118,7 +124,7 @@ class _QuickTranslateResultPanelState extends State<QuickTranslateResultPanel> {
           const SizedBox(height: 10),
           if (resultText.trim().isEmpty && !failed)
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 52),
+              padding: const EdgeInsets.symmetric(vertical: 18),
               child: Text(
                 widget.selectedResult?.status ==
                         TranslationResultStatus.translating
@@ -135,7 +141,7 @@ class _QuickTranslateResultPanelState extends State<QuickTranslateResultPanel> {
             const LinearProgressIndicator(minHeight: 2),
           if (resultText.trim().isNotEmpty)
             ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: 138, maxHeight: 240),
+              constraints: const BoxConstraints(minHeight: 28, maxHeight: 300),
               child: SingleChildScrollView(
                 child: GestureDetector(
                   onDoubleTap: widget.copyResultOnDoubleClick
@@ -145,7 +151,7 @@ class _QuickTranslateResultPanelState extends State<QuickTranslateResultPanel> {
                     resultText,
                     key: const ValueKey('quick-result'),
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      fontSize: 19,
+                      fontSize: 17,
                       height: 1.65,
                       letterSpacing: 0,
                     ),
@@ -284,21 +290,46 @@ class _QuickTranslateResultPanelState extends State<QuickTranslateResultPanel> {
               ),
             ),
           ),
-        if (widget.results.length > 1)
+        if (widget.services.length > 1)
           Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Wrap(
-              spacing: 6,
-              children: [
-                for (final result in widget.results)
-                  ChoiceChip(
-                    label: Text(result.service.name),
-                    selected: result.service.id == widget.selectedServiceId,
-                    onSelected: (_) =>
-                        widget.onServiceSelected(result.service.id),
-                  ),
-              ],
+            padding: const EdgeInsets.only(top: 8),
+            child: Tooltip(
+              message: widget.labels.serviceHint,
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: [
+                  for (final service in widget.services)
+                    ChoiceChip(
+                      label: Text(service.name),
+                      selected: service.id == widget.selectedServiceId,
+                      onSelected: (_) => widget.onServiceSelected(service.id),
+                    ),
+                ],
+              ),
             ),
+          ),
+        if (widget.selectedResult?.status == TranslationResultStatus.cancelled)
+          Text(
+            widget.labels.stopped,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        if (widget.selectedResult?.status == TranslationResultStatus.completed)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              if (widget.onReplace != null)
+                TextButton.icon(
+                  onPressed: widget.onReplace,
+                  icon: const Icon(Icons.find_replace_rounded, size: 16),
+                  label: Text(widget.labels.replace),
+                ),
+              IconButton(
+                tooltip: widget.labels.retry,
+                onPressed: widget.submitting ? null : widget.onTranslate,
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+              ),
+            ],
           ),
       ],
     );

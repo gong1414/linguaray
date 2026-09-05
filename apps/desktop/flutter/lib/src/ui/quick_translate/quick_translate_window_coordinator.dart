@@ -9,7 +9,13 @@ import '../../services/window_positioning.dart' show fitPopoverToWorkArea;
 import '../../utils/platform_util.dart';
 
 final class QuickTranslateWindowCoordinator {
-  QuickTranslateWindowCoordinator(this._window, this._isMounted);
+  QuickTranslateWindowCoordinator(
+    this._window,
+    this._isMounted, {
+    this.onDismiss,
+  });
+
+  final VoidCallback? onDismiss;
 
   final nativeapi.Window Function() _window;
   final bool Function() _isMounted;
@@ -18,13 +24,20 @@ final class QuickTranslateWindowCoordinator {
 
   Timer? _settledTimer;
   bool _resizeScheduled = false;
+  int? _resizedListenerId;
   int? _focusedListenerId;
   int? _blurredListenerId;
 
   nativeapi.Window get window => _window();
 
+  void startDragging() => window.startDragging();
+
   void registerEvents() {
     if (!(kIsMacOS || kIsWindows)) return;
+    _resizedListenerId = nativeapi.WindowManager.instance
+        .on<nativeapi.WindowResizedEvent>((event) {
+          if (event.windowId == window.id) scheduleResize();
+        });
     _focusedListenerId = nativeapi.WindowManager.instance
         .on<nativeapi.WindowFocusedEvent>((event) {
           if (event.windowId == window.id) {
@@ -34,6 +47,7 @@ final class QuickTranslateWindowCoordinator {
     _blurredListenerId = nativeapi.WindowManager.instance
         .on<nativeapi.WindowBlurredEvent>((event) {
           if (event.windowId == window.id && !window.isAlwaysOnTop) {
+            onDismiss?.call();
             hideMiniTranslatorWindow();
           }
         });
@@ -55,6 +69,9 @@ final class QuickTranslateWindowCoordinator {
 
   void dispose() {
     _settledTimer?.cancel();
+    if (_resizedListenerId != null) {
+      nativeapi.WindowManager.instance.off(_resizedListenerId!);
+    }
     if (_focusedListenerId != null) {
       nativeapi.WindowManager.instance.off(_focusedListenerId!);
     }

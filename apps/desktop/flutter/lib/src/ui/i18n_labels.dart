@@ -72,6 +72,21 @@ String appErrorMessage(String? code) {
 QuickTranslateLabels quickTranslateLabels() {
   return QuickTranslateLabels(
     title: t.ui.quick.title,
+    close: t.ui.quick.close,
+    collapseSource: t.ui.quick.collapse_source,
+    showSource: t.ui.quick.show_source,
+    expandReading: t.ui.quick.expand_reading,
+    compactReading: t.ui.quick.compact_reading,
+    fontLarger: t.ui.quick.font_larger,
+    fontSmaller: t.ui.quick.font_smaller,
+    fontReset: t.ui.quick.font_reset,
+    stop: t.ui.quick.stop,
+    stopped: t.ui.quick.stopped,
+    replace: t.ui.quick.replace,
+    replaceChanged: t.ui.quick.replace_changed,
+    replaceUnsupported: t.ui.quick.replace_unsupported,
+    serviceHint: t.ui.quick.service_hint,
+
     sourceLabel: t.ui.quick.source_label,
     resultLabel: t.ui.quick.result_label,
     resultPlaceholder: t.ui.quick.result_placeholder,

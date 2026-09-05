@@ -53,10 +53,14 @@ Map<String, Widget> buildCatalogGoldenStates({
     'quick_success': const QuickTranslateCatalogPreview(
       scenario: CatalogQuickScenario.success,
     ),
+    'quick_on_demand': const QuickTranslateCatalogPreview(
+      scenario: CatalogQuickScenario.multiple,
+    ),
     'quick_service_error': const QuickTranslateCatalogPreview(
       scenario: CatalogQuickScenario.serviceError,
     ),
     'quick_long_result': const QuickTranslateCatalogPreview(
+      width: 760,
       scenario: CatalogQuickScenario.longResult,
     ),
     'ocr_empty': const OcrCatalogPreview(scenario: CatalogOcrScenario.empty),
@@ -144,7 +148,7 @@ String _catalogError(String? code) => code ?? '识别失败';
 class QuickTranslateCatalogPreview extends StatelessWidget {
   const QuickTranslateCatalogPreview({
     required this.scenario,
-    this.width = 720,
+    this.width = 460,
     super.key,
   });
 
@@ -195,6 +199,10 @@ class QuickTranslateCatalogPreview extends StatelessWidget {
       width: width,
       child: QuickTranslateView(
         labels: _quickZh,
+        onClose: _noop,
+        onStop: _noop,
+        onToggleReading: _noop,
+        onReplace: scenario == CatalogQuickScenario.success ? _noop : null,
         languages: _languages,
         services: scenario == CatalogQuickScenario.multiple
             ? _allServices
@@ -610,6 +618,21 @@ class ProviderEditorCatalogPreview extends StatelessWidget {
 }
 
 const _quickZh = QuickTranslateLabels(
+  close: '关闭',
+  collapseSource: '折叠原文',
+  showSource: '展开原文',
+  expandReading: '展开双栏阅读',
+  compactReading: '紧凑小窗',
+  fontLarger: '放大字体',
+  fontSmaller: '缩小字体',
+  fontReset: '还原字号',
+  stop: '停止翻译',
+  stopped: '翻译已停止',
+  replace: '替换原文',
+  replaceChanged: '原文或选区已变化，请重新划词翻译。',
+  replaceUnsupported: '当前应用不支持替换原文，可以复制译文。',
+  serviceHint: '点击服务后按需翻译',
+
   title: '快捷翻译',
   sourceLabel: '原文',
   resultLabel: '译文',

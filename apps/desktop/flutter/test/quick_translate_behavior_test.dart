@@ -6,6 +6,41 @@ import 'package:linguaray_desktop/src/ui/quick_translate/quick_translate_screen.
 import 'package:linguaray_desktop/src/ui/quick_translate/widgets/quick_translate_view.dart';
 
 void main() {
+  testWidgets('source can be collapsed and restored from the quick menu', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_app(_view(sourceText: 'hello')));
+    await tester.tap(find.byType(PopupMenuButton<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Hide source'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('quick-source-input')), findsNothing);
+    await tester.tap(find.text('hello'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('quick-source-input')), findsOneWidget);
+  });
+
+  testWidgets('stop button cancels and Escape closes the quick surface', (
+    tester,
+  ) async {
+    var stops = 0;
+    var closes = 0;
+    await tester.pumpWidget(
+      _app(
+        _view(
+          sourceText: 'hello',
+          submitting: true,
+          onStop: () => stops++,
+          onClose: () => closes++,
+        ),
+      ),
+    );
+    await tester.tap(find.text('Stop translation'));
+    expect(stops, 1);
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    expect(closes, 1);
+  });
+
   const english = LanguageOption(code: 'en', name: 'English');
   const chinese = LanguageOption(code: 'zh-Hans', name: '简体中文');
   const japanese = LanguageOption(code: 'ja', name: '日本語');
@@ -137,6 +172,9 @@ QuickTranslateView _view({
   required String sourceText,
   ServiceTranslationResult? result,
   bool submitWithModifier = false,
+  bool submitting = false,
+  VoidCallback? onStop,
+  VoidCallback? onClose,
   bool copyResultOnDoubleClick = false,
   bool speechAvailable = false,
   bool dictionaryAvailable = false,
@@ -154,6 +192,9 @@ QuickTranslateView _view({
   );
   return QuickTranslateView(
     labels: _labels,
+    submitting: submitting,
+    onStop: onStop,
+    onClose: onClose,
     languages: const [
       LanguageOption(code: 'en', name: 'English'),
       LanguageOption(code: 'zh-Hans', name: '简体中文'),

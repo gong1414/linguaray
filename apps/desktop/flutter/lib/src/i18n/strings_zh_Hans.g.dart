@@ -1573,6 +1573,34 @@ class _TranslationsUiQuickZhHans extends TranslationsUiQuickEn {
   String get result_label => '译文';
   @override
   String get result_placeholder => '译文将在这里呈现';
+  @override
+  String get close => '关闭';
+  @override
+  String get collapse_source => '折叠原文';
+  @override
+  String get show_source => '展开原文';
+  @override
+  String get expand_reading => '展开双栏阅读';
+  @override
+  String get compact_reading => '紧凑小窗';
+  @override
+  String get font_larger => '放大字体';
+  @override
+  String get font_smaller => '缩小字体';
+  @override
+  String get font_reset => '还原字号';
+  @override
+  String get stop => '停止翻译';
+  @override
+  String get stopped => '翻译已停止';
+  @override
+  String get replace => '替换原文';
+  @override
+  String get replace_changed => '原文或选区已变化，请重新划词翻译。';
+  @override
+  String get replace_unsupported => '当前应用不支持替换原文，可以复制译文。';
+  @override
+  String get service_hint => '点击服务后按需翻译';
 }
 
 // Path: ui.ocr
@@ -3963,6 +3991,20 @@ extension on TranslationsZhHans {
           'ui.quick.source_label' => '原文',
           'ui.quick.result_label' => '译文',
           'ui.quick.result_placeholder' => '译文将在这里呈现',
+          'ui.quick.close' => '关闭',
+          'ui.quick.collapse_source' => '折叠原文',
+          'ui.quick.show_source' => '展开原文',
+          'ui.quick.expand_reading' => '展开双栏阅读',
+          'ui.quick.compact_reading' => '紧凑小窗',
+          'ui.quick.font_larger' => '放大字体',
+          'ui.quick.font_smaller' => '缩小字体',
+          'ui.quick.font_reset' => '还原字号',
+          'ui.quick.stop' => '停止翻译',
+          'ui.quick.stopped' => '翻译已停止',
+          'ui.quick.replace' => '替换原文',
+          'ui.quick.replace_changed' => '原文或选区已变化，请重新划词翻译。',
+          'ui.quick.replace_unsupported' => '当前应用不支持替换原文，可以复制译文。',
+          'ui.quick.service_hint' => '点击服务后按需翻译',
           'ui.ocr.title' => 'OCR',
           'ui.ocr.empty_title' => '还没有识别结果',
           'ui.ocr.empty_description' => '可以框选屏幕区域、选择图片文件，或识别剪贴板中的图片。',

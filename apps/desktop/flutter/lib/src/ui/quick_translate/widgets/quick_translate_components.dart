@@ -41,6 +41,10 @@ class QuickTranslateCommandHeader extends StatelessWidget {
     required this.languages,
     required this.sourceLanguage,
     required this.targetLanguage,
+    this.onClose,
+    this.onStartDragging,
+    this.menuItems = const [],
+    this.onMenuSelected,
     required this.onTogglePin,
     required this.onCapture,
     required this.onClipboard,
@@ -56,6 +60,10 @@ class QuickTranslateCommandHeader extends StatelessWidget {
   final List<LanguageOption> languages;
   final String sourceLanguage;
   final String targetLanguage;
+  final VoidCallback? onClose;
+  final VoidCallback? onStartDragging;
+  final List<PopupMenuEntry<String>> menuItems;
+  final ValueChanged<String>? onMenuSelected;
   final VoidCallback onTogglePin;
   final VoidCallback onCapture;
   final VoidCallback onClipboard;
@@ -82,9 +90,16 @@ class QuickTranslateCommandHeader extends StatelessWidget {
             const BrandLogo(size: 18),
             const SizedBox(width: 8),
             Expanded(
-              child: Text(
-                labels.title,
-                style: Theme.of(context).textTheme.titleMedium,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onPanStart: (_) => onStartDragging?.call(),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Text(
+                    labels.title,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
               ),
             ),
             IconButton(
@@ -105,15 +120,24 @@ class QuickTranslateCommandHeader extends StatelessWidget {
                 size: 18,
               ),
             ),
+            if (onClose != null)
+              IconButton(
+                tooltip: labels.close,
+                onPressed: onClose,
+                icon: const Icon(Icons.close_rounded, size: 18),
+              ),
             PopupMenuButton<String>(
               tooltip: labels.openSettings,
               onSelected: (value) {
                 switch (value) {
                   case 'settings':
                     onOpenSettings();
+                  default:
+                    onMenuSelected?.call(value);
                 }
               },
               itemBuilder: (context) => [
+                ...menuItems,
                 PopupMenuItem(
                   value: 'settings',
                   child: Text(labels.openSettings),

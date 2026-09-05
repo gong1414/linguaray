@@ -350,11 +350,16 @@ mod tests {
     use super::*;
 
     fn temp_data_dir() -> PathBuf {
+        static NEXT_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let sequence = NEXT_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let unique = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("time went backwards")
             .as_nanos();
-        let dir = std::env::temp_dir().join(format!("linguaray-vocabulary-{unique}"));
+        let dir = std::env::temp_dir().join(format!(
+            "linguaray-vocabulary-{}-{unique}-{sequence}",
+            std::process::id()
+        ));
         fs::create_dir_all(&dir).expect("create vocabulary test dir");
         dir
     }

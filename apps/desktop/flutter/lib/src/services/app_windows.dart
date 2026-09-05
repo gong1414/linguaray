@@ -109,6 +109,7 @@ void focusSettingsWindow() {
     if (!window.isVisible) window.showInactive();
   }
 
+  window.isAlwaysOnTop = false;
   window.title = kSettingsWindowTitle;
   window.titleBarStyle = kIsMacOS ? TitleBarStyle.normal : TitleBarStyle.hidden;
   window.windowControlButtonsVisible = kIsMacOS;
@@ -156,6 +157,7 @@ void initializeResidentApp() {
   final window = settingsWindowController.window;
   _requestedSurface = AppSurface.settings;
   appSurface.value = AppSurface.settings;
+  window.isAlwaysOnTop = false;
   window.title = kSettingsWindowTitle;
   window.titleBarStyle = kIsMacOS ? TitleBarStyle.normal : TitleBarStyle.hidden;
   window.windowControlButtonsVisible = kIsMacOS;
@@ -179,6 +181,7 @@ Future<bool> _mountTransientSurface(Window window, AppSurface surface) async {
   _requestedSurface = surface;
   final switchedSurface = appSurface.value != surface;
   if (!switchedSurface) return false;
+  window.isAlwaysOnTop = false;
 
   // A fully hidden macOS window may stop producing Flutter frames. Mount the
   // requested surface while the native host is transparent, then reveal it
@@ -225,7 +228,7 @@ Future<void> showMiniTranslatorWindow({
     window,
     title: kMiniTranslatorWindowTitle,
     minimumSize: _kMiniTranslatorMinimumSize,
-    isResizable: false,
+    isResizable: true,
   );
   if (switchedSurface) {
     window.setSize(

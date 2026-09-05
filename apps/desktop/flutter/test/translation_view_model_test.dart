@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:linguaray_application/linguaray_application.dart';
@@ -5,6 +7,75 @@ import 'package:linguaray_desktop/src/config/dependencies.dart';
 import 'package:linguaray_desktop/src/ui/translation/view_models/translation_view_model.dart';
 
 void main() {
+  test(
+    'only the chosen service runs and completed comparisons are reused',
+    () async {
+      final repository = _TwoServicesRepository();
+      final container = _comparisonContainer(repository);
+      addTearDown(container.dispose);
+      container.listen(translationViewModelProvider, (_, _) {});
+      await _waitFor(
+        () => !container.read(translationViewModelProvider).loadingCatalog,
+      );
+      final vm = container.read(translationViewModelProvider.notifier);
+      vm.setSourceText('Hello');
+      await vm.submit();
+      expect(repository.calls, ['a:Hello']);
+      vm.selectService('b');
+      await _waitFor(
+        () =>
+            container
+                .read(translationViewModelProvider)
+                .selectedResult
+                ?.status ==
+            TranslationResultStatus.completed,
+      );
+      expect(repository.calls, ['a:Hello', 'b:Hello']);
+      vm.selectService('a');
+      expect(repository.calls, hasLength(2));
+      expect(
+        container.read(translationViewModelProvider).selectedResult?.text,
+        'a:Hello',
+      );
+      vm.setSourceText('New');
+      vm.selectService('b');
+      await _waitFor(
+        () =>
+            container.read(translationViewModelProvider).selectedResult?.text ==
+            'b:New',
+      );
+      expect(repository.calls, ['a:Hello', 'b:Hello', 'b:New']);
+    },
+  );
+
+  test('stop cancels a silent provider and keeps its partial output', () async {
+    final repository = _TwoServicesRepository(pending: true);
+    final container = _comparisonContainer(repository);
+    addTearDown(container.dispose);
+    container.listen(translationViewModelProvider, (_, _) {});
+    await _waitFor(
+      () => !container.read(translationViewModelProvider).loadingCatalog,
+    );
+    final vm = container.read(translationViewModelProvider.notifier);
+    vm.setSourceText('Hello');
+    final pending = vm.submit();
+    await _waitFor(
+      () =>
+          container
+              .read(translationViewModelProvider)
+              .selectedResult
+              ?.hasText ==
+          true,
+    );
+    vm.cancel();
+    await pending.timeout(const Duration(seconds: 1));
+    await _waitFor(() => repository.cancelled == 1);
+    final state = container.read(translationViewModelProvider);
+    expect(state.submitting, isFalse);
+    expect(state.selectedResult?.text, 'a:Hello');
+    expect(state.selectedResult?.status, TranslationResultStatus.cancelled);
+  });
+
   test('loads catalog and exposes only application models', () async {
     final container = ProviderContainer(
       overrides: [
@@ -291,5 +362,47 @@ final class _FakeGlossaryRepository implements GlossaryRepository {
       caseSensitive: draft.caseSensitive,
       wholeWord: draft.wholeWord,
     );
+  }
+}
+
+ProviderContainer _comparisonContainer(TranslationRepository repository) =>
+    ProviderContainer(
+      overrides: [
+        translationRepositoryProvider.overrideWithValue(repository),
+        historyRepositoryProvider.overrideWithValue(_FakeHistoryRepository()),
+        glossaryRepositoryProvider.overrideWithValue(_FakeGlossaryRepository()),
+      ],
+    );
+
+final class _TwoServicesRepository extends _FakeTranslationRepository {
+  _TwoServicesRepository({this.pending = false});
+  final bool pending;
+  final calls = <String>[];
+  int cancelled = 0;
+  @override
+  Future<TranslationCatalog> loadCatalog() async => const TranslationCatalog(
+    languages: [LanguageOption(code: 'en', name: 'English')],
+    services: [
+      TranslationServiceOption(id: 'a', name: 'A', isStreaming: true),
+      TranslationServiceOption(id: 'b', name: 'B', isStreaming: true),
+    ],
+    defaultSourceLanguage: 'en',
+    defaultTargetLanguage: 'zh-Hans',
+  );
+  @override
+  Stream<String> translate({
+    required TranslationServiceOption service,
+    required String text,
+    required String sourceLanguage,
+    required String targetLanguage,
+  }) {
+    calls.add('${service.id}:$text');
+    if (!pending) return Stream.value('${service.id}:$text');
+    late StreamController<String> controller;
+    controller = StreamController(
+      onListen: () => controller.add('${service.id}:$text'),
+      onCancel: () => cancelled++,
+    );
+    return controller.stream;
   }
 }
