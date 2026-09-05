@@ -1201,6 +1201,9 @@ class TranslationsSettingsNavigationEn {
 
   /// en: 'General Settings'
   String get general_settings => 'General Settings';
+
+  /// en: 'Library'
+  String get library_group => 'Library';
 }
 
 // Path: settings.general
@@ -1827,6 +1830,9 @@ class TranslationsUiQuickEn {
 
   /// en: 'Translation'
   String get result_label => 'Translation';
+
+  /// en: 'Your translation appears here'
+  String get result_placeholder => 'Your translation appears here';
 }
 
 // Path: ui.ocr
@@ -4052,6 +4058,7 @@ extension on Translations {
           'settings.navigation.ocr_services' => 'Services',
           'settings.navigation.general_group' => 'General',
           'settings.navigation.general_settings' => 'General Settings',
+          'settings.navigation.library_group' => 'Library',
           'settings.general.title' => 'General',
           'settings.general.section.permissions' => 'System Permissions',
           'settings.general.section.ocr' => 'Text Recognition',
@@ -4337,11 +4344,11 @@ extension on Translations {
             'SiliconFlow China endpoint.',
           'settings.providers.catalog.siliconflow_global' =>
             'SiliconFlow global endpoint.',
-          'settings.providers.catalog.modelscope' =>
-            'ModelScope inference API.',
           _ => null,
         } ??
         switch (path) {
+          'settings.providers.catalog.modelscope' =>
+            'ModelScope inference API.',
           'settings.providers.catalog.ollama' => 'Local Ollama server.',
           'settings.providers.catalog.lm_studio' => 'Local LM Studio server.',
           'settings.providers.catalog.localai' => 'LocalAI server.',
@@ -4531,6 +4538,7 @@ extension on Translations {
           'ui.quick.recheck' => 'Recheck',
           'ui.quick.source_label' => 'Original',
           'ui.quick.result_label' => 'Translation',
+          'ui.quick.result_placeholder' => 'Your translation appears here',
           'ui.ocr.title' => 'OCR',
           'ui.ocr.empty_title' => 'No recognized text yet',
           'ui.ocr.empty_description' => 'Capture a region, choose an image, or recognize an image from the clipboard.',

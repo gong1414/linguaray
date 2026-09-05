@@ -14,6 +14,7 @@ final class SettingsShellLabels {
     required this.general,
     required this.permissions,
     required this.about,
+    this.libraryGroup = '',
     this.updates = '',
     this.glossary = '',
     this.vocabulary = '',
@@ -21,6 +22,7 @@ final class SettingsShellLabels {
     this.dataTransfer = '',
   });
 
+  final String libraryGroup;
   final String translationGroup;
   final String translationSettings;
   final String translationServices;

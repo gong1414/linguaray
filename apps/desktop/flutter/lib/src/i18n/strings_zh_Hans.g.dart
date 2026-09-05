@@ -1050,6 +1050,8 @@ class _TranslationsSettingsNavigationZhHans
   String get general_group => '通用';
   @override
   String get general_settings => '通用设置';
+  @override
+  String get library_group => '资料库';
 }
 
 // Path: settings.general
@@ -1569,6 +1571,8 @@ class _TranslationsUiQuickZhHans extends TranslationsUiQuickEn {
   String get source_label => '原文';
   @override
   String get result_label => '译文';
+  @override
+  String get result_placeholder => '译文将在这里呈现';
 }
 
 // Path: ui.ocr
@@ -3550,6 +3554,7 @@ extension on TranslationsZhHans {
           'settings.navigation.ocr_services' => '服务',
           'settings.navigation.general_group' => '通用',
           'settings.navigation.general_settings' => '通用设置',
+          'settings.navigation.library_group' => '资料库',
           'settings.general.title' => '常规',
           'settings.general.section.permissions' => '系统权限',
           'settings.general.section.ocr' => '文字识别',
@@ -3790,10 +3795,10 @@ extension on TranslationsZhHans {
           'settings.providers.catalog.openrouter' => 'OpenRouter 聚合平台。',
           'settings.providers.catalog.siliconflow_cn' => '硅基流动国内节点。',
           'settings.providers.catalog.siliconflow_global' => '硅基流动国际节点。',
-          'settings.providers.catalog.modelscope' => 'ModelScope 推理 API。',
           _ => null,
         } ??
         switch (path) {
+          'settings.providers.catalog.modelscope' => 'ModelScope 推理 API。',
           'settings.providers.catalog.ollama' => '本地 Ollama 服务。',
           'settings.providers.catalog.lm_studio' => '本地 LM Studio 服务。',
           'settings.providers.catalog.localai' => 'LocalAI 服务。',
@@ -3957,6 +3962,7 @@ extension on TranslationsZhHans {
           'ui.quick.recheck' => '重新检查',
           'ui.quick.source_label' => '原文',
           'ui.quick.result_label' => '译文',
+          'ui.quick.result_placeholder' => '译文将在这里呈现',
           'ui.ocr.title' => 'OCR',
           'ui.ocr.empty_title' => '还没有识别结果',
           'ui.ocr.empty_description' => '可以框选屏幕区域、选择图片文件，或识别剪贴板中的图片。',

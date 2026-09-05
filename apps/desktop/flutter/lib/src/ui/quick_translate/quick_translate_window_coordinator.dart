@@ -5,6 +5,7 @@ import 'package:nativeapi/nativeapi.dart' as nativeapi;
 
 import '../../platform/permission_controller.dart';
 import '../../services/app_windows.dart';
+import '../../services/window_positioning.dart' show fitPopoverToWorkArea;
 import '../../utils/platform_util.dart';
 
 final class QuickTranslateWindowCoordinator {
@@ -71,8 +72,30 @@ final class QuickTranslateWindowCoordinator {
             800.0,
           );
       final size = window.contentSize;
-      if ((size.height - height).abs() < 1) return;
-      window.setContentSize(size.width, height);
+      final position = window.position;
+      final displays = nativeapi.DisplayManager.instance.getAll();
+      final display =
+          displays
+              .where(
+                (display) =>
+                    display.workArea.contains(position + const Offset(8, 8)),
+              )
+              .firstOrNull ??
+          displays.firstOrNull;
+      final fitted = display == null
+          ? position & Size(size.width, height)
+          : fitPopoverToWorkArea(
+              position: position,
+              desiredSize: Size(size.width, height),
+              workArea: display.workArea,
+            );
+      if ((size.height - fitted.height).abs() >= 1 ||
+          (size.width - fitted.width).abs() >= 1) {
+        window.setContentSize(fitted.width, fitted.height);
+      }
+      if ((position - fitted.topLeft).distance >= 1) {
+        window.setPosition(fitted.left, fitted.top);
+      }
     } catch (_) {}
   }
 

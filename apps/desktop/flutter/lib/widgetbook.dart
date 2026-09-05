@@ -52,6 +52,13 @@ void main() {
             platform: TargetPlatform.windows,
           ),
           ViewportData(
+            name: 'Reading window',
+            width: 720,
+            height: 420,
+            pixelRatio: 2,
+            platform: TargetPlatform.macOS,
+          ),
+          ViewportData(
             name: 'Quick translate',
             width: 396,
             height: 640,

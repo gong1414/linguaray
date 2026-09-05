@@ -26,6 +26,7 @@ final class QuickTranslateLabels {
     required this.failureMessage,
     this.sourceLabel = '',
     this.resultLabel = '',
+    this.resultPlaceholder = '',
     this.captureFailed = '',
     this.ocrNotConfigured = '',
     this.ocrEmpty = '',
@@ -47,6 +48,7 @@ final class QuickTranslateLabels {
 
   final String sourceLabel;
   final String resultLabel;
+  final String resultPlaceholder;
   final String title;
   final String inputHint;
   final String translate;

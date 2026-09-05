@@ -17,16 +17,14 @@ void main() {
     }
   });
 
-  test('material theme projects the canonical brand palette', () {
+  test('material theme uses the light workbench action palette', () {
     final light = LinguaRayMaterialTheme.light();
     final dark = LinguaRayMaterialTheme.dark();
 
-    expect(light.colorScheme.primary, LinguaRayPalette.linguaBlue);
-    expect(light.colorScheme.secondary, LinguaRayPalette.rayTeal);
+    expect(light.colorScheme.primary, LinguaRayPalette.actionOrange);
     expect(light.scaffoldBackgroundColor, LinguaRayPalette.paper);
     expect(light.colorScheme.onSurface, LinguaRayPalette.graphite);
-    expect(dark.colorScheme.secondary, LinguaRayPalette.rayTealDark);
-    expect(dark.colorScheme.inversePrimary, LinguaRayPalette.linguaBlue);
+    expect(dark.colorScheme.inversePrimary, LinguaRayPalette.actionOrange);
   });
 
   test('core foreground pairs meet desktop contrast requirements', () {

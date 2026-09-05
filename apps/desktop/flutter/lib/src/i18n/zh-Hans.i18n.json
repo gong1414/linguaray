@@ -364,7 +364,8 @@
       "ocr_settings": "OCR 设置",
       "ocr_services": "服务",
       "general_group": "通用",
-      "general_settings": "通用设置"
+      "general_settings": "通用设置",
+      "library_group": "资料库"
     },
     "general": {
       "title": "常规",
@@ -854,7 +855,8 @@
       "clipboard_restore_failed": "无法恢复之前的剪贴板内容。",
       "recheck": "重新检查",
       "source_label": "原文",
-      "result_label": "译文"
+      "result_label": "译文",
+      "result_placeholder": "译文将在这里呈现"
     },
     "ocr": {
       "title": "OCR",

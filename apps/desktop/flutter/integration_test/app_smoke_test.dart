@@ -177,6 +177,18 @@ void main() {
     expect(appSurface.value, AppSurface.miniTranslator);
     expect(find.byType(QuickTranslateScreen), findsOneWidget);
     expect(find.byType(ErrorWidget), findsNothing);
+    final sourcePane = tester.getRect(
+      find.byKey(const ValueKey('quick-source-pane')),
+    );
+    final resultPane = tester.getRect(
+      find.byKey(const ValueKey('quick-result-pane')),
+    );
+    expect(resultPane.left, greaterThanOrEqualTo(sourcePane.right));
+    expect(resultPane.top, sourcePane.top);
+    expect(miniTranslatorWindowController.window.contentSize.width, 720);
+    debugPrint(
+      '[smoke] native quick window uses the two-column reading layout',
+    );
 
     showSettingsWindow();
     await tester.pumpAndSettle();

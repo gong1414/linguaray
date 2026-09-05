@@ -89,118 +89,161 @@ class _OcrViewState extends State<OcrView> {
     final state = widget.state;
     final labels = widget.labels;
     final theme = Theme.of(context);
+    final sources = <Widget>[
+      FilledButton.icon(
+        onPressed: state.busy ? null : widget.onCapture,
+        icon: const Icon(Icons.crop_free_rounded, size: 18),
+        label: Text(labels.capture),
+      ),
+      OutlinedButton.icon(
+        onPressed: state.busy ? null : widget.onFile,
+        icon: const Icon(Icons.image_outlined, size: 18),
+        label: Text(labels.file),
+      ),
+      OutlinedButton.icon(
+        onPressed: state.busy ? null : widget.onClipboard,
+        icon: const Icon(Icons.content_paste_rounded, size: 18),
+        label: Text(labels.clipboard),
+      ),
+      FilterChip(
+        selected: state.continuous,
+        avatar: const Icon(Icons.playlist_add_rounded, size: 17),
+        label: Text(labels.continuous),
+        onSelected: state.busy ? null : widget.onContinuousChanged,
+      ),
+    ];
+    final editor = Padding(
+      padding: const EdgeInsets.all(24),
+      child: state.text.isEmpty && !state.busy
+          ? Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.text_snippet_outlined,
+                    size: 40,
+                    color: theme.colorScheme.outline,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(labels.emptyTitle, style: theme.textTheme.titleMedium),
+                  const SizedBox(height: 8),
+                  Text(
+                    labels.emptyDescription,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ],
+              ),
+            )
+          : TextField(
+              controller: _controller,
+              expands: true,
+              minLines: null,
+              maxLines: null,
+              textAlignVertical: TextAlignVertical.top,
+              onChanged: widget.onTextChanged,
+              style: theme.textTheme.bodyLarge?.copyWith(
+                fontSize: 17,
+                height: 1.7,
+              ),
+              decoration: InputDecoration(
+                hintText: labels.emptyTitle,
+                filled: false,
+                contentPadding: EdgeInsets.zero,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+              ),
+            ),
+    );
     return Scaffold(
       backgroundColor: theme.colorScheme.surfaceContainerLowest,
       body: SafeArea(
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(24, 20, 16, 16),
+              padding: const EdgeInsets.fromLTRB(24, 18, 12, 18),
               child: Row(
                 children: [
                   Text(labels.title, style: theme.textTheme.titleLarge),
-                  if (state.results.isNotEmpty) ...[
-                    const SizedBox(width: 8),
-                    Text(
-                      labels.resultCount(state.results.length),
-                      style: Theme.of(context).textTheme.labelMedium,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      state.results.isNotEmpty
+                          ? labels.resultCount(state.results.length)
+                          : '',
+                      style: theme.textTheme.labelMedium,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  ],
-                  const Spacer(),
-                  IconButton(
-                    tooltip: labels.close,
-                    onPressed: widget.onClose,
-                    icon: const Icon(Icons.close_rounded),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  FilledButton.icon(
-                    onPressed: state.busy ? null : widget.onCapture,
-                    icon: const Icon(Icons.crop_free_rounded, size: 18),
-                    label: Text(labels.capture),
-                  ),
-                  TextButton.icon(
-                    onPressed: state.busy ? null : widget.onFile,
-                    icon: const Icon(Icons.image_outlined, size: 18),
-                    label: Text(labels.file),
-                  ),
-                  TextButton.icon(
-                    onPressed: state.busy ? null : widget.onClipboard,
-                    icon: const Icon(Icons.content_paste_rounded, size: 18),
-                    label: Text(labels.clipboard),
-                  ),
-                  FilterChip(
-                    selected: state.continuous,
-                    avatar: const Icon(Icons.playlist_add_rounded, size: 17),
-                    label: Text(labels.continuous),
-                    onSelected: state.busy ? null : widget.onContinuousChanged,
                   ),
                   IconButton(
                     tooltip: labels.copy,
                     onPressed: state.text.trim().isEmpty ? null : widget.onCopy,
-                    icon: const Icon(Icons.copy_rounded),
+                    icon: const Icon(Icons.copy_rounded, size: 18),
                   ),
                   IconButton(
                     tooltip: labels.clear,
                     onPressed: state.text.isEmpty ? null : widget.onClear,
-                    icon: const Icon(Icons.delete_outline_rounded),
+                    icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                  ),
+                  IconButton(
+                    tooltip: labels.close,
+                    onPressed: widget.onClose,
+                    icon: const Icon(Icons.close_rounded, size: 18),
                   ),
                 ],
               ),
             ),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 24),
-              child: Divider(),
-            ),
+            const Divider(),
             if (state.busy) const LinearProgressIndicator(minHeight: 2),
             if (state.errorCode != null)
               Padding(
-                padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                padding: const EdgeInsets.all(12),
                 child: StatusMessage(
                   kind: StatusKind.error,
                   title: labels.errorMessage(state.errorCode),
                 ),
               ),
             Expanded(
-              child: state.text.isEmpty && !state.busy
-                  ? Center(
-                      child: StatusMessage(
-                        kind: StatusKind.info,
-                        title: labels.emptyTitle,
-                        body: labels.emptyDescription,
-                      ),
-                    )
-                  : Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-                      child: TextField(
-                        controller: _controller,
-                        expands: true,
-                        minLines: null,
-                        maxLines: null,
-                        textAlignVertical: TextAlignVertical.top,
-                        onChanged: widget.onTextChanged,
-                        style: theme.textTheme.bodyLarge?.copyWith(
-                          fontSize: 16,
-                          height: 1.7,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  if (constraints.maxWidth < 560) {
+                    return Column(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Wrap(
+                            spacing: 8,
+                            runSpacing: 6,
+                            children: sources,
+                          ),
                         ),
-                        decoration: InputDecoration(
-                          hintText: labels.emptyTitle,
-                          filled: false,
-                          contentPadding: EdgeInsets.zero,
-                          border: InputBorder.none,
-                          enabledBorder: InputBorder.none,
-                          focusedBorder: InputBorder.none,
+                        Expanded(child: editor),
+                      ],
+                    );
+                  }
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Container(
+                        width: 166,
+                        color: theme.colorScheme.surface,
+                        child: ListView(
+                          padding: const EdgeInsets.all(16),
+                          children: [
+                            for (final source in sources)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: source,
+                              ),
+                          ],
                         ),
                       ),
-                    ),
+                      Expanded(child: editor),
+                    ],
+                  );
+                },
+              ),
             ),
           ],
         ),

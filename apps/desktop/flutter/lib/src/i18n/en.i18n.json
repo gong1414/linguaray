@@ -364,7 +364,8 @@
       "ocr_settings": "OCR Settings",
       "ocr_services": "Services",
       "general_group": "General",
-      "general_settings": "General Settings"
+      "general_settings": "General Settings",
+      "library_group": "Library"
     },
     "general": {
       "title": "General",
@@ -854,7 +855,8 @@
       "clipboard_restore_failed": "The previous clipboard contents could not be restored.",
       "recheck": "Recheck",
       "source_label": "Original",
-      "result_label": "Translation"
+      "result_label": "Translation",
+      "result_placeholder": "Your translation appears here"
     },
     "ocr": {
       "title": "OCR",

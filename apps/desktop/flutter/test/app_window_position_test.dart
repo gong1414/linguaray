@@ -1,8 +1,28 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:linguaray_desktop/src/services/app_windows.dart';
+import 'package:linguaray_desktop/src/services/window_positioning.dart';
 
 void main() {
+  test('wide reading window shrinks to a small secondary work area', () {
+    const workArea = Rect.fromLTWH(-600, 24, 600, 456);
+    final fitted = fitPopoverToWorkArea(
+      position: const Offset(-200, 300),
+      desiredSize: const Size(720, 800),
+      workArea: workArea,
+    );
+    expect(fitted, workArea);
+  });
+
+  test('growing result moves upward while preserving its reading width', () {
+    const workArea = Rect.fromLTWH(0, 24, 1440, 876);
+    final fitted = fitPopoverToWorkArea(
+      position: const Offset(700, 600),
+      desiredSize: const Size(720, 500),
+      workArea: workArea,
+    );
+    expect(fitted, const Rect.fromLTWH(700, 400, 720, 500));
+  });
+
   group('quick window placement', () {
     const workArea = Rect.fromLTWH(100, 50, 1200, 800);
     const size = Size(396, 420);

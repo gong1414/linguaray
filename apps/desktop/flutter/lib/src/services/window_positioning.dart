@@ -3,10 +3,28 @@ import 'package:nativeapi/nativeapi.dart';
 
 import '../utils/platform_util.dart';
 
-const miniTranslatorInitialSize = Size(396, 420);
+const miniTranslatorInitialSize = Size(720, 420);
 const ocrWindowSize = Size(600, 520);
 const _kMiniTranslatorTrayGap = 10.0;
 const _kMiniTranslatorCursorGap = 12.0;
+
+/// Used after content measurement so a wider reading window and long results
+/// remain inside the current display, including scaled and secondary displays.
+Rect fitPopoverToWorkArea({
+  required Offset position,
+  required Size desiredSize,
+  required Rect workArea,
+}) {
+  final size = Size(
+    desiredSize.width.clamp(0, workArea.width),
+    desiredSize.height.clamp(0, workArea.height),
+  );
+  return Offset(
+        _clampDouble(position.dx, workArea.left, workArea.right - size.width),
+        _clampDouble(position.dy, workArea.top, workArea.bottom - size.height),
+      ) &
+      size;
+}
 
 Offset? windowPositionBelowTray(Rect trayBounds, {Size? windowSize}) {
   final size = windowSize ?? miniTranslatorInitialSize;

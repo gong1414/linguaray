@@ -42,37 +42,40 @@ class QuickTranslateInput extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          children: [
-            Text(labels.sourceLabel, style: theme.textTheme.labelMedium),
-            const Spacer(),
-            if (sourceText.isNotEmpty)
-              IconButton(
-                tooltip: labels.clear,
-                onPressed: onClear,
-                icon: const Icon(Icons.close_rounded, size: 16),
-              ),
-            if (speechAvailable && onSpeakSource != null)
-              IconButton(
-                tooltip: speaking ? labels.stopSpeaking : labels.speakSource,
-                onPressed: speaking ? onStopSpeech : onSpeakSource,
-                icon: Icon(
-                  speaking
-                      ? Icons.stop_circle_outlined
-                      : Icons.volume_up_outlined,
-                  size: 17,
+        SizedBox(
+          height: 32,
+          child: Row(
+            children: [
+              Text(labels.sourceLabel, style: theme.textTheme.labelMedium),
+              const Spacer(),
+              if (sourceText.isNotEmpty)
+                IconButton(
+                  tooltip: labels.clear,
+                  onPressed: onClear,
+                  icon: const Icon(Icons.close_rounded, size: 16),
                 ),
-              ),
-          ],
+              if (speechAvailable && onSpeakSource != null)
+                IconButton(
+                  tooltip: speaking ? labels.stopSpeaking : labels.speakSource,
+                  onPressed: speaking ? onStopSpeech : onSpeakSource,
+                  icon: Icon(
+                    speaking
+                        ? Icons.stop_circle_outlined
+                        : Icons.volume_up_outlined,
+                    size: 17,
+                  ),
+                ),
+            ],
+          ),
         ),
         TextField(
           key: const ValueKey('quick-source-input'),
           controller: controller,
           autofocus: true,
-          minLines: 2,
-          maxLines: 5,
+          minLines: 5,
+          maxLines: 7,
           style: theme.textTheme.bodyLarge?.copyWith(
-            fontSize: 15,
+            fontSize: 16,
             height: 1.65,
           ),
           textInputAction: submitWithModifier
@@ -87,7 +90,7 @@ class QuickTranslateInput extends StatelessWidget {
             focusedBorder: InputBorder.none,
             contentPadding: const EdgeInsets.symmetric(vertical: 8),
             hintStyle: theme.textTheme.bodyLarge?.copyWith(
-              fontSize: 15,
+              fontSize: 16,
               height: 1.65,
               color: theme.colorScheme.onSurfaceVariant,
             ),

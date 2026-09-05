@@ -74,6 +74,7 @@ QuickTranslateLabels quickTranslateLabels() {
     title: t.ui.quick.title,
     sourceLabel: t.ui.quick.source_label,
     resultLabel: t.ui.quick.result_label,
+    resultPlaceholder: t.ui.quick.result_placeholder,
     inputHint: t.ui.quick.input_hint,
     translate: t.mini_translator.button.translate,
     clear: t.mini_translator.button.clear,
@@ -118,6 +119,7 @@ QuickTranslateLabels quickTranslateLabels() {
 }
 
 SettingsShellLabels settingsShellLabels() => SettingsShellLabels(
+  libraryGroup: t.settings.navigation.library_group,
   translationGroup: t.settings.navigation.translation_group,
   translationSettings: t.settings.navigation.translation_settings,
   translationServices: t.settings.navigation.translation_services,

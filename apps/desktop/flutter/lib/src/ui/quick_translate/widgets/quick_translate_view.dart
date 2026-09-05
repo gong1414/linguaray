@@ -163,114 +163,171 @@ class _QuickTranslateViewState extends State<QuickTranslateView> {
             },
           };
 
+    final input = QuickTranslateInput(
+      labels: widget.labels,
+      controller: _controller,
+      sourceText: widget.sourceText,
+      submitting: widget.submitting,
+      speechAvailable: widget.speechAvailable,
+      submitWithModifier: widget.submitWithModifier,
+      canTranslate: canTranslate,
+      speakingKind: widget.speakingKind,
+      onSourceTextChanged: widget.onSourceTextChanged,
+      onClear: widget.onClear,
+      onTranslate: widget.onTranslate,
+      onSpeakSource: widget.onSpeakSource,
+      onStopSpeech: widget.onStopSpeech,
+    );
+    final result = QuickTranslateResultPanel(
+      labels: widget.labels,
+      results: widget.results,
+      selectedResult: widget.selectedResult,
+      selectedServiceId: widget.selectedServiceId,
+      glossaryMatches: widget.glossaryMatches,
+      glossaryWarnings: widget.glossaryWarnings,
+      dictionaryAvailable: widget.dictionaryAvailable,
+      speechAvailable: widget.speechAvailable,
+      speakingKind: widget.speakingKind,
+      savingVocabulary: widget.savingVocabulary,
+      vocabularySaved: widget.vocabularySaved,
+      favoriteAvailable: widget.favoriteAvailable,
+      favorite: widget.favorite,
+      updatingFavorite: widget.updatingFavorite,
+      copied: widget.copied,
+      copyResultOnDoubleClick: widget.copyResultOnDoubleClick,
+      onTranslate: widget.onTranslate,
+      onCopy: widget.onCopy,
+      onServiceSelected: widget.onServiceSelected,
+      onLookup: widget.onLookup,
+      onSaveVocabulary: widget.onSaveVocabulary,
+      onToggleFavorite: widget.onToggleFavorite,
+      onSpeakResult: widget.onSpeakResult,
+      onStopSpeech: widget.onStopSpeech,
+    );
     return CallbackShortcuts(
       bindings: submitBindings,
       child: Material(
         color: theme.colorScheme.surfaceContainerLowest,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(18, 10, 18, 14),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              KeyedSubtree(
-                key: widget.toolbarKey,
-                child: QuickTranslateCommandHeader(
-                  labels: widget.labels,
-                  pinned: widget.pinned,
-                  languages: widget.languages,
-                  sourceLanguage: widget.sourceLanguage,
-                  targetLanguage: widget.targetLanguage,
-                  onTogglePin: widget.onTogglePin,
-                  onCapture: widget.onCapture,
-                  onClipboard: widget.onClipboard,
-                  onOpenSettings: widget.onOpenSettings,
-                  onSourceLanguageChanged: widget.onSourceLanguageChanged,
-                  onTargetLanguageChanged: widget.onTargetLanguageChanged,
-                  onSwapLanguages: widget.onSwapLanguages,
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                KeyedSubtree(
+                  key: widget.toolbarKey,
+                  child: QuickTranslateCommandHeader(
+                    labels: widget.labels,
+                    pinned: widget.pinned,
+                    languages: widget.languages,
+                    sourceLanguage: widget.sourceLanguage,
+                    targetLanguage: widget.targetLanguage,
+                    onTogglePin: widget.onTogglePin,
+                    onCapture: widget.onCapture,
+                    onClipboard: widget.onClipboard,
+                    onOpenSettings: widget.onOpenSettings,
+                    onSourceLanguageChanged: widget.onSourceLanguageChanged,
+                    onTargetLanguageChanged: widget.onTargetLanguageChanged,
+                    onSwapLanguages: widget.onSwapLanguages,
+                  ),
                 ),
-              ),
-              KeyedSubtree(
-                key: widget.contentKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const SizedBox(height: 14),
-                    QuickTranslateInput(
-                      labels: widget.labels,
-                      controller: _controller,
-                      sourceText: widget.sourceText,
-                      submitting: widget.submitting,
-                      speechAvailable: widget.speechAvailable,
-                      submitWithModifier: widget.submitWithModifier,
-                      canTranslate: canTranslate,
-                      speakingKind: widget.speakingKind,
-                      onSourceTextChanged: widget.onSourceTextChanged,
-                      onClear: widget.onClear,
-                      onTranslate: widget.onTranslate,
-                      onSpeakSource: widget.onSpeakSource,
-                      onStopSpeech: widget.onStopSpeech,
-                    ),
-                    if (widget.notice != QuickTranslateNotice.none)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: QuickTranslateNoticeMessage(
-                          labels: widget.labels,
-                          notice: widget.notice,
-                          onRecheck: widget.onRecheckPermissions,
-                          onConfigureOcr: widget.onConfigureOcr,
-                          onConfigureServices: widget.onConfigureServices,
-                          onRetryCapture: widget.onCapture,
-                        ),
+                KeyedSubtree(
+                  key: widget.contentKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const SizedBox(height: 12),
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final wide = constraints.maxWidth >= 568;
+                          final sourcePane = Container(
+                            key: const ValueKey('quick-source-pane'),
+                            constraints: BoxConstraints(
+                              minHeight: wide ? 248 : 0,
+                            ),
+                            padding: const EdgeInsets.all(20),
+                            child: input,
+                          );
+                          final resultPane = Container(
+                            key: const ValueKey('quick-result-pane'),
+                            constraints: BoxConstraints(
+                              minHeight: wide ? 248 : 0,
+                            ),
+                            padding: const EdgeInsets.all(20),
+                            color: theme.colorScheme.surface,
+                            child: result,
+                          );
+                          return DecoratedBox(
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: theme.colorScheme.outlineVariant,
+                              ),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(16),
+                              child: wide
+                                  ? IntrinsicHeight(
+                                      child: Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.stretch,
+                                        children: [
+                                          Expanded(child: sourcePane),
+                                          VerticalDivider(
+                                            width: 1,
+                                            color: theme
+                                                .colorScheme
+                                                .outlineVariant,
+                                          ),
+                                          Expanded(child: resultPane),
+                                        ],
+                                      ),
+                                    )
+                                  : Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        sourcePane,
+                                        const Divider(),
+                                        resultPane,
+                                      ],
+                                    ),
+                            ),
+                          );
+                        },
                       ),
-                    if (widget.services.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: StatusMessage(
-                          kind: StatusKind.warning,
-                          title: widget.labels.noServices,
-                          action: OutlinedButton(
-                            onPressed: widget.onConfigureServices,
-                            child: Text(widget.labels.configureServices),
+                      if (widget.notice != QuickTranslateNotice.none)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 12),
+                          child: QuickTranslateNoticeMessage(
+                            labels: widget.labels,
+                            notice: widget.notice,
+                            onRecheck: widget.onRecheckPermissions,
+                            onConfigureOcr: widget.onConfigureOcr,
+                            onConfigureServices: widget.onConfigureServices,
+                            onRetryCapture: widget.onCapture,
                           ),
                         ),
-                      ),
-                    if (widget.submitting)
-                      const Padding(
-                        padding: EdgeInsets.only(top: 8),
-                        child: LinearProgressIndicator(minHeight: 2),
-                      ),
-                    QuickTranslateResultPanel(
-                      labels: widget.labels,
-                      results: widget.results,
-                      selectedResult: widget.selectedResult,
-                      selectedServiceId: widget.selectedServiceId,
-                      glossaryMatches: widget.glossaryMatches,
-                      glossaryWarnings: widget.glossaryWarnings,
-                      dictionaryAvailable: widget.dictionaryAvailable,
-                      speechAvailable: widget.speechAvailable,
-                      speakingKind: widget.speakingKind,
-                      savingVocabulary: widget.savingVocabulary,
-                      vocabularySaved: widget.vocabularySaved,
-                      favoriteAvailable: widget.favoriteAvailable,
-                      favorite: widget.favorite,
-                      updatingFavorite: widget.updatingFavorite,
-                      copied: widget.copied,
-                      copyResultOnDoubleClick: widget.copyResultOnDoubleClick,
-                      onTranslate: widget.onTranslate,
-                      onCopy: widget.onCopy,
-                      onServiceSelected: widget.onServiceSelected,
-                      onLookup: widget.onLookup,
-                      onSaveVocabulary: widget.onSaveVocabulary,
-                      onToggleFavorite: widget.onToggleFavorite,
-                      onSpeakResult: widget.onSpeakResult,
-                      onStopSpeech: widget.onStopSpeech,
-                    ),
-                  ],
+                      if (widget.services.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 12),
+                          child: StatusMessage(
+                            kind: StatusKind.warning,
+                            title: widget.labels.noServices,
+                            action: OutlinedButton(
+                              onPressed: widget.onConfigureServices,
+                              child: Text(widget.labels.configureServices),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

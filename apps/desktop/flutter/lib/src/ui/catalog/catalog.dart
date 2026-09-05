@@ -43,6 +43,10 @@ Map<String, Widget> buildCatalogGoldenStates({
     'provider_models_auth_error': const ProviderModelsCatalogPreview(
       failed: true,
     ),
+    'quick_compact': const QuickTranslateCatalogPreview(
+      scenario: CatalogQuickScenario.success,
+      width: 396,
+    ),
     'quick_empty': const QuickTranslateCatalogPreview(
       scenario: CatalogQuickScenario.empty,
     ),
@@ -138,9 +142,14 @@ String _ocrResultCount(int count) => '$count 次结果';
 String _catalogError(String? code) => code ?? '识别失败';
 
 class QuickTranslateCatalogPreview extends StatelessWidget {
-  const QuickTranslateCatalogPreview({required this.scenario, super.key});
+  const QuickTranslateCatalogPreview({
+    required this.scenario,
+    this.width = 720,
+    super.key,
+  });
 
   final CatalogQuickScenario scenario;
+  final double width;
 
   @override
   Widget build(BuildContext context) {
@@ -183,7 +192,7 @@ class QuickTranslateCatalogPreview extends StatelessWidget {
     };
 
     return SizedBox(
-      width: 396,
+      width: width,
       child: QuickTranslateView(
         labels: _quickZh,
         languages: _languages,
@@ -604,6 +613,7 @@ const _quickZh = QuickTranslateLabels(
   title: '快捷翻译',
   sourceLabel: '原文',
   resultLabel: '译文',
+  resultPlaceholder: '译文将在这里呈现',
   inputHint: '输入、粘贴，或由划词和截图填入',
   translate: '翻译',
   clear: '清空',
@@ -637,6 +647,7 @@ String _failureMessageZh(String? code) => switch (code) {
 };
 
 const _settingsShellZh = SettingsShellLabels(
+  libraryGroup: '资料库',
   translationGroup: '翻译',
   translationSettings: '翻译设置',
   translationServices: '服务',
@@ -657,6 +668,7 @@ const _settingsShellZh = SettingsShellLabels(
 );
 
 const _settingsShellEn = SettingsShellLabels(
+  libraryGroup: 'Library',
   translationGroup: 'Translation',
   translationSettings: 'Translation Settings',
   translationServices: 'Services',
