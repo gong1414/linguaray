@@ -23,7 +23,6 @@ class GeneralSettingsScreen extends ConsumerWidget {
       pageTitle: t.settings.navigation.general_settings,
       preferences: preferences,
       languages: state.languages,
-      translationLanguages: state.translationLanguages,
       errorCode: state.errorCode,
       onRetry: () => unawaited(
         ref.read(generalSettingsViewModelProvider.notifier).reload(),
@@ -44,27 +43,6 @@ class GeneralSettingsScreen extends ConsumerWidget {
       onThemeModeChanged: (value) => unawaited(
         ref.read(generalSettingsViewModelProvider.notifier).setThemeMode(value),
       ),
-      onCommonLanguagesChanged: (value) => unawaited(
-        ref
-            .read(generalSettingsViewModelProvider.notifier)
-            .setCommonLanguages(value),
-      ),
-      onInputSubmitModeChanged: (value) => unawaited(
-        ref
-            .read(generalSettingsViewModelProvider.notifier)
-            .setInputSubmitMode(value),
-      ),
-      onAutoCopyChanged: (value) => unawaited(
-        ref
-            .read(generalSettingsViewModelProvider.notifier)
-            .setAutoCopyDetectedText(value),
-      ),
-      onDoubleClickCopyChanged: (value) => unawaited(
-        ref
-            .read(generalSettingsViewModelProvider.notifier)
-            .setDoubleClickCopyResult(value),
-      ),
-      showTranslationSections: false,
     );
   }
 }

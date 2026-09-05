@@ -9,6 +9,7 @@ import 'package:linguaray_application/linguaray_application.dart';
 import '../../config/dependencies.dart';
 import '../../i18n/i18n.dart';
 import '../i18n_labels.dart';
+import '../shared/settings_page.dart';
 import '../shared/status_message.dart';
 import 'glossary_dialogs.dart';
 
@@ -238,166 +239,171 @@ class _GlossarySettingsScreenState
     final selectedBook = _books
         .where((book) => book.id == _selectedBookId)
         .firstOrNull;
-    return Material(
-      color: Theme.of(context).scaffoldBackgroundColor,
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-            child: Row(
-              children: [
-                Text(
-                  t.ui.shell.glossary,
-                  style: Theme.of(context).textTheme.headlineMedium,
-                ),
-                const Spacer(),
-                PopupMenuButton<GlossaryExchangeFormat>(
-                  enabled: selectedBook != null,
-                  tooltip: page.import_file,
-                  icon: const Icon(Icons.file_upload_outlined),
-                  onSelected: (format) =>
-                      unawaited(_importGlossary(selectedBook!, format)),
-                  itemBuilder: (_) => [
-                    PopupMenuItem(
-                      value: GlossaryExchangeFormat.csv,
-                      child: Text('${page.import_file} · CSV'),
-                    ),
-                    PopupMenuItem(
-                      value: GlossaryExchangeFormat.tbx,
-                      child: Text('${page.import_file} · TBX'),
-                    ),
-                  ],
-                ),
-                PopupMenuButton<GlossaryExchangeFormat>(
-                  enabled: selectedBook != null,
-                  tooltip: page.export_file,
-                  icon: const Icon(Icons.file_download_outlined),
-                  onSelected: (format) =>
-                      unawaited(_exportGlossary(selectedBook!, format)),
-                  itemBuilder: (_) => [
-                    PopupMenuItem(
-                      value: GlossaryExchangeFormat.csv,
-                      child: Text('${page.export_file} · CSV'),
-                    ),
-                    PopupMenuItem(
-                      value: GlossaryExchangeFormat.tbx,
-                      child: Text('${page.export_file} · TBX'),
-                    ),
-                  ],
-                ),
-                const SizedBox(width: 8),
-                OutlinedButton.icon(
-                  onPressed: () => unawaited(_editBook()),
-                  icon: const Icon(Icons.create_new_folder_outlined, size: 18),
-                  label: Text(page.new_book),
-                ),
-                const SizedBox(width: 8),
-                FilledButton.icon(
-                  onPressed: selectedBook == null
-                      ? null
-                      : () => unawaited(_editEntry()),
-                  icon: const Icon(Icons.add_rounded, size: 18),
-                  label: Text(page.add_entry),
-                ),
-              ],
+    return SettingsPage(
+      title: t.ui.shell.glossary,
+      actions: [
+        PopupMenuButton<GlossaryExchangeFormat>(
+          enabled: selectedBook != null,
+          tooltip: page.import_file,
+          icon: const Icon(Icons.file_upload_outlined),
+          onSelected: (format) =>
+              unawaited(_importGlossary(selectedBook!, format)),
+          itemBuilder: (_) => [
+            PopupMenuItem(
+              value: GlossaryExchangeFormat.csv,
+              child: Text('${page.import_file} · CSV'),
             ),
-          ),
+            PopupMenuItem(
+              value: GlossaryExchangeFormat.tbx,
+              child: Text('${page.import_file} · TBX'),
+            ),
+          ],
+        ),
+        PopupMenuButton<GlossaryExchangeFormat>(
+          enabled: selectedBook != null,
+          tooltip: page.export_file,
+          icon: const Icon(Icons.file_download_outlined),
+          onSelected: (format) =>
+              unawaited(_exportGlossary(selectedBook!, format)),
+          itemBuilder: (_) => [
+            PopupMenuItem(
+              value: GlossaryExchangeFormat.csv,
+              child: Text('${page.export_file} · CSV'),
+            ),
+            PopupMenuItem(
+              value: GlossaryExchangeFormat.tbx,
+              child: Text('${page.export_file} · TBX'),
+            ),
+          ],
+        ),
+        OutlinedButton.icon(
+          onPressed: () => unawaited(_editBook()),
+          icon: const Icon(Icons.create_new_folder_outlined, size: 18),
+          label: Text(page.new_book),
+        ),
+        FilledButton.icon(
+          onPressed: selectedBook == null
+              ? null
+              : () => unawaited(_editEntry()),
+          icon: const Icon(Icons.add_rounded, size: 18),
+          label: Text(page.add_entry),
+        ),
+      ],
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
           if (_errorCode != null)
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.only(bottom: 16),
               child: StatusMessage(
                 kind: StatusKind.warning,
                 title: appErrorMessage(_errorCode),
               ),
             ),
           Expanded(
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 190,
-                  child: _books.isEmpty
-                      ? Center(child: Text(page.no_books_title))
-                      : ListView(
-                          padding: const EdgeInsets.fromLTRB(10, 8, 10, 20),
-                          children: [
-                            for (final book in _books)
-                              ListTile(
-                                dense: true,
-                                selected: book.id == _selectedBookId,
-                                title: Text(book.name),
-                                subtitle: Text('${book.entryCount}'),
-                                onTap: () {
-                                  setState(() => _selectedBookId = book.id);
-                                  unawaited(_reloadEntries());
-                                },
-                                trailing: PopupMenuButton<String>(
-                                  onSelected: (action) async {
-                                    if (action == 'rename') {
-                                      await _editBook(book);
-                                    } else if (action == 'toggle') {
-                                      await _repository.upsertBook(
-                                        GlossaryBookDraft(
-                                          id: book.id,
-                                          name: book.name,
-                                          enabled: !book.enabled,
-                                          sourceLanguage: book.sourceLanguage,
-                                          targetLanguage: book.targetLanguage,
-                                        ),
-                                      );
-                                      await _reloadBooks(select: book.id);
-                                    } else if (action == 'delete') {
-                                      await _deleteBook(book);
-                                    }
-                                  },
-                                  itemBuilder: (_) => [
-                                    PopupMenuItem(
-                                      value: 'rename',
-                                      child: Text(page.rename_book),
-                                    ),
-                                    PopupMenuItem(
-                                      value: 'toggle',
-                                      child: Text(
-                                        book.enabled
-                                            ? page.disable
-                                            : page.enable,
+            child: _books.isEmpty
+                ? StatusMessage(
+                    title: page.no_books_title,
+                    body: page.no_books_description,
+                  )
+                : Row(
+                    children: [
+                      SizedBox(
+                        width: 190,
+                        child: _books.isEmpty
+                            ? Center(child: Text(page.no_books_title))
+                            : ListView(
+                                padding: const EdgeInsets.only(right: 12),
+                                children: [
+                                  for (final book in _books)
+                                    ListTile(
+                                      dense: true,
+                                      selected: book.id == _selectedBookId,
+                                      title: Text(book.name),
+                                      subtitle: Text('${book.entryCount}'),
+                                      onTap: () {
+                                        setState(
+                                          () => _selectedBookId = book.id,
+                                        );
+                                        unawaited(_reloadEntries());
+                                      },
+                                      trailing: PopupMenuButton<String>(
+                                        onSelected: (action) async {
+                                          if (action == 'rename') {
+                                            await _editBook(book);
+                                          } else if (action == 'toggle') {
+                                            await _repository.upsertBook(
+                                              GlossaryBookDraft(
+                                                id: book.id,
+                                                name: book.name,
+                                                enabled: !book.enabled,
+                                                sourceLanguage:
+                                                    book.sourceLanguage,
+                                                targetLanguage:
+                                                    book.targetLanguage,
+                                              ),
+                                            );
+                                            await _reloadBooks(select: book.id);
+                                          } else if (action == 'delete') {
+                                            await _deleteBook(book);
+                                          }
+                                        },
+                                        itemBuilder: (_) => [
+                                          PopupMenuItem(
+                                            value: 'rename',
+                                            child: Text(page.rename_book),
+                                          ),
+                                          PopupMenuItem(
+                                            value: 'toggle',
+                                            child: Text(
+                                              book.enabled
+                                                  ? page.disable
+                                                  : page.enable,
+                                            ),
+                                          ),
+                                          PopupMenuItem(
+                                            value: 'delete',
+                                            child: Text(
+                                              t.common.ui.button.delete,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                    PopupMenuItem(
-                                      value: 'delete',
-                                      child: Text(t.common.ui.button.delete),
+                                ],
+                              ),
+                      ),
+                      const VerticalDivider(width: 1),
+                      Expanded(
+                        child: selectedBook == null
+                            ? Center(child: Text(page.no_books_description))
+                            : Column(
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      20,
+                                      0,
+                                      0,
+                                      20,
                                     ),
-                                  ],
-                                ),
+                                    child: SearchBar(
+                                      hintText: page.search_placeholder,
+                                      leading: const Icon(
+                                        Icons.search_rounded,
+                                        size: 18,
+                                      ),
+                                      onChanged: (value) {
+                                        _query = value;
+                                        unawaited(_reloadEntries());
+                                      },
+                                    ),
+                                  ),
+                                  Expanded(child: _entryBody(selectedBook)),
+                                ],
                               ),
-                          ],
-                        ),
-                ),
-                const VerticalDivider(width: 1),
-                Expanded(
-                  child: selectedBook == null
-                      ? Center(child: Text(page.no_books_description))
-                      : Column(
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(12, 8, 20, 8),
-                              child: SearchBar(
-                                hintText: page.search_placeholder,
-                                leading: const Icon(
-                                  Icons.search_rounded,
-                                  size: 18,
-                                ),
-                                onChanged: (value) {
-                                  _query = value;
-                                  unawaited(_reloadEntries());
-                                },
-                              ),
-                            ),
-                            Expanded(child: _entryBody(selectedBook)),
-                          ],
-                        ),
-                ),
-              ],
-            ),
+                      ),
+                    ],
+                  ),
           ),
         ],
       ),
@@ -408,16 +414,17 @@ class _GlossarySettingsScreenState
     final page = t.workbench.glossary_page;
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_entries.isEmpty) {
-      return Center(
-        child: Text(
-          _query.isEmpty
+      return Padding(
+        padding: const EdgeInsets.only(left: 20),
+        child: StatusMessage(
+          title: _query.isEmpty
               ? page.empty_title
               : page.no_results_title(query: _query),
         ),
       );
     }
     return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
+      padding: const EdgeInsets.only(left: 12),
       itemCount: _entries.length,
       separatorBuilder: (_, _) => const Divider(height: 1),
       itemBuilder: (context, index) {

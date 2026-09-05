@@ -44,8 +44,9 @@ and round-trip tests across Dart and Swift consumers.
 
 ## Public Dart API cleanup
 
-Removing generic legacy exports from `package:linguaray_ui/linguaray_ui.dart`
-or splitting `WorkspaceSettingsRepository` changes public package contracts.
+The UI cleanup removed the unused internal widget exports after checking all
+workspace consumers. Splitting `WorkspaceSettingsRepository` still changes a
+shared package contract.
 First inventory downstream imports, add narrower replacement barrels or ports,
 publish a deprecation window, and update package-level API tests.
 

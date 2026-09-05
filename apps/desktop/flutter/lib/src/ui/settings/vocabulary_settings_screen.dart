@@ -7,6 +7,7 @@ import 'package:linguaray_application/linguaray_application.dart';
 import '../../config/dependencies.dart';
 import '../../i18n/i18n.dart';
 import '../i18n_labels.dart';
+import '../shared/settings_page.dart';
 import '../shared/status_message.dart';
 
 class VocabularySettingsScreen extends ConsumerStatefulWidget {
@@ -102,54 +103,34 @@ class _VocabularySettingsScreenState
   @override
   Widget build(BuildContext context) {
     final labels = t.ui.vocabulary;
-    return Material(
-      color: Theme.of(context).scaffoldBackgroundColor,
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-            child: Row(
-              children: [
-                Text(
-                  labels.title,
-                  style: Theme.of(context).textTheme.headlineMedium,
-                ),
-                const Spacer(),
-                SegmentedButton<VocabularyFilter>(
-                  segments: [
-                    ButtonSegment(
-                      value: VocabularyFilter.all,
-                      label: Text(labels.all),
-                    ),
-                    ButtonSegment(
-                      value: VocabularyFilter.favorites,
-                      label: Text(labels.favorites),
-                    ),
-                  ],
-                  selected: {_filter},
-                  onSelectionChanged: (selection) {
-                    if (selection.isEmpty) return;
-                    _filter = selection.first;
-                    unawaited(_reload());
-                  },
-                ),
-              ],
+    return SettingsPage(
+      title: labels.title,
+      actions: [
+        SegmentedButton<VocabularyFilter>(
+          segments: [
+            ButtonSegment(value: VocabularyFilter.all, label: Text(labels.all)),
+            ButtonSegment(
+              value: VocabularyFilter.favorites,
+              label: Text(labels.favorites),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-            child: SearchBar(
-              hintText: labels.search,
-              leading: const Icon(Icons.search_rounded, size: 18),
-              onChanged: (value) {
-                _query = value;
-                unawaited(_reload());
-              },
-            ),
-          ),
-          Expanded(child: _body()),
-        ],
+          ],
+          selected: {_filter},
+          onSelectionChanged: (selection) {
+            if (selection.isEmpty) return;
+            _filter = selection.first;
+            unawaited(_reload());
+          },
+        ),
+      ],
+      toolbar: SearchBar(
+        hintText: labels.search,
+        leading: const Icon(Icons.search_rounded, size: 18),
+        onChanged: (value) {
+          _query = value;
+          unawaited(_reload());
+        },
       ),
+      body: _body(),
     );
   }
 
@@ -160,7 +141,7 @@ class _VocabularySettingsScreenState
     }
     if (_snapshot.errorCode != null && _snapshot.entries.isEmpty) {
       return Padding(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.zero,
         child: StatusMessage(
           kind: StatusKind.error,
           title: appErrorMessage(_snapshot.errorCode),
@@ -173,7 +154,7 @@ class _VocabularySettingsScreenState
     }
     if (_snapshot.entries.isEmpty) {
       return Padding(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.zero,
         child: StatusMessage(
           kind: StatusKind.info,
           title: _query.isEmpty ? labels.empty_title : labels.no_results,
@@ -182,7 +163,7 @@ class _VocabularySettingsScreenState
       );
     }
     return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
+      padding: EdgeInsets.zero,
       itemCount: _snapshot.entries.length,
       separatorBuilder: (_, _) => const Divider(height: 1),
       itemBuilder: (context, index) {

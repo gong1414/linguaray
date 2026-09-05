@@ -36,7 +36,6 @@ void main() {
           capabilities.streamingTranslation,
           reason: '$type',
         );
-        expect(isLlmProviderType(type), capabilities.isLlm, reason: '$type');
       }
     },
   );

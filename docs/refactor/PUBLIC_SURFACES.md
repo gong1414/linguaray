@@ -10,13 +10,14 @@ meaning of these surfaces is not.
   ports, and use cases.
 - `package:linguaray_runtime/linguaray_runtime.dart`: generated UniFFI records,
   enums, objects, functions, errors, and method signatures.
-- `package:linguaray_ui/linguaray_ui.dart`: exported theme and widget APIs.
+- `package:linguaray_ui/linguaray_ui.dart`: the desktop Material theme and canonical brand mark.
 - Existing public screen, controller, repository, and route types used by app
   tests or workspace packages.
 
 Compatibility barrels should re-export moved declarations while oversized
-modules are split. Removing legacy `linguaray_ui` exports or splitting the
-`WorkspaceSettingsRepository` interface requires a separate API migration.
+modules are split. The unused internal UI exports were removed in the visual unification change
+after migrating all workspace callers. Splitting `WorkspaceSettingsRepository`
+still requires a separate API migration.
 
 ## Rust and UniFFI
 

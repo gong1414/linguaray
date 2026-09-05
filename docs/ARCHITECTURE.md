@@ -101,3 +101,19 @@ not contain provider secrets.
 Versioned backup/restore and the shared proxy policy are documented in
 [Data transfer and network policy](DATA_AND_NETWORK.md). Backups deliberately
 exclude secure-storage values.
+
+## Desktop visual contract
+
+`packages/ui_flutter` exposes the canonical logo and `LinguaRayMaterialTheme`.
+Every running surface and Widgetbook uses that theme directly; no alternate
+widget theme or token provider is mounted. Settings pages share `SettingsPage`
+for content backgrounds, heading baselines, action placement, and page insets.
+Native window dimensions are content sizes; Windows frame extents are included
+when constraining minimum sizes and fitting the window to a display work area.
+
+`python3 scripts/check_dart_reachability.py` rejects libraries not reachable from
+`main.dart` or the explicit Widgetbook/testing entry points. It also rejects
+catalog imports in the production graph. This library-level check complements
+the Dart analyzer and Rust Clippy; it does not infer whether every public member
+is used by external consumers. The visual suite renders all settings destinations
+and translation/OCR/provider/update states using production theme font names.

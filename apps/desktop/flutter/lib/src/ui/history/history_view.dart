@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:linguaray_application/linguaray_application.dart';
 
+import '../shared/settings_page.dart';
 import '../shared/status_message.dart';
 
 final class HistoryViewLabels {
@@ -87,81 +88,62 @@ class HistoryView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Material(
-      color: theme.scaffoldBackgroundColor,
-      child: Column(
+    return SettingsPage(
+      title: selectedIds.isEmpty
+          ? labels.title
+          : labels.selectedCount(selectedIds.length),
+      actions: [
+        if (selectedIds.isNotEmpty) ...[
+          TextButton.icon(
+            onPressed: () => onDelete(selectedIds.toList()),
+            icon: const Icon(Icons.delete_outline_rounded, size: 18),
+            label: Text(labels.delete),
+          ),
+          IconButton(
+            tooltip: labels.exitSelection,
+            onPressed: onExitSelection,
+            icon: const Icon(Icons.close_rounded),
+          ),
+        ] else if (snapshot.entries.isNotEmpty)
+          TextButton(onPressed: onClear, child: Text(labels.clear)),
+      ],
+      toolbar: Row(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-            child: Row(
-              children: [
-                if (selectedIds.isEmpty)
-                  Text(labels.title, style: theme.textTheme.headlineMedium)
-                else
-                  Text(
-                    labels.selectedCount(selectedIds.length),
-                    style: theme.textTheme.titleMedium,
-                  ),
-                const Spacer(),
-                if (selectedIds.isNotEmpty) ...[
-                  TextButton.icon(
-                    onPressed: () => onDelete(selectedIds.toList()),
-                    icon: const Icon(Icons.delete_outline_rounded, size: 18),
-                    label: Text(labels.delete),
-                  ),
-                  IconButton(
-                    tooltip: labels.exitSelection,
-                    onPressed: onExitSelection,
-                    icon: const Icon(Icons.close_rounded),
-                  ),
-                ] else if (snapshot.entries.isNotEmpty)
-                  TextButton(onPressed: onClear, child: Text(labels.clear)),
-              ],
+          Expanded(
+            child: SearchBar(
+              hintText: labels.search,
+              leading: const Icon(Icons.search_rounded, size: 18),
+              onChanged: onQueryChanged,
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: SearchBar(
-                    hintText: labels.search,
-                    leading: const Icon(Icons.search_rounded, size: 18),
-                    onChanged: onQueryChanged,
-                  ),
+          if (showFilter) ...[
+            const SizedBox(width: 12),
+            SegmentedButton<HistoryFilter>(
+              segments: [
+                ButtonSegment(
+                  value: HistoryFilter.all,
+                  label: Text(labels.all),
                 ),
-                if (showFilter) ...[
-                  const SizedBox(width: 12),
-                  SegmentedButton<HistoryFilter>(
-                    segments: [
-                      ButtonSegment(
-                        value: HistoryFilter.all,
-                        label: Text(labels.all),
-                      ),
-                      ButtonSegment(
-                        value: HistoryFilter.favorites,
-                        label: Text(labels.favorites),
-                      ),
-                      ButtonSegment(
-                        value: HistoryFilter.edited,
-                        label: Text(labels.edited),
-                      ),
-                    ],
-                    selected: {snapshot.filter},
-                    onSelectionChanged: (selection) {
-                      if (selection.isNotEmpty) {
-                        onFilterChanged(selection.first);
-                      }
-                    },
-                  ),
-                ],
+                ButtonSegment(
+                  value: HistoryFilter.favorites,
+                  label: Text(labels.favorites),
+                ),
+                ButtonSegment(
+                  value: HistoryFilter.edited,
+                  label: Text(labels.edited),
+                ),
               ],
+              selected: {snapshot.filter},
+              onSelectionChanged: (selection) {
+                if (selection.isNotEmpty) {
+                  onFilterChanged(selection.first);
+                }
+              },
             ),
-          ),
-          Expanded(child: _body(context)),
+          ],
         ],
       ),
+      body: _body(context),
     );
   }
 
@@ -171,7 +153,7 @@ class HistoryView extends StatelessWidget {
     }
     if (snapshot.errorCode != null && snapshot.entries.isEmpty) {
       return Padding(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.zero,
         child: StatusMessage(
           kind: StatusKind.error,
           title: labels.errorMessage?.call(snapshot.errorCode) ?? labels.retry,
@@ -181,7 +163,7 @@ class HistoryView extends StatelessWidget {
     }
     if (snapshot.entries.isEmpty) {
       return Padding(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.zero,
         child: StatusMessage(
           kind: StatusKind.info,
           title: snapshot.query.isEmpty ? labels.emptyTitle : labels.noResults,
@@ -190,7 +172,7 @@ class HistoryView extends StatelessWidget {
       );
     }
     return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
+      padding: EdgeInsets.zero,
       itemCount: snapshot.entries.length,
       separatorBuilder: (_, _) => const Divider(height: 1),
       itemBuilder: (context, index) {

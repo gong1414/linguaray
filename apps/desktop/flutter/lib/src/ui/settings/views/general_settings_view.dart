@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:linguaray_application/linguaray_application.dart';
+import 'package:linguaray_ui/linguaray_ui.dart' show LinguaRayMaterialTheme;
 
 import '../../../utils/platform_util.dart';
+import '../../shared/settings_page.dart';
 import '../settings_labels.dart';
 
 class GeneralSettingsView extends StatelessWidget {
@@ -14,45 +16,27 @@ class GeneralSettingsView extends StatelessWidget {
     required this.onLanguageChanged,
     required this.onThemeModeChanged,
     super.key,
-    this.translationLanguages = const [],
     this.errorCode,
     this.onRetry,
-    this.onCommonLanguagesChanged,
-    this.onInputSubmitModeChanged,
-    this.onAutoCopyChanged,
-    this.onDoubleClickCopyChanged,
-    this.onManageTranslationTargets,
-    this.showTranslationSections = true,
-    this.pageTitle,
+    required this.pageTitle,
   });
 
   final GeneralSettingsLabels labels;
   final GeneralPreferences preferences;
   final List<LanguageChoice> languages;
-  final List<LanguageChoice> translationLanguages;
   final String? errorCode;
   final VoidCallback? onRetry;
   final ValueChanged<bool> onLaunchAtLoginChanged;
   final ValueChanged<bool> onShowInMenuBarChanged;
   final ValueChanged<String> onLanguageChanged;
   final ValueChanged<ThemePreference> onThemeModeChanged;
-  final ValueChanged<List<String>>? onCommonLanguagesChanged;
-  final ValueChanged<InputSubmitMode>? onInputSubmitModeChanged;
-  final ValueChanged<bool>? onAutoCopyChanged;
-  final ValueChanged<bool>? onDoubleClickCopyChanged;
-  final VoidCallback? onManageTranslationTargets;
-  final bool showTranslationSections;
-  final String? pageTitle;
+  final String pageTitle;
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(32, 36, 32, 36),
+    return SettingsPage(
+      title: pageTitle,
       children: [
-        if (pageTitle != null) ...[
-          Text(pageTitle!, style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 22),
-        ],
         LayoutBuilder(
           builder: (context, constraints) {
             final appearance = _SettingsBlock(
@@ -157,128 +141,8 @@ class GeneralSettingsView extends StatelessWidget {
                   : TextButton(onPressed: onRetry, child: Text(labels.retry)),
             ),
           ),
-        if (showTranslationSections && labels.input.isNotEmpty) ...[
-          const SizedBox(height: 16),
-          Text(labels.input, style: Theme.of(context).textTheme.titleMedium),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text(labels.submitEnter),
-            value: preferences.inputSubmitMode == InputSubmitMode.enter,
-            onChanged: onInputSubmitModeChanged == null
-                ? null
-                : (value) => onInputSubmitModeChanged!(
-                    value
-                        ? InputSubmitMode.enter
-                        : InputSubmitMode.commandEnter,
-                  ),
-          ),
-        ],
-        if (showTranslationSections &&
-            labels.translationBehaviour.isNotEmpty) ...[
-          const SizedBox(height: 16),
-          Text(
-            labels.translationBehaviour,
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text(labels.autoCopyOcr),
-            value: preferences.autoCopyDetectedText,
-            onChanged: onAutoCopyChanged,
-          ),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text(labels.doubleClickCopy),
-            value: preferences.doubleClickCopyResult,
-            onChanged: onDoubleClickCopyChanged,
-          ),
-        ],
-        if (showTranslationSections &&
-            labels.translationTargets.isNotEmpty) ...[
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  labels.translationTargets,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ),
-              TextButton.icon(
-                onPressed: onManageTranslationTargets,
-                icon: const Icon(Icons.tune_rounded, size: 18),
-                label: Text(labels.manageTranslationTargets),
-              ),
-            ],
-          ),
-          Text(
-            labels.translationTargetsHint,
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          const SizedBox(height: 6),
-          if (preferences.translationTargets.isEmpty)
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(labels.noTranslationTargets),
-            )
-          else
-            for (final target in preferences.translationTargets)
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Icon(
-                  target.enabled
-                      ? Icons.arrow_forward_rounded
-                      : Icons.pause_rounded,
-                  size: 18,
-                ),
-                title: Text(
-                  '${_languageName(target.source, source: true)} → '
-                  '${_languageName(target.target)}',
-                ),
-              ),
-        ],
-        if (showTranslationSections &&
-            labels.commonLanguages.isNotEmpty &&
-            translationLanguages.isNotEmpty) ...[
-          const SizedBox(height: 16),
-          Text(
-            labels.commonLanguages,
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final language in translationLanguages)
-                FilterChip(
-                  label: Text(language.name),
-                  selected: preferences.commonLanguages.contains(language.code),
-                  onSelected: onCommonLanguagesChanged == null
-                      ? null
-                      : (selected) {
-                          final next = [...preferences.commonLanguages];
-                          if (selected) {
-                            next.add(language.code);
-                          } else {
-                            next.remove(language.code);
-                          }
-                          onCommonLanguagesChanged!(next);
-                        },
-                ),
-            ],
-          ),
-        ],
       ],
     );
-  }
-
-  String _languageName(String code, {bool source = false}) {
-    if (source && code == 'auto') return labels.autoDetect;
-    for (final language in translationLanguages) {
-      if (language.code == code) return language.name;
-    }
-    return code;
   }
 }
 
@@ -296,10 +160,11 @@ class _SettingsBlock extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -412,21 +277,24 @@ class _ThemePreview extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     void draw(bool dark) {
+      final scheme = LinguaRayMaterialTheme.forBrightness(
+        dark ? Brightness.dark : Brightness.light,
+      ).colorScheme;
       final paint = Paint();
       canvas.drawRect(
         Offset.zero & size,
-        paint..color = dark ? const Color(0xFF2E2925) : Colors.white,
+        paint..color = scheme.surfaceContainerLowest,
       );
       canvas.drawRect(
         Rect.fromLTWH(0, 0, size.width * .19, size.height),
-        paint..color = dark ? const Color(0xFF24211F) : const Color(0xFFF0EDE9),
+        paint..color = scheme.surface,
       );
       canvas.drawRRect(
         RRect.fromRectAndRadius(
           Rect.fromLTWH(4, 10, size.width * .19 - 8, 12),
           const Radius.circular(2),
         ),
-        paint..color = const Color(0xFFE9A287),
+        paint..color = scheme.primary,
       );
       for (var i = 0; i < 3; i++) {
         canvas.drawRRect(
@@ -439,8 +307,7 @@ class _ThemePreview extends CustomPainter {
             ),
             const Radius.circular(1),
           ),
-          paint
-            ..color = dark ? const Color(0xFF7E7064) : const Color(0xFFDDD6CE),
+          paint..color = scheme.outlineVariant,
         );
       }
     }

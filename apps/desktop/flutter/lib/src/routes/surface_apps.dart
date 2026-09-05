@@ -8,7 +8,6 @@ import '../i18n/i18n.dart';
 import '../services/app_windows.dart';
 import '../services/settings_store.dart';
 import '../ui/ocr/ocr_screen.dart';
-import '../widgets/toast_host.dart';
 import 'app_routes.dart';
 
 class SettingsApp extends StatefulWidget {
@@ -58,7 +57,7 @@ class _SettingsAppState extends State<SettingsApp> {
             const SingleActivator(LogicalKeyboardKey.escape):
                 hideSettingsWindow,
           },
-          child: ToastHost(child: child!),
+          child: child!,
         );
       },
       routerConfig: _router,
@@ -101,7 +100,6 @@ class _MiniTranslatorAppState extends State<MiniTranslatorApp> {
       theme: LinguaRayMaterialTheme.light(),
       darkTheme: LinguaRayMaterialTheme.dark(),
       themeMode: settingsStore.themeMode,
-      builder: (context, child) => ToastHost(child: child!),
       routerConfig: _router,
       localizationsDelegates: context.localizationDelegates,
       supportedLocales: context.supportedLocales,

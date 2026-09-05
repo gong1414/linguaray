@@ -5,157 +5,8 @@ import 'package:flutter/material.dart';
 /// used by the production Material 3 theme.
 abstract final class LinguaRayPalette {
   static const Color actionOrange = Color(0xFFB94D30);
-  static const Color linguaBlue = Color(0xFF2859D9);
-  static const Color rayTeal = Color(0xFF18A6A6);
-  static const Color rayTealDark = Color(0xFF34C0BE);
-  static const Color navy = Color(0xFF13233F);
   static const Color graphite = Color(0xFF302D2B);
   static const Color paper = Color(0xFFF6F5F3);
-  static const Color white = Color(0xFFFFFFFF);
-}
-
-@immutable
-final class LinguaRayBrandColors extends ThemeExtension<LinguaRayBrandColors> {
-  const LinguaRayBrandColors({
-    required this.navy,
-    required this.ray,
-    required this.canvas,
-    required this.ink,
-    required this.resultRule,
-  });
-
-  static const light = LinguaRayBrandColors(
-    navy: LinguaRayPalette.graphite,
-    ray: LinguaRayPalette.rayTeal,
-    canvas: LinguaRayPalette.paper,
-    ink: LinguaRayPalette.graphite,
-    resultRule: LinguaRayPalette.actionOrange,
-  );
-
-  static const dark = LinguaRayBrandColors(
-    navy: LinguaRayPalette.navy,
-    ray: LinguaRayPalette.rayTealDark,
-    canvas: Color(0xFF24211F),
-    ink: Color(0xFFF5EDE7),
-    resultRule: Color(0xFFFFB695),
-  );
-
-  final Color navy;
-  final Color ray;
-  final Color canvas;
-  final Color ink;
-  final Color resultRule;
-
-  @override
-  LinguaRayBrandColors copyWith({
-    Color? navy,
-    Color? ray,
-    Color? canvas,
-    Color? ink,
-    Color? resultRule,
-  }) {
-    return LinguaRayBrandColors(
-      navy: navy ?? this.navy,
-      ray: ray ?? this.ray,
-      canvas: canvas ?? this.canvas,
-      ink: ink ?? this.ink,
-      resultRule: resultRule ?? this.resultRule,
-    );
-  }
-
-  @override
-  LinguaRayBrandColors lerp(covariant LinguaRayBrandColors? other, double t) {
-    if (other == null) return this;
-    return LinguaRayBrandColors(
-      navy: Color.lerp(navy, other.navy, t)!,
-      ray: Color.lerp(ray, other.ray, t)!,
-      canvas: Color.lerp(canvas, other.canvas, t)!,
-      ink: Color.lerp(ink, other.ink, t)!,
-      resultRule: Color.lerp(resultRule, other.resultRule, t)!,
-    );
-  }
-}
-
-@immutable
-final class LinguaRayMetrics extends ThemeExtension<LinguaRayMetrics> {
-  const LinguaRayMetrics({
-    this.space = 8,
-    this.commandBarHeight = 48,
-    this.settingsNavWidth = 80,
-    this.quickWidth = 720,
-    this.controlHeight = 36,
-    this.captionHeight = 32,
-    this.macTrafficInset = 78,
-    this.workbenchMinSize = const Size(840, 560),
-  });
-
-  static const standard = LinguaRayMetrics();
-
-  final double space;
-  final double commandBarHeight;
-  final double settingsNavWidth;
-  final double quickWidth;
-  final double controlHeight;
-  final double captionHeight;
-  final double macTrafficInset;
-  final Size workbenchMinSize;
-
-  @override
-  LinguaRayMetrics copyWith({
-    double? space,
-    double? commandBarHeight,
-    double? settingsNavWidth,
-    double? quickWidth,
-    double? controlHeight,
-    double? captionHeight,
-    double? macTrafficInset,
-    Size? workbenchMinSize,
-  }) {
-    return LinguaRayMetrics(
-      space: space ?? this.space,
-      commandBarHeight: commandBarHeight ?? this.commandBarHeight,
-      settingsNavWidth: settingsNavWidth ?? this.settingsNavWidth,
-      quickWidth: quickWidth ?? this.quickWidth,
-      controlHeight: controlHeight ?? this.controlHeight,
-      captionHeight: captionHeight ?? this.captionHeight,
-      macTrafficInset: macTrafficInset ?? this.macTrafficInset,
-      workbenchMinSize: workbenchMinSize ?? this.workbenchMinSize,
-    );
-  }
-
-  @override
-  LinguaRayMetrics lerp(covariant LinguaRayMetrics? other, double t) {
-    if (other == null) return this;
-    return LinguaRayMetrics(
-      space: lerpDouble(space, other.space, t)!,
-      commandBarHeight: lerpDouble(
-        commandBarHeight,
-        other.commandBarHeight,
-        t,
-      )!,
-      settingsNavWidth: lerpDouble(
-        settingsNavWidth,
-        other.settingsNavWidth,
-        t,
-      )!,
-      quickWidth: lerpDouble(quickWidth, other.quickWidth, t)!,
-      controlHeight: lerpDouble(controlHeight, other.controlHeight, t)!,
-      captionHeight: lerpDouble(captionHeight, other.captionHeight, t)!,
-      macTrafficInset: lerpDouble(macTrafficInset, other.macTrafficInset, t)!,
-      workbenchMinSize: Size.lerp(workbenchMinSize, other.workbenchMinSize, t)!,
-    );
-  }
-}
-
-extension LinguaRayThemeContext on BuildContext {
-  LinguaRayBrandColors get brandColors =>
-      Theme.of(this).extension<LinguaRayBrandColors>() ??
-      (Theme.of(this).brightness == Brightness.dark
-          ? LinguaRayBrandColors.dark
-          : LinguaRayBrandColors.light);
-
-  LinguaRayMetrics get metrics =>
-      Theme.of(this).extension<LinguaRayMetrics>() ?? LinguaRayMetrics.standard;
 }
 
 abstract final class LinguaRayMaterialTheme {
@@ -201,7 +52,7 @@ abstract final class LinguaRayMaterialTheme {
       onSurfaceVariant: Color(0xFF766F69),
       outline: Color(0xFF9D948B),
       outlineVariant: Color(0xFFE7E2DC),
-      inverseSurface: LinguaRayPalette.navy,
+      inverseSurface: LinguaRayPalette.graphite,
       onInverseSurface: LinguaRayPalette.paper,
       inversePrimary: Color(0xFFFFBEA5),
       scrim: Color(0xFF000000),
@@ -251,9 +102,6 @@ abstract final class LinguaRayMaterialTheme {
   static ThemeData _build(Brightness brightness, TargetPlatform? platform) {
     final isDark = brightness == Brightness.dark;
     final scheme = isDark ? _darkScheme() : _lightScheme();
-    final brand = isDark
-        ? LinguaRayBrandColors.dark
-        : LinguaRayBrandColors.light;
     final resolvedPlatform = platform ?? defaultTargetPlatform;
     final base = ThemeData(
       useMaterial3: true,
@@ -428,6 +276,23 @@ abstract final class LinguaRayMaterialTheme {
           color: scheme.onSurfaceVariant,
         ),
       ),
+      searchBarTheme: SearchBarThemeData(
+        constraints: const BoxConstraints(minHeight: 40, maxHeight: 40),
+        elevation: const WidgetStatePropertyAll(0),
+        backgroundColor: WidgetStatePropertyAll(scheme.surfaceContainerLow),
+        surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
+        side: WidgetStatePropertyAll(BorderSide(color: scheme.outlineVariant)),
+        shape: WidgetStatePropertyAll(
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius)),
+        ),
+        padding: const WidgetStatePropertyAll(
+          EdgeInsets.symmetric(horizontal: 12),
+        ),
+        textStyle: WidgetStatePropertyAll(textTheme.bodyMedium),
+        hintStyle: WidgetStatePropertyAll(
+          textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+        ),
+      ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           minimumSize: const Size(0, 36),
@@ -504,10 +369,22 @@ abstract final class LinguaRayMaterialTheme {
       dialogTheme: DialogThemeData(
         backgroundColor: scheme.surfaceContainerLowest,
         surfaceTintColor: Colors.transparent,
-        elevation: 8,
+        elevation: 0,
         shadowColor: Colors.black.withValues(alpha: 0.1),
+        titleTextStyle: textTheme.titleLarge?.copyWith(fontSize: 20),
+        contentTextStyle: textTheme.bodyMedium,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(14),
+          side: BorderSide(color: scheme.outlineVariant),
+        ),
+      ),
+      popupMenuTheme: PopupMenuThemeData(
+        color: scheme.surfaceContainerLowest,
+        surfaceTintColor: Colors.transparent,
+        textStyle: textTheme.bodyMedium,
+        elevation: 4,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(radius),
           side: BorderSide(color: scheme.outlineVariant),
         ),
       ),
@@ -515,7 +392,7 @@ abstract final class LinguaRayMaterialTheme {
         behavior: SnackBarBehavior.floating,
         backgroundColor: isDark
             ? scheme.surfaceContainerHighest
-            : LinguaRayPalette.navy,
+            : LinguaRayPalette.graphite,
         contentTextStyle: textTheme.bodyMedium?.copyWith(color: Colors.white),
       ),
       tooltipTheme: const TooltipThemeData(
@@ -547,9 +424,6 @@ abstract final class LinguaRayMaterialTheme {
       ),
       focusColor: scheme.primary.withValues(alpha: 0.16),
       hoverColor: scheme.onSurface.withValues(alpha: 0.035),
-      extensions: <ThemeExtension<dynamic>>[brand, LinguaRayMetrics.standard],
     );
   }
 }
-
-double? lerpDouble(double a, double b, double t) => a + (b - a) * t;

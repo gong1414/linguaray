@@ -4,13 +4,6 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'strings.g.dart';
 export 'strings.g.dart';
 
-String formatTranslation(String value, {List<String> args = const []}) {
-  return args.fold(
-    value,
-    (text, argument) => text.replaceFirst('{}', argument),
-  );
-}
-
 /// Invalidates descendants after a Slang locale change without replacing
 /// their state objects. This also reaches router overlay entries whose widgets
 /// read the global [t] accessor.

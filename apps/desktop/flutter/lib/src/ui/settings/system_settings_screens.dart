@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -11,6 +10,7 @@ import '../../i18n/i18n.dart';
 import '../../services/system_proxy.dart';
 import '../../utils/external_url.dart';
 import '../i18n_labels.dart';
+import '../shared/settings_page.dart';
 import '../shared/status_message.dart';
 import 'view_models/permissions_view_model.dart';
 import 'view_models/settings_view_model.dart';
@@ -148,11 +148,9 @@ class _AdvancedSettingsScreenState
   Widget build(BuildContext context) {
     final status = _status;
     final advanced = t.settings.advanced;
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(32, 36, 32, 36),
+    return SettingsPage(
+      title: advanced.title,
       children: [
-        Text(advanced.title, style: Theme.of(context).textTheme.headlineMedium),
-        const SizedBox(height: 8),
         Text(advanced.api_server_description),
         if (status != null)
           SwitchListTile(
@@ -352,5 +350,3 @@ class _AdvancedSettingsScreenState
     }
   }
 }
-
-bool get isDesktopWindows => Platform.isWindows;

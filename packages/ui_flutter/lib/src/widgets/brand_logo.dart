@@ -29,43 +29,6 @@ final Path _rayPath = Path()
   ..lineTo(91, 75)
   ..close();
 
-/// The single-color LinguaRay LR monogram for system-controlled surfaces.
-class BrandGlyph extends StatelessWidget {
-  const BrandGlyph({super.key, required this.size, required this.color});
-
-  final double size;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return ExcludeSemantics(
-      child: CustomPaint(
-        size: Size.square(size),
-        painter: _BrandGlyphPainter(color),
-      ),
-    );
-  }
-}
-
-class _BrandGlyphPainter extends CustomPainter {
-  const _BrandGlyphPainter(this.color);
-
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final scale = size.shortestSide / 240;
-    canvas.scale(scale);
-    final paint = Paint()..color = color;
-    canvas.drawPath(_linguaPath, paint);
-    canvas.drawPath(_rayPath, paint);
-  }
-
-  @override
-  bool shouldRepaint(_BrandGlyphPainter oldDelegate) =>
-      color != oldDelegate.color;
-}
-
 /// The production LinguaRay app mark.
 ///
 /// Colors and placement match the flat app-icon master. The UI-only corner

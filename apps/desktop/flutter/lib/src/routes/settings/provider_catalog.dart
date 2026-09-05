@@ -194,17 +194,6 @@ String categoryLabel(String category) {
   };
 }
 
-String networkPolicyLabel(String policy) {
-  final network = t.settings.providers.network;
-  return switch (policy) {
-    'localOnly' => network.local_only,
-    'officialApi' => network.official_api,
-    'unofficialWeb' => network.unofficial_web,
-    'selfHosted' => network.self_hosted,
-    _ => policy,
-  };
-}
-
 String stabilityLabel(String stability) {
   final labels = t.settings.providers.stability;
   return switch (stability) {

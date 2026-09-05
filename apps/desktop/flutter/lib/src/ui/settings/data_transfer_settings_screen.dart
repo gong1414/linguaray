@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../i18n/i18n.dart';
 import '../../platform/data_transfer_controller.dart';
+import '../shared/settings_page.dart';
 import '../shared/status_message.dart';
 
 class DataTransferSettingsScreen extends StatefulWidget {
@@ -37,11 +38,9 @@ class _DataTransferSettingsScreenState
     final busy =
         state == DataTransferOperation.exporting ||
         state == DataTransferOperation.restoring;
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(32, 36, 32, 36),
+    return SettingsPage(
+      title: labels.title,
       children: [
-        Text(labels.title, style: Theme.of(context).textTheme.headlineMedium),
-        const SizedBox(height: 8),
         Text(labels.description),
         const SizedBox(height: 20),
         ListTile(

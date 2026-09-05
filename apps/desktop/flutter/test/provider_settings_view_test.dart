@@ -122,7 +122,7 @@ void main() {
           testResult: null,
           saving: false,
           operationError: null,
-          models: const ['model-a'],
+          discovery: const ProviderModelDiscovery(liveModels: ['model-a']),
           onFetchModels: () => fetches++,
           onIdChanged: (_) {},
           onTypeChanged: (_) {},

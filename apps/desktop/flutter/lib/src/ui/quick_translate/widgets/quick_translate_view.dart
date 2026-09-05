@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:linguaray_application/linguaray_application.dart';
 
 import '../../shared/status_message.dart';
-
 import 'quick_translate_components.dart';
 import 'quick_translate_input.dart';
 import 'quick_translate_models.dart';

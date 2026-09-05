@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:linguaray_application/linguaray_application.dart';
 
+import '../../shared/settings_page.dart';
 import '../settings_labels.dart';
 
 class PermissionsSettingsView extends StatelessWidget {
@@ -25,21 +26,12 @@ class PermissionsSettingsView extends StatelessWidget {
         snapshot.accessibility == AccessState.notRequired &&
         snapshot.screenRecording == AccessState.notRequired;
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(32, 36, 32, 36),
+    return SettingsPage(
+      title: labels.title,
+      actions: [
+        OutlinedButton(onPressed: onRecheck, child: Text(labels.recheck)),
+      ],
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                labels.title,
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-            ),
-            OutlinedButton(onPressed: onRecheck, child: Text(labels.recheck)),
-          ],
-        ),
-        const SizedBox(height: 12),
         if (windows)
           Text(
             labels.windowsNote,

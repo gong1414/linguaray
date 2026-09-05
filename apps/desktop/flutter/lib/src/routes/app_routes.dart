@@ -3,7 +3,6 @@ import 'package:go_router/go_router.dart';
 
 import '../services/app_windows.dart';
 import '../ui/quick_translate/quick_translate_screen.dart';
-import 'debug/runtime.dart' as debug_runtime_route;
 import 'settings/index.dart' as settings_route;
 
 const debugInitialRoute = String.fromEnvironment('LINGUARAY_INITIAL_ROUTE');
@@ -24,7 +23,6 @@ GoRouter createSettingsAppRouter({String? initialLocation}) {
         path: '/',
         redirect: (_, _) => SettingsDestination.settingsTranslation.location,
       ),
-      ...debug_runtime_route.$appRoutes,
       ...settings_route.$appRoutes,
     ],
     initialLocation: initialLocation ?? pendingSettingsLocation,

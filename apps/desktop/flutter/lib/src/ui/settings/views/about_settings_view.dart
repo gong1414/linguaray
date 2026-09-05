@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:linguaray_application/linguaray_application.dart';
 import 'package:linguaray_ui/linguaray_ui.dart' show BrandLogo;
 
+import '../../shared/settings_page.dart';
 import '../settings_labels.dart';
 
 class AboutSettingsView extends StatelessWidget {
@@ -29,8 +30,8 @@ class AboutSettingsView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(32, 36, 32, 36),
+    return SettingsPage(
+      title: labels.title,
       children: [
         const Center(child: BrandLogo(size: 48)),
         const SizedBox(height: 16),

@@ -21,12 +21,6 @@ final class ShortcutsViewState {
   final String? recordingActionId;
   final bool loading;
 
-  bool get hasConflict => shortcuts.any(
-    (item) =>
-        item.status == ShortcutStatus.osConflict ||
-        item.status == ShortcutStatus.localDuplicate,
-  );
-
   ShortcutsViewState copyWith({
     List<ShortcutRecord>? shortcuts,
     Object? recordingActionId = _unset,

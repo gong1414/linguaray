@@ -45,6 +45,8 @@ jobs:
       - run: cargo test --locked --workspace
       - run: dart run melos run dependency_validator
       - run: python3 scripts/check_uniffi_surface.py
+      - run: python3 scripts/check_dart_reachability.py
+      - run: python3 -m unittest discover -s scripts -p 'test_dart_reachability.py'
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.13"
@@ -109,7 +111,6 @@ jobs:
             apps/desktop/flutter/build/macos/Build/Products/Debug/LinguaRay.app
             apps/desktop/flutter/build/windows/x64/runner/Debug
             apps/desktop/flutter/test/failures
-            packages/ui_flutter/test/failures
           if-no-files-found: ignore
 
   windows-goldens:
@@ -127,15 +128,10 @@ jobs:
       - run: dart pub get
       - name: Render desktop snapshots with native Windows fonts
         working-directory: apps/desktop/flutter
-        run: flutter test --update-goldens test/business_widget_golden_test.dart test/catalog_surface_golden_test.dart
-      - name: Render design-system snapshots with native Windows fonts
-        working-directory: packages/ui_flutter
-        run: flutter test --update-goldens test/golden_test.dart
+        run: flutter test --update-goldens test/catalog_surface_golden_test.dart
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: windows-golden-review
           path: |
-            apps/desktop/flutter/test/goldens/windows
             apps/desktop/flutter/test/goldens/catalog/*_windows.png
-            packages/ui_flutter/test/goldens/windows
           if-no-files-found: error

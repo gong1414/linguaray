@@ -1,11 +1,6 @@
 import '../i18n/i18n.dart';
 import '../services/runtime.dart';
 
-/// True for engine adapters that expose an LLM rather than a traditional
-/// translation endpoint.
-bool isLlmProviderType(ProviderType type) =>
-    providerCapabilitiesForType(type).isLlm;
-
 final class ProviderCapabilities {
   const ProviderCapabilities({
     required this.isLlm,

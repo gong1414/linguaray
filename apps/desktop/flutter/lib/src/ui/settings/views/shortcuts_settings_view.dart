@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:linguaray_application/linguaray_application.dart';
 
+import '../../shared/settings_page.dart';
 import '../settings_labels.dart';
 
 class ShortcutsSettingsView extends StatelessWidget {
@@ -33,11 +34,9 @@ class ShortcutsSettingsView extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cardColor = theme.colorScheme.surfaceContainerLowest;
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(32, 36, 32, 36),
+    return SettingsPage(
+      title: title ?? labels.title,
       children: [
-        Text(title ?? labels.title, style: theme.textTheme.titleLarge),
-        const SizedBox(height: 22),
         Row(
           children: [
             if ((title ?? labels.title) != labels.title)
@@ -58,7 +57,7 @@ class ShortcutsSettingsView extends StatelessWidget {
         DecoratedBox(
           decoration: BoxDecoration(
             color: cardColor,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(8),
             border: Border.all(color: theme.colorScheme.outlineVariant),
           ),
           child: Column(

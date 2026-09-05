@@ -91,8 +91,6 @@ const _runtimeDataDirectoryOverride = String.fromEnvironment(
   'LINGUARAY_RUNTIME_DATA_DIR',
 );
 
-ApiServerInfo? get apiServerInfo => _apiServerInfo;
-
 /// Initialises the Rust runtime with the platform's application-support
 /// directory as the data directory.
 ///

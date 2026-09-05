@@ -87,12 +87,12 @@ class SettingsShellView extends StatelessWidget {
                               color: group == active
                                   ? colors.primaryContainer
                                   : Colors.transparent,
-                              borderRadius: BorderRadius.circular(14),
+                              borderRadius: BorderRadius.circular(8),
                               child: InkWell(
                                 key: ValueKey(
                                   'work-area-${group.pages.first.$1.name}',
                                 ),
-                                borderRadius: BorderRadius.circular(14),
+                                borderRadius: BorderRadius.circular(8),
                                 onTap: () =>
                                     onSectionSelected(group.pages.first.$1),
                                 child: Padding(
@@ -174,7 +174,7 @@ class SettingsShellView extends StatelessWidget {
                                     vertical: 12,
                                   ),
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
+                                    borderRadius: BorderRadius.circular(8),
                                   ),
                                 ),
                                 child: Text(label),

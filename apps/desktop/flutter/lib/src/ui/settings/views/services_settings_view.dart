@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:linguaray_application/linguaray_application.dart';
 
+import '../../shared/settings_page.dart';
 import '../../shared/status_message.dart';
 import '../settings_labels.dart';
 
@@ -46,16 +47,11 @@ class ServicesSettingsView extends StatelessWidget {
         ? services.where((service) => service.kind == 'dictionary').toList()
         : const <ServiceRecord>[];
     final cardColor = theme.colorScheme.surfaceContainerLowest;
-    final cardShape = RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(12),
-      side: BorderSide(color: theme.colorScheme.outlineVariant),
-    );
+    final cardShape = theme.cardTheme.shape;
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(32, 36, 32, 36),
+    return SettingsPage(
+      title: pageTitle,
       children: [
-        Text(pageTitle, style: theme.textTheme.titleLarge),
-        const SizedBox(height: 22),
         Row(
           children: [
             Expanded(

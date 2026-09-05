@@ -25,14 +25,6 @@ List<String> get supportedLanguages {
   return _supportedLanguages!;
 }
 
-String get defaultSourceLanguage => _preferredLanguage('en');
-
-String get defaultTargetLanguage {
-  return defaultTargetLanguageForAppLanguage(
-    LocaleSettings.currentLocale.languageTag,
-  );
-}
-
 String defaultTargetLanguageForAppLanguage(String languageTag) {
   final normalized = languageTag.trim().toLowerCase().replaceAll('_', '-');
   final code = switch (normalized) {
@@ -52,41 +44,9 @@ String _preferredLanguage(String code) {
   return languages.isNotEmpty ? languages.first : code;
 }
 
-bool isAutoSource(String source) => source == kAutoSource;
-
-String getSourceDisplayName(String source, {bool showNative = false}) {
-  if (isAutoSource(source)) return t.mini_translator.language.auto_detect;
-  return getLanguageName(source, showNative: showNative);
-}
-
-/// Native (original) name of each language in its own writing system.
-///
-/// Lazily loaded from the Rust runtime on first access.
-Map<String, String>? _nativeLanguageNames;
-
-Map<String, String> get _nativeNames {
-  _nativeLanguageNames ??= {
-    for (final lang in runtime.listLanguages()) lang.code: lang.localName,
-  };
-  return _nativeLanguageNames!;
-}
-
-/// Returns the language name in the app's current locale.
-///
-/// When [showNative] is true and the native name differs from the translated
-/// name, the native name is appended in parentheses.
-///
-/// Examples with a Chinese app locale:
-///   - `getLanguageName("en")`           → "英语"
-///   - `getLanguageName("en", showNative: true)` → "英语 (English)"
-///   - `getLanguageName("zh-Hans")`      → "中文（简体）"
-String getLanguageName(String language, {bool showNative = false}) {
-  final translated = _languageNameFromT(language) ?? language;
-  if (!showNative) return translated;
-  final native = _nativeNames[language] ?? language;
-  if (translated == native) return translated;
-  return '$translated ($native)';
-}
+/// Returns the language name in the current interface locale.
+String getLanguageName(String language) =>
+    _languageNameFromT(language) ?? language;
 
 /// Looks up the translated name for a language code via the i18n system.
 String? _languageNameFromT(String language) {
@@ -115,22 +75,6 @@ List<String> defaultCommonLanguages() {
   ];
   // Keep only languages that are actually in the supported list.
   return base.where((code) => supportedLanguages.contains(code)).toList();
-}
-
-/// Returns the subset of [supportedLanguages] that are in [commonLanguageCodes].
-/// The order follows [commonLanguageCodes]; codes not in [supportedLanguages]
-/// are silently dropped.
-List<String> getCommonLanguages(List<String> commonLanguageCodes) {
-  return commonLanguageCodes
-      .where((code) => supportedLanguages.contains(code))
-      .toList();
-}
-
-/// Returns the subset of [supportedLanguages] that are NOT in [commonLanguageCodes].
-/// The order follows [supportedLanguages].
-List<String> getOtherLanguages(List<String> commonLanguageCodes) {
-  final commonSet = commonLanguageCodes.toSet();
-  return supportedLanguages.where((l) => !commonSet.contains(l)).toList();
 }
 
 Locale languageToLocale(String language) {

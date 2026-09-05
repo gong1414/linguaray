@@ -116,11 +116,15 @@ cargo fmt --all -- --check
 cargo clippy --locked --workspace --all-targets -- -D warnings
 cargo test --locked --workspace
 python3 scripts/check_uniffi_surface.py
+python3 scripts/check_dart_reachability.py
 ```
 
 Use `python3 scripts/format.py --check` to check Dart, Rust, and Swift formatting
 together. UI changes need Widgetbook coverage and deliberate golden updates.
 Platform changes need desktop integration coverage where practical.
+Use `LinguaRayMaterialTheme` for all surfaces and `SettingsPage` for settings
+layouts. Catalog fixtures must stay reachable only from the Widgetbook entry,
+and tests must not be the only callers keeping a product library alive.
 
 ## Git practices
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:linguaray_application/linguaray_application.dart';
 
+import '../shared/settings_page.dart';
 import '../shared/status_message.dart';
 
 final class UpdatesViewLabels {
@@ -55,35 +56,29 @@ class UpdatesView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Material(
-      color: theme.scaffoldBackgroundColor,
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-        children: [
-          Text(labels.title, style: theme.textTheme.headlineMedium),
-          const SizedBox(height: 12),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text(labels.current),
-            subtitle: Text(state.currentVersion),
-            trailing: FilledButton(
-              onPressed:
-                  (state.status == UpdateStatus.checking ||
-                      state.status == UpdateStatus.downloading)
-                  ? null
-                  : onCheck,
-              child: Text(
-                state.status == UpdateStatus.checking
-                    ? labels.checking
-                    : labels.check,
-              ),
+    return SettingsPage(
+      title: labels.title,
+      children: [
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text(labels.current),
+          subtitle: Text(state.currentVersion),
+          trailing: FilledButton(
+            onPressed:
+                (state.status == UpdateStatus.checking ||
+                    state.status == UpdateStatus.downloading)
+                ? null
+                : onCheck,
+            child: Text(
+              state.status == UpdateStatus.checking
+                  ? labels.checking
+                  : labels.check,
             ),
           ),
-          const SizedBox(height: 12),
-          ..._status(context),
-        ],
-      ),
+        ),
+        const SizedBox(height: 12),
+        ..._status(context),
+      ],
     );
   }
 
@@ -92,7 +87,9 @@ class UpdatesView extends StatelessWidget {
       case UpdateStatus.idle:
         return const [];
       case UpdateStatus.checking:
-        return [const StatusMessage(kind: StatusKind.progress, title: '')];
+        return [
+          StatusMessage(kind: StatusKind.progress, title: labels.checking),
+        ];
       case UpdateStatus.upToDate:
         return [
           StatusMessage(kind: StatusKind.success, title: labels.upToDate),

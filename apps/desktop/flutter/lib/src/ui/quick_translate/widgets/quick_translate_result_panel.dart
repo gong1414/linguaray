@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:linguaray_application/linguaray_application.dart';
-import 'package:linguaray_ui/linguaray_ui.dart' show LinguaRayThemeContext;
 
 import '../../shared/status_message.dart';
 import 'quick_translate_components.dart';
@@ -100,7 +99,7 @@ class _QuickTranslateResultPanelState extends State<QuickTranslateResultPanel> {
                   width: 3,
                   height: 12,
                   decoration: BoxDecoration(
-                    color: context.brandColors.resultRule,
+                    color: Theme.of(context).colorScheme.primary,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),

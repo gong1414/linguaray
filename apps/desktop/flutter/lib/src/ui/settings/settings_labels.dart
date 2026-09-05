@@ -49,22 +49,9 @@ final class GeneralSettingsLabels {
     required this.showInMenuBar,
     required this.appearance,
     required this.language,
-    required this.theme,
     required this.light,
     required this.dark,
     required this.system,
-    this.commonLanguages = '',
-    this.autoCopyOcr = '',
-    this.doubleClickCopy = '',
-    this.submitEnter = '',
-    this.submitModifierEnter = '',
-    this.input = '',
-    this.translationBehaviour = '',
-    this.translationTargets = '',
-    this.translationTargetsHint = '',
-    this.noTranslationTargets = '',
-    this.manageTranslationTargets = '',
-    this.autoDetect = '',
     this.error = '',
     this.errorMessage,
     this.retry = '',
@@ -75,22 +62,9 @@ final class GeneralSettingsLabels {
   final String showInMenuBar;
   final String appearance;
   final String language;
-  final String theme;
   final String light;
   final String dark;
   final String system;
-  final String commonLanguages;
-  final String autoCopyOcr;
-  final String doubleClickCopy;
-  final String submitEnter;
-  final String submitModifierEnter;
-  final String input;
-  final String translationBehaviour;
-  final String translationTargets;
-  final String translationTargetsHint;
-  final String noTranslationTargets;
-  final String manageTranslationTargets;
-  final String autoDetect;
   final String error;
   final String Function(String? code)? errorMessage;
   final String retry;

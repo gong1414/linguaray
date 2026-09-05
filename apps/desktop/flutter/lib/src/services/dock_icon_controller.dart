@@ -11,8 +11,6 @@ class DockIconController {
   static final DockIconController instance = DockIconController._();
   bool _applied = false;
 
-  bool get shouldShowDockIcon => false;
-
   void setSettingsWindowVisible(bool value) => _apply();
   void setTrayIconVisible(bool value) => _apply();
 

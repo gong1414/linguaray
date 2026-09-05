@@ -111,8 +111,8 @@ Golden screenshots use each operating system's own fonts. Refresh Windows
 baselines on Windows, not by overriding the platform theme on macOS. Run
 **Actions → CI → Run workflow → refresh_windows_goldens** to generate a
 `windows-golden-review` artifact. Review the images and commit the intended
-changes; normal CI never regenerates or silently accepts them. Business and
-design-system Windows snapshots live in their own `goldens/windows` folders.
+changes; normal CI never regenerates or silently accepts them. All desktop
+snapshots live in `apps/desktop/flutter/test/goldens/catalog/`.
 
 ## Supported targets and protocol registration
 

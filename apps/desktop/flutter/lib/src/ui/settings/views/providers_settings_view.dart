@@ -3,6 +3,7 @@ import 'package:linguaray_application/linguaray_application.dart';
 
 import '../../../i18n/i18n.dart';
 import '../../../routes/settings/provider_catalog.dart';
+import '../../shared/settings_page.dart';
 import '../../shared/status_message.dart';
 import '../settings_labels.dart';
 
@@ -26,103 +27,89 @@ class ProvidersSettingsView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(32, 36, 32, 24),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  labels.title,
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-              ),
-              FilledButton.icon(
-                onPressed: onAdd,
-                icon: const Icon(Icons.add_rounded),
-                label: Text(labels.add),
-              ),
-            ],
-          ),
-        ),
-        Expanded(
-          child: loading
-              ? const Center(child: CircularProgressIndicator())
-              : providers.isEmpty
-              ? Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: StatusMessage(
-                    kind: StatusKind.info,
-                    title: labels.empty,
-                    action: OutlinedButton(
-                      onPressed: onAdd,
-                      child: Text(labels.add),
-                    ),
-                  ),
-                )
-              : ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-                  itemCount: providers.length,
-                  separatorBuilder: (_, _) => const Padding(
-                    padding: EdgeInsets.only(left: 60),
-                    child: Divider(),
-                  ),
-                  itemBuilder: (context, index) {
-                    final provider = providers[index];
-                    final model = provider.publicFields['defaultModel'];
-                    final colors = Theme.of(context).colorScheme;
-                    return ListTile(
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 8,
-                      ),
-                      leading: Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: colors.surfaceContainerLow,
-                          borderRadius: BorderRadius.circular(9),
-                        ),
-                        alignment: Alignment.center,
-                        child: Icon(
-                          model == null
-                              ? Icons.translate_rounded
-                              : Icons.auto_awesome_outlined,
-                          size: 18,
-                          color: colors.onSurfaceVariant,
-                        ),
-                      ),
-                      onTap: () => onEdit(provider.id),
-                      title: Text(provider.displayName),
-                      subtitle: Text(
-                        [
-                          if (model != null && model.isNotEmpty) model,
-                          if (provider.hasStoredSecret) labels.secretStored,
-                        ].join(' · '),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            tooltip: labels.edit,
-                            onPressed: () => onEdit(provider.id),
-                            icon: const Icon(Icons.edit_outlined),
-                          ),
-                          IconButton(
-                            tooltip: labels.delete,
-                            onPressed: () => onDelete(provider.id),
-                            icon: const Icon(Icons.delete_outline_rounded),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
+    return SettingsPage(
+      title: labels.title,
+      actions: [
+        FilledButton.icon(
+          onPressed: onAdd,
+          icon: const Icon(Icons.add_rounded),
+          label: Text(labels.add),
         ),
       ],
+      body: loading
+          ? const Center(child: CircularProgressIndicator())
+          : providers.isEmpty
+          ? Padding(
+              padding: EdgeInsets.zero,
+              child: StatusMessage(
+                kind: StatusKind.info,
+                title: labels.empty,
+                action: OutlinedButton(
+                  onPressed: onAdd,
+                  child: Text(labels.add),
+                ),
+              ),
+            )
+          : ListView.separated(
+              padding: EdgeInsets.zero,
+              itemCount: providers.length,
+              separatorBuilder: (_, _) => const Padding(
+                padding: EdgeInsets.only(left: 60),
+                child: Divider(),
+              ),
+              itemBuilder: (context, index) {
+                final provider = providers[index];
+                final model = provider.publicFields['defaultModel'];
+                final colors = Theme.of(context).colorScheme;
+                return ListTile(
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 8,
+                  ),
+                  leading: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: colors.surfaceContainerLow,
+                      borderRadius: BorderRadius.circular(9),
+                    ),
+                    alignment: Alignment.center,
+                    child: Icon(
+                      model == null
+                          ? Icons.translate_rounded
+                          : Icons.auto_awesome_outlined,
+                      size: 18,
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+                  onTap: () => onEdit(provider.id),
+                  title: Text(provider.displayName),
+                  subtitle: Text(
+                    [
+                      if (model != null && model.isNotEmpty) model,
+                      if (provider.hasStoredSecret) labels.secretStored,
+                    ].join(' · '),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        tooltip: labels.edit,
+                        onPressed: () => onEdit(provider.id),
+                        icon: const Icon(Icons.edit_outlined),
+                      ),
+                      IconButton(
+                        tooltip: labels.delete,
+                        onPressed: () => onDelete(provider.id),
+                        icon: const Icon(Icons.delete_outline_rounded),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
     );
   }
 }
@@ -147,10 +134,8 @@ class ProviderEditorView extends StatefulWidget {
     required this.onCancel,
     super.key,
     this.idReadOnly = false,
-    this.models = const [],
     this.discovery,
     this.loadingModels = false,
-    this.modelsError,
     this.onFetchModels,
   });
 
@@ -165,10 +150,8 @@ class ProviderEditorView extends StatefulWidget {
   final bool saving;
   final String? operationError;
   final bool idReadOnly;
-  final List<String> models;
   final ProviderModelDiscovery? discovery;
   final bool loadingModels;
-  final String? modelsError;
   final VoidCallback? onFetchModels;
   final ValueChanged<String> onIdChanged;
   final ValueChanged<String> onTypeChanged;
@@ -429,13 +412,6 @@ class _ProviderEditorViewState extends State<ProviderEditorView> {
             label: Text(t.settings.providers.fetch_models),
           ),
         ),
-        if (widget.modelsError != null) ...[
-          const SizedBox(height: 8),
-          Text(
-            widget.modelsError!,
-            style: TextStyle(color: Theme.of(context).colorScheme.error),
-          ),
-        ],
         _modelList(field),
       ],
     );
@@ -444,7 +420,7 @@ class _ProviderEditorViewState extends State<ProviderEditorView> {
   Widget _modelList(ProviderFieldSpec field) {
     final result = widget.discovery;
     final labels = t.settings.providers;
-    final live = result?.liveModels ?? widget.models;
+    final live = result?.liveModels ?? const <String>[];
     final references = result?.referenceModels ?? const <String>[];
     final models = _showReferenceModels ? references : live;
     final query = _modelQuery.trim().toLowerCase();

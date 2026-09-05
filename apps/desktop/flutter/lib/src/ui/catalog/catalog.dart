@@ -8,15 +8,19 @@ import '../i18n_labels.dart';
 import '../ocr/ocr_view.dart';
 import '../quick_translate/widgets/quick_translate_view.dart';
 import '../settings/data_transfer_settings_screen.dart';
+import '../settings/glossary_settings_screen.dart';
 import '../settings/settings_labels.dart';
 import '../settings/settings_shell_view.dart';
+import '../settings/system_settings_screens.dart';
 import '../settings/views/about_settings_view.dart';
 import '../settings/views/general_settings_view.dart';
 import '../settings/views/permissions_settings_view.dart';
 import '../settings/views/providers_settings_view.dart';
 import '../settings/views/services_settings_view.dart';
 import '../settings/views/shortcuts_settings_view.dart';
+import '../settings/vocabulary_settings_screen.dart';
 import '../updates/updates_view.dart';
+import 'settings_fixtures.dart';
 
 enum CatalogQuickScenario {
   empty,
@@ -34,9 +38,7 @@ enum CatalogQuickScenario {
 
 enum CatalogOcrScenario { empty, recognizing, success, continuous, error }
 
-Map<String, Widget> buildCatalogGoldenStates({
-  TargetPlatform platform = TargetPlatform.macOS,
-}) {
+Map<String, Widget> buildCatalogGoldenStates() {
   return {
     'providers_configured': const ProvidersCatalogPreview(),
     'provider_models_live': const ProviderModelsCatalogPreview(),
@@ -70,19 +72,46 @@ Map<String, Widget> buildCatalogGoldenStates({
     'ocr_continuous': const OcrCatalogPreview(
       scenario: CatalogOcrScenario.continuous,
     ),
-    'settings_translation': const SettingsCatalogPreview(
-      section: SettingsSection.translation,
+    for (final section in SettingsSection.values)
+      'settings_${section.name.replaceAllMapped(RegExp(r'[A-Z]'), (match) => '_${match[0]!.toLowerCase()}')}':
+          SettingsCatalogPreview(section: section),
+    'history_empty': const _CatalogShell(
+      section: SettingsSection.history,
+      child: HistoryCatalogPreview(empty: true),
     ),
-    'settings_translation_services': const SettingsCatalogPreview(
+    'history_error': const _CatalogShell(
+      section: SettingsSection.history,
+      child: HistoryCatalogPreview(empty: true, failed: true),
+    ),
+    'history_loading': const _CatalogShell(
+      section: SettingsSection.history,
+      child: HistoryCatalogPreview(empty: true, loading: true),
+    ),
+    for (final status in UpdateStatus.values)
+      'updates_${status.name}': _CatalogShell(
+        section: SettingsSection.updates,
+        child: UpdatesCatalogPreview(status: status),
+      ),
+    'services_empty': const SettingsCatalogPreview(
       section: SettingsSection.translationServices,
+      servicesEmpty: true,
     ),
-    'settings_ocr': const SettingsCatalogPreview(section: SettingsSection.ocr),
-    'settings_permissions': const SettingsCatalogPreview(
-      section: SettingsSection.permissions,
+    'shortcut_conflict': const SettingsCatalogPreview(
+      section: SettingsSection.translation,
+      shortcutConflict: true,
     ),
-    'settings_general': const SettingsCatalogPreview(
-      section: SettingsSection.general,
+    'glossary_empty': const SettingsCatalogPreview(
+      section: SettingsSection.glossary,
+      libraryEmpty: true,
     ),
+    'vocabulary_empty': const SettingsCatalogPreview(
+      section: SettingsSection.vocabulary,
+      libraryEmpty: true,
+    ),
+    'provider_editor_secret': const ProviderEditorCatalogPreview(
+      secretStored: true,
+    ),
+    'provider_editor_error': const ProviderEditorCatalogPreview(failed: true),
   };
 }
 
@@ -258,14 +287,14 @@ class SettingsCatalogPreview extends StatelessWidget {
   const SettingsCatalogPreview({
     required this.section,
     super.key,
-    this.providersEmpty = false,
+    this.libraryEmpty = false,
     this.servicesEmpty = false,
     this.shortcutConflict = false,
     this.english = false,
   });
 
   final SettingsSection section;
-  final bool providersEmpty;
+  final bool libraryEmpty;
   final bool servicesEmpty;
   final bool shortcutConflict;
   final bool english;
@@ -426,23 +455,34 @@ class SettingsCatalogPreview extends StatelessWidget {
           onGrantScreenRecording: () {},
           onRecheck: () {},
         ),
-        SettingsSection.dataTransfer => const DataTransferSettingsScreen(),
-        SettingsSection.favorites ||
-        SettingsSection.history ||
+        SettingsSection.dataTransfer => const IgnorePointer(
+          child: DataTransferSettingsScreen(),
+        ),
+        SettingsSection.favorites => const HistoryCatalogPreview(
+          empty: false,
+          favorites: true,
+        ),
+        SettingsSection.history => const HistoryCatalogPreview(empty: false),
+        SettingsSection.updates => const UpdatesCatalogPreview(),
         SettingsSection.glossary ||
         SettingsSection.vocabulary ||
-        SettingsSection.integration ||
-        SettingsSection.updates => Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(section.name),
+        SettingsSection.integration => CatalogSettingsFixture(
+          empty: libraryEmpty,
+          child: switch (section) {
+            SettingsSection.glossary => const GlossarySettingsScreen(),
+            SettingsSection.vocabulary => const VocabularySettingsScreen(),
+            _ => const AdvancedSettingsScreen(),
+          },
         ),
         SettingsSection.about => AboutSettingsView(
           labels: _aboutZh,
-          info: const AboutInfo(
+          info: AboutInfo(
             appName: 'LinguaRay',
-            version: '0.5.0',
-            buildNumber: '18',
-            platformLabel: 'macOS',
+            version: '0.6.1',
+            buildNumber: '20',
+            platformLabel: Theme.of(context).platform == TargetPlatform.macOS
+                ? 'macOS'
+                : 'Windows',
             license: 'MIT',
           ),
           copied: false,
@@ -712,7 +752,6 @@ const _generalZh = GeneralSettingsLabels(
   showInMenuBar: '在菜单栏显示',
   appearance: '外观',
   language: '界面语言',
-  theme: '主题',
   light: '浅色',
   dark: '深色',
   system: '跟随系统',
@@ -724,7 +763,6 @@ const _generalEn = GeneralSettingsLabels(
   showInMenuBar: 'Show in menu bar',
   appearance: 'Appearance',
   language: 'Interface language',
-  theme: 'Theme',
   light: 'Light',
   dark: 'Dark',
   system: 'System',
@@ -839,15 +877,24 @@ const _longSource =
 const _longResult = 'LinguaRay 是一款隐私优先的桌面翻译工具。它不打扰当前工作，把提供商密钥留在系统钥匙串中。';
 
 class HistoryCatalogPreview extends StatelessWidget {
-  const HistoryCatalogPreview({required this.empty, super.key});
+  const HistoryCatalogPreview({
+    required this.empty,
+    this.failed = false,
+    this.loading = false,
+    this.favorites = false,
+    super.key,
+  });
 
   final bool empty;
+  final bool failed;
+  final bool loading;
+  final bool favorites;
 
   @override
   Widget build(BuildContext context) {
     return HistoryView(
-      labels: const HistoryViewLabels(
-        title: '历史',
+      labels: HistoryViewLabels(
+        title: favorites ? '收藏夹' : '历史记录',
         all: '全部',
         favorites: '收藏',
         edited: '我改过的',
@@ -857,6 +904,7 @@ class HistoryCatalogPreview extends StatelessWidget {
         noResults: '没有匹配的历史',
         loading: '正在读取…',
         retry: '重试',
+        errorMessage: (_) => '无法读取历史记录，请重试。',
         delete: '删除',
         clear: '清空',
         exitSelection: '退出多选',
@@ -869,6 +917,8 @@ class HistoryCatalogPreview extends StatelessWidget {
         selectedCount: _historySelectedCount,
       ),
       snapshot: HistorySnapshot(
+        loading: loading,
+        errorCode: failed ? 'network_error' : null,
         entries: empty
             ? const []
             : const [
@@ -891,9 +941,10 @@ class HistoryCatalogPreview extends StatelessWidget {
           favorites: empty ? 0 : 1,
           edited: 0,
         ),
-        filter: HistoryFilter.all,
+        filter: favorites ? HistoryFilter.favorites : HistoryFilter.all,
         query: '',
       ),
+      showFilter: !favorites,
       selectedIds: const {},
       onQueryChanged: (_) {},
       onFilterChanged: (_) {},
@@ -914,7 +965,12 @@ String _historySelectedCount(int count) => '已选 $count 条';
 void _noop() {}
 
 class UpdatesCatalogPreview extends StatelessWidget {
-  const UpdatesCatalogPreview({super.key});
+  const UpdatesCatalogPreview({
+    super.key,
+    this.status = UpdateStatus.available,
+  });
+
+  final UpdateStatus status;
 
   @override
   Widget build(BuildContext context) {
@@ -933,16 +989,22 @@ class UpdatesCatalogPreview extends StatelessWidget {
         unsigned: '没有校验和，不会安装',
         notes: '发行说明',
         retry: '重试',
+        errorMessage: (_) => '无法检查更新，请检查网络后重试。',
       ),
-      state: const UpdateState(
-        status: UpdateStatus.available,
-        currentVersion: '0.5.0',
-        manifest: UpdateManifest(
-          version: '0.6.0',
-          notes: 'New interface.',
-          assetName: 'LinguaRay-macos.zip',
-          assetUrl: 'https://example.invalid/app.zip',
-          checksumSha256: 'abc',
+      state: UpdateState(
+        status: status,
+        currentVersion: '0.6.1',
+        downloadedPath: status == UpdateStatus.readyToInstall
+            ? '/preview/LinguaRay-macos.dmg'
+            : null,
+        progress: status == UpdateStatus.downloading ? 0.42 : null,
+        errorCode: status == UpdateStatus.failed ? 'network_error' : null,
+        manifest: const UpdateManifest(
+          version: '0.6.2',
+          notes: '优化翻译窗口的阅读体验，改进模型列表获取。',
+          assetName: 'LinguaRay-macos.dmg',
+          assetUrl: 'https://example.invalid/LinguaRay-macos.dmg',
+          checksumSha256: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
         ),
       ),
       onCheck: () {},
@@ -950,4 +1012,18 @@ class UpdatesCatalogPreview extends StatelessWidget {
       onInstall: () {},
     );
   }
+}
+
+class _CatalogShell extends StatelessWidget {
+  const _CatalogShell({required this.section, required this.child});
+  final SettingsSection section;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => SettingsShellView(
+    labels: _settingsShellZh,
+    section: section,
+    onSectionSelected: (_) {},
+    child: child,
+  );
 }
