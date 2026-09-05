@@ -224,4 +224,4 @@ class CaptureController {
   }
 }
 
-final captureController = CaptureController();
+final captureController = CaptureController(permissions: permissionController);

@@ -45,6 +45,7 @@ class _QuickTranslateScreenState extends ConsumerState<QuickTranslateScreen>
   late final VocabularyRepository _vocabularyRepository;
   late final QuickTranslateWindowCoordinator _windowCoordinator;
   late final TriggerController _triggers;
+  late final PermissionController _permissions;
 
   @override
   void initState() {
@@ -53,15 +54,17 @@ class _QuickTranslateScreenState extends ConsumerState<QuickTranslateScreen>
     _lookUpWord = ref.read(lookUpWordProvider);
     _vocabularyRepository = ref.read(vocabularyRepositoryProvider);
     _triggers = ref.read(triggerControllerProvider);
+    _permissions = ref.read(permissionControllerProvider);
     _windowCoordinator = QuickTranslateWindowCoordinator(
       () => mounted,
       onDismiss: () => ref.read(translationViewModelProvider.notifier).cancel(),
+      permissions: _permissions,
     );
     _speechSubscription = _speechService.states.listen(_handleSpeechState);
     WidgetsBinding.instance.addObserver(this);
     _triggers.quickWindowRequest.addListener(_consumeWindowRequest);
     _triggers.lastError.addListener(_showTriggerError);
-    permissionController.addListener(_onPermissionChanged);
+    _permissions.addListener(_onPermissionChanged);
     _windowCoordinator.registerEvents();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _consumeWindowRequest();
@@ -74,7 +77,7 @@ class _QuickTranslateScreenState extends ConsumerState<QuickTranslateScreen>
   void dispose() {
     _triggers.quickWindowRequest.removeListener(_consumeWindowRequest);
     _triggers.lastError.removeListener(_showTriggerError);
-    permissionController.removeListener(_onPermissionChanged);
+    _permissions.removeListener(_onPermissionChanged);
     WidgetsBinding.instance.removeObserver(this);
     _windowCoordinator.dispose();
     _copiedTimer?.cancel();
@@ -86,7 +89,7 @@ class _QuickTranslateScreenState extends ConsumerState<QuickTranslateScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      unawaited(permissionController.refresh());
+      unawaited(_permissions.refresh());
     }
   }
 
@@ -134,7 +137,7 @@ class _QuickTranslateScreenState extends ConsumerState<QuickTranslateScreen>
   }
 
   void _onPermissionChanged() {
-    final snapshot = permissionController.snapshot;
+    final snapshot = _permissions.snapshot;
     final denied =
         snapshot.accessibility == PermissionState.denied ||
         snapshot.screenRecording == PermissionState.denied;
@@ -436,7 +439,7 @@ class _QuickTranslateScreenState extends ConsumerState<QuickTranslateScreen>
           unawaited(_triggers.trigger(TriggerAction.translateInput)),
       onOpenSettings: _windowCoordinator.openSettings,
       onConfigureServices: _windowCoordinator.openSettings,
-      onRecheckPermissions: () => unawaited(permissionController.refresh()),
+      onRecheckPermissions: () => unawaited(_permissions.refresh()),
     );
   }
 
@@ -444,7 +447,7 @@ class _QuickTranslateScreenState extends ConsumerState<QuickTranslateScreen>
     final target = _replacementTarget;
     if (target == null || _replacing) return;
     setState(() => _replacing = true);
-    await permissionController.refresh();
+    await _permissions.refresh();
     final result = await selectionReplacementController.replace(target, text);
     if (!mounted) return;
     setState(() => _replacing = false);

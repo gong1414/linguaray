@@ -296,4 +296,6 @@ class TriggerController {
 final triggerController = TriggerController(
   ocr: ocrController,
   capture: captureController,
+  selection: selectionController,
+  permissions: permissionController,
 );

@@ -21,7 +21,9 @@ import '../platform/credentials/secret_store.dart';
 import '../platform/files/text_file_dialogs.dart';
 import '../platform/network/network_proxy.dart';
 import '../platform/network/system_proxy.dart';
+import '../platform/permissions/permission_controller.dart';
 import '../platform/permissions/permission_repository.dart';
+import '../platform/selection/selection_controller.dart';
 import '../platform/shortcuts/shortcut_repository.dart';
 import '../platform/shortcuts/shortcut_service.dart';
 import '../platform/speech/channel_speech_service.dart';
@@ -44,6 +46,14 @@ final triggerControllerProvider = Provider<TriggerController>(
 
 final shortcutServiceProvider = Provider<ShortcutService>(
   (ref) => shortcutService,
+);
+
+final permissionControllerProvider = Provider<PermissionController>(
+  (ref) => permissionController,
+);
+
+final selectionControllerProvider = Provider<SelectionController>(
+  (ref) => selectionController,
 );
 
 final translationRepositoryProvider = Provider<TranslationRepository>(
@@ -87,7 +97,9 @@ final serviceSettingsRepositoryProvider = Provider<ServiceSettingsRepository>(
 );
 
 final permissionRepositoryProvider = Provider<PermissionRepository>(
-  (ref) => ControllerPermissionRepository(),
+  (ref) => ControllerPermissionRepository(
+    controller: ref.watch(permissionControllerProvider),
+  ),
 );
 
 final shortcutRepositoryProvider = Provider<ShortcutRepository>(

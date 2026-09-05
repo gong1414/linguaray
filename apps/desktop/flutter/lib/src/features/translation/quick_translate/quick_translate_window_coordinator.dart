@@ -10,9 +10,14 @@ import '../../../platform/windows/window_positioning.dart'
     show fitPopoverToWorkArea;
 
 final class QuickTranslateWindowCoordinator {
-  QuickTranslateWindowCoordinator(this._isMounted, {this.onDismiss});
+  QuickTranslateWindowCoordinator(
+    this._isMounted, {
+    this.onDismiss,
+    PermissionController? permissions,
+  }) : _permissions = permissions ?? permissionController;
 
   final VoidCallback? onDismiss;
+  final PermissionController _permissions;
 
   final bool Function() _isMounted;
   final GlobalKey toolbarKey = GlobalKey();
@@ -55,7 +60,7 @@ final class QuickTranslateWindowCoordinator {
     _focusedListenerId = nativeapi.WindowManager.instance
         .on<nativeapi.WindowFocusedEvent>((event) {
           if (event.windowId == _window.id) {
-            unawaited(permissionController.refresh());
+            unawaited(_permissions.refresh());
           }
         });
     _blurredListenerId = nativeapi.WindowManager.instance

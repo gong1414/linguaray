@@ -48,4 +48,6 @@ class SelectionController {
   }
 }
 
-final selectionController = SelectionController();
+final selectionController = SelectionController(
+  permissions: permissionController,
+);

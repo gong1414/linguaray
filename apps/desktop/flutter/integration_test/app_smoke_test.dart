@@ -17,7 +17,6 @@ import 'package:linguaray_desktop/src/app/windows/app_windows.dart';
 import 'package:linguaray_desktop/src/features/translation/data/llm_stream.dart';
 import 'package:linguaray_desktop/src/features/translation/quick_translate/quick_translate_screen.dart';
 import 'package:linguaray_desktop/src/platform/credentials/secret_store.dart';
-import 'package:linguaray_desktop/src/platform/permissions/permission_controller.dart';
 import 'package:linguaray_desktop/src/platform/platform_types.dart';
 
 const _testSystemServices = bool.fromEnvironment(
@@ -148,7 +147,9 @@ void main() {
       '[smoke] Dart to Rust cancellable stream delivered local response',
     );
 
-    final permissions = await permissionController.refresh();
+    final permissions = await providerContainer
+        .read(permissionControllerProvider)
+        .refresh();
     debugPrint('[smoke] permissions refreshed');
     expect(permissions.accessibility, isNot(PermissionState.unknown));
     expect(permissions.screenRecording, isNot(PermissionState.unknown));

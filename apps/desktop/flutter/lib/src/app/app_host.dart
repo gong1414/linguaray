@@ -47,6 +47,7 @@ class _RootBodyViewState extends ConsumerState<_RootBodyView>
   late final SettingsStore _store;
   late final ShortcutService _shortcuts;
   late final TriggerController _triggers;
+  late final PermissionController _permissions;
   late final AppTrayController _tray;
   late final ProviderSubscription<UpdateState> _updateSubscription;
   late bool _showInMenuBar;
@@ -59,6 +60,7 @@ class _RootBodyViewState extends ConsumerState<_RootBodyView>
     _store = ref.read(settingsStoreProvider);
     _shortcuts = ref.read(shortcutServiceProvider);
     _triggers = ref.read(triggerControllerProvider);
+    _permissions = ref.read(permissionControllerProvider);
     _updates = AutomaticUpdateSchedule(
       enabled: () => _store.advanced.checkUpdatesOnLaunch,
       runCheck: () => ref.read(updateCoordinatorProvider.notifier).check(),
@@ -90,7 +92,7 @@ class _RootBodyViewState extends ConsumerState<_RootBodyView>
     protocolController.onCommand = externalActionController.dispatchProtocol;
     protocolController.start();
     externalActionController.start();
-    unawaited(permissionController.refresh());
+    unawaited(_permissions.refresh());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (debugInitialDestination == null) {
         initializeResidentApp();
@@ -115,7 +117,7 @@ class _RootBodyViewState extends ConsumerState<_RootBodyView>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      unawaited(permissionController.refresh());
+      unawaited(_permissions.refresh());
       unawaited(_updates.check());
     }
   }

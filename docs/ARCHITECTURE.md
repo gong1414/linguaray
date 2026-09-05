@@ -108,7 +108,9 @@ platform controllers take `SettingsStore` through constructors; `main` and
 read appearance, locale, and tray visibility through that provider. The OCR
 surface, quick translator, history, tray, and host dispatch actions through
 `triggerControllerProvider`. Capture and global shortcut registration are
-bound as `captureControllerProvider` and `shortcutServiceProvider`; tray and
+bound as `captureControllerProvider` and `shortcutServiceProvider`.
+Permission and selection controllers are bound as
+`permissionControllerProvider` and `selectionControllerProvider`; tray and
 shortcut triggers still share those same composition-root instances.
 
 macOS host plugins are split by capability under `macos/Runner/Plugins`
