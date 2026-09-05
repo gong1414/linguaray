@@ -6,6 +6,7 @@ import 'package:linguaray_desktop/src/platform/capture/capture_controller.dart';
 import 'package:linguaray_desktop/src/platform/permissions/permission_controller.dart';
 import 'package:linguaray_desktop/src/platform/protocol/protocol_controller.dart';
 import 'package:linguaray_desktop/src/platform/selection/selection_controller.dart';
+import 'package:linguaray_desktop/src/platform/selection/selection_replacement_controller.dart';
 import 'package:linguaray_desktop/src/platform/shortcuts/shortcut_service.dart';
 
 void main() {
@@ -27,12 +28,20 @@ void main() {
       container.read(protocolControllerProvider),
       same(protocolController),
     );
+    expect(
+      container.read(selectionReplacementControllerProvider),
+      same(selectionReplacementController),
+    );
   });
 
   test('platform action providers can be overridden', () {
     final permissions = PermissionController();
     final capture = CaptureController(permissions: permissions);
-    final selection = SelectionController(permissions: permissions);
+    final replacement = SelectionReplacementController();
+    final selection = SelectionController(
+      permissions: permissions,
+      replacement: replacement,
+    );
     final triggers = TriggerController(
       capture: capture,
       selection: selection,
@@ -48,6 +57,7 @@ void main() {
         permissionControllerProvider.overrideWithValue(permissions),
         selectionControllerProvider.overrideWithValue(selection),
         protocolControllerProvider.overrideWithValue(protocol),
+        selectionReplacementControllerProvider.overrideWithValue(replacement),
       ],
     );
     addTearDown(container.dispose);
@@ -57,6 +67,10 @@ void main() {
     expect(container.read(permissionControllerProvider), same(permissions));
     expect(container.read(selectionControllerProvider), same(selection));
     expect(container.read(protocolControllerProvider), same(protocol));
+    expect(
+      container.read(selectionReplacementControllerProvider),
+      same(replacement),
+    );
     expect(
       container.read(captureControllerProvider),
       isNot(same(captureController)),
@@ -80,6 +94,10 @@ void main() {
     expect(
       container.read(protocolControllerProvider),
       isNot(same(protocolController)),
+    );
+    expect(
+      container.read(selectionReplacementControllerProvider),
+      isNot(same(selectionReplacementController)),
     );
   });
 }

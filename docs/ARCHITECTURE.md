@@ -113,8 +113,9 @@ controller. Incoming `linguaray://` links are owned by
 `protocolControllerProvider`. Capture and global shortcut registration are
 bound as `captureControllerProvider` and `shortcutServiceProvider`.
 Permission and selection controllers are bound as
-`permissionControllerProvider` and `selectionControllerProvider`; tray and
-shortcut triggers still share those same composition-root instances.
+`permissionControllerProvider` and `selectionControllerProvider`.
+Selection replacement is bound as `selectionReplacementControllerProvider`;
+tray and shortcut triggers still share those same composition-root instances.
 
 macOS host plugins are split by capability under `macos/Runner/Plugins`
 (presentation, speech, protocol, system proxy, selection replacement).

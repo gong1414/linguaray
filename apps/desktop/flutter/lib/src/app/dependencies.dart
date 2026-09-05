@@ -25,6 +25,7 @@ import '../platform/permissions/permission_controller.dart';
 import '../platform/permissions/permission_repository.dart';
 import '../platform/protocol/protocol_controller.dart';
 import '../platform/selection/selection_controller.dart';
+import '../platform/selection/selection_replacement_controller.dart';
 import '../platform/shortcuts/shortcut_repository.dart';
 import '../platform/shortcuts/shortcut_service.dart';
 import '../platform/speech/channel_speech_service.dart';
@@ -67,6 +68,11 @@ final permissionControllerProvider = Provider<PermissionController>(
 final selectionControllerProvider = Provider<SelectionController>(
   (ref) => selectionController,
 );
+
+final selectionReplacementControllerProvider =
+    Provider<SelectionReplacementController>(
+      (ref) => selectionReplacementController,
+    );
 
 final protocolControllerProvider = Provider<ProtocolController>(
   (ref) => protocolController,

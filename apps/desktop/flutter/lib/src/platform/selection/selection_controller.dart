@@ -6,10 +6,14 @@ import '../platform_types.dart';
 import 'selection_replacement_controller.dart';
 
 class SelectionController {
-  SelectionController({PermissionController? permissions})
-    : _permissions = permissions ?? permissionController;
+  SelectionController({
+    PermissionController? permissions,
+    SelectionReplacementController? replacement,
+  }) : _permissions = permissions ?? permissionController,
+       _replacement = replacement ?? selectionReplacementController;
 
   final PermissionController _permissions;
+  final SelectionReplacementController _replacement;
 
   Future<SelectionResult> readSelection() async {
     final triggerPosition = DisplayManager.instance.getCursorPosition();
@@ -22,7 +26,7 @@ class SelectionController {
       );
     }
 
-    final target = await selectionReplacementController.capture();
+    final target = await _replacement.capture();
     final result = await runtime
         .textExtractor()
         .extractFromScreenSelectionDetailed();
@@ -50,4 +54,5 @@ class SelectionController {
 
 final selectionController = SelectionController(
   permissions: permissionController,
+  replacement: selectionReplacementController,
 );

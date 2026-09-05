@@ -46,6 +46,7 @@ class _QuickTranslateScreenState extends ConsumerState<QuickTranslateScreen>
   late final QuickTranslateWindowCoordinator _windowCoordinator;
   late final TriggerController _triggers;
   late final PermissionController _permissions;
+  late final SelectionReplacementController _replacement;
 
   @override
   void initState() {
@@ -55,6 +56,7 @@ class _QuickTranslateScreenState extends ConsumerState<QuickTranslateScreen>
     _vocabularyRepository = ref.read(vocabularyRepositoryProvider);
     _triggers = ref.read(triggerControllerProvider);
     _permissions = ref.read(permissionControllerProvider);
+    _replacement = ref.read(selectionReplacementControllerProvider);
     _windowCoordinator = QuickTranslateWindowCoordinator(
       () => mounted,
       onDismiss: () => ref.read(translationViewModelProvider.notifier).cancel(),
@@ -448,7 +450,7 @@ class _QuickTranslateScreenState extends ConsumerState<QuickTranslateScreen>
     if (target == null || _replacing) return;
     setState(() => _replacing = true);
     await _permissions.refresh();
-    final result = await selectionReplacementController.replace(target, text);
+    final result = await _replacement.replace(target, text);
     if (!mounted) return;
     setState(() => _replacing = false);
     if (result == SelectionReplacementResult.replaced) {
