@@ -1,4 +1,6 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:linguaray_desktop/src/app/dependencies.dart';
 import 'package:linguaray_desktop/src/platform/credentials/secret_store.dart';
 import 'package:linguaray_desktop/src/platform/platform_types.dart';
 
@@ -115,4 +117,30 @@ void main() {
       expect(store.values, before);
     },
   );
+
+  test('credentials provider exposes the composition-root instance', () {
+    initProviderCredentialsController();
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    expect(
+      container.read(providerCredentialsControllerProvider),
+      same(providerCredentialsController),
+    );
+  });
+
+  test('credentials provider can be overridden', () {
+    final controller = ProviderCredentialsController(
+      store: _MemorySecretStore(),
+    );
+    final container = ProviderContainer(
+      overrides: [
+        providerCredentialsControllerProvider.overrideWithValue(controller),
+      ],
+    );
+    addTearDown(container.dispose);
+    expect(
+      container.read(providerCredentialsControllerProvider),
+      same(controller),
+    );
+  });
 }

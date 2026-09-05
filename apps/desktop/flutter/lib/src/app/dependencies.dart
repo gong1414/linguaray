@@ -83,6 +83,11 @@ final dockIconControllerProvider = Provider<DockIconController>(
   (ref) => dockIconController,
 );
 
+final providerCredentialsControllerProvider =
+    Provider<ProviderCredentialsController>(
+      (ref) => providerCredentialsController,
+    );
+
 final translationRepositoryProvider = Provider<TranslationRepository>(
   (ref) =>
       RuntimeTranslationRepository(store: ref.watch(settingsStoreProvider)),
@@ -113,7 +118,7 @@ final integrationSettingsRepositoryProvider =
 final providerSettingsRepositoryProvider = Provider<ProviderSettingsRepository>(
   (ref) => RuntimeProviderSettingsAdapter(
     ref.watch(settingsStoreProvider),
-    providerCredentialsController,
+    ref.watch(providerCredentialsControllerProvider),
   ),
 );
 final serviceSettingsRepositoryProvider = Provider<ServiceSettingsRepository>(
@@ -231,8 +236,9 @@ typedef BackupRestoreEffects = Future<void> Function();
 
 final backupRestoreEffectsProvider = Provider<BackupRestoreEffects>((ref) {
   final store = ref.watch(settingsStoreProvider);
+  final credentials = ref.watch(providerCredentialsControllerProvider);
   return () async {
-    await providerCredentialsController.hydrateAll();
+    await credentials.hydrateAll();
     await Future.wait([
       store.reloadAppearance(),
       store.reloadGeneral(),
