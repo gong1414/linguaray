@@ -1,7 +1,6 @@
 use std::sync::mpsc::Receiver;
 
 use async_trait::async_trait;
-use reqwest::{Response, StatusCode};
 use thiserror::Error;
 
 use crate::{
@@ -10,21 +9,7 @@ use crate::{
     TranslateRequest, TranslateResponse,
 };
 
-async fn failed_response(response: Response, secrets: &[&str]) -> (StatusCode, String) {
-    let status = response.status();
-    let mut body = response.text().await.unwrap_or_default();
-    for secret in secrets.iter().copied().filter(|value| !value.is_empty()) {
-        body = body.replace(secret, "[redacted]");
-    }
-    let message = if body.is_empty() {
-        status.to_string()
-    } else {
-        body.chars().take(512).collect()
-    };
-    (status, message)
-}
-
-macro_rules! http_error {
+macro_rules! capability_error {
     ($name:ident) => {
         #[derive(Debug, Error, Clone)]
         pub enum $name {
@@ -45,50 +30,25 @@ macro_rules! http_error {
         }
 
         impl $name {
-            pub fn from_network_error(error: reqwest::Error) -> Self {
+            pub fn from_network_error(error: impl ToString) -> Self {
                 Self::NetworkError(error.to_string())
             }
 
-            async fn classify_response(
-                provider: &'static str,
-                response: Response,
-                secrets: &[&str],
-            ) -> Result<Response, Self> {
-                if response.status().is_success() {
-                    return Ok(response);
-                }
-                let (status, message) = failed_response(response, secrets).await;
-                Err(match status {
-                    StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN => Self::AuthError(message),
-                    StatusCode::TOO_MANY_REQUESTS => Self::RateLimitError(message),
-                    value if value.is_client_error() => Self::InvalidRequest(message),
+            pub fn from_http_status(provider: &'static str, status: u16, message: String) -> Self {
+                match status {
+                    401 | 403 => Self::AuthError(message),
+                    429 => Self::RateLimitError(message),
+                    400..=499 => Self::InvalidRequest(message),
                     _ => Self::NetworkError(format!("{provider}: {message}")),
-                })
-            }
-
-            pub async fn from_response(
-                provider: &'static str,
-                response: Response,
-            ) -> Result<Response, Self> {
-                Self::classify_response(provider, response, &[]).await
+                }
             }
         }
     };
 }
 
-http_error!(DictionaryError);
-http_error!(OcrError);
-http_error!(TranslationError);
-
-impl TranslationError {
-    pub async fn from_response_redacting(
-        provider: &'static str,
-        response: Response,
-        secrets: &[&str],
-    ) -> Result<Response, Self> {
-        Self::classify_response(provider, response, secrets).await
-    }
-}
+capability_error!(DictionaryError);
+capability_error!(OcrError);
+capability_error!(TranslationError);
 
 #[derive(Debug, Error, Clone)]
 pub enum LlmError {
@@ -170,23 +130,28 @@ pub trait LlmService: Send + Sync {
 
 #[cfg(test)]
 mod tests {
-    use super::failed_response;
+    use super::TranslationError;
 
     #[test]
-    fn redaction_is_bounded_and_ignores_empty_values() {
-        let mut message = "Bearer secret".to_owned();
-        for _ in 0..600 {
-            message.push('x');
-        }
-        let sanitized = ["secret", ""].into_iter().fold(message, |value, secret| {
-            if secret.is_empty() {
-                value
-            } else {
-                value.replace(secret, "[redacted]")
+    fn http_status_maps_to_capability_errors() {
+        assert!(matches!(
+            TranslationError::from_http_status("demo", 401, "nope".into()),
+            TranslationError::AuthError(_)
+        ));
+        assert!(matches!(
+            TranslationError::from_http_status("demo", 429, "slow".into()),
+            TranslationError::RateLimitError(_)
+        ));
+        assert!(matches!(
+            TranslationError::from_http_status("demo", 400, "bad".into()),
+            TranslationError::InvalidRequest(_)
+        ));
+        match TranslationError::from_http_status("demo", 500, "boom".into()) {
+            TranslationError::NetworkError(message) => {
+                assert!(message.contains("demo"));
+                assert!(message.contains("boom"));
             }
-        });
-        assert!(sanitized.contains("[redacted]"));
-        assert!(!sanitized.contains("Bearer secret"));
-        let _ = failed_response;
+            other => panic!("{other:?}"),
+        }
     }
 }

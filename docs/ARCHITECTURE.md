@@ -91,11 +91,25 @@ window coordinators. They do not expose native window handles to widgets.
 Glossary file exchange separates the feature operation from native text-file
 dialogs, encoding and disk I/O. Cancellation returns no imported/exported result.
 
-`app/settings/settings_store.dart` still synchronizes runtime snapshots and OS
-side effects (login items, appearance and the local API). Separating those
-transactions and reducing global notifications is a subsequent behavior change,
-not part of the completed directory/contract migration. Library CRUD state can
-also be extracted further from screens without moving persistence out of Rust.
+`app/settings/settings_store.dart` caches runtime snapshots, per-section
+listenables, and the last load error for each section. It does not apply OS
+login items, native appearance, or the local API server.
+`app/settings/settings_effects.dart` owns those transactions: the settings page
+and tray observe section listenables, and the lifecycle coordinator applies
+side effects after the cache updates.
+
+History, glossary, and vocabulary screens observe feature view models. Dialogs
+stay in the page; load, filter, and CRUD go through the view model to the
+existing Rust-backed repositories.
+
+macOS host plugins are split by capability under `macos/Runner/Plugins`
+(presentation, speech, protocol, system proxy, selection replacement). Windows
+host channels live in matching `windows/runner/*_host.cpp` files. Channel names
+and message shapes stay unchanged.
+
+`linguaray-core` keeps capability traits and HTTP status error models. Reqwest
+response classification and secret redaction live in
+`crates/engine/src/common/http.rs`.
 
 ### Design system
 

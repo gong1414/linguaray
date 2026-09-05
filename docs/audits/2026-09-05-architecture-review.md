@@ -129,6 +129,14 @@ macOS 的 `MacAppPresentationPlugin.swift` 同文件包含 Presentation、System
 - 快捷翻译/OCR 的原生窗口操作收进协调器；历史记录通过应用命令打开翻译；术语库文件对话框及读写从 Widget 提取到平台实现与功能控制器。
 - 新增依赖边界检查，无迁移例外；CI 与发布验证同时执行。Windows CI 增加完整 runtime 测试，覆盖文件替换语义。
 
-保留为后续独立阶段：SettingsStore 的副作用事务与细粒度通知、资料库 CRUD 状态提取、原生 Swift/C++ 文件拆分，以及 Rust core HTTP 依赖边界。当前目录重整不以移动 crate、改变持久化格式或增加包数量为前提。
+已完成 SettingsStore 的副作用拆分与分区通知：缓存只保留快照、错误和 section Listenable；登录项、原生外观和本地 API 由 `SettingsEffectsCoordinator` 在生命周期中应用。设置页、托盘、快捷键和主题只订阅相关分区。
+
+已完成资料库 CRUD 状态提取：历史记录、术语库和生词本的加载、筛选、选择和写入都在各自 ViewModel 中；页面只负责展示和确认对话框。持久化仍在 Rust。
+
+已按能力拆分原生宿主：macOS 的 Speech / Protocol / SystemProxy 从 `MacAppPresentationPlugin.swift` 独立成文件；Windows 的语音、协议和系统代理从 `flutter_window.cpp` 抽到对应 host 源文件。channel 名称和消息格式保持兼容。
+
+已把 HTTP 响应分类和脱敏从 `linguaray-core` 挪到 `crates/engine/src/common/http.rs`。core 只保留能力契约和按状态码构造的错误模型，不再依赖 reqwest。
+
+当前目录重整不以移动 crate、改变持久化格式或增加包数量为前提。
 
 本次验证记录见最终交付；历史基线 CI 的通过状态不代替重构后验证。

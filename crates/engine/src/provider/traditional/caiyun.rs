@@ -6,7 +6,7 @@ use linguaray_core::{
     TranslationService,
 };
 
-use crate::common::HttpClient;
+use crate::common::{ClassifyHttpResponse, HttpClient};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 

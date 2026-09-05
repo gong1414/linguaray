@@ -1,4 +1,4 @@
-use crate::common::HttpClient;
+use crate::common::{ClassifyHttpResponse, HttpClient};
 use async_trait::async_trait;
 use linguaray_core::{
     Provider, TextTranslation, TranslateRequest, TranslateResponse, TranslationError,

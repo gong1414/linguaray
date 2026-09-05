@@ -1,6 +1,6 @@
 #![cfg_attr(not(feature = "youdao"), allow(dead_code))]
 
-use crate::common::HttpClient;
+use crate::common::{ClassifyHttpResponse, HttpClient};
 use async_trait::async_trait;
 use base64::Engine;
 use linguaray_core::{
