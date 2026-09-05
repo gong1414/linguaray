@@ -1,8 +1,10 @@
 import 'package:flutter/widgets.dart' show Rect;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:linguaray_application/linguaray_application.dart';
 import 'package:linguaray_desktop/src/app/commands/external_action_controller.dart';
 import 'package:linguaray_desktop/src/app/commands/trigger_controller.dart';
+import 'package:linguaray_desktop/src/app/dependencies.dart';
 import 'package:linguaray_desktop/src/platform/platform_types.dart';
 
 void main() {
@@ -45,6 +47,25 @@ void main() {
       TriggerAction.clipboardOcr,
     ]);
   });
+
+  test(
+    'external action provider dispatches through triggerControllerProvider',
+    () async {
+      final triggers = _RecordingTriggerController();
+      final container = ProviderContainer(
+        overrides: [triggerControllerProvider.overrideWithValue(triggers)],
+      );
+      addTearDown(container.dispose);
+
+      await container
+          .read(externalActionControllerProvider)
+          .dispatchProtocol(
+            const ProtocolCommand(action: ProtocolAction.translateSelection),
+          );
+
+      expect(triggers.actions, [TriggerAction.translateSelection]);
+    },
+  );
 }
 
 final class _RecordingTriggerController extends TriggerController {

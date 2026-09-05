@@ -100,4 +100,6 @@ ExternalActionKind? _externalKindFor(ProtocolAction action) => switch (action) {
   ProtocolAction.ignored => null,
 };
 
-final externalActionController = ExternalActionController();
+final externalActionController = ExternalActionController(
+  triggers: triggerController,
+);

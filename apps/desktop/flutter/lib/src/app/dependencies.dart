@@ -27,6 +27,7 @@ import '../platform/selection/selection_controller.dart';
 import '../platform/shortcuts/shortcut_repository.dart';
 import '../platform/shortcuts/shortcut_service.dart';
 import '../platform/speech/channel_speech_service.dart';
+import 'commands/external_action_controller.dart';
 import 'commands/trigger_controller.dart';
 import 'env.dart';
 import 'settings/settings_section.dart';
@@ -43,6 +44,16 @@ final captureControllerProvider = Provider<CaptureController>(
 final triggerControllerProvider = Provider<TriggerController>(
   (ref) => triggerController,
 );
+
+final externalActionControllerProvider = Provider<ExternalActionController>((
+  ref,
+) {
+  final triggers = ref.watch(triggerControllerProvider);
+  if (identical(triggers, triggerController)) {
+    return externalActionController;
+  }
+  return ExternalActionController(triggers: triggers);
+});
 
 final shortcutServiceProvider = Provider<ShortcutService>(
   (ref) => shortcutService,
