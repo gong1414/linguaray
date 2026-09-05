@@ -70,7 +70,6 @@ jobs:
 
   desktop:
     name: package-${{ matrix.platform }}
-    needs: verify
     strategy:
       fail-fast: false
       matrix:
@@ -138,7 +137,7 @@ jobs:
 
   publish:
     name: sign-feed-and-publish
-    needs: desktop
+    needs: [verify, desktop]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
