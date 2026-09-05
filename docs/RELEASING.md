@@ -105,6 +105,15 @@ exercise signature tampering, platform selection, download integrity, installer
 handoff and periodic checks without executing an installer. Production private
 keys are not required to run the test suite.
 
+### Native desktop golden baselines
+
+Golden screenshots use each operating system's own fonts. Refresh Windows
+baselines on Windows, not by overriding the platform theme on macOS. Run
+**Actions → CI → Run workflow → refresh_windows_goldens** to generate a
+`windows-golden-review` artifact. Review the images and commit the intended
+changes; normal CI never regenerates or silently accepts them. Business and
+design-system Windows snapshots live in their own `goldens/windows` folders.
+
 ## Supported targets and protocol registration
 
 Supported releases target macOS 13 or newer and Windows 10 or newer. There is
