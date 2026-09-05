@@ -6,8 +6,7 @@ import 'package:linguaray_application/linguaray_application.dart';
 
 import '../../../i18n/i18n.dart';
 import '../../../shared/i18n_labels.dart';
-import '../../../shared/settings_page.dart';
-import '../../../shared/status_message.dart';
+import 'vocabulary_view.dart';
 import 'vocabulary_view_model.dart';
 
 class VocabularySettingsScreen extends ConsumerWidget {
@@ -17,113 +16,39 @@ class VocabularySettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final snapshot = ref.watch(vocabularyViewModelProvider);
     final labels = t.ui.vocabulary;
-    return SettingsPage(
-      title: labels.title,
-      actions: [
-        SegmentedButton<VocabularyFilter>(
-          segments: [
-            ButtonSegment(value: VocabularyFilter.all, label: Text(labels.all)),
-            ButtonSegment(
-              value: VocabularyFilter.favorites,
-              label: Text(labels.favorites),
-            ),
-          ],
-          selected: {snapshot.filter},
-          onSelectionChanged: (selection) {
-            if (selection.isEmpty) return;
-            unawaited(
-              ref
-                  .read(vocabularyViewModelProvider.notifier)
-                  .setFilter(selection.first),
-            );
-          },
-        ),
-      ],
-      toolbar: SearchBar(
-        hintText: labels.search,
-        leading: const Icon(Icons.search_rounded, size: 18),
-        onChanged: (value) => unawaited(
-          ref.read(vocabularyViewModelProvider.notifier).setQuery(value),
-        ),
+    return VocabularyView(
+      labels: VocabularyViewLabels(
+        title: labels.title,
+        all: labels.all,
+        favorites: labels.favorites,
+        search: labels.search,
+        emptyTitle: labels.empty_title,
+        emptyDescription: labels.empty_description,
+        noResults: labels.no_results,
+        retry: t.workbench.translation.retry,
+        favorite: labels.favorite,
+        unfavorite: labels.unfavorite,
+        delete: labels.delete,
+        errorMessage: appErrorMessage,
       ),
-      body: _body(context, ref, snapshot),
+      snapshot: snapshot,
+      onFilterChanged: (filter) => unawaited(
+        ref.read(vocabularyViewModelProvider.notifier).setFilter(filter),
+      ),
+      onQueryChanged: (value) => unawaited(
+        ref.read(vocabularyViewModelProvider.notifier).setQuery(value),
+      ),
+      onRetry: () =>
+          unawaited(ref.read(vocabularyViewModelProvider.notifier).reload()),
+      onEditNote: (entry) => unawaited(_editNote(context, ref, entry)),
+      onFavorite: (entry, favorite) => unawaited(
+        ref
+            .read(vocabularyViewModelProvider.notifier)
+            .setFavorite(entry, favorite),
+      ),
+      onDelete: (entry) => unawaited(_delete(context, ref, entry)),
     );
   }
-}
-
-Widget _body(BuildContext context, WidgetRef ref, VocabularySnapshot snapshot) {
-  final labels = t.ui.vocabulary;
-  if (snapshot.loading && snapshot.entries.isEmpty) {
-    return const Center(child: CircularProgressIndicator());
-  }
-  if (snapshot.errorCode != null && snapshot.entries.isEmpty) {
-    return Padding(
-      padding: EdgeInsets.zero,
-      child: StatusMessage(
-        kind: StatusKind.error,
-        title: appErrorMessage(snapshot.errorCode),
-        action: OutlinedButton(
-          onPressed: () => unawaited(
-            ref.read(vocabularyViewModelProvider.notifier).reload(),
-          ),
-          child: Text(t.workbench.translation.retry),
-        ),
-      ),
-    );
-  }
-  if (snapshot.entries.isEmpty) {
-    return Padding(
-      padding: EdgeInsets.zero,
-      child: StatusMessage(
-        kind: StatusKind.info,
-        title: snapshot.query.isEmpty ? labels.empty_title : labels.no_results,
-        body: snapshot.query.isEmpty ? labels.empty_description : null,
-      ),
-    );
-  }
-  return ListView.separated(
-    padding: EdgeInsets.zero,
-    itemCount: snapshot.entries.length,
-    separatorBuilder: (_, _) => const Divider(height: 1),
-    itemBuilder: (context, index) {
-      final entry = snapshot.entries[index];
-      return ListTile(
-        title: Text(entry.word),
-        subtitle: Text(
-          [
-            entry.translation,
-            if (entry.note?.isNotEmpty == true) entry.note!,
-          ].join('\n'),
-          maxLines: 3,
-          overflow: TextOverflow.ellipsis,
-        ),
-        onTap: () => unawaited(_editNote(context, ref, entry)),
-        trailing: Wrap(
-          spacing: 0,
-          children: [
-            IconButton(
-              tooltip: entry.favorite ? labels.unfavorite : labels.favorite,
-              onPressed: () => unawaited(
-                ref
-                    .read(vocabularyViewModelProvider.notifier)
-                    .setFavorite(entry, !entry.favorite),
-              ),
-              icon: Icon(
-                entry.favorite
-                    ? Icons.star_rounded
-                    : Icons.star_outline_rounded,
-              ),
-            ),
-            IconButton(
-              tooltip: labels.delete,
-              onPressed: () => unawaited(_delete(context, ref, entry)),
-              icon: const Icon(Icons.delete_outline_rounded),
-            ),
-          ],
-        ),
-      );
-    },
-  );
 }
 
 Future<void> _editNote(

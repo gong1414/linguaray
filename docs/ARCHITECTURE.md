@@ -98,9 +98,11 @@ login items, native appearance, or the local API server.
 and tray observe section listenables, and the lifecycle coordinator applies
 side effects after the cache updates.
 
-History, glossary, and vocabulary screens observe feature view models. Dialogs
-stay in the page; load, filter, and CRUD go through the view model to the
-existing Rust-backed repositories.
+History, glossary, and vocabulary screens observe feature view models and
+render dedicated views. Dialogs stay in the page; load, filter, and CRUD go
+through the view model to the existing Rust-backed repositories. Settings
+adapters rethrow section load errors so pages can keep a previous snapshot
+and still show a retryable failure.
 
 macOS host plugins are split by capability under `macos/Runner/Plugins`
 (presentation, speech, protocol, system proxy, selection replacement).
