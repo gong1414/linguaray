@@ -1342,9 +1342,9 @@ class TranslationsSettingsAdvancedEn {
   /// en: 'Comma-separated domains or IP addresses'
   String get proxy_bypass_hint => 'Comma-separated domains or IP addresses';
 
-  /// en: 'Check for updates when LinguaRay starts'
+  /// en: 'Automatically check for updates (at startup and every 6 hours)'
   String get check_updates_on_launch =>
-      'Check for updates when LinguaRay starts';
+      'Automatically check for updates (at startup and every 6 hours)';
 
   /// en: 'Save network settings'
   String get save_network => 'Save network settings';
@@ -2028,9 +2028,9 @@ class TranslationsUiErrorsEn {
   String get update_checksum_mismatch =>
       'The downloaded file did not match its checksum.';
 
-  /// en: 'The update does not have a valid LinguaRay platform signature.'
+  /// en: 'The update signature is invalid or the publisher identity has changed.'
   String get update_signature_invalid =>
-      'The update does not have a valid LinguaRay platform signature.';
+      'The update signature is invalid or the publisher identity has changed.';
 
   /// en: 'The verified installer could not be started.'
   String get update_install_failed =>
@@ -4262,7 +4262,7 @@ extension on Translations {
           'settings.advanced.proxy_bypass_hint' =>
             'Comma-separated domains or IP addresses',
           'settings.advanced.check_updates_on_launch' =>
-            'Check for updates when LinguaRay starts',
+            'Automatically check for updates (at startup and every 6 hours)',
           'settings.advanced.save_network' => 'Save network settings',
           'settings.data_transfer.title' => 'Import & Export',
           'settings.data_transfer.description' =>
@@ -4655,8 +4655,7 @@ extension on Translations {
             'This update has no checksum and will not be installed.',
           'ui.errors.update_checksum_mismatch' =>
             'The downloaded file did not match its checksum.',
-          'ui.errors.update_signature_invalid' =>
-            'The update does not have a valid LinguaRay platform signature.',
+          'ui.errors.update_signature_invalid' => 'The update signature is invalid or the publisher identity has changed.',
           'ui.errors.update_install_failed' =>
             'The verified installer could not be started.',
           'ui.errors.protocol_invalid' => 'This LinguaRay link is not valid.',

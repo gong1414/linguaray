@@ -68,7 +68,11 @@ class UpdatesView extends StatelessWidget {
             title: Text(labels.current),
             subtitle: Text(state.currentVersion),
             trailing: FilledButton(
-              onPressed: state.status == UpdateStatus.checking ? null : onCheck,
+              onPressed:
+                  (state.status == UpdateStatus.checking ||
+                      state.status == UpdateStatus.downloading)
+                  ? null
+                  : onCheck,
               child: Text(
                 state.status == UpdateStatus.checking
                     ? labels.checking

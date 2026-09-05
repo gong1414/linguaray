@@ -515,7 +515,7 @@
       "proxy_url_hint": "例如 http://127.0.0.1:7890",
       "proxy_bypass": "不使用代理",
       "proxy_bypass_hint": "用英文逗号分隔域名或 IP 地址",
-      "check_updates_on_launch": "LinguaRay 启动时检查更新",
+      "check_updates_on_launch": "自动检查更新（启动时及每 6 小时）",
       "save_network": "保存网络设置"
     },
     "data_transfer": {
@@ -913,7 +913,7 @@
       "update_download_failed": "无法下载更新。",
       "update_checksum_missing": "该更新没有校验和，不会安装。",
       "update_checksum_mismatch": "下载的文件与校验和不匹配。",
-      "update_signature_invalid": "更新包没有有效的 LinguaRay 平台签名。",
+      "update_signature_invalid": "更新签名无效，或发布者身份发生变化。",
       "update_install_failed": "无法启动已经校验的安装程序。",
       "protocol_invalid": "这个 LinguaRay 链接无效。",
       "protocol_too_large": "链接中的文本过大，无法打开。",

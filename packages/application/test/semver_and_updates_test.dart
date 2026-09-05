@@ -7,6 +7,11 @@ void main() {
     expect(isNewerVersion('v1.0.0', '0.9.9'), isTrue);
     expect(isNewerVersion('0.5.0', '0.5.0'), isFalse);
     expect(isNewerVersion('0.4.9', '0.5.0'), isFalse);
+    expect(isNewerVersion('0.6.1', '0.6.1-beta.1'), isTrue);
+    expect(isNewerVersion('0.6.1-beta.2', '0.6.1'), isFalse);
+    expect(isNewerVersion('0.6.1+20', '0.6.1+19'), isFalse);
+    expect(isNewerVersion('invalid', '0.6.1'), isFalse);
+    expect(isNewerVersion('0.6.1', 'invalid'), isFalse);
   });
 
   test(
@@ -60,7 +65,7 @@ void main() {
     );
 
     expect(state.status, UpdateStatus.readyToInstall);
-    expect(repository.calls, ['download', 'checksum', 'signature']);
+    expect(repository.calls, ['manifest', 'download', 'checksum', 'signature']);
   });
 }
 
@@ -94,7 +99,15 @@ final class _FakeUpdateRepository implements UpdateRepository {
   }
 
   @override
-  Future<void> verifyPlatformSignature({required String filePath}) async {
+  Future<void> verifyManifest(UpdateManifest manifest) async {
+    calls.add('manifest');
+  }
+
+  @override
+  Future<void> verifyPlatformSignature({
+    required String filePath,
+    required UpdateManifest manifest,
+  }) async {
     calls.add('signature');
   }
 }

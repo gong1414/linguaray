@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart' as crypto;
@@ -7,69 +6,54 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
-const String kLinguaRayReleasesUrl =
-    'https://api.github.com/repos/gong1414/linguaray/releases/latest';
-const int _maximumUpdateBytes = 1024 * 1024 * 1024;
+import 'signed_update_feed.dart';
+
+const String kLinguaRayReleasesUrl = updateManifestUrl;
 
 final class GitHubUpdateRepository implements UpdateRepository {
   GitHubUpdateRepository({
     HttpClient? client,
     this.releasesUrl = kLinguaRayReleasesUrl,
-  }) : _client = client ?? HttpClient();
+    SignedUpdateFeed? feed,
+    this.downloadDirectory,
+    this.platformVerifier,
+  }) : _client = client ?? HttpClient(),
+       _feed = feed ?? SignedUpdateFeed(platform: Platform.operatingSystem) {
+    _client.connectionTimeout = const Duration(seconds: 15);
+  }
 
   final HttpClient _client;
+  final SignedUpdateFeed _feed;
   final String releasesUrl;
+  final Directory? downloadDirectory;
+  final Future<void> Function(String path, UpdateManifest manifest)?
+  platformVerifier;
 
   void close() => _client.close(force: true);
 
   @override
   Future<UpdateManifest?> checkLatest() async {
     final request = await _client.getUrl(Uri.parse(releasesUrl));
-    request.headers.set('Accept', 'application/vnd.github+json');
     request.headers.set('User-Agent', 'LinguaRay');
-    final response = await request.close();
-    if (response.statusCode >= 400) {
+    request.headers.set('Cache-Control', 'no-cache');
+    final response = await request.close().timeout(const Duration(seconds: 15));
+    if (response.statusCode != HttpStatus.ok) {
+      await response.timeout(const Duration(seconds: 15)).drain<void>();
       throw const AppFailure(AppErrorCode.updateCheckFailed);
     }
-    final body = await response.transform(utf8.decoder).join();
-    final json = jsonDecode(body);
-    if (json is! Map<String, dynamic>) return null;
-    final tag = json['tag_name'] as String? ?? '';
-    final notes = json['body'] as String? ?? '';
-    final assets = json['assets'];
-    if (assets is! List) return null;
-    final wanted = Platform.isWindows
-        ? 'LinguaRay-windows-x64.exe'
-        : 'LinguaRay-macos.dmg';
-    Map<String, dynamic>? asset;
-    Map<String, dynamic>? checksums;
-    for (final item in assets) {
-      if (item is! Map) continue;
-      final name = item['name'] as String? ?? '';
-      if (name == wanted) {
-        asset = Map<String, dynamic>.from(item);
-      }
-      if (name == 'SHA256SUMS.txt') {
-        checksums = Map<String, dynamic>.from(item);
+    final bytes = <int>[];
+    await for (final chunk in response.timeout(const Duration(seconds: 15))) {
+      bytes.addAll(chunk);
+      if (bytes.length > 256 * 1024) {
+        throw const AppFailure(AppErrorCode.updateCheckFailed);
       }
     }
-    if (asset == null) return null;
-    String? checksum;
-    if (checksums != null) {
-      checksum = await _downloadChecksum(
-        checksums['browser_download_url'] as String? ?? '',
-        asset['name'] as String? ?? '',
-      );
-    }
-    return UpdateManifest(
-      version: tag,
-      notes: notes,
-      assetName: asset['name'] as String? ?? '',
-      assetUrl: asset['browser_download_url'] as String? ?? '',
-      checksumSha256: checksum,
-      publishedAt: json['published_at'] as String?,
-    );
+    return _feed.decode(bytes);
   }
+
+  @override
+  Future<void> verifyManifest(UpdateManifest manifest) =>
+      _feed.verify(manifest);
 
   @override
   Future<String> currentVersion() async {
@@ -82,50 +66,59 @@ final class GitHubUpdateRepository implements UpdateRepository {
     required UpdateManifest manifest,
     void Function(double progress)? onProgress,
   }) async {
+    await verifyManifest(manifest);
     final request = await _client.getUrl(Uri.parse(manifest.assetUrl));
-    final response = await request.close();
-    if (response.statusCode >= 400) {
+    final response = await request.close().timeout(const Duration(seconds: 15));
+    if (response.statusCode != HttpStatus.ok) {
+      await response.timeout(const Duration(seconds: 15)).drain<void>();
       throw const AppFailure(AppErrorCode.updateDownloadFailed);
     }
-    final directory = await getTemporaryDirectory();
-    final safeName = p.basename(manifest.assetName);
-    if (safeName != manifest.assetName || safeName.isEmpty) {
+    final expected = manifest.byteLength!;
+    if (response.contentLength >= 0 && response.contentLength != expected) {
+      await response.timeout(const Duration(seconds: 15)).drain<void>();
       throw const AppFailure(AppErrorCode.updateDownloadFailed);
     }
-    final updateDirectory = Directory(
-      p.join(directory.path, 'LinguaRay', 'updates', manifest.version),
-    );
-    await updateDirectory.create(recursive: true);
-    final file = File(p.join(updateDirectory.path, safeName));
-    if (await file.exists()) await file.delete();
-    final sink = file.openWrite();
-    final total = response.contentLength;
-    if (total > _maximumUpdateBytes) {
-      await sink.close();
-      throw const AppFailure(AppErrorCode.updateDownloadFailed);
-    }
+    final directory = downloadDirectory ?? await getTemporaryDirectory();
+    final root = Directory(p.join(directory.path, 'LinguaRay', 'updates'));
+    await root.create(recursive: true);
+    final attempt = await root.createTemp('v${manifest.version}-');
+    final partial = File(p.join(attempt.path, '${manifest.assetName}.part'));
+    final sink = partial.openWrite();
     var received = 0;
     try {
-      await for (final chunk in response) {
+      await for (final chunk in response.timeout(const Duration(seconds: 30))) {
         received += chunk.length;
-        if (received > _maximumUpdateBytes) {
+        if (received > expected || received > maximumUpdateBytes) {
           throw const AppFailure(AppErrorCode.updateDownloadFailed);
         }
         sink.add(chunk);
-        if (total > 0) onProgress?.call(received / total);
+        onProgress?.call(received / expected);
       }
+      await sink.close();
+      if (received != expected) {
+        throw const AppFailure(AppErrorCode.updateDownloadFailed);
+      }
+      return (await partial.rename(p.join(attempt.path, manifest.assetName)))
+          .path;
     } catch (_) {
       await sink.close();
-      if (await file.exists()) await file.delete();
+      if (await attempt.exists()) await attempt.delete(recursive: true);
       rethrow;
     }
-    await sink.close();
-    return file.path;
   }
 
   @override
-  Future<void> verifyPlatformSignature({required String filePath}) async {
+  Future<void> verifyPlatformSignature({
+    required String filePath,
+    required UpdateManifest manifest,
+  }) async {
+    await verifyManifest(manifest);
+    if (platformVerifier != null) return platformVerifier!(filePath, manifest);
     if (Platform.isMacOS) {
+      final currentTeam = await _macTeamIdentifier(Platform.resolvedExecutable);
+      // A cryptographically authenticated update can bootstrap an unsigned
+      // installation. Once platform signing is in use it may not be downgraded.
+      if (!manifest.platformSigned && currentTeam == null) return;
       final updateVerification = await Process.run('/usr/bin/codesign', [
         '--verify',
         '--deep',
@@ -136,10 +129,8 @@ final class GitHubUpdateRepository implements UpdateRepository {
         throw const AppFailure(AppErrorCode.updateSignatureInvalid);
       }
       final updateTeam = await _macTeamIdentifier(filePath);
-      final currentTeam = await _macTeamIdentifier(Platform.resolvedExecutable);
       if (updateTeam == null ||
-          currentTeam == null ||
-          updateTeam != currentTeam) {
+          (currentTeam != null && updateTeam != currentTeam)) {
         throw const AppFailure(AppErrorCode.updateSignatureInvalid);
       }
       return;
@@ -149,17 +140,21 @@ final class GitHubUpdateRepository implements UpdateRepository {
         '-NoProfile',
         '-NonInteractive',
         '-Command',
-        r'''& { param([string]$UpdatePath, [string]$CurrentPath)
+        r'''& { param([string]$UpdatePath, [string]$CurrentPath, [string]$RequireSignature)
 $update = Get-AuthenticodeSignature -LiteralPath $UpdatePath
 $current = Get-AuthenticodeSignature -LiteralPath $CurrentPath
-if ($update.Status -eq 'Valid' -and $current.Status -eq 'Valid' -and
-    $update.SignerCertificate.Subject -eq $current.SignerCertificate.Subject) {
+if ($RequireSignature -ne 'true' -and $current.Status -ne 'Valid') {
+  'Valid'
+} elseif ($update.Status -eq 'Valid' -and
+    ($current.Status -ne 'Valid' -or
+     $update.SignerCertificate.Subject -eq $current.SignerCertificate.Subject)) {
   'Valid'
 } else {
   'Invalid'
 } }''',
         filePath,
         Platform.resolvedExecutable,
+        manifest.platformSigned.toString(),
       ]);
       if (result.exitCode == 0 && result.stdout.toString().trim() != 'Valid') {
         throw const AppFailure(AppErrorCode.updateSignatureInvalid);
@@ -186,7 +181,7 @@ if ($update.Status -eq 'Valid' -and $current.Status -eq 'Valid' -and
     ).firstMatch(output);
     final identifier = match?.group(1)?.trim();
     if (identifier == null || identifier.isEmpty || identifier == 'not set') {
-      throw const AppFailure(AppErrorCode.updateSignatureInvalid);
+      return null;
     }
     return identifier;
   }
@@ -202,30 +197,12 @@ if ($update.Status -eq 'Valid' -and $current.Status -eq 'Valid' -and
       throw const AppFailure(AppErrorCode.updateChecksumMismatch);
     }
   }
-
-  Future<String?> _downloadChecksum(String url, String assetName) async {
-    if (url.isEmpty) return null;
-    try {
-      final request = await _client.getUrl(Uri.parse(url));
-      final response = await request.close();
-      if (response.statusCode >= 400) return null;
-      final body = await response.transform(utf8.decoder).join();
-      for (final line in body.split(RegExp(r'\r?\n'))) {
-        final trimmed = line.trim();
-        if (trimmed.isEmpty) continue;
-        final match = RegExp(r'^([a-fA-F0-9]{64})\s+\*?(.+)$')
-            .firstMatch(trimmed);
-        if (match?.group(2) == assetName) return match!.group(1);
-      }
-      return null;
-    } catch (_) {
-      return null;
-    }
-  }
 }
 
 final class DesktopUpdateInstaller implements UpdateInstaller {
-  DesktopUpdateInstaller({this.opener});
+  DesktopUpdateInstaller({required this.repository, this.opener});
+
+  final UpdateRepository repository;
 
   final MethodChannelHandler? opener;
 
@@ -237,6 +214,17 @@ final class DesktopUpdateInstaller implements UpdateInstaller {
     if (!manifest.hasChecksum) {
       throw const AppFailure(AppErrorCode.updateChecksumMissing);
     }
+    // Revalidate on handoff: the downloaded file may have changed while the
+    // update screen was waiting for the user to confirm installation.
+    await repository.verifyManifest(manifest);
+    await repository.verifyChecksum(
+      filePath: filePath,
+      sha256: manifest.checksumSha256!,
+    );
+    await repository.verifyPlatformSignature(
+      filePath: filePath,
+      manifest: manifest,
+    );
     if (opener != null) {
       await opener!(filePath);
       return;

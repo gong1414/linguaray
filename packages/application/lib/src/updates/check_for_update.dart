@@ -9,8 +9,9 @@ final class CheckForUpdate {
   final UpdateRepository _repository;
 
   Future<UpdateState> call() async {
-    final current = await _repository.currentVersion();
+    var current = '';
     try {
+      current = await _repository.currentVersion();
       final latest = await _repository.checkLatest();
       if (latest == null || !isNewerVersion(latest.version, current)) {
         return UpdateState(
@@ -25,6 +26,12 @@ final class CheckForUpdate {
         errorCode: latest.hasChecksum
             ? null
             : AppErrorCode.updateChecksumMissing.wireName,
+      );
+    } on AppFailure catch (error) {
+      return UpdateState(
+        status: UpdateStatus.failed,
+        currentVersion: current,
+        errorCode: error.wireName,
       );
     } catch (_) {
       return UpdateState(
@@ -55,6 +62,7 @@ final class DownloadVerifiedUpdate {
       );
     }
     try {
+      await _repository.verifyManifest(manifest);
       final path = await _repository.download(
         manifest: manifest,
         onProgress: onProgress,
@@ -63,7 +71,10 @@ final class DownloadVerifiedUpdate {
         filePath: path,
         sha256: manifest.checksumSha256!,
       );
-      await _repository.verifyPlatformSignature(filePath: path);
+      await _repository.verifyPlatformSignature(
+        filePath: path,
+        manifest: manifest,
+      );
       return UpdateState(
         status: UpdateStatus.readyToInstall,
         currentVersion: currentVersion,

@@ -38,6 +38,11 @@ jobs:
       - run: cargo test --locked --workspace
       - run: dart run melos run dependency_validator
       - run: python3 scripts/check_uniffi_surface.py
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.13"
+      - run: python3 -m pip install -r scripts/release-requirements.txt
+      - run: python3 -m unittest discover -s scripts -p 'test_release_manifest.py'
 
   desktop:
     name: desktop-${{ matrix.device }}

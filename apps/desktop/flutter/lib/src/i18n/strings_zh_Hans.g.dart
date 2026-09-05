@@ -1183,7 +1183,7 @@ class _TranslationsSettingsAdvancedZhHans
   @override
   String get proxy_bypass_hint => '用英文逗号分隔域名或 IP 地址';
   @override
-  String get check_updates_on_launch => 'LinguaRay 启动时检查更新';
+  String get check_updates_on_launch => '自动检查更新（启动时及每 6 小时）';
   @override
   String get save_network => '保存网络设置';
 }
@@ -1700,7 +1700,7 @@ class _TranslationsUiErrorsZhHans extends TranslationsUiErrorsEn {
   @override
   String get update_checksum_mismatch => '下载的文件与校验和不匹配。';
   @override
-  String get update_signature_invalid => '更新包没有有效的 LinguaRay 平台签名。';
+  String get update_signature_invalid => '更新签名无效，或发布者身份发生变化。';
   @override
   String get update_install_failed => '无法启动已经校验的安装程序。';
   @override
@@ -3706,7 +3706,7 @@ extension on TranslationsZhHans {
           'settings.advanced.proxy_url_hint' => '例如 http://127.0.0.1:7890',
           'settings.advanced.proxy_bypass' => '不使用代理',
           'settings.advanced.proxy_bypass_hint' => '用英文逗号分隔域名或 IP 地址',
-          'settings.advanced.check_updates_on_launch' => 'LinguaRay 启动时检查更新',
+          'settings.advanced.check_updates_on_launch' => '自动检查更新（启动时及每 6 小时）',
           'settings.advanced.save_network' => '保存网络设置',
           'settings.data_transfer.title' => '导入导出',
           'settings.data_transfer.description' =>
@@ -4044,7 +4044,7 @@ extension on TranslationsZhHans {
           'ui.errors.update_download_failed' => '无法下载更新。',
           'ui.errors.update_checksum_missing' => '该更新没有校验和，不会安装。',
           'ui.errors.update_checksum_mismatch' => '下载的文件与校验和不匹配。',
-          'ui.errors.update_signature_invalid' => '更新包没有有效的 LinguaRay 平台签名。',
+          'ui.errors.update_signature_invalid' => '更新签名无效，或发布者身份发生变化。',
           'ui.errors.update_install_failed' => '无法启动已经校验的安装程序。',
           'ui.errors.protocol_invalid' => '这个 LinguaRay 链接无效。',
           'ui.errors.protocol_too_large' => '链接中的文本过大，无法打开。',

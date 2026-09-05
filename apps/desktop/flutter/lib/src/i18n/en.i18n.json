@@ -515,7 +515,7 @@
       "proxy_url_hint": "For example, http://127.0.0.1:7890",
       "proxy_bypass": "Do not proxy",
       "proxy_bypass_hint": "Comma-separated domains or IP addresses",
-      "check_updates_on_launch": "Check for updates when LinguaRay starts",
+      "check_updates_on_launch": "Automatically check for updates (at startup and every 6 hours)",
       "save_network": "Save network settings"
     },
     "data_transfer": {
@@ -913,7 +913,7 @@
       "update_download_failed": "The update could not be downloaded.",
       "update_checksum_missing": "This update has no checksum and will not be installed.",
       "update_checksum_mismatch": "The downloaded file did not match its checksum.",
-      "update_signature_invalid": "The update does not have a valid LinguaRay platform signature.",
+      "update_signature_invalid": "The update signature is invalid or the publisher identity has changed.",
       "update_install_failed": "The verified installer could not be started.",
       "protocol_invalid": "This LinguaRay link is not valid.",
       "protocol_too_large": "The linked text is too large to open.",

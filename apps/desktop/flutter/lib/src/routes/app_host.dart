@@ -62,7 +62,7 @@ class _RootBodyViewState extends State<_RootBodyView>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (debugInitialDestination == null) {
         initializeResidentApp();
-        unawaited(startupUpdateController.check());
+        startupUpdateController.start();
       } else {
         showSettingsWindow(destination: debugInitialDestination);
       }
@@ -74,6 +74,7 @@ class _RootBodyViewState extends State<_RootBodyView>
     WidgetsBinding.instance.removeObserver(this);
     settingsStore.removeListener(_handleChanged);
     unawaited(ShortcutService.instance.stop());
+    startupUpdateController.stop();
     _tray.dispose();
     super.dispose();
   }
@@ -82,6 +83,7 @@ class _RootBodyViewState extends State<_RootBodyView>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       unawaited(permissionController.refresh());
+      unawaited(startupUpdateController.check());
     }
   }
 
@@ -94,6 +96,7 @@ class _RootBodyViewState extends State<_RootBodyView>
       _showInMenuBar = visible;
       _tray.setVisible(visible);
     }
+    unawaited(startupUpdateController.check());
     _tray.rebuildMenu();
   }
 

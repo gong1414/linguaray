@@ -75,7 +75,8 @@ final updateRepositoryProvider = Provider<UpdateRepository>((ref) {
 });
 
 final updateInstallerProvider = Provider<UpdateInstaller>(
-  (ref) => DesktopUpdateInstaller(),
+  (ref) =>
+      DesktopUpdateInstaller(repository: ref.watch(updateRepositoryProvider)),
 );
 
 final checkForUpdateProvider = Provider<CheckForUpdate>(

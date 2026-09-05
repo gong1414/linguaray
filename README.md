@@ -18,7 +18,8 @@
 
 > [!IMPORTANT]
 > LinguaRay is in active pre-release development. The core workflows and
-> desktop builds are tested in CI, but there is no signed stable release yet.
+> desktop builds are tested in CI. Releases use an authenticated update feed;
+> platform signing and notarization depend on the configured release certificates.
 > For evaluation, run the application from source.
 
 ## Why LinguaRay?
@@ -55,7 +56,7 @@ tray menu and global shortcuts; Preferences is the only persistent window.
 | Local API, URL-scheme, PopClip, SnipDo, and Raycast integration | Implemented |
 | Local backup/restore, proxy modes, and verified update checks | Implemented |
 | macOS and Windows desktop builds | Built and exercised by CI |
-| Signed installers and stable releases | Signed draft workflow is ready; no stable release published yet |
+| Desktop updates | Automatic checks, verified downloads, and installer handoff; see [release setup](docs/RELEASING.md) |
 
 Migration from the retired Tauri prototype and automatic replacement of
 selected source text are intentionally outside the current scope. Half-finished

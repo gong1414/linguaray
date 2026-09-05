@@ -1,25 +1,16 @@
-/// Compares two dotted semantic versions, ignoring a leading `v`.
-///
-/// Pre-release suffixes after `-` or `+` are stripped so `1.2.3-beta` compares
-/// as `1.2.3`. Returns true when [candidate] is strictly newer than [current].
-bool isNewerVersion(String candidate, String current) {
-  final left = _parts(candidate);
-  final right = _parts(current);
-  final length = left.length > right.length ? left.length : right.length;
-  for (var i = 0; i < length; i++) {
-    final a = i < left.length ? left[i] : 0;
-    final b = i < right.length ? right[i] : 0;
-    if (a > b) return true;
-    if (a < b) return false;
-  }
-  return false;
-}
+import 'package:pub_semver/pub_semver.dart';
 
-List<int> _parts(String version) {
-  var value = version.trim();
-  if (value.toLowerCase().startsWith('v')) {
-    value = value.substring(1);
+/// Stable releases outrank their prereleases. Build metadata does not affect
+/// precedence, and malformed versions must never trigger an update.
+bool isNewerVersion(String candidate, String current) {
+  Version parse(String value) {
+    value = value.trim().replaceFirst(RegExp(r'^[vV]'), '');
+    return Version.parse(value.split('+').first);
   }
-  final cut = value.split(RegExp(r'[-+]')).first;
-  return [for (final part in cut.split('.')) int.tryParse(part) ?? 0];
+
+  try {
+    return parse(candidate) > parse(current);
+  } on FormatException {
+    return false;
+  }
 }
