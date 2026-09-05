@@ -1,4 +1,6 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:linguaray_desktop/src/app/dependencies.dart';
 import 'package:linguaray_desktop/src/features/ocr/ocr_controller.dart';
 import 'package:linguaray_desktop/src/platform/capture/capture_controller.dart';
 import 'package:linguaray_desktop/src/platform/platform_types.dart';
@@ -44,6 +46,27 @@ void main() {
     );
 
     expect(copied, ['first']);
+  });
+
+  test('ocr controller provider exposes the composition-root instance', () {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    expect(container.read(ocrControllerProvider), same(ocrController));
+  });
+
+  test('ocr controller provider can be overridden', () {
+    final capture = _FakeCaptureController();
+    final controller = OcrController(
+      capture: capture,
+      autoCopy: () => false,
+      writeClipboard: (_) async {},
+    );
+    final container = ProviderContainer(
+      overrides: [ocrControllerProvider.overrideWithValue(controller)],
+    );
+    addTearDown(container.dispose);
+    expect(container.read(ocrControllerProvider), same(controller));
+    expect(container.read(ocrControllerProvider), isNot(same(ocrController)));
   });
 }
 

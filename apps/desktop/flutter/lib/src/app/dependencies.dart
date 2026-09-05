@@ -9,6 +9,7 @@ import '../features/library/glossary/data/runtime_glossary_repository.dart';
 import '../features/library/glossary/glossary_exchange_controller.dart';
 import '../features/library/history/data/runtime_history_repository.dart';
 import '../features/library/vocabulary/data/runtime_vocabulary_repository.dart';
+import '../features/ocr/ocr_controller.dart';
 import '../features/preferences/data/general_settings_adapter.dart';
 import '../features/providers/data/provider_settings_adapter.dart';
 import '../features/services/data/service_settings_adapter.dart';
@@ -27,6 +28,8 @@ import 'settings/settings_section.dart';
 import 'settings/settings_store.dart';
 
 final settingsStoreProvider = Provider<SettingsStore>((ref) => settingsStore);
+
+final ocrControllerProvider = Provider<OcrController>((ref) => ocrController);
 
 final translationRepositoryProvider = Provider<TranslationRepository>(
   (ref) =>

@@ -105,7 +105,9 @@ Settings adapters rethrow section load errors so pages can keep a previous
 snapshot and still show a retryable failure. Feature data adapters and
 platform controllers take `SettingsStore` through constructors; `main` and
 `settingsStoreProvider` remain the composition root. App shells and the host
-read appearance, locale, and tray visibility through that provider.
+read appearance, locale, and tray visibility through that provider. The OCR
+surface observes `ocrControllerProvider` rather than the global controller
+identifier; tray and shortcut triggers still share that same instance.
 
 macOS host plugins are split by capability under `macos/Runner/Plugins`
 (presentation, speech, protocol, system proxy, selection replacement).
