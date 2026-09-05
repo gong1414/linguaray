@@ -10,9 +10,10 @@ import '../../../app/settings/settings_store.dart';
 
 final class RuntimeSystemSettingsAdapter
     implements IntegrationSettingsRepository, AppInfoRepository {
-  const RuntimeSystemSettingsAdapter(this._store);
+  const RuntimeSystemSettingsAdapter(this._store, this._effects);
 
   final SettingsStore _store;
+  final SettingsEffectsCoordinator _effects;
 
   @override
   Future<ApiServerStatus> loadApiServer() async {
@@ -27,7 +28,7 @@ final class RuntimeSystemSettingsAdapter
       );
     }
     try {
-      final info = await settingsEffects.syncAdvanced();
+      final info = await _effects.syncAdvanced();
       return ApiServerStatus(
         enabled: advanced.apiServerEnabled,
         host: advanced.apiServerHost,

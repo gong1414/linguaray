@@ -33,10 +33,15 @@ import '../platform/windows/dock_icon_controller.dart';
 import 'commands/external_action_controller.dart';
 import 'commands/trigger_controller.dart';
 import 'env.dart';
+import 'settings/settings_effects.dart';
 import 'settings/settings_section.dart';
 import 'settings/settings_store.dart';
 
 final settingsStoreProvider = Provider<SettingsStore>((ref) => settingsStore);
+
+final settingsEffectsProvider = Provider<SettingsEffectsCoordinator>(
+  (ref) => settingsEffects,
+);
 
 final ocrControllerProvider = Provider<OcrController>((ref) => ocrController);
 
@@ -102,18 +107,30 @@ final translateTextProvider = Provider<TranslateText>(
 );
 
 final preferencesRepositoryProvider = Provider<PreferencesRepository>(
-  (ref) => RuntimeGeneralSettingsAdapter(ref.watch(settingsStoreProvider)),
+  (ref) => RuntimeGeneralSettingsAdapter(
+    ref.watch(settingsStoreProvider),
+    ref.watch(settingsEffectsProvider),
+  ),
 );
 final translationPreferencesRepositoryProvider =
     Provider<TranslationPreferencesRepository>(
-      (ref) => RuntimeGeneralSettingsAdapter(ref.watch(settingsStoreProvider)),
+      (ref) => RuntimeGeneralSettingsAdapter(
+        ref.watch(settingsStoreProvider),
+        ref.watch(settingsEffectsProvider),
+      ),
     );
 final appInfoRepositoryProvider = Provider<AppInfoRepository>(
-  (ref) => RuntimeSystemSettingsAdapter(ref.watch(settingsStoreProvider)),
+  (ref) => RuntimeSystemSettingsAdapter(
+    ref.watch(settingsStoreProvider),
+    ref.watch(settingsEffectsProvider),
+  ),
 );
 final integrationSettingsRepositoryProvider =
     Provider<IntegrationSettingsRepository>(
-      (ref) => RuntimeSystemSettingsAdapter(ref.watch(settingsStoreProvider)),
+      (ref) => RuntimeSystemSettingsAdapter(
+        ref.watch(settingsStoreProvider),
+        ref.watch(settingsEffectsProvider),
+      ),
     );
 final providerSettingsRepositoryProvider = Provider<ProviderSettingsRepository>(
   (ref) => RuntimeProviderSettingsAdapter(
@@ -214,7 +231,10 @@ final translationInteractionPreferencesProvider = Provider<GeneralPreferences>((
   void changed() => ref.invalidateSelf();
   listenable.addListener(changed);
   ref.onDispose(() => listenable.removeListener(changed));
-  return RuntimeGeneralSettingsAdapter(store).currentPreferences;
+  return RuntimeGeneralSettingsAdapter(
+    store,
+    ref.watch(settingsEffectsProvider),
+  ).currentPreferences;
 });
 
 final glossaryExchangeControllerProvider = Provider<GlossaryExchangeController>(

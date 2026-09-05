@@ -1,3 +1,5 @@
+// ignore_for_file: prefer_initializing_formals
+
 import 'dart:async';
 
 import 'package:linguaray_application/linguaray_application.dart';
@@ -10,8 +12,8 @@ import 'trigger_controller.dart';
 /// Dispatches local API and deep-link commands through the same typed
 /// controller boundary as tray items and global shortcuts.
 class ExternalActionController {
-  ExternalActionController({TriggerController? triggers})
-    : _triggers = triggers ?? triggerController;
+  ExternalActionController({required TriggerController triggers})
+    : _triggers = triggers;
 
   final TriggerController _triggers;
   bool _started = false;

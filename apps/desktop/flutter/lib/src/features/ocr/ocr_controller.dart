@@ -1,3 +1,5 @@
+// ignore_for_file: prefer_initializing_formals
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
@@ -44,13 +46,11 @@ final class OcrViewState {
 /// surface. Platform capture and runtime OCR stay behind typed controllers.
 class OcrController extends ChangeNotifier {
   OcrController({
-    CaptureController? capture,
-    SettingsStore? store,
-    bool Function()? autoCopy,
+    required CaptureController capture,
+    required bool Function() autoCopy,
     OcrClipboardWriter? writeClipboard,
-  }) : _capture = capture ?? captureController,
-       _autoCopy =
-           autoCopy ?? (() => (store ?? settingsStore).autoCopyDetectedText),
+  }) : _capture = capture,
+       _autoCopy = autoCopy,
        _writeClipboard =
            writeClipboard ??
            ((text) => Clipboard.setData(ClipboardData(text: text)));
@@ -143,4 +143,7 @@ class OcrController extends ChangeNotifier {
   }
 }
 
-final ocrController = OcrController(capture: captureController);
+final ocrController = OcrController(
+  capture: captureController,
+  autoCopy: () => settingsStore.autoCopyDetectedText,
+);

@@ -1,8 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:linguaray_desktop/src/app/dependencies.dart';
+import 'package:linguaray_desktop/src/app/settings/settings_store.dart';
 import 'package:linguaray_desktop/src/features/ocr/ocr_controller.dart';
 import 'package:linguaray_desktop/src/platform/capture/capture_controller.dart';
+import 'package:linguaray_desktop/src/platform/permissions/permission_controller.dart';
 import 'package:linguaray_desktop/src/platform/platform_types.dart';
 
 void main() {
@@ -71,6 +73,9 @@ void main() {
 }
 
 final class _FakeCaptureController extends CaptureController {
+  _FakeCaptureController()
+    : super(permissions: PermissionController(), store: settingsStore);
+
   int _next = 0;
 
   OcrRecognitionResult _result(OcrInputSource source) {

@@ -1,23 +1,18 @@
 import 'dart:io';
 
 import '../../app/runtime.dart' show AdvancedSettings;
-import '../../app/settings/settings_store.dart';
 import 'proxy_bypass.dart';
 import 'system_proxy.dart';
 
 HttpClient createNetworkHttpClient({
-  AdvancedSettings Function()? readAdvanced,
+  required AdvancedSettings Function() readAdvanced,
 }) {
   final client = HttpClient();
-  client.findProxy = (uri) => findLinguaRayProxy(
-    uri,
-    advanced: (readAdvanced ?? () => settingsStore.advanced)(),
-  );
+  client.findProxy = (uri) => findLinguaRayProxy(uri, advanced: readAdvanced());
   return client;
 }
 
-String findLinguaRayProxy(Uri uri, {AdvancedSettings? advanced}) {
-  advanced ??= settingsStore.advanced;
+String findLinguaRayProxy(Uri uri, {required AdvancedSettings advanced}) {
   switch (advanced.proxyMode) {
     case 'direct':
       return 'DIRECT';

@@ -1,3 +1,5 @@
+// ignore_for_file: prefer_initializing_formals
+
 import 'package:linguaray_application/linguaray_application.dart';
 import 'package:linguaray_runtime/linguaray_runtime.dart'
     show ShortcutSettingsPatch;
@@ -19,9 +21,11 @@ const kShortcutShowOcrWindow = 'showOcrWindow';
 const kShortcutClipboard = 'translateInput';
 
 final class RuntimeShortcutRepository implements ShortcutRepository {
-  RuntimeShortcutRepository({SettingsStore? store, ShortcutService? service})
-    : _store = store ?? settingsStore,
-      _service = service ?? shortcutService;
+  RuntimeShortcutRepository({
+    required SettingsStore store,
+    required ShortcutService service,
+  }) : _store = store,
+       _service = service;
 
   final SettingsStore _store;
   final ShortcutService _service;

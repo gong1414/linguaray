@@ -1,3 +1,5 @@
+// ignore_for_file: prefer_initializing_formals
+
 import 'package:nativeapi/nativeapi.dart';
 
 import '../../app/runtime.dart';
@@ -7,10 +9,10 @@ import 'selection_replacement_controller.dart';
 
 class SelectionController {
   SelectionController({
-    PermissionController? permissions,
-    SelectionReplacementController? replacement,
-  }) : _permissions = permissions ?? permissionController,
-       _replacement = replacement ?? selectionReplacementController;
+    required PermissionController permissions,
+    required SelectionReplacementController replacement,
+  }) : _permissions = permissions,
+       _replacement = replacement;
 
   final PermissionController _permissions;
   final SelectionReplacementController _replacement;

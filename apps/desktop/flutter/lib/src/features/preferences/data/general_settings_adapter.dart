@@ -11,9 +11,10 @@ import '../../../shared/language_util.dart';
 
 final class RuntimeGeneralSettingsAdapter
     implements PreferencesRepository, TranslationPreferencesRepository {
-  const RuntimeGeneralSettingsAdapter(this._store);
+  const RuntimeGeneralSettingsAdapter(this._store, this._effects);
 
   final SettingsStore _store;
+  final SettingsEffectsCoordinator _effects;
 
   @override
   Future<GeneralPreferences> loadGeneral() async {
@@ -58,7 +59,7 @@ final class RuntimeGeneralSettingsAdapter
   @override
   Future<void> setLaunchAtLogin(bool value) async {
     await _store.updateGeneral(GeneralSettingsPatch(launchAtLogin: value));
-    final sync = await settingsEffects.syncGeneral();
+    final sync = await _effects.syncGeneral();
     if (sync.rejected) {
       throw StateError('The operating system rejected the login item change.');
     }
@@ -83,7 +84,7 @@ final class RuntimeGeneralSettingsAdapter
         },
       ),
     );
-    await settingsEffects.syncAppearance();
+    await _effects.syncAppearance();
   }
 
   @override

@@ -11,13 +11,11 @@ import '../platform_types.dart';
 typedef TriggerActionHandler = Future<void> Function(TriggerAction action);
 
 class ShortcutService extends ChangeNotifier {
-  ShortcutService({SettingsStore? store})
-    : _store = store ?? settingsStore,
-      _shortcutSettings = (store ?? settingsStore).listenableFor(
-        SettingsSection.shortcuts,
-      );
+  ShortcutService({required SettingsStore store})
+    : _store = store,
+      _shortcutSettings = store.listenableFor(SettingsSection.shortcuts);
 
-  static final ShortcutService instance = ShortcutService();
+  static final ShortcutService instance = ShortcutService(store: settingsStore);
 
   final SettingsStore _store;
   TriggerActionHandler? _handler;

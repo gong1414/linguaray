@@ -1,3 +1,5 @@
+// ignore_for_file: prefer_initializing_formals
+
 import 'dart:io';
 
 import 'package:linguaray_application/linguaray_application.dart';
@@ -10,8 +12,7 @@ import '../../providers/data/provider_util.dart';
 import 'llm_stream.dart';
 
 final class RuntimeTranslationRepository implements TranslationRepository {
-  RuntimeTranslationRepository({SettingsStore? store})
-    : _store = store ?? settingsStore;
+  RuntimeTranslationRepository({required SettingsStore store}) : _store = store;
 
   final SettingsStore _store;
   final Map<String, ProviderType> _providerTypesById = {};

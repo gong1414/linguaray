@@ -5,7 +5,13 @@ import 'package:linguaray_application/linguaray_application.dart';
 import 'package:linguaray_desktop/src/app/commands/external_action_controller.dart';
 import 'package:linguaray_desktop/src/app/commands/trigger_controller.dart';
 import 'package:linguaray_desktop/src/app/dependencies.dart';
+import 'package:linguaray_desktop/src/app/settings/settings_store.dart';
+import 'package:linguaray_desktop/src/features/ocr/ocr_controller.dart';
+import 'package:linguaray_desktop/src/platform/capture/capture_controller.dart';
+import 'package:linguaray_desktop/src/platform/permissions/permission_controller.dart';
 import 'package:linguaray_desktop/src/platform/platform_types.dart';
+import 'package:linguaray_desktop/src/platform/selection/selection_controller.dart';
+import 'package:linguaray_desktop/src/platform/selection/selection_replacement_controller.dart';
 
 void main() {
   test('protocol actions share the typed runtime action dispatcher', () async {
@@ -69,6 +75,27 @@ void main() {
 }
 
 final class _RecordingTriggerController extends TriggerController {
+  _RecordingTriggerController()
+    : super(
+        selection: SelectionController(
+          permissions: PermissionController(),
+          replacement: SelectionReplacementController(),
+        ),
+        capture: CaptureController(
+          permissions: PermissionController(),
+          store: settingsStore,
+        ),
+        ocr: OcrController(
+          capture: CaptureController(
+            permissions: PermissionController(),
+            store: settingsStore,
+          ),
+          autoCopy: () => false,
+          writeClipboard: (_) async {},
+        ),
+        permissions: PermissionController(),
+      );
+
   final List<TriggerAction> actions = [];
   int inputWindowCount = 0;
   int translationWindowCount = 0;

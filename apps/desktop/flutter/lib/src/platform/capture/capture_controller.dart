@@ -1,3 +1,5 @@
+// ignore_for_file: prefer_initializing_formals
+
 import 'dart:io';
 
 import 'package:file_selector/file_selector.dart';
@@ -10,9 +12,11 @@ import '../permissions/permission_controller.dart';
 import '../platform_types.dart';
 
 class CaptureController {
-  CaptureController({PermissionController? permissions, SettingsStore? store})
-    : _permissions = permissions ?? permissionController,
-      _store = store ?? settingsStore;
+  CaptureController({
+    required PermissionController permissions,
+    required SettingsStore store,
+  }) : _permissions = permissions,
+       _store = store;
 
   final PermissionController _permissions;
   final SettingsStore _store;
@@ -224,4 +228,7 @@ class CaptureController {
   }
 }
 
-final captureController = CaptureController(permissions: permissionController);
+final captureController = CaptureController(
+  permissions: permissionController,
+  store: settingsStore,
+);

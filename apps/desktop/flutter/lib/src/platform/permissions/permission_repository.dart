@@ -1,11 +1,13 @@
+// ignore_for_file: prefer_initializing_formals
+
 import 'package:linguaray_application/linguaray_application.dart';
 
 import '../platform_types.dart';
 import 'permission_controller.dart';
 
 final class ControllerPermissionRepository implements PermissionRepository {
-  ControllerPermissionRepository({PermissionController? controller})
-    : _controller = controller ?? permissionController;
+  ControllerPermissionRepository({required PermissionController controller})
+    : _controller = controller;
 
   final PermissionController _controller;
 

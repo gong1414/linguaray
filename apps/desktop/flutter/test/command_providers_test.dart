@@ -2,6 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:linguaray_desktop/src/app/commands/trigger_controller.dart';
 import 'package:linguaray_desktop/src/app/dependencies.dart';
+import 'package:linguaray_desktop/src/app/settings/settings_store.dart';
+import 'package:linguaray_desktop/src/features/ocr/ocr_controller.dart';
 import 'package:linguaray_desktop/src/platform/capture/capture_controller.dart';
 import 'package:linguaray_desktop/src/platform/permissions/permission_controller.dart';
 import 'package:linguaray_desktop/src/platform/protocol/protocol_controller.dart';
@@ -41,18 +43,27 @@ void main() {
 
   test('platform action providers can be overridden', () {
     final permissions = PermissionController();
-    final capture = CaptureController(permissions: permissions);
+    final capture = CaptureController(
+      permissions: permissions,
+      store: settingsStore,
+    );
     final replacement = SelectionReplacementController();
     final selection = SelectionController(
       permissions: permissions,
       replacement: replacement,
     );
+    final ocr = OcrController(
+      capture: capture,
+      autoCopy: () => false,
+      writeClipboard: (_) async {},
+    );
     final triggers = TriggerController(
       capture: capture,
       selection: selection,
+      ocr: ocr,
       permissions: permissions,
     );
-    final shortcuts = ShortcutService();
+    final shortcuts = ShortcutService(store: settingsStore);
     final protocol = ProtocolController();
     final dockIcons = DockIconController();
     final container = ProviderContainer(

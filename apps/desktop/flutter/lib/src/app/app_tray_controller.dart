@@ -1,3 +1,7 @@
+// Named constructor parameters stay public; private fields cannot be
+// initializing formals across libraries.
+// ignore_for_file: prefer_initializing_formals
+
 import 'dart:async';
 import 'dart:io';
 
@@ -19,12 +23,12 @@ import 'windows/app_windows.dart';
 final class AppTrayController {
   AppTrayController({
     required this._readUpdate,
-    SettingsStore? store,
-    TriggerController? triggers,
-    DockIconController? dockIcons,
-  }) : _store = store ?? settingsStore,
-       _triggers = triggers ?? triggerController,
-       _dockIcons = dockIcons ?? dockIconController;
+    required SettingsStore store,
+    required TriggerController triggers,
+    required DockIconController dockIcons,
+  }) : _store = store,
+       _triggers = triggers,
+       _dockIcons = dockIcons;
   final UpdateState Function() _readUpdate;
   final SettingsStore _store;
   final TriggerController _triggers;

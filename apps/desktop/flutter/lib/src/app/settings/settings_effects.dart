@@ -1,3 +1,5 @@
+// ignore_for_file: prefer_initializing_formals
+
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -70,10 +72,10 @@ final class DesktopSettingsSystemEffects implements SettingsSystemEffects {
 /// settings cache. The cache itself only stores snapshots and errors.
 final class SettingsEffectsCoordinator {
   SettingsEffectsCoordinator({
-    SettingsSnapshotSource? store,
+    required SettingsSnapshotSource store,
     SettingsSystemEffects? effects,
     TranslationTarget Function(String appLanguage)? defaultTranslationTarget,
-  }) : _store = store ?? settingsStore,
+  }) : _store = store,
        _effects = effects ?? DesktopSettingsSystemEffects(),
        _defaultTranslationTarget =
            defaultTranslationTarget ?? _defaultTranslationTargetForLanguage;
@@ -201,4 +203,4 @@ TranslationTarget _defaultTranslationTargetForLanguage(String language) {
   );
 }
 
-final settingsEffects = SettingsEffectsCoordinator();
+final settingsEffects = SettingsEffectsCoordinator(store: settingsStore);

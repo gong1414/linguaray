@@ -103,8 +103,11 @@ observe feature view models and render dedicated views. Dialogs stay in the
 page; load, filter, CRUD, and backup operations go through the view model.
 Settings adapters rethrow section load errors so pages can keep a previous
 snapshot and still show a retryable failure. Feature data adapters and
-platform controllers take `SettingsStore` through constructors; `main` and
-`settingsStoreProvider` remain the composition root. App shells and the host
+platform controllers take `SettingsStore` and other composition-root
+services through required constructors; `main`, `settingsStoreProvider`,
+and `settingsEffectsProvider` remain the composition root. Settings side
+effects are applied by `SettingsEffectsCoordinator` through that provider.
+App shells and the host
 read appearance, locale, and tray visibility through that provider. The OCR
 surface, quick translator, history, tray, and host dispatch actions through
 `triggerControllerProvider`. Deep links and the local API dispatch through

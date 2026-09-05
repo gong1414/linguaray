@@ -1,3 +1,5 @@
+// ignore_for_file: prefer_initializing_formals
+
 import 'package:linguaray_application/linguaray_application.dart';
 
 import '../../../app/runtime.dart';
@@ -7,8 +9,7 @@ import '../../../platform/platform_util.dart';
 import '../../providers/data/provider_util.dart';
 
 final class RuntimeDictionaryRepository implements DictionaryRepository {
-  RuntimeDictionaryRepository({SettingsStore? store})
-    : _store = store ?? settingsStore;
+  RuntimeDictionaryRepository({required SettingsStore store}) : _store = store;
 
   final SettingsStore _store;
 

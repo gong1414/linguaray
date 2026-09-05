@@ -1,3 +1,5 @@
+// ignore_for_file: prefer_initializing_formals
+
 import 'dart:async';
 
 import 'package:flutter/widgets.dart';
@@ -13,8 +15,8 @@ final class QuickTranslateWindowCoordinator {
   QuickTranslateWindowCoordinator(
     this._isMounted, {
     this.onDismiss,
-    PermissionController? permissions,
-  }) : _permissions = permissions ?? permissionController;
+    required PermissionController permissions,
+  }) : _permissions = permissions;
 
   final VoidCallback? onDismiss;
   final PermissionController _permissions;

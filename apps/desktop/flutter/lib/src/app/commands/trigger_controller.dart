@@ -1,3 +1,5 @@
+// ignore_for_file: prefer_initializing_formals
+
 import 'package:flutter/foundation.dart';
 import 'package:nativeapi/nativeapi.dart';
 
@@ -25,14 +27,14 @@ class QuickWindowRequest {
 
 class TriggerController {
   TriggerController({
-    SelectionController? selection,
-    CaptureController? capture,
-    OcrController? ocr,
-    PermissionController? permissions,
-  }) : _selection = selection ?? selectionController,
-       _capture = capture ?? captureController,
-       _ocr = ocr ?? OcrController(capture: capture ?? captureController),
-       _permissions = permissions ?? permissionController;
+    required SelectionController selection,
+    required CaptureController capture,
+    required OcrController ocr,
+    required PermissionController permissions,
+  }) : _selection = selection,
+       _capture = capture,
+       _ocr = ocr,
+       _permissions = permissions;
 
   final SelectionController _selection;
   final CaptureController _capture;
