@@ -23,6 +23,7 @@ import '../platform/network/network_proxy.dart';
 import '../platform/network/system_proxy.dart';
 import '../platform/permissions/permission_controller.dart';
 import '../platform/permissions/permission_repository.dart';
+import '../platform/protocol/protocol_controller.dart';
 import '../platform/selection/selection_controller.dart';
 import '../platform/shortcuts/shortcut_repository.dart';
 import '../platform/shortcuts/shortcut_service.dart';
@@ -65,6 +66,10 @@ final permissionControllerProvider = Provider<PermissionController>(
 
 final selectionControllerProvider = Provider<SelectionController>(
   (ref) => selectionController,
+);
+
+final protocolControllerProvider = Provider<ProtocolController>(
+  (ref) => protocolController,
 );
 
 final translationRepositoryProvider = Provider<TranslationRepository>(

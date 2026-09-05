@@ -109,7 +109,8 @@ read appearance, locale, and tray visibility through that provider. The OCR
 surface, quick translator, history, tray, and host dispatch actions through
 `triggerControllerProvider`. Deep links and the local API dispatch through
 `externalActionControllerProvider`, which is bound to that trigger
-controller. Capture and global shortcut registration are
+controller. Incoming `linguaray://` links are owned by
+`protocolControllerProvider`. Capture and global shortcut registration are
 bound as `captureControllerProvider` and `shortcutServiceProvider`.
 Permission and selection controllers are bound as
 `permissionControllerProvider` and `selectionControllerProvider`; tray and

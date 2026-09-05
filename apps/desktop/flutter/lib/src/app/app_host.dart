@@ -48,6 +48,7 @@ class _RootBodyViewState extends ConsumerState<_RootBodyView>
   late final ShortcutService _shortcuts;
   late final TriggerController _triggers;
   late final ExternalActionController _externalActions;
+  late final ProtocolController _protocol;
   late final PermissionController _permissions;
   late final AppTrayController _tray;
   late final ProviderSubscription<UpdateState> _updateSubscription;
@@ -62,6 +63,7 @@ class _RootBodyViewState extends ConsumerState<_RootBodyView>
     _shortcuts = ref.read(shortcutServiceProvider);
     _triggers = ref.read(triggerControllerProvider);
     _externalActions = ref.read(externalActionControllerProvider);
+    _protocol = ref.read(protocolControllerProvider);
     _permissions = ref.read(permissionControllerProvider);
     _updates = AutomaticUpdateSchedule(
       enabled: () => _store.advanced.checkUpdatesOnLaunch,
@@ -91,8 +93,8 @@ class _RootBodyViewState extends ConsumerState<_RootBodyView>
       onOpenSettings: showSettingsWindow,
     );
     unawaited(_shortcuts.start(onAction: _triggers.trigger));
-    protocolController.onCommand = _externalActions.dispatchProtocol;
-    protocolController.start();
+    _protocol.onCommand = _externalActions.dispatchProtocol;
+    _protocol.start();
     _externalActions.start();
     unawaited(_permissions.refresh());
     WidgetsBinding.instance.addPostFrameCallback((_) {
