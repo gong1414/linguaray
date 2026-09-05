@@ -1,6 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:linguaray_application/linguaray_application.dart';
 
+import '../features/backup/backup_port.dart';
+import '../features/backup/data/file_selector_backup_picker.dart';
+import '../features/backup/data/runtime_backup_archive.dart';
 import '../features/integrations/data/system_settings_adapter.dart';
 import '../features/library/glossary/data/runtime_glossary_repository.dart';
 import '../features/library/glossary/glossary_exchange_controller.dart';
@@ -15,6 +18,7 @@ import '../features/updates/data/github_update_repository.dart';
 import '../platform/credentials/secret_store.dart';
 import '../platform/files/text_file_dialogs.dart';
 import '../platform/network/network_proxy.dart';
+import '../platform/network/system_proxy.dart';
 import '../platform/permissions/permission_repository.dart';
 import '../platform/shortcuts/shortcut_repository.dart';
 import '../platform/speech/channel_speech_service.dart';
@@ -154,3 +158,29 @@ final glossaryExchangeControllerProvider = Provider<GlossaryExchangeController>(
     const TextFileDialogs(),
   ),
 );
+
+final backupArchiveProvider = Provider<BackupArchive>(
+  (ref) => const RuntimeBackupArchive(),
+);
+
+final backupFilePickerProvider = Provider<BackupFilePicker>(
+  (ref) => const FileSelectorBackupPicker(),
+);
+
+typedef BackupRestoreEffects = Future<void> Function();
+
+final backupRestoreEffectsProvider = Provider<BackupRestoreEffects>((ref) {
+  final store = ref.watch(settingsStoreProvider);
+  return () async {
+    await providerCredentialsController.hydrateAll();
+    await Future.wait([
+      store.reloadAppearance(),
+      store.reloadGeneral(),
+      store.reloadShortcuts(),
+      store.reloadAdvanced(),
+      store.reloadProviders(),
+      store.reloadServices(),
+    ]);
+    await initializeSystemProxy();
+  };
+});

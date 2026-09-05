@@ -3,7 +3,8 @@ import 'package:linguaray_application/linguaray_application.dart';
 
 import '../app/navigation/settings_shell_view.dart';
 import '../features/about/about_settings_view.dart';
-import '../features/backup/data_transfer_settings_screen.dart';
+import '../features/backup/data_transfer_view.dart';
+import '../features/backup/data_transfer_view_model.dart';
 import '../features/integrations/advanced_settings_screen.dart';
 import '../features/library/glossary/glossary_settings_screen.dart';
 import '../features/library/history/history_view.dart';
@@ -455,8 +456,11 @@ class SettingsCatalogPreview extends StatelessWidget {
           onGrantScreenRecording: () {},
           onRecheck: () {},
         ),
-        SettingsSection.dataTransfer => const IgnorePointer(
-          child: DataTransferSettingsScreen(),
+        SettingsSection.dataTransfer => DataTransferView(
+          labels: _dataTransferZh,
+          state: const DataTransferViewState(),
+          onExport: () {},
+          onRestore: () {},
         ),
         SettingsSection.favorites => const HistoryCatalogPreview(
           empty: false,
@@ -823,6 +827,22 @@ const _shortcutsZh = ShortcutsSettingsLabels(
 );
 
 String _shortcutConflictZh(String label) => '与「$label」冲突';
+
+const _dataTransferZh = DataTransferViewLabels(
+  title: '导入导出',
+  description: '在不同安装之间迁移 LinguaRay 设置与本地数据。',
+  exportTitle: '导出备份',
+  exportDescription: '把设置、历史、收藏、生词本和术语库保存为一个 ZIP 文件。',
+  exportAction: '导出…',
+  restoreTitle: '恢复备份',
+  restoreDescription: '使用 LinguaRay 备份替换当前本地数据。',
+  restoreAction: '恢复…',
+  secretsNotice: '备份绝不包含 API 密钥或代理凭据；换一台电脑后需要重新填写服务密钥。',
+  working: '正在处理…',
+  exported: '备份已导出',
+  restored: '备份已恢复',
+  failed: '备份操作失败',
+);
 
 const _permissionsZh = PermissionsSettingsLabels(
   title: '权限',
