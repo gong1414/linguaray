@@ -16,13 +16,16 @@ import '../features/services/data/service_settings_adapter.dart';
 import '../features/translation/data/runtime_dictionary_repository.dart';
 import '../features/translation/data/runtime_translation_repository.dart';
 import '../features/updates/data/github_update_repository.dart';
+import '../platform/capture/capture_controller.dart';
 import '../platform/credentials/secret_store.dart';
 import '../platform/files/text_file_dialogs.dart';
 import '../platform/network/network_proxy.dart';
 import '../platform/network/system_proxy.dart';
 import '../platform/permissions/permission_repository.dart';
 import '../platform/shortcuts/shortcut_repository.dart';
+import '../platform/shortcuts/shortcut_service.dart';
 import '../platform/speech/channel_speech_service.dart';
+import 'commands/trigger_controller.dart';
 import 'env.dart';
 import 'settings/settings_section.dart';
 import 'settings/settings_store.dart';
@@ -30,6 +33,18 @@ import 'settings/settings_store.dart';
 final settingsStoreProvider = Provider<SettingsStore>((ref) => settingsStore);
 
 final ocrControllerProvider = Provider<OcrController>((ref) => ocrController);
+
+final captureControllerProvider = Provider<CaptureController>(
+  (ref) => captureController,
+);
+
+final triggerControllerProvider = Provider<TriggerController>(
+  (ref) => triggerController,
+);
+
+final shortcutServiceProvider = Provider<ShortcutService>(
+  (ref) => shortcutService,
+);
 
 final translationRepositoryProvider = Provider<TranslationRepository>(
   (ref) =>
@@ -76,7 +91,10 @@ final permissionRepositoryProvider = Provider<PermissionRepository>(
 );
 
 final shortcutRepositoryProvider = Provider<ShortcutRepository>(
-  (ref) => RuntimeShortcutRepository(store: ref.watch(settingsStoreProvider)),
+  (ref) => RuntimeShortcutRepository(
+    store: ref.watch(settingsStoreProvider),
+    service: ref.watch(shortcutServiceProvider),
+  ),
 );
 
 final historyRepositoryProvider = Provider<HistoryRepository>(

@@ -8,7 +8,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:linguaray_application/linguaray_application.dart';
 import 'package:linguaray_desktop/main.dart' as app;
-import 'package:linguaray_desktop/src/app/commands/trigger_controller.dart';
 import 'package:linguaray_desktop/src/app/dependencies.dart';
 import 'package:linguaray_desktop/src/app/navigation/library_settings_screens.dart';
 import 'package:linguaray_desktop/src/app/navigation/settings_screens.dart';
@@ -20,7 +19,6 @@ import 'package:linguaray_desktop/src/features/translation/quick_translate/quick
 import 'package:linguaray_desktop/src/platform/credentials/secret_store.dart';
 import 'package:linguaray_desktop/src/platform/permissions/permission_controller.dart';
 import 'package:linguaray_desktop/src/platform/platform_types.dart';
-import 'package:linguaray_desktop/src/platform/shortcuts/shortcut_service.dart';
 
 const _testSystemServices = bool.fromEnvironment(
   'LINGUARAY_SYSTEM_SERVICES_SMOKE',
@@ -43,6 +41,9 @@ void main() {
     expect(find.byType(SettingsShellView), findsOneWidget);
     expect(find.byType(ErrorWidget), findsNothing);
     expect(settingsWindowController.window.isVisible, isFalse);
+    final providerContainer = ProviderScope.containerOf(
+      tester.element(find.byType(SettingsShellView)),
+    );
 
     await tester.runAsync(() async {
       final storage = NativeSecretStore();
@@ -65,14 +66,16 @@ void main() {
     debugPrint('[smoke] native credential storage roundtrip passed');
 
     await tester.runAsync(() async {
+      final shortcuts = providerContainer.read(shortcutServiceProvider);
       final deadline = DateTime.now().add(const Duration(seconds: 10));
-      while (ShortcutService.instance.bindings.length !=
-              TriggerAction.values.length &&
+      while (shortcuts.bindings.length != TriggerAction.values.length &&
           DateTime.now().isBefore(deadline)) {
         await Future<void>.delayed(const Duration(milliseconds: 100));
       }
     });
-    final shortcutBindings = ShortcutService.instance.bindings;
+    final shortcutBindings = providerContainer
+        .read(shortcutServiceProvider)
+        .bindings;
     expect(shortcutBindings, hasLength(TriggerAction.values.length));
     final configuredShortcuts = shortcutBindings
         .where((binding) => binding.accelerator.isNotEmpty)
@@ -150,9 +153,6 @@ void main() {
     expect(permissions.accessibility, isNot(PermissionState.unknown));
     expect(permissions.screenRecording, isNot(PermissionState.unknown));
 
-    final providerContainer = ProviderScope.containerOf(
-      tester.element(find.byType(SettingsShellView)),
-    );
     final speech = providerContainer.read(speechServiceProvider);
     expect(await speech.isAvailable(), isTrue);
     debugPrint('[smoke] speech available');
@@ -241,9 +241,9 @@ void main() {
       }
     }
 
-    final showQuickWindow = triggerController.trigger(
-      TriggerAction.toggleQuickWindow,
-    );
+    final showQuickWindow = providerContainer
+        .read(triggerControllerProvider)
+        .trigger(TriggerAction.toggleQuickWindow);
     await tester.pump();
     await showQuickWindow;
     await tester.pumpAndSettle();

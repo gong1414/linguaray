@@ -7,7 +7,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:linguaray_application/linguaray_application.dart';
 import 'package:linguaray_desktop/main.dart' as app;
-import 'package:linguaray_desktop/src/app/commands/trigger_controller.dart';
 import 'package:linguaray_desktop/src/app/dependencies.dart';
 import 'package:linguaray_desktop/src/app/navigation/settings_shell_view.dart';
 import 'package:linguaray_desktop/src/app/runtime.dart';
@@ -219,9 +218,9 @@ void main() {
         await container
             .read(serviceSettingsRepositoryProvider)
             .setDefaultTranslationService('$providerId+translation');
-        final quick = triggerController.trigger(
-          TriggerAction.toggleQuickWindow,
-        );
+        final quick = container
+            .read(triggerControllerProvider)
+            .trigger(TriggerAction.toggleQuickWindow);
         await tester.pump();
         await quick;
         await tester.pumpAndSettle();

@@ -17,10 +17,15 @@ import 'settings/settings_store.dart';
 import 'windows/app_windows.dart';
 
 final class AppTrayController {
-  AppTrayController({required this._readUpdate, SettingsStore? store})
-    : _store = store ?? settingsStore;
+  AppTrayController({
+    required this._readUpdate,
+    SettingsStore? store,
+    TriggerController? triggers,
+  }) : _store = store ?? settingsStore,
+       _triggers = triggers ?? triggerController;
   final UpdateState Function() _readUpdate;
   final SettingsStore _store;
+  final TriggerController _triggers;
   late final TrayIcon _trayIcon;
 
   void initialize({required bool visible}) {
@@ -60,32 +65,31 @@ final class AppTrayController {
     _addAction(
       menu,
       labels.selection_translation,
-      () => triggerController.trigger(TriggerAction.translateSelection),
+      () => _triggers.trigger(TriggerAction.translateSelection),
       shortcut: shortcuts.extractTextFromScreenSelection,
     );
     _addAction(
       menu,
       labels.capture_translation,
-      () => triggerController.trigger(TriggerAction.captureAndTranslate),
+      () => _triggers.trigger(TriggerAction.captureAndTranslate),
       shortcut: shortcuts.extractTextFromScreenCapture,
     );
     _addAction(
       menu,
       labels.input_translation,
-      () => triggerController.openInputWindow(trayBounds: _trayIcon.bounds),
+      () => _triggers.openInputWindow(trayBounds: _trayIcon.bounds),
       shortcut: shortcuts.translateInputContent,
     );
     _addAction(
       menu,
       labels.clipboard_translation,
-      () => triggerController.trigger(TriggerAction.translateInput),
+      () => _triggers.trigger(TriggerAction.translateInput),
       shortcut: shortcuts.extractTextFromClipboard,
     );
     _addAction(
       menu,
       labels.show_translation_window,
-      () =>
-          triggerController.showTranslationWindow(trayBounds: _trayIcon.bounds),
+      () => _triggers.showTranslationWindow(trayBounds: _trayIcon.bounds),
       shortcut: shortcuts.toggleMiniTranslator,
     );
 
@@ -93,31 +97,31 @@ final class AppTrayController {
     _addAction(
       menu,
       labels.capture_ocr,
-      () => triggerController.trigger(TriggerAction.captureOcr),
+      () => _triggers.trigger(TriggerAction.captureOcr),
       shortcut: shortcuts.captureOcr,
     );
     _addAction(
       menu,
       labels.silent_capture_ocr,
-      () => triggerController.trigger(TriggerAction.silentCaptureOcr),
+      () => _triggers.trigger(TriggerAction.silentCaptureOcr),
       shortcut: shortcuts.silentCaptureOcr,
     );
     _addAction(
       menu,
       labels.file_ocr,
-      () => triggerController.trigger(TriggerAction.fileOcr),
+      () => _triggers.trigger(TriggerAction.fileOcr),
       shortcut: shortcuts.fileOcr,
     );
     _addAction(
       menu,
       labels.clipboard_ocr,
-      () => triggerController.trigger(TriggerAction.clipboardOcr),
+      () => _triggers.trigger(TriggerAction.clipboardOcr),
       shortcut: shortcuts.clipboardOcr,
     );
     _addAction(
       menu,
       labels.show_ocr_window,
-      () => triggerController.trigger(TriggerAction.showOcrWindow),
+      () => _triggers.trigger(TriggerAction.showOcrWindow),
       shortcut: shortcuts.showOcrWindow,
     );
 

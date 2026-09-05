@@ -293,4 +293,7 @@ class TriggerController {
   };
 }
 
-final triggerController = TriggerController(ocr: ocrController);
+final triggerController = TriggerController(
+  ocr: ocrController,
+  capture: captureController,
+);

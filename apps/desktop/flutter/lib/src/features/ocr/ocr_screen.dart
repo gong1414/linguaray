@@ -21,6 +21,7 @@ class OcrScreen extends ConsumerStatefulWidget {
 
 class _OcrScreenState extends ConsumerState<OcrScreen> {
   late final OcrController _ocr;
+  late final TriggerController _triggers;
   late final OcrWindowCoordinator _window;
   bool _pinned = false;
 
@@ -28,6 +29,7 @@ class _OcrScreenState extends ConsumerState<OcrScreen> {
   void initState() {
     super.initState();
     _ocr = ref.read(ocrControllerProvider);
+    _triggers = ref.read(triggerControllerProvider);
     _window = OcrWindowCoordinator(
       keepVisible: () => _ocr.state.busy || _pinned,
     );
@@ -69,12 +71,10 @@ class _OcrScreenState extends ConsumerState<OcrScreen> {
         ),
         state: _ocr.state,
         onTextChanged: _ocr.setText,
-        onCapture: () =>
-            unawaited(triggerController.trigger(TriggerAction.captureOcr)),
-        onFile: () =>
-            unawaited(triggerController.trigger(TriggerAction.fileOcr)),
+        onCapture: () => unawaited(_triggers.trigger(TriggerAction.captureOcr)),
+        onFile: () => unawaited(_triggers.trigger(TriggerAction.fileOcr)),
         onClipboard: () =>
-            unawaited(triggerController.trigger(TriggerAction.clipboardOcr)),
+            unawaited(_triggers.trigger(TriggerAction.clipboardOcr)),
         onContinuousChanged: _ocr.setContinuous,
         onCopy: () => unawaited(_ocr.copy()),
         onClear: _ocr.clear,

@@ -45,6 +45,8 @@ class _RootBodyView extends ConsumerStatefulWidget {
 class _RootBodyViewState extends ConsumerState<_RootBodyView>
     with WidgetsBindingObserver {
   late final SettingsStore _store;
+  late final ShortcutService _shortcuts;
+  late final TriggerController _triggers;
   late final AppTrayController _tray;
   late final ProviderSubscription<UpdateState> _updateSubscription;
   late bool _showInMenuBar;
@@ -55,6 +57,8 @@ class _RootBodyViewState extends ConsumerState<_RootBodyView>
   void initState() {
     super.initState();
     _store = ref.read(settingsStoreProvider);
+    _shortcuts = ref.read(shortcutServiceProvider);
+    _triggers = ref.read(triggerControllerProvider);
     _updates = AutomaticUpdateSchedule(
       enabled: () => _store.advanced.checkUpdatesOnLaunch,
       runCheck: () => ref.read(updateCoordinatorProvider.notifier).check(),
@@ -71,6 +75,7 @@ class _RootBodyViewState extends ConsumerState<_RootBodyView>
     _tray = AppTrayController(
       readUpdate: () => ref.read(updateCoordinatorProvider),
       store: _store,
+      triggers: _triggers,
     );
     _tray.initialize(visible: _showInMenuBar);
     _updateSubscription = ref.listenManual(
@@ -81,9 +86,7 @@ class _RootBodyViewState extends ConsumerState<_RootBodyView>
       onReopen: showSettingsWindow,
       onOpenSettings: showSettingsWindow,
     );
-    unawaited(
-      ShortcutService.instance.start(onAction: triggerController.trigger),
-    );
+    unawaited(_shortcuts.start(onAction: _triggers.trigger));
     protocolController.onCommand = externalActionController.dispatchProtocol;
     protocolController.start();
     externalActionController.start();
@@ -102,7 +105,7 @@ class _RootBodyViewState extends ConsumerState<_RootBodyView>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _hostSettings.removeListener(_handleChanged);
-    unawaited(ShortcutService.instance.stop());
+    unawaited(_shortcuts.stop());
     _updates.dispose();
     _updateSubscription.close();
     _tray.dispose();

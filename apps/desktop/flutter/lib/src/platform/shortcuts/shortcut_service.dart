@@ -281,3 +281,5 @@ PhysicalKeyboardKey? _physicalKey(String value) {
     _ => null,
   };
 }
+
+final shortcutService = ShortcutService.instance;

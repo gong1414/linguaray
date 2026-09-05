@@ -21,7 +21,7 @@ const kShortcutClipboard = 'translateInput';
 final class RuntimeShortcutRepository implements ShortcutRepository {
   RuntimeShortcutRepository({SettingsStore? store, ShortcutService? service})
     : _store = store ?? settingsStore,
-      _service = service ?? ShortcutService.instance;
+      _service = service ?? shortcutService;
 
   final SettingsStore _store;
   final ShortcutService _service;

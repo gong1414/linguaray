@@ -44,6 +44,7 @@ class _QuickTranslateScreenState extends ConsumerState<QuickTranslateScreen>
   late final LookUpWord _lookUpWord;
   late final VocabularyRepository _vocabularyRepository;
   late final QuickTranslateWindowCoordinator _windowCoordinator;
+  late final TriggerController _triggers;
 
   @override
   void initState() {
@@ -51,14 +52,15 @@ class _QuickTranslateScreenState extends ConsumerState<QuickTranslateScreen>
     _speechService = ref.read(speechServiceProvider);
     _lookUpWord = ref.read(lookUpWordProvider);
     _vocabularyRepository = ref.read(vocabularyRepositoryProvider);
+    _triggers = ref.read(triggerControllerProvider);
     _windowCoordinator = QuickTranslateWindowCoordinator(
       () => mounted,
       onDismiss: () => ref.read(translationViewModelProvider.notifier).cancel(),
     );
     _speechSubscription = _speechService.states.listen(_handleSpeechState);
     WidgetsBinding.instance.addObserver(this);
-    triggerController.quickWindowRequest.addListener(_consumeWindowRequest);
-    triggerController.lastError.addListener(_showTriggerError);
+    _triggers.quickWindowRequest.addListener(_consumeWindowRequest);
+    _triggers.lastError.addListener(_showTriggerError);
     permissionController.addListener(_onPermissionChanged);
     _windowCoordinator.registerEvents();
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -70,8 +72,8 @@ class _QuickTranslateScreenState extends ConsumerState<QuickTranslateScreen>
 
   @override
   void dispose() {
-    triggerController.quickWindowRequest.removeListener(_consumeWindowRequest);
-    triggerController.lastError.removeListener(_showTriggerError);
+    _triggers.quickWindowRequest.removeListener(_consumeWindowRequest);
+    _triggers.lastError.removeListener(_showTriggerError);
     permissionController.removeListener(_onPermissionChanged);
     WidgetsBinding.instance.removeObserver(this);
     _windowCoordinator.dispose();
@@ -89,9 +91,9 @@ class _QuickTranslateScreenState extends ConsumerState<QuickTranslateScreen>
   }
 
   void _consumeWindowRequest() {
-    final request = triggerController.quickWindowRequest.value;
+    final request = _triggers.quickWindowRequest.value;
     if (request == null) return;
-    triggerController.quickWindowRequest.value = null;
+    _triggers.quickWindowRequest.value = null;
     final viewModel = ref.read(translationViewModelProvider.notifier);
     if (request.clearExisting) {
       _replacementTarget = request.replacementTarget;
@@ -106,7 +108,7 @@ class _QuickTranslateScreenState extends ConsumerState<QuickTranslateScreen>
   }
 
   void _showTriggerError() {
-    final error = triggerController.lastError.value;
+    final error = _triggers.lastError.value;
     if (error == null) return;
     setState(() {
       _notice = switch (error.code) {
@@ -428,11 +430,10 @@ class _QuickTranslateScreenState extends ConsumerState<QuickTranslateScreen>
         setState(() => _pinned = !_pinned);
         _windowCoordinator.setPinned(_pinned);
       },
-      onCapture: () => unawaited(
-        triggerController.trigger(TriggerAction.captureAndTranslate),
-      ),
+      onCapture: () =>
+          unawaited(_triggers.trigger(TriggerAction.captureAndTranslate)),
       onClipboard: () =>
-          unawaited(triggerController.trigger(TriggerAction.translateInput)),
+          unawaited(_triggers.trigger(TriggerAction.translateInput)),
       onOpenSettings: _windowCoordinator.openSettings,
       onConfigureServices: _windowCoordinator.openSettings,
       onRecheckPermissions: () => unawaited(permissionController.refresh()),

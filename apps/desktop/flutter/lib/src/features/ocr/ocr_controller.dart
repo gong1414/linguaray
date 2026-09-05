@@ -143,4 +143,4 @@ class OcrController extends ChangeNotifier {
   }
 }
 
-final ocrController = OcrController();
+final ocrController = OcrController(capture: captureController);

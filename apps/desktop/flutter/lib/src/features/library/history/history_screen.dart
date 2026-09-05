@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:linguaray_application/linguaray_application.dart';
 
-import '../../../app/commands/trigger_controller.dart';
+import '../../../app/dependencies.dart';
 import '../../../i18n/i18n.dart';
 import '../../../shared/i18n_labels.dart';
 import 'history_view.dart';
@@ -73,8 +73,9 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
       onFilterChanged: (value) => unawaited(
         ref.read(historyViewModelProvider.notifier).setFilter(value),
       ),
-      onOpen: (entry) =>
-          unawaited(triggerController.translateText(entry.source)),
+      onOpen: (entry) => unawaited(
+        ref.read(triggerControllerProvider).translateText(entry.source),
+      ),
       onFavorite: (entry, favorite) => unawaited(
         ref
             .read(historyViewModelProvider.notifier)
