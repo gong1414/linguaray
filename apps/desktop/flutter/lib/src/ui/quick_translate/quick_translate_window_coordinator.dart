@@ -89,6 +89,11 @@ final class QuickTranslateWindowCoordinator {
             800.0,
           );
       final size = window.contentSize;
+      final outer = window.size;
+      final frame = Size(
+        (outer.width - size.width).clamp(0, double.infinity),
+        (outer.height - size.height).clamp(0, double.infinity),
+      );
       final position = window.position;
       final displays = nativeapi.DisplayManager.instance.getAll();
       final display =
@@ -100,15 +105,22 @@ final class QuickTranslateWindowCoordinator {
               .firstOrNull ??
           displays.firstOrNull;
       final fitted = display == null
-          ? position & Size(size.width, height)
+          ? position & Size(size.width + frame.width, height + frame.height)
           : fitPopoverToWorkArea(
               position: position,
-              desiredSize: Size(size.width, height),
+              desiredSize: Size(
+                size.width + frame.width,
+                height + frame.height,
+              ),
               workArea: display.workArea,
             );
-      if ((size.height - fitted.height).abs() >= 1 ||
-          (size.width - fitted.width).abs() >= 1) {
-        window.setContentSize(fitted.width, fitted.height);
+      final content = Size(
+        (fitted.width - frame.width).clamp(1, double.infinity),
+        (fitted.height - frame.height).clamp(1, double.infinity),
+      );
+      if ((size.height - content.height).abs() >= 1 ||
+          (size.width - content.width).abs() >= 1) {
+        window.setContentSize(content.width, content.height);
       }
       if ((position - fitted.topLeft).distance >= 1) {
         window.setPosition(fitted.left, fitted.top);

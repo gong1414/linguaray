@@ -114,12 +114,12 @@ void focusSettingsWindow() {
   window.titleBarStyle = kIsMacOS ? TitleBarStyle.normal : TitleBarStyle.hidden;
   window.windowControlButtonsVisible = kIsMacOS;
   window.isResizable = true;
-  window.setMinimumSize(
-    _kSettingsWindowMinimumSize.width,
-    _kSettingsWindowMinimumSize.height,
-  );
-  if (switchedSurface || window.size != _kSettingsWindowSize) {
-    window.setSize(_kSettingsWindowSize.width, _kSettingsWindowSize.height);
+  _setMinimumContentSize(window, _kSettingsWindowMinimumSize);
+  if (switchedSurface || window.contentSize != _kSettingsWindowSize) {
+    window.setContentSize(
+      _kSettingsWindowSize.width,
+      _kSettingsWindowSize.height,
+    );
   }
   if (!_settingsWindowConfigured) {
     _settingsWindowConfigured = true;
@@ -162,10 +162,7 @@ void initializeResidentApp() {
   window.titleBarStyle = kIsMacOS ? TitleBarStyle.normal : TitleBarStyle.hidden;
   window.windowControlButtonsVisible = kIsMacOS;
   window.isResizable = true;
-  window.setMinimumSize(
-    _kSettingsWindowMinimumSize.width,
-    _kSettingsWindowMinimumSize.height,
-  );
+  _setMinimumContentSize(window, _kSettingsWindowMinimumSize);
   window.hide();
   dockIconController.setSettingsWindowVisible(false);
 }
@@ -194,6 +191,17 @@ Future<bool> _mountTransientSurface(Window window, AppSurface surface) async {
   return true;
 }
 
+/// Native minimum bounds include the frame on Windows. Product dimensions
+/// always describe the usable Flutter content, on both supported platforms.
+void _setMinimumContentSize(Window window, Size minimum) {
+  final outer = window.size;
+  final content = window.contentSize;
+  window.setMinimumSize(
+    minimum.width + (outer.width - content.width).clamp(0, double.infinity),
+    minimum.height + (outer.height - content.height).clamp(0, double.infinity),
+  );
+}
+
 void _configureTransientWindow(
   Window window, {
   required String title,
@@ -204,7 +212,7 @@ void _configureTransientWindow(
   window.titleBarStyle = TitleBarStyle.hidden;
   window.windowControlButtonsVisible = false;
   window.isResizable = isResizable;
-  window.setMinimumSize(minimumSize.width, minimumSize.height);
+  _setMinimumContentSize(window, minimumSize);
 }
 
 void _presentTransientWindow(Window window, Offset? position) {
@@ -231,7 +239,7 @@ Future<void> showMiniTranslatorWindow({
     isResizable: true,
   );
   if (switchedSurface) {
-    window.setSize(
+    window.setContentSize(
       miniTranslatorInitialSize.width,
       miniTranslatorInitialSize.height,
     );
@@ -239,7 +247,9 @@ Future<void> showMiniTranslatorWindow({
 
   final newPosition =
       position ??
-      (trayBounds != null ? windowPositionBelowTray(trayBounds) : null);
+      (trayBounds != null
+          ? windowPositionBelowTray(trayBounds, windowSize: window.size)
+          : null);
   _presentTransientWindow(window, newPosition);
 }
 
@@ -262,12 +272,12 @@ Future<void> showOcrWindow({Offset? position, Rect? trayBounds}) async {
     isResizable: true,
   );
   if (switchedSurface) {
-    window.setSize(ocrWindowSize.width, ocrWindowSize.height);
+    window.setContentSize(ocrWindowSize.width, ocrWindowSize.height);
   }
   final newPosition =
       position ??
       (trayBounds != null
-          ? windowPositionBelowTray(trayBounds, windowSize: ocrWindowSize)
+          ? windowPositionBelowTray(trayBounds, windowSize: window.size)
           : null);
   _presentTransientWindow(window, newPosition);
 }
