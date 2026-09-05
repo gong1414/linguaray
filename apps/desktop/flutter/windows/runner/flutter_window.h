@@ -6,6 +6,7 @@
 
 #include <memory>
 
+#include "protocol_host.h"
 #include "win32_window.h"
 
 // A window that does nothing but host a Flutter view.
@@ -29,7 +30,5 @@ class FlutterWindow : public Win32Window {
   // The Flutter instance hosted by this window.
   std::unique_ptr<flutter::FlutterViewController> flutter_controller_;
 };
-
-void SetPendingProtocolUrl(const std::string& url);
 
 #endif  // RUNNER_FLUTTER_WINDOW_H_

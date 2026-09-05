@@ -10,10 +10,18 @@ void main() {
   ).readAsStringSync();
   final dartProxy = File('lib/src/platform/network/system_proxy.dart')
       .readAsStringSync();
-  final macHost = File('macos/Runner/Plugins/MacAppPresentationPlugin.swift')
-      .readAsStringSync();
-  final windowsHost = File('windows/runner/flutter_window.cpp')
-      .readAsStringSync();
+  final macHost = Directory('macos/Runner/Plugins')
+      .listSync()
+      .whereType<File>()
+      .where((file) => file.path.endsWith('.swift'))
+      .map((file) => file.readAsStringSync())
+      .join('\n');
+  final windowsHost = Directory('windows/runner')
+      .listSync()
+      .whereType<File>()
+      .where((file) => file.path.endsWith('.cpp') || file.path.endsWith('.h'))
+      .map((file) => file.readAsStringSync())
+      .join('\n');
 
   test('Dart and both desktop hosts agree on shared channel names', () {
     final contracts = <String, List<String>>{

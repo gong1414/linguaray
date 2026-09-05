@@ -1,7 +1,5 @@
-import AVFoundation
 import AppKit
 import FlutterMacOS
-import SystemConfiguration
 
 /// Owns how the process presents itself to macOS: with a Dock icon and the main
 /// menu bar (`.regular`), or as a status-bar-only app (`.accessory`).
@@ -39,22 +37,13 @@ final class MacAppPresentationPlugin: NSObject, FlutterPlugin {
       binaryMessenger: registrar.messenger
     )
     let instance = MacAppPresentationPlugin(channel: channel)
-    instance.selectionReplacement = SelectionReplacementPlugin(messenger: registrar.messenger)
+    instance.selectionReplacement = SelectionReplacementPlugin(
+      messenger: registrar.messenger
+    )
     shared = instance
     registrar.addMethodCallDelegate(instance, channel: channel)
-
-    let speechChannel = FlutterMethodChannel(
-      name: "linguaray/speech",
-      binaryMessenger: registrar.messenger
-    )
-    SpeechPlugin.register(channel: speechChannel)
-
-    let protocolChannel = FlutterMethodChannel(
-      name: "linguaray/protocol",
-      binaryMessenger: registrar.messenger
-    )
-    ProtocolPlugin.register(channel: protocolChannel)
-
+    SpeechPlugin.register(with: registrar)
+    ProtocolPlugin.register(with: registrar)
     SystemProxyPlugin.register(messenger: registrar.messenger)
   }
 
@@ -103,10 +92,6 @@ final class MacAppPresentationPlugin: NSObject, FlutterPlugin {
     }
   }
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // AppKit → Dart
-  // ──────────────────────────────────────────────────────────────────────────
-
   /// The user clicked the Dock icon (or re-launched the app while it runs).
   func notifyReopen() {
     channel.invokeMethod("onReopen", arguments: nil)
@@ -116,10 +101,6 @@ final class MacAppPresentationPlugin: NSObject, FlutterPlugin {
   func notifyOpenSettings() {
     channel.invokeMethod("onOpenSettings", arguments: nil)
   }
-
-  // ──────────────────────────────────────────────────────────────────────────
-  // Activation policy
-  // ──────────────────────────────────────────────────────────────────────────
 
   @MainActor
   static func setDockIconVisible(_ visible: Bool) {
@@ -157,194 +138,5 @@ final class MacAppPresentationPlugin: NSObject, FlutterPlugin {
   @MainActor
   private static func hasVisibleActivatableWindow() -> Bool {
     NSApp.windows.contains { $0.isVisible && $0.canBecomeKey }
-  }
-}
-
-private enum SystemProxyPlugin {
-  private static var channel: FlutterMethodChannel?
-
-  static func register(messenger: FlutterBinaryMessenger) {
-    let channel = FlutterMethodChannel(
-      name: "linguaray/system_proxy",
-      binaryMessenger: messenger
-    )
-    self.channel = channel
-    channel.setMethodCallHandler { call, result in
-      guard call.method == "read" else {
-        result(FlutterMethodNotImplemented)
-        return
-      }
-      result(readSystemProxy())
-    }
-  }
-
-  private static func readSystemProxy() -> [String: Any] {
-    guard let proxies = SCDynamicStoreCopyProxies(nil) as? [String: Any] else {
-      return [:]
-    }
-
-    var value: [String: Any] = [:]
-    if let endpoint = endpoint(
-      proxies,
-      enabledKey: kSCPropNetProxiesHTTPEnable,
-      hostKey: kSCPropNetProxiesHTTPProxy,
-      portKey: kSCPropNetProxiesHTTPPort
-    ) {
-      value["http"] = endpoint
-    }
-    if let endpoint = endpoint(
-      proxies,
-      enabledKey: kSCPropNetProxiesHTTPSEnable,
-      hostKey: kSCPropNetProxiesHTTPSProxy,
-      portKey: kSCPropNetProxiesHTTPSPort
-    ) {
-      value["https"] = endpoint
-    }
-    var bypass = proxies[kSCPropNetProxiesExceptionsList as String] as? [String] ?? []
-    if (proxies[kSCPropNetProxiesExcludeSimpleHostnames as String] as? NSNumber)?.boolValue == true
-    {
-      bypass.append("<local>")
-    }
-    value["bypass"] = bypass
-    return value
-  }
-
-  private static func endpoint(
-    _ proxies: [String: Any],
-    enabledKey: CFString,
-    hostKey: CFString,
-    portKey: CFString
-  ) -> String? {
-    guard
-      (proxies[enabledKey as String] as? NSNumber)?.boolValue == true,
-      let host = proxies[hostKey as String] as? String,
-      !host.isEmpty,
-      let port = proxies[portKey as String] as? NSNumber,
-      port.intValue > 0
-    else {
-      return nil
-    }
-    return "\(host):\(port.intValue)"
-  }
-}
-
-// Flutter platform-channel callbacks and AVSpeechSynthesizer callbacks both
-// arrive on the runner's main thread. Swift cannot infer that executor contract
-// from the Objective-C protocols, so declare the shared plugin explicitly.
-final class SpeechPlugin: NSObject, FlutterPlugin, AVSpeechSynthesizerDelegate,
-  @unchecked Sendable
-{
-  static let shared = SpeechPlugin()
-  private let synthesizer = AVSpeechSynthesizer()
-  private var channel: FlutterMethodChannel?
-  private var activeUtterance: AVSpeechUtterance?
-
-  static func register(channel: FlutterMethodChannel) {
-    shared.channel = channel
-    shared.synthesizer.delegate = shared
-    channel.setMethodCallHandler { call, result in
-      shared.handle(call, result: result)
-    }
-  }
-
-  static func register(with registrar: FlutterPluginRegistrar) {
-    let channel = FlutterMethodChannel(
-      name: "linguaray/speech",
-      binaryMessenger: registrar.messenger
-    )
-    register(channel: channel)
-  }
-
-  func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-    switch call.method {
-    case "isAvailable":
-      result(true)
-    case "stop":
-      activeUtterance = nil
-      synthesizer.stopSpeaking(at: .immediate)
-      notifyState("idle")
-      result(nil)
-    case "speak":
-      guard
-        let arguments = call.arguments as? [String: Any],
-        let text = arguments["text"] as? String,
-        !text.isEmpty
-      else {
-        result(
-          FlutterError(code: "bad_args", message: "Expected text.", details: nil)
-        )
-        return
-      }
-      // Invalidate the previous utterance before stopping it so its delayed
-      // cancellation delegate callback cannot clear the state of the new one.
-      activeUtterance = nil
-      synthesizer.stopSpeaking(at: .immediate)
-      let utterance = AVSpeechUtterance(string: text)
-      if let language = arguments["language"] as? String, !language.isEmpty {
-        utterance.voice = AVSpeechSynthesisVoice(language: language)
-      }
-      activeUtterance = utterance
-      synthesizer.speak(utterance)
-      result(nil)
-    default:
-      result(FlutterMethodNotImplemented)
-    }
-  }
-
-  func speechSynthesizer(
-    _ synthesizer: AVSpeechSynthesizer,
-    didFinish utterance: AVSpeechUtterance
-  ) {
-    guard utterance === activeUtterance else { return }
-    activeUtterance = nil
-    notifyState("idle")
-  }
-
-  func speechSynthesizer(
-    _ synthesizer: AVSpeechSynthesizer,
-    didCancel utterance: AVSpeechUtterance
-  ) {
-    guard utterance === activeUtterance else { return }
-    activeUtterance = nil
-    notifyState("interrupted")
-  }
-
-  private func notifyState(_ state: String) {
-    channel?.invokeMethod("stateChanged", arguments: state)
-  }
-}
-
-final class ProtocolPlugin: NSObject, FlutterPlugin {
-  static let shared = ProtocolPlugin()
-  private var channel: FlutterMethodChannel?
-  private var pendingURLs: [String] = []
-
-  static func register(channel: FlutterMethodChannel) {
-    shared.channel = channel
-    for rawURL in shared.pendingURLs {
-      channel.invokeMethod("open", arguments: rawURL)
-    }
-    shared.pendingURLs.removeAll(keepingCapacity: false)
-  }
-
-  static func register(with registrar: FlutterPluginRegistrar) {
-    let channel = FlutterMethodChannel(
-      name: "linguaray/protocol",
-      binaryMessenger: registrar.messenger
-    )
-    register(channel: channel)
-  }
-
-  func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-    result(FlutterMethodNotImplemented)
-  }
-
-  func open(_ url: URL) {
-    let rawURL = url.absoluteString
-    guard let channel else {
-      pendingURLs.append(rawURL)
-      return
-    }
-    channel.invokeMethod("open", arguments: rawURL)
   }
 }
