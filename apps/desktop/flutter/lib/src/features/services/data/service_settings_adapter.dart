@@ -1,6 +1,7 @@
 import 'package:linguaray_application/linguaray_application.dart';
 
 import '../../../app/runtime.dart';
+import '../../../app/settings/settings_section.dart';
 import '../../../app/settings/settings_store.dart';
 import '../../providers/data/provider_util.dart';
 
@@ -16,6 +17,9 @@ final class RuntimeServiceSettingsAdapter implements ServiceSettingsRepository {
       _store.reloadServices(),
       _store.reloadProviders(),
     ]);
+    _store.throwIfErrored(SettingsSection.general);
+    _store.throwIfErrored(SettingsSection.services);
+    _store.throwIfErrored(SettingsSection.providers);
     final providers = {for (final item in _store.providers) item.id: item};
     final defaultTranslation = _store.defaultTranslationService;
     final defaultOcr = _store.defaultOcrService;
@@ -61,6 +65,7 @@ final class RuntimeServiceSettingsAdapter implements ServiceSettingsRepository {
       fields: fields,
     );
     await _store.reloadServices();
+    _store.throwIfErrored(SettingsSection.services);
   }
 
   @override
@@ -78,18 +83,22 @@ final class RuntimeServiceSettingsAdapter implements ServiceSettingsRepository {
       fields: draft.fields,
     );
     await _store.reloadServices();
+    _store.throwIfErrored(SettingsSection.services);
   }
 
   @override
   Future<void> deleteService(String serviceId) async {
     await runtime.settings().deleteService(serviceId: serviceId);
     await _store.reloadServices();
+    _store.throwIfErrored(SettingsSection.services);
   }
 
   @override
   Future<void> reorderTranslationServices(List<String> serviceIds) async {
     await runtime.settings().setTranslationServiceOrder(order: serviceIds);
     await Future.wait([_store.reloadGeneral(), _store.reloadServices()]);
+    _store.throwIfErrored(SettingsSection.general);
+    _store.throwIfErrored(SettingsSection.services);
   }
 
   bool _isVisibleService(

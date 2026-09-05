@@ -17,6 +17,7 @@ class ShortcutsSettingsView extends StatelessWidget {
     this.title,
     this.additionalChildren = const [],
     this.descriptionBuilder,
+    this.errorBanner,
   });
 
   final ShortcutsSettingsLabels labels;
@@ -29,6 +30,7 @@ class ShortcutsSettingsView extends StatelessWidget {
   final VoidCallback onReset;
   final List<Widget> additionalChildren;
   final String Function(String actionId)? descriptionBuilder;
+  final Widget? errorBanner;
 
   @override
   Widget build(BuildContext context) {
@@ -37,6 +39,7 @@ class ShortcutsSettingsView extends StatelessWidget {
     return SettingsPage(
       title: title ?? labels.title,
       children: [
+        if (errorBanner != null) ...[errorBanner!, const SizedBox(height: 12)],
         Row(
           children: [
             if ((title ?? labels.title) != labels.title)

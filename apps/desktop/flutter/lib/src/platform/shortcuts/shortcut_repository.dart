@@ -2,6 +2,7 @@ import 'package:linguaray_application/linguaray_application.dart';
 import 'package:linguaray_runtime/linguaray_runtime.dart'
     show ShortcutSettingsPatch;
 
+import '../../app/settings/settings_section.dart';
 import '../../app/settings/settings_store.dart';
 import '../platform_types.dart';
 import 'shortcut_service.dart';
@@ -34,6 +35,7 @@ final class RuntimeShortcutRepository implements ShortcutRepository {
   @override
   Future<List<ShortcutRecord>> load() async {
     await _store.reloadShortcuts();
+    _store.throwIfErrored(SettingsSection.shortcuts);
     final byAction = {
       for (final binding in _service.bindings) binding.action: binding,
     };

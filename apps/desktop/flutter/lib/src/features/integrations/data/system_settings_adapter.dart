@@ -69,6 +69,7 @@ final class RuntimeSystemSettingsAdapter
   @override
   Future<NetworkSettings> loadNetworkSettings() async {
     await _store.reloadAdvanced();
+    _store.throwIfErrored(SettingsSection.advanced);
     final advanced = _store.advanced;
     return NetworkSettings(
       proxyMode: switch (advanced.proxyMode) {

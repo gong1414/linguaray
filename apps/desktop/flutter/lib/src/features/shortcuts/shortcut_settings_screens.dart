@@ -8,6 +8,7 @@ import 'package:linguaray_application/linguaray_application.dart';
 
 import '../../i18n/i18n.dart';
 import '../../shared/i18n_labels.dart';
+import '../../shared/status_message.dart';
 import '../preferences/general_settings_view_model.dart';
 import '../preferences/translation_preference_dialogs.dart';
 import 'shortcuts_settings_view.dart';
@@ -118,6 +119,18 @@ class _ShortcutsSettingsScreenState
               ),
         ],
         recordingActionId: state.recordingActionId,
+        errorBanner: state.errorCode == null
+            ? null
+            : StatusMessage(
+                kind: StatusKind.error,
+                title: appErrorMessage(state.errorCode),
+                action: TextButton(
+                  onPressed: () => unawaited(
+                    ref.read(shortcutsViewModelProvider.notifier).reload(),
+                  ),
+                  child: Text(t.workbench.translation.retry),
+                ),
+              ),
         descriptionBuilder: shortcutActionDescription,
         additionalChildren: _preferenceChildren(context, generalState),
         onStartRecording: (id) {

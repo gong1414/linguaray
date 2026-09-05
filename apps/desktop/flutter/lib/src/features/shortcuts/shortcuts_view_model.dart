@@ -15,16 +15,19 @@ final class ShortcutsViewState {
     this.shortcuts = const [],
     this.recordingActionId,
     this.loading = true,
+    this.errorCode,
   });
 
   final List<ShortcutRecord> shortcuts;
   final String? recordingActionId;
   final bool loading;
+  final String? errorCode;
 
   ShortcutsViewState copyWith({
     List<ShortcutRecord>? shortcuts,
     Object? recordingActionId = _unset,
     bool? loading,
+    Object? errorCode = _unset,
   }) {
     return ShortcutsViewState(
       shortcuts: shortcuts ?? this.shortcuts,
@@ -32,6 +35,9 @@ final class ShortcutsViewState {
           ? this.recordingActionId
           : recordingActionId as String?,
       loading: loading ?? this.loading,
+      errorCode: identical(errorCode, _unset)
+          ? this.errorCode
+          : errorCode as String?,
     );
   }
 }
@@ -46,8 +52,19 @@ final class ShortcutsViewModel extends Notifier<ShortcutsViewState> {
   }
 
   Future<void> reload() async {
-    final shortcuts = await ref.read(shortcutRepositoryProvider).load();
-    state = state.copyWith(shortcuts: shortcuts, loading: false);
+    try {
+      final shortcuts = await ref.read(shortcutRepositoryProvider).load();
+      state = state.copyWith(
+        shortcuts: shortcuts,
+        loading: false,
+        errorCode: null,
+      );
+    } catch (_) {
+      state = state.copyWith(
+        loading: false,
+        errorCode: AppErrorCode.unknown.wireName,
+      );
+    }
   }
 
   Future<void> startRecording(String actionId) async {

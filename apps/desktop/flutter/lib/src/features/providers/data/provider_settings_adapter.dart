@@ -3,6 +3,7 @@ import 'package:linguaray_runtime/linguaray_runtime.dart'
     show listCatalogSnapshotModels, listProviderCatalog;
 
 import '../../../app/runtime.dart';
+import '../../../app/settings/settings_section.dart';
 import '../../../app/settings/settings_store.dart';
 import '../../../platform/credentials/secret_fields.dart';
 import '../../../platform/credentials/secret_store.dart';
@@ -23,6 +24,7 @@ final class RuntimeProviderSettingsAdapter
   @override
   Future<List<ProviderRecord>> listProviders() async {
     await _store.reloadProviders();
+    _store.throwIfErrored(SettingsSection.providers);
     final catalog = providerTypeOptionsFromCatalog(listProviderCatalog());
     return [
       for (final provider in _store.providers)

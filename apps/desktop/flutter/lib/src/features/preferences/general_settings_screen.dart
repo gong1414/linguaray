@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../i18n/i18n.dart';
 import '../../shared/i18n_labels.dart';
+import '../../shared/settings_page.dart';
+import '../../shared/status_message.dart';
 import 'general_settings_view.dart';
 import 'general_settings_view_model.dart';
 
@@ -15,8 +17,23 @@ class GeneralSettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(generalSettingsViewModelProvider);
     final preferences = state.preferences;
-    if (preferences == null || state.loading) {
+    if (state.loading && preferences == null) {
       return const Center(child: CircularProgressIndicator());
+    }
+    if (preferences == null) {
+      return SettingsPage(
+        title: t.settings.navigation.general_settings,
+        body: StatusMessage(
+          kind: StatusKind.error,
+          title: appErrorMessage(state.errorCode),
+          action: OutlinedButton(
+            onPressed: () => unawaited(
+              ref.read(generalSettingsViewModelProvider.notifier).reload(),
+            ),
+            child: Text(t.workbench.translation.retry),
+          ),
+        ),
+      );
     }
     return GeneralSettingsView(
       labels: generalSettingsLabels(),

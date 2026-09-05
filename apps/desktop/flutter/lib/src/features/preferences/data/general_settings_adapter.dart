@@ -5,6 +5,7 @@ import 'package:linguaray_runtime/linguaray_runtime.dart'
 
 import '../../../app/runtime.dart' hide InputSubmitMode;
 import '../../../app/settings/settings_effects.dart';
+import '../../../app/settings/settings_section.dart';
 import '../../../app/settings/settings_store.dart';
 import '../../../shared/language_util.dart';
 
@@ -17,6 +18,8 @@ final class RuntimeGeneralSettingsAdapter
   @override
   Future<GeneralPreferences> loadGeneral() async {
     await Future.wait([_store.reloadGeneral(), _store.reloadAppearance()]);
+    _store.throwIfErrored(SettingsSection.general);
+    _store.throwIfErrored(SettingsSection.appearance);
     return currentPreferences;
   }
 

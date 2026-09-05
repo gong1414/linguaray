@@ -105,6 +105,16 @@ class SettingsStore extends ChangeNotifier implements SettingsSnapshotSource {
 
   Object? errorFor(SettingsSection section) => _errors[section];
 
+  /// Throws the last load error for [section] so adapters and view models can
+  /// keep a previous snapshot while still reporting the failure.
+  void throwIfErrored(SettingsSection section) {
+    final error = _errors[section];
+    if (error == null) return;
+    if (error is Exception) throw error;
+    if (error is Error) throw error;
+    throw StateError('$error');
+  }
+
   Future<void> init() async {
     // Appearance owns the user's app language and must load first so the
     // lifecycle coordinator can seed a matching default translation target.
