@@ -53,6 +53,31 @@ pub fn translate_text_system_prompt(
     style: Option<&str>,
     glossary: &[GlossaryTerm],
 ) -> String {
+    let mut instructions = translation_instructions(source, target, style, glossary);
+    instructions.push(json_only(r#"{"translations":[{"text":"..."}]}"#));
+    instructions.join("\n\n")
+}
+
+/// Streaming output is displayed as it arrives, so it must be plain text.
+pub fn translate_text_stream_system_prompt(
+    source: &str,
+    target: &str,
+    glossary: &[GlossaryTerm],
+) -> String {
+    let mut instructions = translation_instructions(source, target, None, glossary);
+    instructions.push(
+        "Return only the translated text. Do not add JSON wrappers, Markdown fences, labels, or explanations."
+            .to_owned(),
+    );
+    instructions.join("\n\n")
+}
+
+fn translation_instructions(
+    source: &str,
+    target: &str,
+    style: Option<&str>,
+    glossary: &[GlossaryTerm],
+) -> Vec<String> {
     let mut instructions = vec![
         format!("Translate from {source} to {target}."),
         "Preserve meaning, tone, paragraph breaks, code, and established names.".to_owned(),
@@ -63,8 +88,7 @@ pub fn translate_text_system_prompt(
     if let Some(rules) = glossary_constraints(glossary) {
         instructions.push(rules);
     }
-    instructions.push(json_only(r#"{"translations":[{"text":"..."}]}"#));
-    instructions.join("\n\n")
+    instructions
 }
 
 pub fn translate_text_user_prompt(text: &str) -> String {

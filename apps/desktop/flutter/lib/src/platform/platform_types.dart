@@ -98,17 +98,15 @@ class OcrRecognitionResult {
 }
 
 abstract interface class SecretStore {
-  String? read({required String providerId, required String field});
+  Future<String?> read({required String providerId, required String field});
 
-  void write({
+  Future<void> write({
     required String providerId,
     required String field,
     required String value,
   });
 
-  void delete({required String providerId, required String field});
-
-  void deleteProvider(String providerId);
+  Future<void> delete({required String providerId, required String field});
 }
 
 class PlatformOperationException implements Exception {

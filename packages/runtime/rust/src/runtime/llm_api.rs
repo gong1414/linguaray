@@ -357,10 +357,9 @@ impl RuntimeLlm {
                             &terms,
                         )
                     } else {
-                        linguaray_engine::prompt::translate_text_system_prompt(
+                        linguaray_engine::prompt::translate_text_stream_system_prompt(
                             &source_lang,
                             &target_lang,
-                            None,
                             &terms,
                         )
                     };

@@ -11,6 +11,14 @@ use std::{
 };
 
 fn server(parts: Vec<Vec<u8>>, delay: Duration) -> String {
+    server_checking_request(parts, delay, |_| {})
+}
+
+fn server_checking_request(
+    parts: Vec<Vec<u8>>,
+    delay: Duration,
+    check: impl FnOnce(serde_json::Value) + Send + 'static,
+) -> String {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let address = listener.local_addr().unwrap();
     thread::spawn(move || {
@@ -41,6 +49,8 @@ fn server(parts: Vec<Vec<u8>>, delay: Duration) -> String {
                 }
             }
         }
+        let body_start = data.windows(4).position(|x| x == b"\r\n\r\n").unwrap() + 4;
+        check(serde_json::from_slice(&data[body_start..]).unwrap());
         socket.write_all(b"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n").unwrap();
         for part in parts {
             write!(socket, "{:x}\r\n", part.len()).unwrap();
@@ -124,7 +134,11 @@ impl StreamCallback for Callback {
 #[test]
 fn runtime_stream_must_deliver_a_successful_local_response() {
     let payload = b"data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"hello\"},\"finish_reason\":\"stop\"}]}\n\n";
-    let base = server(vec![payload.to_vec()], Duration::from_millis(5));
+    let base = server_checking_request(vec![payload.to_vec()], Duration::from_millis(5), |body| {
+        let prompt = body["messages"][0]["content"].as_str().unwrap();
+        assert!(prompt.contains("Return only the translated text"));
+        assert!(!prompt.contains("Return only valid JSON"));
+    });
     let dir = std::env::temp_dir().join(format!(
         "linguaray-audit-stream-{}",
         SystemTime::now()

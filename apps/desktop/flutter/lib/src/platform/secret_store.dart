@@ -1,4 +1,4 @@
-import 'package:nativeapi/nativeapi.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../services/runtime.dart';
 import 'platform_types.dart';
@@ -8,41 +8,32 @@ const _kSecretScope = 'io.github.gong1414.linguaray.v2.providers';
 const _kSecretScheme = 'linguaray-secret';
 
 class NativeSecretStore implements SecretStore {
-  NativeSecretStore() : _storage = SecureStorage.withScope(_kSecretScope);
+  // Use the macOS login Keychain, which also supports ad-hoc desktop builds.
+  // No access groups or cross-application credential sharing are needed.
+  final FlutterSecureStorage _storage = const FlutterSecureStorage(
+    mOptions: MacOsOptions(
+      accountName: _kSecretScope,
+      usesDataProtectionKeychain: false,
+    ),
+  );
 
-  final SecureStorage _storage;
-
-  String _key(String providerId, String field) => '$providerId::$field';
+  String _key(String providerId, String field) =>
+      '$_kSecretScope::$providerId::$field';
 
   @override
-  String? read({required String providerId, required String field}) {
-    final value = _storage.get(_key(providerId, field));
-    return value.isEmpty ? null : value;
-  }
+  Future<String?> read({required String providerId, required String field}) =>
+      _storage.read(key: _key(providerId, field));
 
   @override
-  void write({
+  Future<void> write({
     required String providerId,
     required String field,
     required String value,
-  }) {
-    if (!_storage.set(_key(providerId, field), value)) {
-      throw StateError('Secure storage rejected a provider credential.');
-    }
-  }
+  }) => _storage.write(key: _key(providerId, field), value: value);
 
   @override
-  void delete({required String providerId, required String field}) {
-    _storage.remove(_key(providerId, field));
-  }
-
-  @override
-  void deleteProvider(String providerId) {
-    final prefix = '$providerId::';
-    for (final key in _storage.keys.where((key) => key.startsWith(prefix))) {
-      _storage.remove(key);
-    }
-  }
+  Future<void> delete({required String providerId, required String field}) =>
+      _storage.delete(key: _key(providerId, field));
 }
 
 class ProviderCredentialsController {
@@ -61,11 +52,11 @@ class ProviderCredentialsController {
       Uri.tryParse(value)?.scheme == _kSecretScheme;
 
   /// Stores secrets in the OS vault and returns fields safe for settings.json.
-  Map<String, String> protectFields({
+  Future<Map<String, String>> protectFields({
     required String providerId,
     required Map<String, String> fields,
     Map<String, String> existingFields = const {},
-  }) {
+  }) async {
     final protected = <String, String>{};
     final keys = {
       ...fields.keys,
@@ -81,7 +72,7 @@ class ProviderCredentialsController {
 
       final value = fieldValue.trim();
       if (value.isNotEmpty && !isReference(value)) {
-        _store.write(providerId: providerId, field: key, value: value);
+        await _store.write(providerId: providerId, field: key, value: value);
         protected[key] = _reference(providerId, key);
       } else if (isReference(value)) {
         protected[key] = value;
@@ -98,11 +89,11 @@ class ProviderCredentialsController {
   /// Resolves a provider draft into an in-memory configuration suitable for
   /// a connection test. Unlike [protectFields], this method never writes to
   /// secure storage and never returns opaque secret references.
-  Map<String, String> materializeFields({
+  Future<Map<String, String>> materializeFields({
     required String providerId,
     required Map<String, String> fields,
     Map<String, String> existingFields = const {},
-  }) {
+  }) async {
     final materialized = <String, String>{};
     final keys = {
       ...fields.keys,
@@ -124,7 +115,7 @@ class ProviderCredentialsController {
 
       final reference = isReference(value) ? value : existingFields[key];
       if (reference == null || !isReference(reference)) continue;
-      final stored = _store.read(providerId: providerId, field: key);
+      final stored = await _store.read(providerId: providerId, field: key);
       if (stored != null) materialized[key] = stored;
     }
     return materialized;
@@ -134,7 +125,10 @@ class ProviderCredentialsController {
     final secrets = <String, String>{};
     for (final entry in provider.fields.entries) {
       if (!isSecretField(entry.key) || !isReference(entry.value)) continue;
-      final value = _store.read(providerId: provider.id, field: entry.key);
+      final value = await _store.read(
+        providerId: provider.id,
+        field: entry.key,
+      );
       if (value != null) secrets[entry.key] = value;
     }
     await runtime.settings().setProviderSecrets(
@@ -150,7 +144,14 @@ class ProviderCredentialsController {
     }
   }
 
-  void deleteProvider(String providerId) => _store.deleteProvider(providerId);
+  Future<void> deleteProvider(
+    String providerId, {
+    required Iterable<String> fields,
+  }) async {
+    for (final field in fields.where(isSecretField)) {
+      await _store.delete(providerId: providerId, field: field);
+    }
+  }
 }
 
 late final ProviderCredentialsController providerCredentialsController;

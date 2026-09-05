@@ -105,7 +105,7 @@ final class RuntimeProviderSettingsAdapter {
     final type = parseProviderType(draft.typeId);
     final existing = _existingProvider(draft.id);
     _ensureValidDraft(draft, type: type, existing: existing);
-    final protected = _credentials.protectFields(
+    final protected = await _credentials.protectFields(
       providerId: draft.id,
       fields: draft.fields,
       existingFields: existing?.fields ?? const {},
@@ -121,8 +121,14 @@ final class RuntimeProviderSettingsAdapter {
   }
 
   Future<void> deleteProvider(String providerId) async {
+    final existing = await runtime.settings().getProvider(
+      providerId: providerId,
+    );
+    await _credentials.deleteProvider(
+      providerId,
+      fields: existing?.fields.keys ?? const [],
+    );
     await runtime.settings().deleteProvider(providerId: providerId);
-    _credentials.deleteProvider(providerId);
     await Future.wait([_store.reloadProviders(), _store.reloadServices()]);
   }
 
@@ -131,7 +137,7 @@ final class RuntimeProviderSettingsAdapter {
       final type = parseProviderType(draft.typeId);
       final existing = _existingProvider(draft.id);
       _ensureValidDraft(draft, type: type, existing: existing);
-      final fields = _credentials.materializeFields(
+      final fields = await _credentials.materializeFields(
         providerId: draft.id,
         fields: draft.fields,
         existingFields: existing?.fields ?? const {},
@@ -183,7 +189,7 @@ final class RuntimeProviderSettingsAdapter {
         errorCode: 'validation_missing',
       );
     }
-    final fields = _credentials.materializeFields(
+    final fields = await _credentials.materializeFields(
       providerId: draft.id,
       fields: draft.fields,
       existingFields: existing?.fields ?? const {},

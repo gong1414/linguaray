@@ -11,6 +11,7 @@ import 'package:linguaray_desktop/main.dart' as app;
 import 'package:linguaray_desktop/src/config/dependencies.dart';
 import 'package:linguaray_desktop/src/platform/permission_controller.dart';
 import 'package:linguaray_desktop/src/platform/platform_types.dart';
+import 'package:linguaray_desktop/src/platform/secret_store.dart';
 import 'package:linguaray_desktop/src/platform/trigger_controller.dart';
 import 'package:linguaray_desktop/src/services/app_windows.dart';
 import 'package:linguaray_desktop/src/services/llm_stream.dart';
@@ -42,6 +43,26 @@ void main() {
     expect(find.byType(SettingsShellView), findsOneWidget);
     expect(find.byType(ErrorWidget), findsNothing);
     expect(settingsWindowController.window.isVisible, isFalse);
+
+    await tester.runAsync(() async {
+      final storage = NativeSecretStore();
+      final id = 'vault-smoke-${DateTime.now().microsecondsSinceEpoch}';
+      try {
+        await storage.write(
+          providerId: id,
+          field: 'apiKey',
+          value: 'public-vault-fixture',
+        );
+        expect(
+          await NativeSecretStore().read(providerId: id, field: 'apiKey'),
+          'public-vault-fixture',
+        );
+      } finally {
+        await storage.delete(providerId: id, field: 'apiKey');
+      }
+      expect(await storage.read(providerId: id, field: 'apiKey'), isNull);
+    });
+    debugPrint('[smoke] native credential storage roundtrip passed');
 
     await tester.runAsync(() async {
       final deadline = DateTime.now().add(const Duration(seconds: 10));
