@@ -312,39 +312,12 @@ impl HistoryStore {
     }
 
     fn persist(&self) -> Result<(), String> {
-        let parent = self
-            .path
-            .parent()
-            .ok_or_else(|| "history path has no parent".to_owned())?;
-        fs::create_dir_all(parent).map_err(|error| {
-            format!(
-                "failed to create history directory `{}`: {error}",
-                parent.display()
-            )
-        })?;
         let content = serde_json::to_string_pretty(&HistoryFile {
             version: HISTORY_VERSION,
             entries: self.entries.clone(),
         })
         .map_err(|error| format!("failed to encode history: {error}"))?;
-        let temporary = self.path.with_extension("json.tmp");
-        fs::write(&temporary, content).map_err(|error| {
-            format!("failed to write history `{}`: {error}", temporary.display())
-        })?;
-        if self.path.exists() {
-            fs::remove_file(&self.path).map_err(|error| {
-                format!(
-                    "failed to replace history `{}`: {error}",
-                    self.path.display()
-                )
-            })?;
-        }
-        fs::rename(&temporary, &self.path).map_err(|error| {
-            format!(
-                "failed to commit history `{}`: {error}",
-                self.path.display()
-            )
-        })
+        crate::storage::write_bytes(&self.path, content.as_bytes())
     }
 }
 

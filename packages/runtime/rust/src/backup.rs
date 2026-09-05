@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 use std::fs::{self, File};
-use std::io::Write;
+use std::io::{Seek, Write};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -80,25 +80,6 @@ impl Drop for InstalledBackup {
 }
 
 pub fn export_backup(data_dir: &Path, destination: &Path) -> Result<(u64, u32), String> {
-    let parent = destination
-        .parent()
-        .ok_or_else(|| "backup destination has no parent".to_owned())?;
-    fs::create_dir_all(parent).map_err(|error| {
-        format!(
-            "failed to create backup directory `{}`: {error}",
-            parent.display()
-        )
-    })?;
-    let temporary = destination.with_extension("linguaray-backup.tmp");
-    if temporary.exists() {
-        fs::remove_file(&temporary).map_err(|error| {
-            format!(
-                "failed to replace temporary backup `{}`: {error}",
-                temporary.display()
-            )
-        })?;
-    }
-
     let created_at = now_secs()?;
     let manifest = BackupManifest {
         format: BACKUP_FORMAT.to_owned(),
@@ -106,69 +87,55 @@ pub fn export_backup(data_dir: &Path, destination: &Path) -> Result<(u64, u32), 
         created_at,
         includes_secrets: false,
     };
-    let file = File::create(&temporary)
-        .map_err(|error| format!("failed to create backup `{}`: {error}", temporary.display()))?;
-    let mut archive = ZipWriter::new(file);
-    let options = SimpleFileOptions::default()
-        .compression_method(CompressionMethod::Deflated)
-        .unix_permissions(0o600);
-    let manifest_json = serde_json::to_vec_pretty(&manifest)
-        .map_err(|error| format!("failed to encode backup manifest: {error}"))?;
-    archive
-        .start_file("manifest.json", options)
-        .map_err(|error| format!("failed to write backup manifest: {error}"))?;
-    archive
-        .write_all(&manifest_json)
-        .map_err(|error| format!("failed to write backup manifest: {error}"))?;
-    let mut file_count = 1_u32;
+    crate::storage::write_atomic(destination, |file| {
+        let mut archive = ZipWriter::new(file);
+        let options = SimpleFileOptions::default()
+            .compression_method(CompressionMethod::Deflated)
+            .unix_permissions(0o600);
+        let manifest_json = serde_json::to_vec_pretty(&manifest)
+            .map_err(|error| format!("failed to encode backup manifest: {error}"))?;
+        archive
+            .start_file("manifest.json", options)
+            .map_err(|error| format!("failed to write backup manifest: {error}"))?;
+        archive
+            .write_all(&manifest_json)
+            .map_err(|error| format!("failed to write backup manifest: {error}"))?;
+        let mut file_count = 1_u32;
 
-    for name in ["settings.json", "history.json", "vocabulary.json"] {
-        let path = data_dir.join(name);
-        if path.is_file() {
-            write_file(&mut archive, &path, name, options)?;
-            file_count += 1;
+        for name in ["settings.json", "history.json", "vocabulary.json"] {
+            let path = data_dir.join(name);
+            if path.is_file() {
+                write_file(&mut archive, &path, name, options)?;
+                file_count += 1;
+            }
         }
-    }
-    archive
-        .add_directory("glossary/", options)
-        .map_err(|error| format!("failed to add glossary directory: {error}"))?;
-    let glossary = data_dir.join("glossary");
-    if glossary.is_dir() {
-        let mut entries = fs::read_dir(&glossary)
-            .map_err(|error| format!("failed to read glossary: {error}"))?
-            .filter_map(Result::ok)
-            .map(|entry| entry.path())
-            .filter(|path| path.extension().and_then(|value| value.to_str()) == Some("json"))
-            .collect::<Vec<_>>();
-        entries.sort();
-        for path in entries {
-            let name = path
-                .file_name()
-                .and_then(|value| value.to_str())
-                .ok_or_else(|| "glossary file name is not valid UTF-8".to_owned())?;
-            write_file(&mut archive, &path, &format!("glossary/{name}"), options)?;
-            file_count += 1;
+        archive
+            .add_directory("glossary/", options)
+            .map_err(|error| format!("failed to add glossary directory: {error}"))?;
+        let glossary = data_dir.join("glossary");
+        if glossary.is_dir() {
+            let mut entries = fs::read_dir(&glossary)
+                .map_err(|error| format!("failed to read glossary: {error}"))?
+                .filter_map(Result::ok)
+                .map(|entry| entry.path())
+                .filter(|path| path.extension().and_then(|value| value.to_str()) == Some("json"))
+                .collect::<Vec<_>>();
+            entries.sort();
+            for path in entries {
+                let name = path
+                    .file_name()
+                    .and_then(|value| value.to_str())
+                    .ok_or_else(|| "glossary file name is not valid UTF-8".to_owned())?;
+                write_file(&mut archive, &path, &format!("glossary/{name}"), options)?;
+                file_count += 1;
+            }
         }
-    }
-    archive
-        .finish()
-        .map_err(|error| format!("failed to finish backup: {error}"))?;
+        archive
+            .finish()
+            .map_err(|error| format!("failed to finish backup: {error}"))?;
 
-    if destination.exists() {
-        fs::remove_file(destination).map_err(|error| {
-            format!(
-                "failed to replace backup `{}`: {error}",
-                destination.display()
-            )
-        })?;
-    }
-    fs::rename(&temporary, destination).map_err(|error| {
-        format!(
-            "failed to publish backup `{}`: {error}",
-            destination.display()
-        )
-    })?;
-    Ok((created_at, file_count))
+        Ok((created_at, file_count))
+    })
 }
 
 pub fn stage_backup(source: &Path) -> Result<StagedBackup, String> {
@@ -347,8 +314,8 @@ pub fn discard_staging(staging: &Path) {
     let _ = fs::remove_dir_all(staging);
 }
 
-fn write_file(
-    archive: &mut ZipWriter<File>,
+fn write_file<W: Write + Seek>(
+    archive: &mut ZipWriter<W>,
     source: &Path,
     archive_name: &str,
     options: SimpleFileOptions,
@@ -428,6 +395,7 @@ mod tests {
         )
         .expect("write glossary");
         let archive = root.join("backup.zip");
+        fs::write(&archive, b"previous backup").unwrap();
 
         let (_, count) = export_backup(&data, &archive).expect("export backup");
         assert_eq!(count, 4);
@@ -439,6 +407,20 @@ mod tests {
 
         discard_staging(&staged.directory);
         fs::remove_dir_all(root).expect("remove test data");
+    }
+
+    #[test]
+    fn failed_export_preserves_the_previous_archive() {
+        let root = tempfile::tempdir().unwrap();
+        let data = root.path().join("data");
+        fs::create_dir_all(data.join("glossary/invalid.json")).unwrap();
+        fs::write(data.join("settings.json"), "{}").unwrap();
+        let archive = root.path().join("backup.zip");
+        fs::write(&archive, b"previous backup").unwrap();
+
+        assert!(export_backup(&data, &archive).is_err());
+        assert_eq!(fs::read(&archive).unwrap(), b"previous backup");
+        assert_eq!(fs::read_dir(root.path()).unwrap().count(), 2);
     }
 
     #[test]

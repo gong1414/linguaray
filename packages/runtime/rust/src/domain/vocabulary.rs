@@ -263,48 +263,12 @@ impl VocabularyStore {
     }
 
     fn persist(&self) -> Result<(), String> {
-        let parent = self
-            .path
-            .parent()
-            .ok_or_else(|| "vocabulary path has no parent".to_owned())?;
-        fs::create_dir_all(parent).map_err(|error| {
-            format!(
-                "failed to create vocabulary directory `{}`: {error}",
-                parent.display()
-            )
-        })?;
         let content = serde_json::to_string_pretty(&VocabularyFile {
             version: VOCABULARY_VERSION,
             entries: self.entries.clone(),
         })
         .map_err(|error| format!("failed to encode vocabulary: {error}"))?;
-        let temporary = self.path.with_file_name(format!(
-            ".{}.tmp",
-            self.path
-                .file_name()
-                .and_then(|name| name.to_str())
-                .unwrap_or("vocabulary.json")
-        ));
-        fs::write(&temporary, content).map_err(|error| {
-            format!(
-                "failed to write vocabulary `{}`: {error}",
-                temporary.display()
-            )
-        })?;
-        if self.path.exists() {
-            fs::remove_file(&self.path).map_err(|error| {
-                format!(
-                    "failed to replace vocabulary `{}`: {error}",
-                    self.path.display()
-                )
-            })?;
-        }
-        fs::rename(&temporary, &self.path).map_err(|error| {
-            format!(
-                "failed to commit vocabulary `{}`: {error}",
-                self.path.display()
-            )
-        })
+        crate::storage::write_bytes(&self.path, content.as_bytes())
     }
 }
 

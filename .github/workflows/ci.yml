@@ -97,7 +97,7 @@ jobs:
         run: python3 scripts/format.py --check swift
       - name: Real system OCR fixture
         working-directory: .
-        run: cargo test -p linguaray_runtime system_ocr_recognizes_fixed_catalog_image
+        run: cargo test --locked -p linguaray_runtime
       - name: Desktop integration smoke
         run: flutter test integration_test/app_smoke_test.dart -d ${{ matrix.device }}
       # Integration testing replaces the local app bundle with its test

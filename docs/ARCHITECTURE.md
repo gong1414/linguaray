@@ -98,6 +98,17 @@ LinguaRay uses its own `v2` configuration namespace and does not read or delete
 data from the former Tauri application. Logs, UI state, and normal settings must
 not contain provider secrets.
 
+Settings, history, vocabulary, glossary files and backup exports use the same
+`packages/runtime/rust/src/storage.rs` commit primitive. It writes to a unique
+file beside the destination, flushes it, and replaces the destination without
+first deleting the previous file. Failed staging and replacement leave the
+previous committed file intact. A terminated writer may leave a `.tmp` file;
+loaders and backup export ignore it. JSON schemas and data paths are unchanged.
+This is a single-file guarantee, not a transaction across all runtime stores.
+Backup restore retains its separate staged install and rollback protocol.
+Directory synchronization after commit is best effort on Unix; power-loss
+durability depends on the operating system, filesystem and hardware.
+
 Versioned backup/restore and the shared proxy policy are documented in
 [Data transfer and network policy](DATA_AND_NETWORK.md). Backups deliberately
 exclude secure-storage values.

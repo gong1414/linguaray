@@ -13,6 +13,7 @@ pub use catalog::{
 pub mod domain;
 mod remote;
 pub mod runtime;
+mod storage;
 pub use api_server::{ApiServerInfo, RuntimeApiServer};
 pub use runtime::{
     BackupSummary, RestoreSummary, Runtime, RuntimeBackup, RuntimeDictionary, RuntimeError,

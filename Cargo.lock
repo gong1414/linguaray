@@ -1035,6 +1035,7 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "struct-patch",
+ "tempfile",
  "thiserror 2.0.20",
  "tokio",
  "uniffi",

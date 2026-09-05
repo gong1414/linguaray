@@ -30,21 +30,8 @@ impl Settings {
 
     pub fn save(&self, file_path: impl AsRef<Path>) -> Result<(), String> {
         let path = file_path.as_ref();
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).map_err(|error| {
-                format!(
-                    "failed to create settings directory `{}`: {error}",
-                    parent.display()
-                )
-            })?;
-        }
         let content = self.to_pretty_json()?;
-        fs::write(path, content).map_err(|error| {
-            format!(
-                "failed to write settings file `{}`: {error}",
-                path.display()
-            )
-        })
+        crate::storage::write_bytes(path, content.as_bytes())
     }
 
     pub fn to_pretty_json(&self) -> Result<String, String> {

@@ -706,21 +706,10 @@ impl GlossaryStore {
     }
 
     fn write_book(&self, book: &BookFile) -> Result<(), String> {
-        fs::create_dir_all(&self.dir).map_err(|error| {
-            format!(
-                "failed to create glossary directory `{}`: {error}",
-                self.dir.display()
-            )
-        })?;
         let path = self.book_path(&book.id);
         let content = serde_json::to_string_pretty(book)
             .map_err(|error| format!("failed to encode glossary book `{}`: {error}", book.id))?;
-        fs::write(&path, content).map_err(|error| {
-            format!(
-                "failed to write glossary book `{}`: {error}",
-                path.display()
-            )
-        })
+        crate::storage::write_bytes(&path, content.as_bytes())
     }
 
     fn book_path(&self, book_id: &str) -> PathBuf {
