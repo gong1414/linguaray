@@ -1297,9 +1297,9 @@ class _TranslationsSettingsProvidersZhHans
   @override
   String get model_manual => '手动输入模型 ID';
   @override
-  String get model_empty => '还没有模型。可以从供应商获取，或手动输入。';
+  String get model_empty => '没有匹配的模型，也可手动填写模型 ID。';
   @override
-  String get model_failed => '无法获取模型。你仍可手动输入模型 ID 并保存。';
+  String get model_failed => '模型获取失败，请检查接口地址、代理及响应格式。';
   @override
   String get add_directly => '添加';
   @override
@@ -1337,6 +1337,34 @@ class _TranslationsSettingsProvidersZhHans
   @override
   late final _TranslationsSettingsProvidersDeleteDialogZhHans delete_dialog =
       _TranslationsSettingsProvidersDeleteDialogZhHans._(_root);
+  @override
+  String get model_auto_hint => '凭证完整后自动获取模型，也可手动填写模型 ID。列表不代表已验证翻译权限。';
+  @override
+  String get model_auth_failed => '鉴权失败（401/403），请检查该供应商的 API Key 和权限。';
+  @override
+  String get model_rate_limited => '供应商请求限流，请稍后重试。';
+  @override
+  String get model_unsupported => '此接口不提供模型列表（404/405）。请手动填写模型 ID，或配置模型列表地址。';
+  @override
+  String get model_timeout => '模型查询超时，请检查接口地址或代理后重试。';
+  @override
+  String get model_reference => '离线参考目录 · 未验证权限';
+  @override
+  String get model_live => '供应商接口返回的模型';
+  @override
+  String get model_search => '搜索全部模型 ID';
+  @override
+  String get model_updated => '查询时间';
+  @override
+  String get test => '测试连接';
+  @override
+  String get test_passed => '连接成功';
+  @override
+  String get test_model => '测试所选模型';
+  @override
+  String get test_model_passed => '所选模型已响应';
+  @override
+  String get test_model_hint => '发送简短测试文本，验证所选模型能否回复。';
 }
 
 // Path: settings.layout
@@ -1649,6 +1677,8 @@ class _TranslationsUiErrorsZhHans extends TranslationsUiErrorsEn {
   String get invalid_port => '请输入 0（自动分配）或 1 到 65535 之间的端口。';
   @override
   String get unknown => '出现了问题，请重试。';
+  @override
+  String get translation_incomplete => '输出未完整结束。已保留收到的文本，请调整输出长度或更换模型后重试。';
 }
 
 // Path: ui.recovery
@@ -2609,6 +2639,18 @@ class _TranslationsSettingsProvidersCatalogZhHans
       '自托管 LibreTranslate。默认 http://127.0.0.1:5000。不会调用公共实例。';
   @override
   String get mtranserver => '自托管 MTranServer。默认 http://127.0.0.1:8989。';
+  @override
+  String get minimax => 'MiniMax 官方接口，使用 Anthropic 兼容协议。';
+  @override
+  String get stepfun => 'StepFun 官方接口，使用 OpenAI 兼容协议。';
+  @override
+  String get mistral => 'Mistral 官方接口，使用 OpenAI 兼容协议。';
+  @override
+  String get together => 'Together AI 官方接口，使用 OpenAI 兼容协议。';
+  @override
+  String get fireworks => 'Fireworks AI 官方接口，使用 OpenAI 兼容协议。';
+  @override
+  String get custom => '连接自定义网关或其他 OpenAI 兼容服务。';
 }
 
 // Path: settings.providers.item
@@ -3696,8 +3738,8 @@ extension on TranslationsZhHans {
           'settings.providers.verify' => '验证连接',
           'settings.providers.save_without_verify' => '保存',
           'settings.providers.model_manual' => '手动输入模型 ID',
-          'settings.providers.model_empty' => '还没有模型。可以从供应商获取，或手动输入。',
-          'settings.providers.model_failed' => '无法获取模型。你仍可手动输入模型 ID 并保存。',
+          'settings.providers.model_empty' => '没有匹配的模型，也可手动填写模型 ID。',
+          'settings.providers.model_failed' => '模型获取失败，请检查接口地址、代理及响应格式。',
           'settings.providers.add_directly' => '添加',
           'settings.providers.switch_to_google_web' => '切换到 Google Web',
           'settings.providers.fields.api_key' => 'API Key',
@@ -3758,6 +3800,17 @@ extension on TranslationsZhHans {
             '自托管 LibreTranslate。默认 http://127.0.0.1:5000。不会调用公共实例。',
           'settings.providers.catalog.mtranserver' =>
             '自托管 MTranServer。默认 http://127.0.0.1:8989。',
+          'settings.providers.catalog.minimax' =>
+            'MiniMax 官方接口，使用 Anthropic 兼容协议。',
+          'settings.providers.catalog.stepfun' =>
+            'StepFun 官方接口，使用 OpenAI 兼容协议。',
+          'settings.providers.catalog.mistral' =>
+            'Mistral 官方接口，使用 OpenAI 兼容协议。',
+          'settings.providers.catalog.together' =>
+            'Together AI 官方接口，使用 OpenAI 兼容协议。',
+          'settings.providers.catalog.fireworks' =>
+            'Fireworks AI 官方接口，使用 OpenAI 兼容协议。',
+          'settings.providers.catalog.custom' => '连接自定义网关或其他 OpenAI 兼容服务。',
           'settings.providers.item.empty' => '暂无已配置的提供商。添加一个提供商以启用翻译服务。',
           'settings.providers.item.loading' => '正在加载提供商...',
           'settings.providers.item.no_services' => '暂无可用服务。',
@@ -3814,6 +3867,23 @@ extension on TranslationsZhHans {
           'settings.providers.description.fallback' => '提供翻译服务',
           'settings.providers.delete_dialog.title' => '删除「{}」？',
           'settings.providers.delete_dialog.message' => '此操作无法撤销。',
+          'settings.providers.model_auto_hint' =>
+            '凭证完整后自动获取模型，也可手动填写模型 ID。列表不代表已验证翻译权限。',
+          'settings.providers.model_auth_failed' =>
+            '鉴权失败（401/403），请检查该供应商的 API Key 和权限。',
+          'settings.providers.model_rate_limited' => '供应商请求限流，请稍后重试。',
+          'settings.providers.model_unsupported' =>
+            '此接口不提供模型列表（404/405）。请手动填写模型 ID，或配置模型列表地址。',
+          'settings.providers.model_timeout' => '模型查询超时，请检查接口地址或代理后重试。',
+          'settings.providers.model_reference' => '离线参考目录 · 未验证权限',
+          'settings.providers.model_live' => '供应商接口返回的模型',
+          'settings.providers.model_search' => '搜索全部模型 ID',
+          'settings.providers.model_updated' => '查询时间',
+          'settings.providers.test' => '测试连接',
+          'settings.providers.test_passed' => '连接成功',
+          'settings.providers.test_model' => '测试所选模型',
+          'settings.providers.test_model_passed' => '所选模型已响应',
+          'settings.providers.test_model_hint' => '发送简短测试文本，验证所选模型能否回复。',
           'settings.layout.title' => '设置',
           'settings.layout.empty.title' => '选择一个分类',
           'settings.layout.empty.message' => '从侧边栏选择一个设置分类。',
@@ -3927,6 +3997,8 @@ extension on TranslationsZhHans {
           'ui.errors.api_server_bind_failed' => '本地 API 服务无法绑定该端口。',
           'ui.errors.invalid_port' => '请输入 0（自动分配）或 1 到 65535 之间的端口。',
           'ui.errors.unknown' => '出现了问题，请重试。',
+          'ui.errors.translation_incomplete' =>
+            '输出未完整结束。已保留收到的文本，请调整输出长度或更换模型后重试。',
           'ui.recovery.retry' => '重试',
           'ui.recovery.recheck_permission' => '重新检查权限',
           'ui.recovery.open_permission_settings' => '打开权限设置',

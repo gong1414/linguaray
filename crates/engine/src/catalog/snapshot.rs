@@ -1,4 +1,5 @@
 use serde::Deserialize;
+use std::sync::OnceLock;
 
 const SNAPSHOT_JSON: &str = include_str!("models_dev_snapshot.json");
 
@@ -35,8 +36,11 @@ pub struct SnapshotModalities {
     pub output: Vec<String>,
 }
 
-fn snapshot() -> SnapshotFile {
-    serde_json::from_str(SNAPSHOT_JSON).expect("models.dev snapshot must parse")
+fn snapshot() -> &'static SnapshotFile {
+    static SNAPSHOT: OnceLock<SnapshotFile> = OnceLock::new();
+    SNAPSHOT.get_or_init(|| {
+        serde_json::from_str(SNAPSHOT_JSON).expect("models.dev snapshot must parse")
+    })
 }
 
 /// models.dev provider id used for a LinguaRay preset.
@@ -55,6 +59,11 @@ pub fn models_dev_id_for_preset(preset_id: &str) -> Option<&'static str> {
         "siliconflow-cn" | "siliconflow-global" => Some("siliconflow"),
         "modelscope" => Some("modelscope"),
         "lm-studio" => Some("lmstudio"),
+        "minimax" => Some("minimax"),
+        "stepfun" => Some("stepfun-ai"),
+        "mistral" => Some("mistral"),
+        "together" => Some("togetherai"),
+        "fireworks" => Some("fireworks-ai"),
         _ => None,
     }
 }
@@ -65,17 +74,17 @@ pub fn models_for_preset(preset_id: &str) -> Vec<CatalogSnapshotModel> {
     };
     snapshot()
         .providers
-        .into_iter()
+        .iter()
         .find(|provider| provider.id == dev_id)
-        .map(|provider| provider.models)
+        .map(|provider| provider.models.clone())
         .unwrap_or_default()
 }
 
 pub fn snapshot_models() -> Vec<(String, Vec<CatalogSnapshotModel>)> {
     snapshot()
         .providers
-        .into_iter()
-        .map(|provider| (provider.id, provider.models))
+        .iter()
+        .map(|provider| (provider.id.clone(), provider.models.clone()))
         .collect()
 }
 
@@ -108,6 +117,11 @@ mod tests {
                 "siliconflow",
                 "modelscope",
                 "lmstudio",
+                "minimax",
+                "stepfun-ai",
+                "mistral",
+                "togetherai",
+                "fireworks-ai",
             ]
         );
         assert!(file

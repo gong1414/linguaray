@@ -342,8 +342,9 @@ final class _FakeWorkspaceSettingsRepository
   Future<List<String>> listProviderModels(String providerId) async => const [];
 
   @override
-  Future<List<String>> discoverProviderModels(ProviderDraft draft) async =>
-      const [];
+  Future<ProviderModelDiscovery> discoverProviderModels(
+    ProviderDraft draft,
+  ) async => const ProviderModelDiscovery();
 
   @override
   Future<void> reorderTranslationServices(List<String> serviceIds) async {

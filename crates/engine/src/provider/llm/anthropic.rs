@@ -1,9 +1,9 @@
-use std::sync::{mpsc, Arc};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use linguaray_core::{
     ChatMessage, ChatRequest, ChatResponse, ChatRole, LlmError, LlmService, LlmStreamReceiver,
-    Provider, ResponseFormat, StreamChunk,
+    Provider, ResponseFormat,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -20,6 +20,8 @@ pub struct AnthropicProviderConfig {
     pub base_url: Option<String>,
     #[serde(rename = "defaultModel", alias = "default_model", default)]
     pub default_model: String,
+    #[serde(rename = "modelsUrl", alias = "models_url", default)]
+    pub models_url: Option<String>,
 }
 
 // ── Provider ──────────────────────────────────────────────────────────────────
@@ -45,6 +47,7 @@ impl AnthropicProvider {
             api_key: config.api_key.clone(),
             default_model: default_model.clone(),
             http: http.clone(),
+            models_url: config.models_url.filter(|url| !url.trim().is_empty()),
         });
 
         Ok(Self { llm_service })
@@ -91,6 +94,7 @@ pub struct AnthropicLlmService {
     api_key: String,
     default_model: String,
     http: HttpClient,
+    models_url: Option<String>,
 }
 
 impl AnthropicLlmService {
@@ -164,44 +168,76 @@ impl AnthropicLlmService {
     }
 
     async fn list_models(&self) -> Result<Vec<String>, LlmError> {
-        let response = self
-            .http
-            .client
-            .get(self.http.join_url("/v1/models"))
-            .header("x-api-key", &self.api_key)
-            .header("anthropic-version", "2023-06-01")
-            .header("Content-Type", "application/json")
-            .send()
-            .await
-            .map_err(|e| LlmError::NetworkError(e.to_string()))?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let body = response.text().await.unwrap_or_default();
-            return Err(match status.as_u16() {
-                401 | 403 => LlmError::AuthError(body),
-                429 => LlmError::RateLimitError(body),
-                400..=499 => LlmError::InvalidRequest(body),
-                _ => LlmError::NetworkError(format!("HTTP {status}: {body}")),
-            });
-        }
-
-        let json: serde_json::Value = response
-            .json()
-            .await
-            .map_err(|e| LlmError::SerializationError(e.to_string()))?;
-
-        // Anthropic API returns { "data": [{ "id": "...", ... }] }
-        let models = json["data"]
-            .as_array()
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(|m| m["id"].as_str().map(String::from))
-                    .collect::<Vec<_>>()
-            })
-            .unwrap_or_default();
-
-        Ok(models)
+        let url = self
+            .models_url
+            .clone()
+            .unwrap_or_else(|| self.http.join_url("/v1/models"));
+        let mut cursor: Option<String> = None;
+        let mut seen = std::collections::HashSet::new();
+        let mut models = std::collections::BTreeSet::new();
+        // Bound the entire traversal, including providers that return bad cursors.
+        tokio::time::timeout(crate::catalog::MODELS_FETCH_TIMEOUT, async {
+            for _ in 0..100 {
+                let mut request = self
+                    .http
+                    .client
+                    .get(&url)
+                    .header("x-api-key", &self.api_key)
+                    .header("anthropic-version", "2023-06-01")
+                    .query(&[("limit", "1000")]);
+                if let Some(after) = &cursor {
+                    request = request.query(&[("after_id", after)]);
+                }
+                let response = request
+                    .send()
+                    .await
+                    .map_err(|e| LlmError::NetworkError(e.to_string()))?;
+                let status = response.status().as_u16();
+                let body = response
+                    .text()
+                    .await
+                    .map_err(|e| LlmError::NetworkError(e.to_string()))?;
+                match crate::catalog::interpret_models_response(status, &body, &[&self.api_key]) {
+                    crate::catalog::CandidateOutcome::Success(ids) => models.extend(ids),
+                    crate::catalog::CandidateOutcome::TryNext => {
+                        return Err(LlmError::InvalidRequest(format!(
+                            "HTTP {status}: models endpoint unavailable"
+                        )))
+                    }
+                    crate::catalog::CandidateOutcome::Fail(error) => {
+                        return Err(LlmError::NetworkError(error))
+                    }
+                }
+                let json: Value = serde_json::from_str(&body)
+                    .map_err(|e| LlmError::SerializationError(e.to_string()))?;
+                if json["has_more"].as_bool() != Some(true) {
+                    return Ok(models.into_iter().collect());
+                }
+                let next = json["last_id"]
+                    .as_str()
+                    .filter(|id| !id.is_empty())
+                    .ok_or_else(|| {
+                        LlmError::SerializationError("missing model pagination cursor".into())
+                    })?;
+                if !seen.insert(next.to_owned()) {
+                    return Err(LlmError::SerializationError(
+                        "repeated model pagination cursor".into(),
+                    ));
+                }
+                cursor = Some(next.to_owned());
+            }
+            Err(LlmError::SerializationError(
+                "model pagination exceeds limit".into(),
+            ))
+        })
+        .await
+        .map_err(|_| LlmError::NetworkError("model query timed out".into()))?
+        .map_err(|error: LlmError| {
+            LlmError::NetworkError(crate::catalog::urls::redact_secrets(
+                &error.to_string(),
+                &[&self.api_key],
+            ))
+        })
     }
 }
 
@@ -276,98 +312,11 @@ impl LlmService for AnthropicLlmService {
             });
         }
 
-        let (tx, rx) = mpsc::channel();
-
-        tokio::spawn(async move {
-            use futures_util::StreamExt;
-            let mut byte_stream = response.bytes_stream();
-            let mut buffer = String::new();
-            let mut current_event: Option<String> = None;
-
-            while let Some(chunk_result) = byte_stream.next().await {
-                match chunk_result {
-                    Ok(bytes) => {
-                        buffer.push_str(&String::from_utf8_lossy(&bytes));
-                        while let Some(line_end) = buffer.find('\n') {
-                            let line = buffer[..line_end].trim().to_string();
-                            buffer = buffer[line_end + 1..].to_string();
-
-                            if line.is_empty() {
-                                continue;
-                            }
-
-                            if let Some(event) = line.strip_prefix("event: ") {
-                                current_event = Some(event.to_string());
-                                continue;
-                            }
-
-                            if let Some(data) = line.strip_prefix("data: ") {
-                                let event_type = current_event
-                                    .take()
-                                    .unwrap_or_else(|| "message".to_string());
-
-                                match event_type.as_str() {
-                                    "content_block_delta" => {
-                                        if let Ok(parsed) = serde_json::from_str::<Value>(data) {
-                                            if let Some(delta) = parsed["delta"].as_object() {
-                                                if delta["type"] == "text_delta" {
-                                                    let text = delta["text"]
-                                                        .as_str()
-                                                        .unwrap_or("")
-                                                        .to_string();
-                                                    if !text.is_empty() {
-                                                        let index =
-                                                            parsed["index"].as_u64().unwrap_or(0)
-                                                                as u32;
-                                                        let _ = tx.send(StreamChunk {
-                                                            content: text,
-                                                            index,
-                                                            finish_reason: None,
-                                                        });
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                    "message_stop" => {
-                                        let _ = tx.send(StreamChunk {
-                                            content: String::new(),
-                                            index: 0,
-                                            finish_reason: Some("stop".to_string()),
-                                        });
-                                        return;
-                                    }
-                                    "error" => {
-                                        if let Ok(parsed) = serde_json::from_str::<Value>(data) {
-                                            let error_msg = parsed["error"]["message"]
-                                                .as_str()
-                                                .unwrap_or("Unknown stream error");
-                                            let _ = tx.send(StreamChunk {
-                                                content: error_msg.to_string(),
-                                                index: 0,
-                                                finish_reason: Some("error".to_string()),
-                                            });
-                                        }
-                                        return;
-                                    }
-                                    _ => {}
-                                }
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        let _ = tx.send(StreamChunk {
-                            content: format!("Stream error: {e}"),
-                            index: 0,
-                            finish_reason: Some("error".to_string()),
-                        });
-                        return;
-                    }
-                }
-            }
-        });
-
-        Ok(LlmStreamReceiver { rx })
+        Ok(super::streaming::receive(
+            response,
+            super::streaming::WireFormat::Anthropic,
+            vec![self.api_key.clone()],
+        ))
     }
 }
 

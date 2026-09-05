@@ -68,7 +68,7 @@ abstract interface class WorkspaceSettingsRepository {
 
   Future<ProviderTestResult> testProvider(ProviderDraft draft);
 
-  Future<List<String>> discoverProviderModels(ProviderDraft draft);
+  Future<ProviderModelDiscovery> discoverProviderModels(ProviderDraft draft);
 
   Future<List<String>> listProviderModels(String providerId);
 

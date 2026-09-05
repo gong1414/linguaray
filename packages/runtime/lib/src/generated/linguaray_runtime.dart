@@ -15185,7 +15185,7 @@ void _checkApiChecksums() {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
   if (uniffi_linguaray_runtime_checksum_method_runtimesettings_test_provider() !=
-      55082) {
+      38376) {
     throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
   }
   if (uniffi_linguaray_runtime_checksum_method_runtimesettings_update_advanced() !=

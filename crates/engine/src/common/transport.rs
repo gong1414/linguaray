@@ -42,7 +42,12 @@ pub fn current_network_proxy() -> Result<NetworkProxyConfig, String> {
 }
 
 pub fn build_http_client() -> Result<Client, String> {
-    build_http_client_with(Client::builder())
+    build_http_client_with(
+        Client::builder()
+            .connect_timeout(std::time::Duration::from_secs(10))
+            .read_timeout(std::time::Duration::from_secs(60))
+            .timeout(std::time::Duration::from_secs(180)),
+    )
 }
 
 pub fn build_http_client_with(builder: ClientBuilder) -> Result<Client, String> {

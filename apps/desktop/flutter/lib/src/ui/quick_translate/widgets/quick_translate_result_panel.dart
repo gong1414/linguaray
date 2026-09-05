@@ -216,7 +216,8 @@ class _QuickTranslateResultPanelState extends State<QuickTranslateResultPanel> {
               ],
             ),
           ),
-        ] else if (failed)
+        ],
+        if (failed)
           Padding(
             padding: const EdgeInsets.only(top: 8),
             child: StatusMessage(

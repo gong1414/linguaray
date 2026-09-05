@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:linguaray_application/linguaray_application.dart';
 
 import '../../config/dependencies.dart';
+import '../../controllers/settings/provider_model_discovery_controller.dart';
+import '../../data/provider_draft_validation.dart';
 import '../../i18n/i18n.dart';
 import '../../routes/settings/provider_catalog.dart';
 import '../i18n_labels.dart';
@@ -252,9 +254,12 @@ class _ProviderEditorDialogState extends ConsumerState<_ProviderEditorDialog> {
   late String _presetId = '';
   final Map<String, String> _fields = {};
   Set<String> _storedSecrets = {};
-  List<String> _models = const [];
-  bool _loadingModels = false;
-  String? _modelsError;
+  late final ProviderModelDiscoveryController _discovery =
+      ProviderModelDiscoveryController(
+        (draft) => ref
+            .read(workspaceSettingsRepositoryProvider)
+            .discoverProviderModels(draft),
+      );
 
   @override
   void initState() {
@@ -278,6 +283,33 @@ class _ProviderEditorDialogState extends ConsumerState<_ProviderEditorDialog> {
         _storedSecrets = provider.storedSecretKeys;
       }
     }
+    _discovery.addListener(_modelsChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _scheduleModels(immediately: true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _discovery.dispose();
+    super.dispose();
+  }
+
+  void _modelsChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _scheduleModels({bool immediately = false}) {
+    final type = _selected;
+    final valid =
+        type?.isLlm == true &&
+        validateProviderDraft(
+          draft: _draft,
+          type: type,
+          storedSecretKeys: _storedSecrets,
+          ignoredRequiredFields: const {'defaultModel'},
+        ).isValid;
+    _discovery.schedule(valid ? _draft : null, immediately: immediately);
   }
 
   ProviderTypeOption? get _selected => findProviderCatalogOption(
@@ -304,28 +336,6 @@ class _ProviderEditorDialogState extends ConsumerState<_ProviderEditorDialog> {
     }
   }
 
-  Future<void> _fetchModels() async {
-    setState(() {
-      _loadingModels = true;
-      _modelsError = null;
-    });
-    try {
-      final models = await ref
-          .read(workspaceSettingsRepositoryProvider)
-          .discoverProviderModels(_draft);
-      if (!mounted) return;
-      setState(() {
-        _models = models;
-        _modelsError = models.isEmpty ? t.settings.providers.model_empty : null;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _modelsError = t.settings.providers.model_failed);
-    } finally {
-      if (mounted) setState(() => _loadingModels = false);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(providersSettingsViewModelProvider);
@@ -339,9 +349,8 @@ class _ProviderEditorDialogState extends ConsumerState<_ProviderEditorDialog> {
       testing: state.testing,
       testResult: state.testResult,
       saving: state.saving,
-      models: _models,
-      loadingModels: _loadingModels,
-      modelsError: _modelsError,
+      discovery: _discovery.result,
+      loadingModels: _discovery.loading,
       operationError: switch (state.operationErrorCode) {
         'validation_missing' => providersSettingsLabels().validationMissing,
         'save_failed' => providersSettingsLabels().saveFailed,
@@ -351,6 +360,7 @@ class _ProviderEditorDialogState extends ConsumerState<_ProviderEditorDialog> {
       onIdChanged: (value) {
         ref.read(providersSettingsViewModelProvider.notifier).clearFeedback();
         setState(() => _id = value);
+        _scheduleModels();
       },
       onTypeChanged: (value) {
         final selected = findProviderCatalogOption(
@@ -369,12 +379,22 @@ class _ProviderEditorDialogState extends ConsumerState<_ProviderEditorDialog> {
           }
           _storedSecrets = {};
         });
+        _scheduleModels();
       },
       onFieldChanged: (key, value) {
         ref.read(providersSettingsViewModelProvider.notifier).clearFeedback();
-        setState(() => _fields[key] = value);
+        setState(() {
+          _fields[key] = value;
+          // Older saved drafts may contain the preset's derived models URL.
+          // When the API root changes, let discovery follow that root again.
+          if (key == 'baseUrl' &&
+              _fields['modelsUrl'] == _selected?.modelsUrl) {
+            _fields.remove('modelsUrl');
+          }
+        });
+        if (key != 'defaultModel') _scheduleModels();
       },
-      onFetchModels: () => unawaited(_fetchModels()),
+      onFetchModels: () => _scheduleModels(immediately: true),
       onTest: () => unawaited(
         ref.read(providersSettingsViewModelProvider.notifier).test(_draft),
       ),

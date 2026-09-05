@@ -308,6 +308,8 @@ const Object _unset = Object();
 
 final class ProvidersSettingsViewModel
     extends Notifier<ProvidersSettingsViewState> {
+  int _testGeneration = 0;
+
   @override
   ProvidersSettingsViewState build() {
     scheduleMicrotask(reload);
@@ -347,6 +349,7 @@ final class ProvidersSettingsViewModel
   }
 
   Future<void> test(ProviderDraft draft) async {
+    final generation = ++_testGeneration;
     final validationError = _validationError(draft);
     if (validationError != null) {
       state = state.copyWith(
@@ -368,8 +371,10 @@ final class ProvidersSettingsViewModel
       final result = await ref
           .read(workspaceSettingsRepositoryProvider)
           .testProvider(draft);
+      if (generation != _testGeneration || !ref.mounted) return;
       state = state.copyWith(testResult: result);
     } catch (_) {
+      if (generation != _testGeneration || !ref.mounted) return;
       state = state.copyWith(
         testResult: const ProviderTestResult(
           status: ProviderTestStatus.failed,
@@ -377,12 +382,19 @@ final class ProvidersSettingsViewModel
         ),
       );
     } finally {
-      state = state.copyWith(testing: false);
+      if (generation == _testGeneration && ref.mounted) {
+        state = state.copyWith(testing: false);
+      }
     }
   }
 
   void clearFeedback() {
-    state = state.copyWith(testResult: null, operationErrorCode: null);
+    _testGeneration++;
+    state = state.copyWith(
+      testing: false,
+      testResult: null,
+      operationErrorCode: null,
+    );
   }
 
   String? _validationError(ProviderDraft draft) {

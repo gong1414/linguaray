@@ -280,25 +280,27 @@ impl RuntimeLlm {
                     .await
                     .map_err(|error| error.to_string())?;
 
-                loop {
-                    match receiver.rx.recv() {
-                        Ok(chunk) => {
-                            if let Some(reason) = chunk.finish_reason {
-                                if reason == "error" {
+                tokio::task::spawn_blocking(move || {
+                    loop {
+                        match receiver.rx.recv() {
+                            Ok(chunk) => {
+                                if chunk.finish_reason.as_deref() == Some("error") {
                                     callback.on_error(chunk.content);
-                                } else {
-                                    callback.on_finish(reason);
+                                    break;
                                 }
+                                if !chunk.content.is_empty() { callback.on_chunk(chunk.content); }
+                                if let Some(reason) = chunk.finish_reason {
+                                    callback.on_finish(reason);
+                                    break;
+                                }
+                            }
+                            Err(_) => {
+                                callback.on_error("stream ended before completion".into());
                                 break;
                             }
-                            callback.on_chunk(chunk.content);
-                        }
-                        Err(_) => {
-                            callback.on_finish("stop".to_string());
-                            break;
                         }
                     }
-                }
+                }).await.map_err(|error| format!("stream worker failed: {error}"))?;
             } else {
                 // Fallback to non-streaming translation via the translation service
                 let translation_service = provider.translation().ok_or_else(|| {

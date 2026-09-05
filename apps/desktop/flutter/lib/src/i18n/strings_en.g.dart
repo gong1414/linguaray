@@ -1477,13 +1477,13 @@ class TranslationsSettingsProvidersEn {
   /// en: 'Enter a model id'
   String get model_manual => 'Enter a model id';
 
-  /// en: 'No models yet. Fetch from the provider or enter one manually.'
+  /// en: 'No matching models. You can enter a model ID manually.'
   String get model_empty =>
-      'No models yet. Fetch from the provider or enter one manually.';
+      'No matching models. You can enter a model ID manually.';
 
-  /// en: 'Could not fetch models. You can still enter a model id and save.'
+  /// en: 'Could not fetch models. Check the API address, proxy and response format.'
   String get model_failed =>
-      'Could not fetch models. You can still enter a model id and save.';
+      'Could not fetch models. Check the API address, proxy and response format.';
 
   /// en: 'Add'
   String get add_directly => 'Add';
@@ -1513,6 +1513,55 @@ class TranslationsSettingsProvidersEn {
       TranslationsSettingsProvidersDescriptionEn.internal(_root);
   late final TranslationsSettingsProvidersDeleteDialogEn delete_dialog =
       TranslationsSettingsProvidersDeleteDialogEn.internal(_root);
+
+  /// en: 'Models are fetched automatically when credentials are ready. You can also enter a model ID. Listing does not verify translation access.'
+  String get model_auto_hint =>
+      'Models are fetched automatically when credentials are ready. You can also enter a model ID. Listing does not verify translation access.';
+
+  /// en: 'Authentication failed (401/403). Check this provider’s API key and permissions.'
+  String get model_auth_failed =>
+      'Authentication failed (401/403). Check this provider’s API key and permissions.';
+
+  /// en: 'The provider is rate limiting requests. Please retry later.'
+  String get model_rate_limited =>
+      'The provider is rate limiting requests. Please retry later.';
+
+  /// en: 'This endpoint does not offer a model list (404/405). Enter the model ID manually or configure a models URL.'
+  String get model_unsupported =>
+      'This endpoint does not offer a model list (404/405). Enter the model ID manually or configure a models URL.';
+
+  /// en: 'Model query timed out. Check the API address or proxy and retry.'
+  String get model_timeout =>
+      'Model query timed out. Check the API address or proxy and retry.';
+
+  /// en: 'Offline reference catalog · access not verified'
+  String get model_reference =>
+      'Offline reference catalog · access not verified';
+
+  /// en: 'Models returned by this provider'
+  String get model_live => 'Models returned by this provider';
+
+  /// en: 'Search all model IDs'
+  String get model_search => 'Search all model IDs';
+
+  /// en: 'Queried at'
+  String get model_updated => 'Queried at';
+
+  /// en: 'Test connection'
+  String get test => 'Test connection';
+
+  /// en: 'Connection succeeded'
+  String get test_passed => 'Connection succeeded';
+
+  /// en: 'Test selected model'
+  String get test_model => 'Test selected model';
+
+  /// en: 'Selected model responded'
+  String get test_model_passed => 'Selected model responded';
+
+  /// en: 'Sends a short test message to verify the selected model can respond.'
+  String get test_model_hint =>
+      'Sends a short test message to verify the selected model can respond.';
 }
 
 // Path: settings.layout
@@ -1947,6 +1996,10 @@ class TranslationsUiErrorsEn {
 
   /// en: 'Something went wrong. Try again.'
   String get unknown => 'Something went wrong. Try again.';
+
+  /// en: 'The output did not finish normally. Received text is preserved; adjust the output limit or choose another model and retry.'
+  String get translation_incomplete =>
+      'The output did not finish normally. Received text is preserved; adjust the output limit or choose another model and retry.';
 }
 
 // Path: ui.recovery
@@ -3074,6 +3127,27 @@ class TranslationsSettingsProvidersCatalogEn {
   /// en: 'Self-hosted MTranServer. Default http://127.0.0.1:8989.'
   String get mtranserver =>
       'Self-hosted MTranServer. Default http://127.0.0.1:8989.';
+
+  /// en: 'MiniMax API using the Anthropic compatible protocol.'
+  String get minimax => 'MiniMax API using the Anthropic compatible protocol.';
+
+  /// en: 'StepFun API using the OpenAI compatible protocol.'
+  String get stepfun => 'StepFun API using the OpenAI compatible protocol.';
+
+  /// en: 'Mistral API using the OpenAI compatible protocol.'
+  String get mistral => 'Mistral API using the OpenAI compatible protocol.';
+
+  /// en: 'Together AI API using the OpenAI compatible protocol.'
+  String get together =>
+      'Together AI API using the OpenAI compatible protocol.';
+
+  /// en: 'Fireworks AI API using the OpenAI compatible protocol.'
+  String get fireworks =>
+      'Fireworks AI API using the OpenAI compatible protocol.';
+
+  /// en: 'Connect a custom gateway or another OpenAI compatible service.'
+  String get custom =>
+      'Connect a custom gateway or another OpenAI compatible service.';
 }
 
 // Path: settings.providers.item
@@ -4203,9 +4277,8 @@ extension on Translations {
           'settings.providers.save_without_verify' => 'Save',
           'settings.providers.model_manual' => 'Enter a model id',
           'settings.providers.model_empty' =>
-            'No models yet. Fetch from the provider or enter one manually.',
-          'settings.providers.model_failed' =>
-            'Could not fetch models. You can still enter a model id and save.',
+            'No matching models. You can enter a model ID manually.',
+          'settings.providers.model_failed' => 'Could not fetch models. Check the API address, proxy and response format.',
           'settings.providers.add_directly' => 'Add',
           'settings.providers.switch_to_google_web' => 'Switch to Google Web',
           'settings.providers.fields.api_key' => 'API key',
@@ -4272,6 +4345,18 @@ extension on Translations {
           'settings.providers.catalog.libretranslate' => 'Self-hosted LibreTranslate. Default http://127.0.0.1:5000. Not a public instance.',
           'settings.providers.catalog.mtranserver' =>
             'Self-hosted MTranServer. Default http://127.0.0.1:8989.',
+          'settings.providers.catalog.minimax' =>
+            'MiniMax API using the Anthropic compatible protocol.',
+          'settings.providers.catalog.stepfun' =>
+            'StepFun API using the OpenAI compatible protocol.',
+          'settings.providers.catalog.mistral' =>
+            'Mistral API using the OpenAI compatible protocol.',
+          'settings.providers.catalog.together' =>
+            'Together AI API using the OpenAI compatible protocol.',
+          'settings.providers.catalog.fireworks' =>
+            'Fireworks AI API using the OpenAI compatible protocol.',
+          'settings.providers.catalog.custom' =>
+            'Connect a custom gateway or another OpenAI compatible service.',
           'settings.providers.item.empty' =>
             'No providers configured. Add one to enable translation services.',
           'settings.providers.item.loading' => 'Loading providers...',
@@ -4344,6 +4429,23 @@ extension on Translations {
           'settings.providers.delete_dialog.title' => 'Delete "{}"?',
           'settings.providers.delete_dialog.message' =>
             'This action cannot be undone.',
+          'settings.providers.model_auto_hint' => 'Models are fetched automatically when credentials are ready. You can also enter a model ID. Listing does not verify translation access.',
+          'settings.providers.model_auth_failed' => 'Authentication failed (401/403). Check this provider’s API key and permissions.',
+          'settings.providers.model_rate_limited' =>
+            'The provider is rate limiting requests. Please retry later.',
+          'settings.providers.model_unsupported' => 'This endpoint does not offer a model list (404/405). Enter the model ID manually or configure a models URL.',
+          'settings.providers.model_timeout' =>
+            'Model query timed out. Check the API address or proxy and retry.',
+          'settings.providers.model_reference' =>
+            'Offline reference catalog · access not verified',
+          'settings.providers.model_live' => 'Models returned by this provider',
+          'settings.providers.model_search' => 'Search all model IDs',
+          'settings.providers.model_updated' => 'Queried at',
+          'settings.providers.test' => 'Test connection',
+          'settings.providers.test_passed' => 'Connection succeeded',
+          'settings.providers.test_model' => 'Test selected model',
+          'settings.providers.test_model_passed' => 'Selected model responded',
+          'settings.providers.test_model_hint' => 'Sends a short test message to verify the selected model can respond.',
           'settings.layout.title' => 'Settings',
           'settings.layout.empty.title' => 'Select a Category',
           'settings.layout.empty.message' =>
@@ -4491,6 +4593,7 @@ extension on Translations {
           'ui.errors.invalid_port' =>
             'Enter 0 for an automatic port, or a port from 1 to 65535.',
           'ui.errors.unknown' => 'Something went wrong. Try again.',
+          'ui.errors.translation_incomplete' => 'The output did not finish normally. Received text is preserved; adjust the output limit or choose another model and retry.',
           'ui.recovery.retry' => 'Try again',
           'ui.recovery.recheck_permission' => 'Recheck permission',
           'ui.recovery.open_permission_settings' => 'Open permission settings',

@@ -28,6 +28,12 @@ ProviderTypeOption? findProviderCatalogOption(
   }
   final engineId = engineTypeId?.trim();
   if (engineId != null && engineId.isNotEmpty) {
+    if (engineId == 'openai_compatible') {
+      final custom = options
+          .where((option) => option.id == 'openai-compatible')
+          .firstOrNull;
+      if (custom != null) return custom;
+    }
     for (final option in options) {
       if (option.engineTypeId == engineId || option.id == engineId) {
         return option;
@@ -43,8 +49,6 @@ ProviderTypeOption? findProviderCatalogOption(
 Map<String, String> providerPresetInitialFields(ProviderTypeOption option) {
   return <String, String>{
     if (option.baseUrl.trim().isNotEmpty) 'baseUrl': option.baseUrl.trim(),
-    if (option.modelsUrl.trim().isNotEmpty)
-      'modelsUrl': option.modelsUrl.trim(),
     for (final field in option.fields)
       if (field.defaultValue?.trim().isNotEmpty == true)
         field.key: field.defaultValue!.trim(),
@@ -146,6 +150,13 @@ String catalogDescription(ProviderTypeOption option) {
     'youdao-zhiyun' => catalog.youdao,
     'caiyun' => catalog.caiyun,
     'openai' => catalog.openai,
+    'openai-compatible' => catalog.custom,
+    'minimax' => catalog.minimax,
+    'stepfun' => catalog.stepfun,
+    'mistral' => catalog.mistral,
+    'together' => catalog.together,
+    'fireworks' => catalog.fireworks,
+
     'anthropic' => catalog.anthropic,
     'gemini' => catalog.gemini,
     'deepseek' => catalog.deepseek,

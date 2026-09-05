@@ -1,9 +1,9 @@
-use std::sync::{mpsc, Arc};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use linguaray_core::{
     ChatChoice, ChatMessage, ChatRequest, ChatResponse, ChatRole, LlmError, LlmService,
-    LlmStreamReceiver, Provider, ResponseFormat, StreamChunk,
+    LlmStreamReceiver, Provider, ResponseFormat,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -190,6 +190,7 @@ impl OllamaLlmService {
             .http
             .client
             .get(self.http.join_url("/api/tags"))
+            .timeout(crate::catalog::MODELS_FETCH_TIMEOUT)
             .header("Content-Type", "application/json")
             .send()
             .await
@@ -214,7 +215,9 @@ impl OllamaLlmService {
                     .filter_map(|m| m["name"].as_str().map(String::from))
                     .collect::<Vec<_>>()
             })
-            .unwrap_or_default();
+            .ok_or_else(|| {
+                LlmError::SerializationError("invalid models response: missing models array".into())
+            })?;
 
         Ok(models)
     }
@@ -286,72 +289,10 @@ impl LlmService for OllamaLlmService {
             });
         }
 
-        let (tx, rx) = mpsc::channel();
-
-        tokio::spawn(async move {
-            use futures_util::StreamExt;
-            let mut byte_stream = response.bytes_stream();
-            let mut buffer = String::new();
-
-            while let Some(chunk_result) = byte_stream.next().await {
-                match chunk_result {
-                    Ok(bytes) => {
-                        buffer.push_str(&String::from_utf8_lossy(&bytes));
-                        while let Some(line_end) = buffer.find('\n') {
-                            let line = buffer[..line_end].trim().to_string();
-                            buffer = buffer[line_end + 1..].to_string();
-
-                            if line.is_empty() {
-                                continue;
-                            }
-
-                            match serde_json::from_str::<Value>(&line) {
-                                Ok(parsed) => {
-                                    let content = parsed["message"]["content"]
-                                        .as_str()
-                                        .unwrap_or("")
-                                        .to_string();
-
-                                    let done = parsed["done"].as_bool().unwrap_or(false);
-                                    let finish_reason = if done {
-                                        parsed["done_reason"]
-                                            .as_str()
-                                            .map(|s| s.to_string())
-                                            .or(Some("stop".to_string()))
-                                    } else {
-                                        None
-                                    };
-
-                                    if !content.is_empty() || finish_reason.is_some() {
-                                        let _ = tx.send(StreamChunk {
-                                            content,
-                                            index: 0,
-                                            finish_reason,
-                                        });
-                                    }
-
-                                    if done {
-                                        return;
-                                    }
-                                }
-                                Err(_) => {
-                                    // Skip unparseable lines
-                                }
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        let _ = tx.send(StreamChunk {
-                            content: format!("Stream error: {e}"),
-                            index: 0,
-                            finish_reason: Some("error".to_string()),
-                        });
-                        return;
-                    }
-                }
-            }
-        });
-
-        Ok(LlmStreamReceiver { rx })
+        Ok(super::streaming::receive(
+            response,
+            super::streaming::WireFormat::Ollama,
+            Vec::new(),
+        ))
     }
 }

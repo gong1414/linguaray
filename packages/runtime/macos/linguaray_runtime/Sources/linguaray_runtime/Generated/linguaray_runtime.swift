@@ -2596,10 +2596,9 @@ public protocol RuntimeSettingsProtocol: AnyObject, Sendable {
    * the process-wide runtime engine. The caller supplies credentials read
    * from secure storage; they live only in this temporary provider object.
    *
-   * LLM providers are probed by listing models. Translation, dictionary,
-   * and OCR-only providers execute a small capability-specific request.
-   * The returned number is the model count for LLM providers and zero for
-   * traditional providers.
+   * LLM providers send a short message to the selected model. Translation,
+   * dictionary, and OCR-only providers execute a small capability-specific
+   * request. Returns zero on success (kept for FFI compatibility).
    */
   func testProvider(providerId: String, providerType: String, fields: [String: String]) async throws
     -> UInt32
@@ -3023,10 +3022,9 @@ open class RuntimeSettings: RuntimeSettingsProtocol, @unchecked Sendable {
    * the process-wide runtime engine. The caller supplies credentials read
    * from secure storage; they live only in this temporary provider object.
    *
-   * LLM providers are probed by listing models. Translation, dictionary,
-   * and OCR-only providers execute a small capability-specific request.
-   * The returned number is the model count for LLM providers and zero for
-   * traditional providers.
+   * LLM providers send a short message to the selected model. Translation,
+   * dictionary, and OCR-only providers execute a small capability-specific
+   * request. Returns zero on success (kept for FFI compatibility).
    */
   open func testProvider(providerId: String, providerType: String, fields: [String: String])
     async throws -> UInt32
@@ -11072,7 +11070,7 @@ private let initializationResult: InitializationResult = {
   if uniffi_linguaray_runtime_checksum_method_runtimesettings_subscribe() != 61804 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_linguaray_runtime_checksum_method_runtimesettings_test_provider() != 55082 {
+  if uniffi_linguaray_runtime_checksum_method_runtimesettings_test_provider() != 38376 {
     return InitializationResult.apiChecksumMismatch
   }
   if uniffi_linguaray_runtime_checksum_method_runtimesettings_update_advanced() != 40958 {

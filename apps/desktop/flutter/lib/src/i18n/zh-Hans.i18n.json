@@ -601,8 +601,8 @@
       "verify": "验证连接",
       "save_without_verify": "保存",
       "model_manual": "手动输入模型 ID",
-      "model_empty": "还没有模型。可以从供应商获取，或手动输入。",
-      "model_failed": "无法获取模型。你仍可手动输入模型 ID 并保存。",
+      "model_empty": "没有匹配的模型，也可手动填写模型 ID。",
+      "model_failed": "模型获取失败，请检查接口地址、代理及响应格式。",
       "add_directly": "添加",
       "switch_to_google_web": "切换到 Google Web",
       "fields": {
@@ -655,7 +655,13 @@
         "llama_cpp": "本地 llama.cpp 服务。",
         "litellm": "本地 LiteLLM 代理。",
         "libretranslate": "自托管 LibreTranslate。默认 http://127.0.0.1:5000。不会调用公共实例。",
-        "mtranserver": "自托管 MTranServer。默认 http://127.0.0.1:8989。"
+        "mtranserver": "自托管 MTranServer。默认 http://127.0.0.1:8989。",
+        "minimax": "MiniMax 官方接口，使用 Anthropic 兼容协议。",
+        "stepfun": "StepFun 官方接口，使用 OpenAI 兼容协议。",
+        "mistral": "Mistral 官方接口，使用 OpenAI 兼容协议。",
+        "together": "Together AI 官方接口，使用 OpenAI 兼容协议。",
+        "fireworks": "Fireworks AI 官方接口，使用 OpenAI 兼容协议。",
+        "custom": "连接自定义网关或其他 OpenAI 兼容服务。"
       },
       "item": {
         "empty": "暂无已配置的提供商。添加一个提供商以启用翻译服务。",
@@ -749,7 +755,21 @@
       "delete_dialog": {
         "title": "删除「{}」？",
         "message": "此操作无法撤销。"
-      }
+      },
+      "model_auto_hint": "凭证完整后自动获取模型，也可手动填写模型 ID。列表不代表已验证翻译权限。",
+      "model_auth_failed": "鉴权失败（401/403），请检查该供应商的 API Key 和权限。",
+      "model_rate_limited": "供应商请求限流，请稍后重试。",
+      "model_unsupported": "此接口不提供模型列表（404/405）。请手动填写模型 ID，或配置模型列表地址。",
+      "model_timeout": "模型查询超时，请检查接口地址或代理后重试。",
+      "model_reference": "离线参考目录 · 未验证权限",
+      "model_live": "供应商接口返回的模型",
+      "model_search": "搜索全部模型 ID",
+      "model_updated": "查询时间",
+      "test": "测试连接",
+      "test_passed": "连接成功",
+      "test_model": "测试所选模型",
+      "test_model_passed": "所选模型已响应",
+      "test_model_hint": "发送简短测试文本，验证所选模型能否回复。"
     },
     "layout": {
       "title": "设置",
@@ -881,7 +901,8 @@
       "protocol_too_large": "链接中的文本过大，无法打开。",
       "api_server_bind_failed": "本地 API 服务无法绑定该端口。",
       "invalid_port": "请输入 0（自动分配）或 1 到 65535 之间的端口。",
-      "unknown": "出现了问题，请重试。"
+      "unknown": "出现了问题，请重试。",
+      "translation_incomplete": "输出未完整结束。已保留收到的文本，请调整输出长度或更换模型后重试。"
     },
     "recovery": {
       "retry": "重试",

@@ -1,9 +1,8 @@
-use std::sync::{mpsc, Arc};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use linguaray_core::{
     ChatRequest, ChatResponse, ChatRole, LlmError, LlmService, LlmStreamReceiver, Provider,
-    StreamChunk,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -367,75 +366,11 @@ impl LlmService for OpenAiCompatibleLlmService {
     async fn chat_stream(&self, request: ChatRequest) -> Result<LlmStreamReceiver, LlmError> {
         let response = self.send_chat(&request, true).await?;
 
-        let (tx, rx) = mpsc::channel();
-
-        tokio::spawn(async move {
-            use futures_util::StreamExt;
-            let mut byte_stream = response.bytes_stream();
-            let mut buffer = String::new();
-
-            while let Some(chunk_result) = byte_stream.next().await {
-                match chunk_result {
-                    Ok(bytes) => {
-                        buffer.push_str(&String::from_utf8_lossy(&bytes));
-                        while let Some(line_end) = buffer.find('\n') {
-                            let line = buffer[..line_end].trim().to_string();
-                            buffer = buffer[line_end + 1..].to_string();
-
-                            if line.is_empty() || line.starts_with(':') {
-                                continue;
-                            }
-
-                            if line == "data: [DONE]" {
-                                let _ = tx.send(StreamChunk {
-                                    content: String::new(),
-                                    index: 0,
-                                    finish_reason: Some("stop".to_string()),
-                                });
-                                return;
-                            }
-
-                            if let Some(data) = line.strip_prefix("data: ") {
-                                if let Ok(parsed) = serde_json::from_str::<Value>(data) {
-                                    if let Some(choices) = parsed["choices"].as_array() {
-                                        for choice in choices {
-                                            let index =
-                                                choice["index"].as_u64().unwrap_or(0) as u32;
-                                            let delta_content = choice["delta"]["content"]
-                                                .as_str()
-                                                .unwrap_or("")
-                                                .to_string();
-                                            let finish_reason = choice["finish_reason"]
-                                                .as_str()
-                                                .map(|s| s.to_string());
-
-                                            if !delta_content.is_empty() || finish_reason.is_some()
-                                            {
-                                                let _ = tx.send(StreamChunk {
-                                                    content: delta_content,
-                                                    index,
-                                                    finish_reason,
-                                                });
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        let _ = tx.send(StreamChunk {
-                            content: format!("Stream error: {e}"),
-                            index: 0,
-                            finish_reason: Some("error".to_string()),
-                        });
-                        return;
-                    }
-                }
-            }
-        });
-
-        Ok(LlmStreamReceiver { rx })
+        Ok(super::streaming::receive(
+            response,
+            super::streaming::WireFormat::OpenAi,
+            vec![self.api_key.clone()],
+        ))
     }
 }
 

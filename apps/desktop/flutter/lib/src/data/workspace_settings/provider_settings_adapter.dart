@@ -9,7 +9,6 @@ import '../../services/runtime.dart';
 import '../../services/settings_store.dart';
 import '../../utils/provider_util.dart';
 import '../provider_draft_validation.dart';
-import '../provider_model_ids.dart';
 
 final class RuntimeProviderSettingsAdapter {
   const RuntimeProviderSettingsAdapter(
@@ -137,15 +136,12 @@ final class RuntimeProviderSettingsAdapter {
         fields: draft.fields,
         existingFields: existing?.fields ?? const {},
       );
-      final modelCount = await runtime.settings().testProvider(
+      await runtime.settings().testProvider(
         providerId: draft.id,
         providerType: providerTypeValue(type),
         fields: fields,
       );
-      return ProviderTestResult(
-        status: ProviderTestStatus.passed,
-        message: isLlmProviderType(type) ? '$modelCount' : null,
-      );
+      return const ProviderTestResult(status: ProviderTestStatus.passed);
     } on ArgumentError {
       return const ProviderTestResult(
         status: ProviderTestStatus.failed,
@@ -159,7 +155,9 @@ final class RuntimeProviderSettingsAdapter {
     }
   }
 
-  Future<List<String>> discoverProviderModels(ProviderDraft draft) async {
+  Future<ProviderModelDiscovery> discoverProviderModels(
+    ProviderDraft draft,
+  ) async {
     final type = parseProviderType(draft.typeId);
     final existing = _existingProvider(draft.id);
     final option = findProviderCatalogOption(
@@ -167,7 +165,7 @@ final class RuntimeProviderSettingsAdapter {
       presetId: draft.presetId,
       engineTypeId: draft.typeId,
     );
-    final snapshotIds = [
+    final reference = [
       for (final model in listCatalogSnapshotModels(
         presetId: draft.presetId ?? '',
       ))
@@ -180,67 +178,55 @@ final class RuntimeProviderSettingsAdapter {
       ignoredRequiredFields: const {'defaultModel'},
     );
     if (!validation.isValid) {
-      if (validation.issue ==
-              ProviderDraftValidationIssue.missingRequiredField &&
-          snapshotIds.isNotEmpty) {
-        return snapshotIds;
-      }
-      _throwDraftValidation(draft, validation, type: type);
+      return ProviderModelDiscovery(
+        referenceModels: reference,
+        errorCode: 'validation_missing',
+      );
     }
     final fields = _credentials.materializeFields(
       providerId: draft.id,
       fields: draft.fields,
       existingFields: existing?.fields ?? const {},
     );
-    if (isLlmProviderType(type) &&
-        (fields['defaultModel']?.trim().isEmpty ?? true)) {
+    if (fields['defaultModel']?.trim().isEmpty ?? true) {
       fields['defaultModel'] = '__model_discovery__';
     }
-    List<String> live;
     try {
-      live = await runtime.settings().discoverProviderModels(
+      final live = await runtime.settings().discoverProviderModels(
         providerId: draft.id,
         providerType: providerTypeValue(type),
         fields: fields,
       );
-    } catch (_) {
-      if (snapshotIds.isNotEmpty) return snapshotIds;
-      rethrow;
+      return ProviderModelDiscovery(
+        liveModels: live.toSet().toList()..sort(),
+        referenceModels: reference,
+        queriedAt: DateTime.now(),
+      );
+    } catch (error) {
+      // Do not put response bodies, URLs or materialized credentials in UI state.
+      final message = error.toString().toLowerCase();
+      final code =
+          message.contains('401') ||
+              message.contains('403') ||
+              message.contains('auth')
+          ? 'auth_error'
+          : message.contains('429') || message.contains('rate limit')
+          ? 'rate_limited'
+          : message.contains('404') || message.contains('405')
+          ? 'unsupported'
+          : message.contains('timed out') || message.contains('timeout')
+          ? 'timeout'
+          : 'network_error';
+      return ProviderModelDiscovery(
+        referenceModels: reference,
+        queriedAt: DateTime.now(),
+        errorCode: code,
+      );
     }
-    return mergeProviderModelIds(
-      saved: draft.fields['defaultModel'],
-      live: live,
-      snapshot: snapshotIds,
-    );
   }
 
-  Future<List<String>> listProviderModels(String providerId) async {
-    try {
-      final live = await runtime.settings().listModels(providerId: providerId);
-      final provider = _existingProvider(providerId);
-      final snapshotIds = [
-        for (final model in listCatalogSnapshotModels(
-          presetId: provider?.presetId ?? '',
-        ))
-          model.id,
-      ];
-      return mergeProviderModelIds(
-        saved: provider?.fields['defaultModel'],
-        live: live,
-        snapshot: snapshotIds,
-      );
-    } catch (_) {
-      final provider = _existingProvider(providerId);
-      final snapshot = listCatalogSnapshotModels(
-        presetId: provider?.presetId ?? '',
-      );
-      final saved = provider?.fields['defaultModel']?.trim();
-      return [
-        if (saved != null && saved.isNotEmpty) saved,
-        for (final model in snapshot) model.id,
-      ];
-    }
-  }
+  Future<List<String>> listProviderModels(String providerId) =>
+      runtime.settings().listModels(providerId: providerId);
 
   Future<void> saveService(ServiceDraft draft) async {
     final type = switch (draft.kind) {

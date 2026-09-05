@@ -4,6 +4,7 @@ import 'package:linguaray_application/linguaray_application.dart';
 import '../../platform/ocr_controller.dart';
 import '../../platform/platform_types.dart';
 import '../history/history_view.dart';
+import '../i18n_labels.dart';
 import '../ocr/ocr_view.dart';
 import '../quick_translate/widgets/quick_translate_view.dart';
 import '../settings/data_transfer_settings_screen.dart';
@@ -37,6 +38,10 @@ Map<String, Widget> buildCatalogGoldenStates({
   TargetPlatform platform = TargetPlatform.macOS,
 }) {
   return {
+    'provider_models_live': const ProviderModelsCatalogPreview(),
+    'provider_models_auth_error': const ProviderModelsCatalogPreview(
+      failed: true,
+    ),
     'quick_empty': const QuickTranslateCatalogPreview(
       scenario: CatalogQuickScenario.empty,
     ),
@@ -431,6 +436,66 @@ class SettingsCatalogPreview extends StatelessWidget {
       },
     );
   }
+}
+
+class ProviderModelsCatalogPreview extends StatelessWidget {
+  const ProviderModelsCatalogPreview({super.key, this.failed = false});
+  final bool failed;
+
+  @override
+  Widget build(BuildContext context) => ProviderEditorView(
+    labels: providersSettingsLabels(),
+    types: const [
+      ProviderTypeOption(
+        id: 'openrouter',
+        label: 'OpenRouter',
+        isLlm: true,
+        engineTypeId: 'openai_compatible',
+        fields: [
+          ProviderFieldSpec(
+            key: 'apiKey',
+            label: 'API Key',
+            secret: true,
+            requiredField: true,
+          ),
+          ProviderFieldSpec(
+            key: 'defaultModel',
+            label: 'Model',
+            secret: false,
+            requiredField: true,
+          ),
+        ],
+      ),
+    ],
+    draftId: 'openrouter',
+    typeId: 'openrouter',
+    idReadOnly: true,
+    fields: const {'defaultModel': 'anthropic/claude-sonnet-4-6'},
+    storedSecretKeys: const {'apiKey'},
+    testing: false,
+    testResult: null,
+    saving: false,
+    operationError: null,
+    discovery: ProviderModelDiscovery(
+      liveModels: failed
+          ? const []
+          : const [
+              'anthropic/claude-sonnet-4-6',
+              'deepseek/deepseek-chat',
+              'vendor/custom-model',
+            ],
+      referenceModels: const ['offline/reference-model'],
+      queriedAt: DateTime(2026, 9, 5, 12, 30),
+      errorCode: failed ? 'auth_error' : null,
+    ),
+    onFetchModels: () {},
+    onIdChanged: (_) {},
+    onTypeChanged: (_) {},
+    onFieldChanged: (_, _) {},
+    onTest: () {},
+    onSave: () {},
+    onCancel: () {},
+  );
 }
 
 class ProviderEditorCatalogPreview extends StatelessWidget {

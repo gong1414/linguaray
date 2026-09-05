@@ -151,7 +151,7 @@ final class RuntimeWorkspaceSettingsRepository
       _providers.testProvider(draft);
 
   @override
-  Future<List<String>> discoverProviderModels(ProviderDraft draft) =>
+  Future<ProviderModelDiscovery> discoverProviderModels(ProviderDraft draft) =>
       _providers.discoverProviderModels(draft);
 
   @override

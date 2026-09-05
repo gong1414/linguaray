@@ -119,6 +119,7 @@ class ProviderEditorView extends StatefulWidget {
     super.key,
     this.idReadOnly = false,
     this.models = const [],
+    this.discovery,
     this.loadingModels = false,
     this.modelsError,
     this.onFetchModels,
@@ -136,6 +137,7 @@ class ProviderEditorView extends StatefulWidget {
   final String? operationError;
   final bool idReadOnly;
   final List<String> models;
+  final ProviderModelDiscovery? discovery;
   final bool loadingModels;
   final String? modelsError;
   final VoidCallback? onFetchModels;
@@ -157,6 +159,8 @@ class _ProviderEditorViewState extends State<ProviderEditorView> {
   final TextEditingController _searchController = TextEditingController();
   final Map<String, TextEditingController> _fieldControllers = {};
   String _query = '';
+  String _modelQuery = '';
+  bool _showReferenceModels = false;
   bool _advancedOpen = false;
 
   @override
@@ -168,13 +172,24 @@ class _ProviderEditorViewState extends State<ProviderEditorView> {
   @override
   void didUpdateWidget(covariant ProviderEditorView oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.discovery != oldWidget.discovery &&
+        widget.discovery?.succeeded == true) {
+      _showReferenceModels = false;
+    }
     if (oldWidget.draftId != widget.draftId &&
         _idController.text != widget.draftId) {
       _idController.text = widget.draftId;
     }
     if (oldWidget.typeId != widget.typeId) {
       _advancedOpen = false;
+      _modelQuery = '';
+      _showReferenceModels = false;
       _syncFieldControllers();
+    } else {
+      for (final entry in _fieldControllers.entries) {
+        final value = widget.fields[entry.key] ?? '';
+        if (entry.value.text != value) entry.value.text = value;
+      }
     }
   }
 
@@ -234,40 +249,35 @@ class _ProviderEditorViewState extends State<ProviderEditorView> {
         .toList(growable: false);
 
     return AlertDialog(
-      title: Text(widget.idReadOnly ? labels.edit : labels.add),
+      title: Text(
+        widget.idReadOnly ? '${labels.edit} · ${selected.label}' : labels.add,
+      ),
       content: SizedBox(
         width: 460,
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextField(
-                key: const ValueKey('provider-id'),
-                enabled: !widget.idReadOnly,
-                controller: _idController,
-                decoration: InputDecoration(labelText: labels.idLabel),
-                onChanged: widget.onIdChanged,
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                initialValue: selected.id,
-                decoration: InputDecoration(labelText: labels.typeLabel),
-                items: [
-                  for (final type in widget.types)
-                    DropdownMenuItem(value: type.id, child: Text(type.label)),
-                ],
-                onChanged: widget.idReadOnly
-                    ? null
-                    : (value) {
-                        if (value != null) widget.onTypeChanged(value);
-                      },
-              ),
+              if (!widget.idReadOnly)
+                DropdownButtonFormField<String>(
+                  initialValue: selected.id,
+                  decoration: InputDecoration(labelText: labels.typeLabel),
+                  items: [
+                    for (final type in widget.types)
+                      DropdownMenuItem(value: type.id, child: Text(type.label)),
+                  ],
+                  onChanged: widget.idReadOnly
+                      ? null
+                      : (value) {
+                          if (value != null) widget.onTypeChanged(value);
+                        },
+                ),
               const SizedBox(height: 12),
               for (final field in normalFields) ...[
                 _field(field, labels),
                 const SizedBox(height: 12),
               ],
-              if (advancedFields.isNotEmpty) ...[
+              ...[
                 Align(
                   alignment: Alignment.centerLeft,
                   child: TextButton.icon(
@@ -281,12 +291,26 @@ class _ProviderEditorViewState extends State<ProviderEditorView> {
                     label: Text(t.settings.providers.advanced),
                   ),
                 ),
-                if (_advancedOpen)
+                if (_advancedOpen) ...[
+                  TextField(
+                    key: const ValueKey('provider-id'),
+                    enabled: !widget.idReadOnly,
+                    controller: _idController,
+                    decoration: InputDecoration(labelText: labels.idLabel),
+                    onChanged: widget.onIdChanged,
+                  ),
+                  const SizedBox(height: 12),
                   for (final field in advancedFields) ...[
                     _field(field, labels),
                     const SizedBox(height: 12),
                   ],
+                ],
               ],
+              if (selected.isLlm)
+                Text(
+                  t.settings.providers.test_model_hint,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
               if (widget.testResult != null)
                 StatusMessage(
                   kind: switch (widget.testResult!.status) {
@@ -296,7 +320,9 @@ class _ProviderEditorViewState extends State<ProviderEditorView> {
                     ProviderTestStatus.idle => StatusKind.info,
                   },
                   title: widget.testResult!.status == ProviderTestStatus.passed
-                      ? labels.testPassed
+                      ? (selected.isLlm
+                            ? t.settings.providers.test_model_passed
+                            : labels.testPassed)
                       : widget.testResult!.status == ProviderTestStatus.failed
                       ? labels.testFailed
                       : labels.testing,
@@ -321,7 +347,13 @@ class _ProviderEditorViewState extends State<ProviderEditorView> {
         TextButton(onPressed: widget.onCancel, child: Text(labels.cancel)),
         OutlinedButton(
           onPressed: widget.testing ? null : widget.onTest,
-          child: Text(widget.testing ? labels.testing : labels.test),
+          child: Text(
+            widget.testing
+                ? labels.testing
+                : selected.isLlm
+                ? t.settings.providers.test_model
+                : labels.test,
+          ),
         ),
         FilledButton(
           onPressed: widget.saving ? null : widget.onSave,
@@ -375,22 +407,109 @@ class _ProviderEditorViewState extends State<ProviderEditorView> {
             style: TextStyle(color: Theme.of(context).colorScheme.error),
           ),
         ],
-        if (widget.models.isNotEmpty) ...[
+        _modelList(field),
+      ],
+    );
+  }
+
+  Widget _modelList(ProviderFieldSpec field) {
+    final result = widget.discovery;
+    final labels = t.settings.providers;
+    final live = result?.liveModels ?? widget.models;
+    final references = result?.referenceModels ?? const <String>[];
+    final models = _showReferenceModels ? references : live;
+    final query = _modelQuery.trim().toLowerCase();
+    final filtered = models
+        .where((id) => id.toLowerCase().contains(query))
+        .toList();
+    final error = switch (result?.errorCode) {
+      'auth_error' => labels.model_auth_failed,
+      'rate_limited' => labels.model_rate_limited,
+      'unsupported' => labels.model_unsupported,
+      'timeout' => labels.model_timeout,
+      'validation_missing' => labels.model_auto_hint,
+      null => null,
+      _ => labels.model_failed,
+    };
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 8),
+        Text(
+          labels.model_auto_hint,
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        if (error != null) ...[
           const SizedBox(height: 8),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              for (final model in widget.models.take(16))
-                ActionChip(
-                  label: Text(model),
-                  onPressed: () {
-                    _fieldControllers[field.key]?.text = model;
-                    widget.onFieldChanged(field.key, model);
-                  },
-                ),
-            ],
+          Text(
+            error,
+            style: TextStyle(color: Theme.of(context).colorScheme.error),
           ),
+        ],
+        if (references.isNotEmpty)
+          CheckboxListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            title: Text(labels.model_reference),
+            value: _showReferenceModels,
+            onChanged: (value) =>
+                setState(() => _showReferenceModels = value ?? false),
+          ),
+        if (result?.succeeded == true || models.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Text(
+            '${_showReferenceModels ? labels.model_reference : labels.model_live} · ${models.length}',
+            style: Theme.of(context).textTheme.labelLarge,
+          ),
+          if (result?.queriedAt case final DateTime updated)
+            Text(
+              '${labels.model_updated} ${TimeOfDay.fromDateTime(updated).format(context)}',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          const SizedBox(height: 8),
+          TextField(
+            key: ValueKey('provider-model-search-${widget.typeId}'),
+            decoration: InputDecoration(
+              prefixIcon: const Icon(Icons.search_rounded),
+              labelText: labels.model_search,
+            ),
+            onChanged: (value) => setState(() => _modelQuery = value),
+          ),
+          const SizedBox(height: 8),
+          if (filtered.isEmpty)
+            Text(labels.model_empty)
+          else
+            SizedBox(
+              height: (filtered.length * 48.0).clamp(48.0, 192.0),
+              child: ListView.builder(
+                key: const ValueKey('provider-model-list'),
+                itemCount: filtered.length,
+                itemExtent: 48,
+                itemBuilder: (context, index) {
+                  final model = filtered[index];
+                  final selected = _fieldControllers[field.key]?.text == model;
+                  return ListTile(
+                    key: ValueKey('provider-model-$model'),
+                    dense: true,
+                    selected: selected,
+                    title: Text(
+                      model,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    trailing: selected
+                        ? const Icon(Icons.check_rounded, size: 18)
+                        : null,
+                    onTap: () {
+                      setState(
+                        () => _fieldControllers[field.key]?.text = model,
+                      );
+                      widget.onFieldChanged(field.key, model);
+                    },
+                  );
+                },
+              ),
+            ),
         ],
       ],
     );

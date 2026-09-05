@@ -15,6 +15,27 @@ void main() {
     isStreaming: false,
   );
 
+  testWidgets('partial output keeps its failure and retry visible', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _app(
+        _view(
+          sourceText: 'hello',
+          result: const ServiceTranslationResult(
+            service: service,
+            status: TranslationResultStatus.failed,
+            text: 'Partial text',
+            errorCode: 'translation_incomplete',
+          ),
+        ),
+      ),
+    );
+    expect(find.text('Partial text'), findsOneWidget);
+    expect(find.text('失败'), findsOneWidget);
+    expect(find.text('重试'), findsOneWidget);
+  });
+
   test('common languages are promoted in the configured order', () {
     final ordered = orderLanguagesByPreference(
       const [english, chinese, japanese],

@@ -541,6 +541,108 @@ pub const PRESETS: &[ProviderPreset] = &[
         "https://console.groq.com/keys",
         "https://api.groq.com/openai/v1",
     ),
+    ProviderPreset {
+        category: ProviderCategory::LlmOfficial,
+        ..llm_preset(
+            "minimax",
+            ProviderType::Anthropic,
+            "MiniMax",
+            "settings.providers.catalog.minimax",
+            "https://platform.minimax.io",
+            "https://platform.minimax.io/user-center/basic-information/interface-key",
+            "https://api.minimax.io/anthropic",
+        )
+    },
+    ProviderPreset {
+        category: ProviderCategory::LlmOfficial,
+        ..llm_preset(
+            "stepfun",
+            ProviderType::OpenAiCompatible,
+            "StepFun",
+            "settings.providers.catalog.stepfun",
+            "https://platform.stepfun.ai",
+            "https://platform.stepfun.ai",
+            "https://api.stepfun.ai/v1",
+        )
+    },
+    ProviderPreset {
+        category: ProviderCategory::LlmOfficial,
+        ..llm_preset(
+            "mistral",
+            ProviderType::OpenAiCompatible,
+            "Mistral",
+            "settings.providers.catalog.mistral",
+            "https://mistral.ai",
+            "https://console.mistral.ai/api-keys",
+            "https://api.mistral.ai/v1",
+        )
+    },
+    ProviderPreset {
+        category: ProviderCategory::Aggregator,
+        ..llm_preset(
+            "together",
+            ProviderType::OpenAiCompatible,
+            "Together AI",
+            "settings.providers.catalog.together",
+            "https://www.together.ai",
+            "https://api.together.ai/settings/api-keys",
+            "https://api.together.ai/v1",
+        )
+    },
+    ProviderPreset {
+        category: ProviderCategory::Aggregator,
+        ..llm_preset(
+            "fireworks",
+            ProviderType::OpenAiCompatible,
+            "Fireworks AI",
+            "settings.providers.catalog.fireworks",
+            "https://fireworks.ai",
+            "https://app.fireworks.ai/settings/users/api-keys",
+            "https://api.fireworks.ai/inference/v1",
+        )
+    },
+    ProviderPreset {
+        fields: &[
+            field(
+                "baseUrl",
+                "settings.providers.fields.base_url",
+                false,
+                true,
+                false,
+                None,
+            ),
+            field(
+                "apiKey",
+                "settings.providers.fields.api_key",
+                true,
+                false,
+                false,
+                None,
+            ),
+            field(
+                "defaultModel",
+                "settings.providers.fields.default_model",
+                false,
+                true,
+                false,
+                None,
+            ),
+            field(
+                "modelsUrl",
+                "settings.providers.fields.models_url",
+                false,
+                false,
+                true,
+                None,
+            ),
+        ],
+        ..local_llm(
+            "openai-compatible",
+            "OpenAI Compatible",
+            "settings.providers.catalog.custom",
+            "",
+        )
+    },
     llm_preset(
         "openrouter",
         ProviderType::OpenAiCompatible,

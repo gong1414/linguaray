@@ -601,8 +601,8 @@
       "verify": "Verify connection",
       "save_without_verify": "Save",
       "model_manual": "Enter a model id",
-      "model_empty": "No models yet. Fetch from the provider or enter one manually.",
-      "model_failed": "Could not fetch models. You can still enter a model id and save.",
+      "model_empty": "No matching models. You can enter a model ID manually.",
+      "model_failed": "Could not fetch models. Check the API address, proxy and response format.",
       "add_directly": "Add",
       "switch_to_google_web": "Switch to Google Web",
       "fields": {
@@ -655,7 +655,13 @@
         "llama_cpp": "Local llama.cpp server.",
         "litellm": "Local LiteLLM proxy.",
         "libretranslate": "Self-hosted LibreTranslate. Default http://127.0.0.1:5000. Not a public instance.",
-        "mtranserver": "Self-hosted MTranServer. Default http://127.0.0.1:8989."
+        "mtranserver": "Self-hosted MTranServer. Default http://127.0.0.1:8989.",
+        "minimax": "MiniMax API using the Anthropic compatible protocol.",
+        "stepfun": "StepFun API using the OpenAI compatible protocol.",
+        "mistral": "Mistral API using the OpenAI compatible protocol.",
+        "together": "Together AI API using the OpenAI compatible protocol.",
+        "fireworks": "Fireworks AI API using the OpenAI compatible protocol.",
+        "custom": "Connect a custom gateway or another OpenAI compatible service."
       },
       "item": {
         "empty": "No providers configured. Add one to enable translation services.",
@@ -749,7 +755,21 @@
       "delete_dialog": {
         "title": "Delete \"{}\"?",
         "message": "This action cannot be undone."
-      }
+      },
+      "model_auto_hint": "Models are fetched automatically when credentials are ready. You can also enter a model ID. Listing does not verify translation access.",
+      "model_auth_failed": "Authentication failed (401/403). Check this provider’s API key and permissions.",
+      "model_rate_limited": "The provider is rate limiting requests. Please retry later.",
+      "model_unsupported": "This endpoint does not offer a model list (404/405). Enter the model ID manually or configure a models URL.",
+      "model_timeout": "Model query timed out. Check the API address or proxy and retry.",
+      "model_reference": "Offline reference catalog · access not verified",
+      "model_live": "Models returned by this provider",
+      "model_search": "Search all model IDs",
+      "model_updated": "Queried at",
+      "test": "Test connection",
+      "test_passed": "Connection succeeded",
+      "test_model": "Test selected model",
+      "test_model_passed": "Selected model responded",
+      "test_model_hint": "Sends a short test message to verify the selected model can respond."
     },
     "layout": {
       "title": "Settings",
@@ -881,7 +901,8 @@
       "protocol_too_large": "The linked text is too large to open.",
       "api_server_bind_failed": "The local API server could not bind to that port.",
       "invalid_port": "Enter 0 for an automatic port, or a port from 1 to 65535.",
-      "unknown": "Something went wrong. Try again."
+      "unknown": "Something went wrong. Try again.",
+      "translation_incomplete": "The output did not finish normally. Received text is preserved; adjust the output limit or choose another model and retry."
     },
     "recovery": {
       "retry": "Try again",

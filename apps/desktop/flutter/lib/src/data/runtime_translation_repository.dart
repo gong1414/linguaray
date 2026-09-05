@@ -127,7 +127,14 @@ final class RuntimeTranslationRepository implements TranslationRepository {
           text: text,
         )) {
           if (chunk.content.isNotEmpty) yield chunk.content;
+          if (chunk.isDone &&
+              chunk.finishReason != 'stop' &&
+              chunk.finishReason != 'end_turn') {
+            throw const TranslationFailure('translation_incomplete');
+          }
         }
+      } on TranslationFailure {
+        rethrow;
       } catch (error) {
         throw _translationFailure(error);
       }

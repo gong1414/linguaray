@@ -1,0 +1,27 @@
+
+running 3 tests
+test inventory_catalog ... Catalog presets: 35; LLM presets: 20; IDs: ["openai", "anthropic", "gemini", "deepseek", "bailian-qwen", "zhipu-bigmodel", "moonshot-kimi", "doubao-ark", "xai", "groq", "openrouter", "siliconflow-cn", "siliconflow-global", "modelscope", "ollama", "lm-studio", "localai", "vllm", "llama-cpp", "litellm"]
+ok
+test runtime_stream_must_deliver_a_successful_local_response ... [Settings::load] path: /private/var/folders/sw/yvwzj7y91dn8gr189hg30jrw0000gn/T/linguaray-audit-stream-1788589706121075000/settings.json
+[Settings::load] file not found, returning defaults
+
+thread 'runtime_stream_must_deliver_a_successful_local_response' (23668871) panicked at /tmp/linguaray_audit_protocol.rs:77:5:
+assertion `left == right` failed: a completed localhost response must reach the FFI callback
+  left: Err(Timeout)
+ right: Ok("chunk:hello")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+test utf8_character_must_survive_transport_chunk_boundary ...
+thread 'utf8_character_must_survive_transport_chunk_boundary' (23669310) panicked at /tmp/linguaray_audit_protocol.rs:56:5:
+assertion `left == right` failed: transport chunks must be buffered as bytes before UTF-8 decoding
+  left: "���好"
+ right: "你好"
+FAILED
+
+failures:
+
+failures:
+    runtime_stream_must_deliver_a_successful_local_response
+    utf8_character_must_survive_transport_chunk_boundary
+
+test result: FAILED. 1 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.22s

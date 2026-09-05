@@ -30,12 +30,18 @@ final class TranslateText {
     }
 
     String? detectedLanguage;
-    if (catalog.services.isNotEmpty) {
+    if (catalog.services.isNotEmpty &&
+        (query.sourceLanguage == autoLanguageCode ||
+            query.targetLanguage == null)) {
       try {
-        detectedLanguage = await _repository.detectLanguage(
-          serviceId: catalog.services.first.id,
-          text: sourceText,
-        );
+        detectedLanguage = query.sourceLanguage != autoLanguageCode
+            ? query.sourceLanguage
+            : await _repository
+                  .detectLanguage(
+                    serviceId: catalog.services.first.id,
+                    text: sourceText,
+                  )
+                  .timeout(const Duration(seconds: 3));
       } catch (_) {
         // Detection is supplemental. Translation remains usable when a
         // provider cannot detect language independently.

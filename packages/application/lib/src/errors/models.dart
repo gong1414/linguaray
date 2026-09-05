@@ -19,6 +19,7 @@ enum AppErrorCode {
   proxyConfigurationInvalid('proxy_configuration_invalid'),
   providerAuthFailed('provider_auth_failed'),
   translationFailed('translation_failed'),
+  translationIncomplete('translation_incomplete'),
   emptyResult('empty_result'),
   catalogUnavailable('catalog_unavailable'),
   noTranslationService('no_translation_service'),
@@ -106,7 +107,8 @@ RecoveryAction recoveryFor(AppErrorCode code) {
     AppErrorCode.proxyConfigurationInvalid => RecoveryAction.editInput,
     AppErrorCode.providerAuthFailed =>
       RecoveryAction.configureTranslationProvider,
-    AppErrorCode.translationFailed => RecoveryAction.retry,
+    AppErrorCode.translationFailed ||
+    AppErrorCode.translationIncomplete => RecoveryAction.retry,
     AppErrorCode.emptyResult => RecoveryAction.retry,
     AppErrorCode.catalogUnavailable => RecoveryAction.retry,
     AppErrorCode.noTranslationService =>

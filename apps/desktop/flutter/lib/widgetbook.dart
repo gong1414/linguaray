@@ -141,6 +141,14 @@ final _catalog = WidgetbookCategory(
           ),
         ),
         WidgetbookUseCase(
+          name: 'Provider models · live discovery',
+          builder: (_) => const ProviderModelsCatalogPreview(),
+        ),
+        WidgetbookUseCase(
+          name: 'Provider models · authentication failure',
+          builder: (_) => const ProviderModelsCatalogPreview(failed: true),
+        ),
+        WidgetbookUseCase(
           name: 'Provider editor · secret stored',
           builder: (_) =>
               const ProviderEditorCatalogPreview(secretStored: true),

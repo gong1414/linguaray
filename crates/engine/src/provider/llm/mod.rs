@@ -8,6 +8,7 @@
 pub mod anthropic;
 pub mod ollama;
 pub mod openai_compatible;
+mod streaming;
 
 fn configured_default_model(default_model: &str) -> Result<String, String> {
     let default_model = default_model.trim().to_owned();

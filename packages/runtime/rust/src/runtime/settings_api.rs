@@ -340,10 +340,9 @@ impl RuntimeSettings {
     /// the process-wide runtime engine. The caller supplies credentials read
     /// from secure storage; they live only in this temporary provider object.
     ///
-    /// LLM providers are probed by listing models. Translation, dictionary,
-    /// and OCR-only providers execute a small capability-specific request.
-    /// The returned number is the model count for LLM providers and zero for
-    /// traditional providers.
+    /// LLM providers send a short message to the selected model. Translation,
+    /// dictionary, and OCR-only providers execute a small capability-specific
+    /// request. Returns zero on success (kept for FFI compatibility).
     pub async fn test_provider(
         &self,
         provider_id: String,
@@ -374,13 +373,18 @@ impl RuntimeSettings {
             .clone();
 
         run_on_worker_thread(move || async move {
-            if provider.llm().is_some() {
-                let models = provider
-                    .list_models()
-                    .await
-                    .map_err(|error| error.to_string())?;
-                return u32::try_from(models.len())
-                    .map_err(|_| "provider returned too many models".to_owned());
+            if let Some(llm) = provider.llm() {
+                let model = llm.available_models().into_iter().next()
+                    .ok_or_else(|| "llm default model must be configured".to_owned())?;
+                let response = llm.chat(linguaray_core::ChatRequest {
+                    model,
+                    messages: vec![linguaray_core::ChatMessage::user("Translate to French. Output only the translation: Hello.")],
+                    temperature: None, max_tokens: None, stream: Some(false), response_format: None,
+                }).await.map_err(|error| error.to_string())?;
+                if !response.choices.iter().any(|choice| !choice.message.content.trim().is_empty()) {
+                    return Err("selected model returned no text".to_owned());
+                }
+                return Ok(0);
             }
 
             if matches!(provider.name(), "libretranslate" | "mtranserver") {

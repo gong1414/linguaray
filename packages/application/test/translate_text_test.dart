@@ -1,7 +1,41 @@
+import 'dart:async';
+
 import 'package:linguaray_application/linguaray_application.dart';
 import 'package:test/test.dart';
 
 void main() {
+  test('explicit language pair does not wait for language detection', () async {
+    final repository = _FakeTranslationRepository(pendingDetection: true);
+    final result = await TranslateText(repository)(
+      query: const TranslationQuery(
+        text: 'hello',
+        sourceLanguage: 'en',
+        targetLanguage: 'zh-Hans',
+      ),
+      catalog: await repository.loadCatalog(),
+    ).last.timeout(const Duration(seconds: 1));
+    expect(result.complete, isTrue);
+    expect(repository.detections, 0);
+  });
+
+  test(
+    'partial text and incomplete status survive a terminal failure',
+    () async {
+      final repository = _FakeTranslationRepository(incomplete: true);
+      final result = await TranslateText(repository)(
+        query: const TranslationQuery(
+          text: 'hello',
+          sourceLanguage: 'en',
+          targetLanguage: 'zh-Hans',
+        ),
+        catalog: await repository.loadCatalog(),
+      ).last;
+      expect(result.results.last.text, '您好');
+      expect(result.results.last.status, TranslationResultStatus.failed);
+      expect(result.results.last.errorCode, 'translation_incomplete');
+    },
+  );
+
   test('streams independent service progress and completes', () async {
     final repository = _FakeTranslationRepository();
     final catalog = await LoadTranslationCatalog(repository)();
@@ -48,7 +82,15 @@ void main() {
 }
 
 final class _FakeTranslationRepository implements TranslationRepository {
-  _FakeTranslationRepository({this.failSecond = false});
+  _FakeTranslationRepository({
+    this.failSecond = false,
+    this.pendingDetection = false,
+    this.incomplete = false,
+  });
+
+  final bool pendingDetection;
+  final bool incomplete;
+  int detections = 0;
 
   final bool failSecond;
   final List<String> translatedSourceLanguages = [];
@@ -75,7 +117,10 @@ final class _FakeTranslationRepository implements TranslationRepository {
   Future<String?> detectLanguage({
     required String serviceId,
     required String text,
-  }) async => 'en';
+  }) async {
+    detections++;
+    return pendingDetection ? Completer<String?>().future : 'en';
+  }
 
   @override
   Future<String> resolveTarget({
@@ -96,6 +141,9 @@ final class _FakeTranslationRepository implements TranslationRepository {
       throw const TranslationFailure('offline');
     }
     yield service.id == 'system' ? '你好' : '您';
-    if (service.id == 'cloud') yield '好';
+    if (service.id == 'cloud') {
+      yield '好';
+      if (incomplete) throw const TranslationFailure('translation_incomplete');
+    }
   }
 }
