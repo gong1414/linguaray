@@ -123,6 +123,79 @@ void main() {
     coordinator.dispose();
   });
 
+  test('appearance changes during an apply are drained in order', () async {
+    final firstApply = Completer<void>();
+    final store = _FakeSnapshot(
+      appearance: AppearanceSettings(
+        language: 'zh-Hans',
+        themeMode: 'dark',
+        theme: 'bright',
+      ),
+    );
+    late final _FakeEffects effects;
+    effects = _FakeEffects(
+      appearanceApply: (mode) => effects.appearanceApplies.length == 1
+          ? firstApply.future
+          : Future.value(),
+    );
+    final coordinator = SettingsEffectsCoordinator(
+      store: store,
+      effects: effects,
+      defaultTranslationTarget: _target,
+    );
+
+    final first = coordinator.syncAppearance();
+    await Future<void>.delayed(Duration.zero);
+    store.appearance = AppearanceSettings(
+      language: 'zh-Hans',
+      themeMode: 'light',
+      theme: 'bright',
+    );
+    final second = coordinator.syncAppearance();
+    firstApply.complete();
+
+    await Future.wait([first, second]);
+    expect(effects.appearanceApplies, [ThemeMode.dark, ThemeMode.light]);
+    coordinator.dispose();
+  });
+
+  test('advanced changes during an apply return the latest server', () async {
+    final firstApply = Completer<ApiServerInfo?>();
+    final store = _FakeSnapshot(advanced: _advanced(enabled: true, port: 8));
+    late final _FakeEffects effects;
+    effects = _FakeEffects(
+      applyApiServer: (settings) {
+        if (effects.apiApplies == 1) return firstApply.future;
+        return Future.value(
+          ApiServerInfo(
+            host: settings.apiServerHost,
+            port: settings.apiServerPort,
+            baseUrl:
+                'http://${settings.apiServerHost}:${settings.apiServerPort}',
+          ),
+        );
+      },
+    );
+    final coordinator = SettingsEffectsCoordinator(
+      store: store,
+      effects: effects,
+      defaultTranslationTarget: _target,
+    );
+
+    final first = coordinator.syncAdvanced();
+    await Future<void>.delayed(Duration.zero);
+    store.advanced = _advanced(enabled: true, port: 9);
+    final second = coordinator.syncAdvanced();
+    firstApply.complete(
+      ApiServerInfo(host: '127.0.0.1', port: 8, baseUrl: 'http://127.0.0.1:8'),
+    );
+
+    expect((await first)?.port, 9);
+    expect((await second)?.port, 9);
+    expect(effects.apiApplies, 2);
+    coordinator.dispose();
+  });
+
   test('dispose stops later section notifications', () async {
     final store = _FakeSnapshot();
     final effects = _FakeEffects();
@@ -234,6 +307,7 @@ final class _FakeEffects implements SettingsSystemEffects {
     this.enabled = false,
     this.supported = true,
     this.apply = true,
+    this.appearanceApply,
     this._applyApiServer,
   });
 
@@ -242,6 +316,7 @@ final class _FakeEffects implements SettingsSystemEffects {
   final bool apply;
   final Future<ApiServerInfo?> Function(AdvancedSettings settings)?
   _applyApiServer;
+  final Future<void> Function(ThemeMode mode)? appearanceApply;
   final loginApplies = <bool>[];
   final appearanceApplies = <ThemeMode>[];
   var apiApplies = 0;
@@ -263,6 +338,7 @@ final class _FakeEffects implements SettingsSystemEffects {
   @override
   Future<void> applyAppearance(ThemeMode mode) async {
     appearanceApplies.add(mode);
+    await appearanceApply?.call(mode);
   }
 
   @override

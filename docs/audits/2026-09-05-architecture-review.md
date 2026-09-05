@@ -129,7 +129,7 @@ macOS 的 `MacAppPresentationPlugin.swift` 同文件包含 Presentation、System
 - 快捷翻译/OCR 的原生窗口操作收进协调器；历史记录通过应用命令打开翻译；术语库文件对话框及读写从 Widget 提取到平台实现与功能控制器。
 - 新增依赖边界检查，无迁移例外；CI 与发布验证同时执行。Windows CI 增加完整 runtime 测试，覆盖文件替换语义。
 
-已完成 SettingsStore 的副作用拆分与分区通知：缓存只保留快照、错误和 section Listenable；登录项、原生外观和本地 API 由 `SettingsEffectsCoordinator` 在生命周期中应用。设置页、托盘、快捷键和主题只订阅相关分区。
+已完成 SettingsStore 的副作用拆分与分区通知：缓存只保留快照、错误和 section Listenable；登录项、原生外观和本地 API 由 `SettingsEffectsCoordinator` 在生命周期中应用。协调器串行合并并发调用，并在系统操作期间设置再次变化时继续应用最新快照；系统拒绝登录项变更时只回写一次真实状态。设置页、托盘、快捷键和主题只订阅相关分区。
 
 已完成资料库 CRUD 状态提取：历史记录、术语库和生词本的加载、筛选、选择和写入都在各自 ViewModel 中；页面只负责展示和确认对话框。持久化仍在 Rust。
 

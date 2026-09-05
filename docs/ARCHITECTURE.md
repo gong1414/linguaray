@@ -96,7 +96,10 @@ listenables, and the last load error for each section. It does not apply OS
 login items, native appearance, or the local API server.
 `app/settings/settings_effects.dart` owns those transactions: the settings page
 and tray observe section listenables, and the lifecycle coordinator applies
-side effects after the cache updates.
+side effects after the cache updates. Each effect serializes concurrent calls
+and drains a newer snapshot that arrives while an OS operation is in flight.
+If the OS rejects a login-item change, its actual value is written back once
+without treating that correction as another user request.
 
 History, glossary, vocabulary, advanced settings, and data-transfer screens
 observe feature view models and render dedicated views. Dialogs stay in the

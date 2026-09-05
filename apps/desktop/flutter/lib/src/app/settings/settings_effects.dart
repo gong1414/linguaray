@@ -116,38 +116,90 @@ final class SettingsEffectsCoordinator {
     _effects.dispose();
   }
 
-  void _onGeneral() => unawaited(syncGeneral());
+  void _onGeneral() => unawaited(
+    syncGeneral().catchError((Object error, StackTrace stackTrace) {
+      debugPrint('Failed to synchronize the login item: $error\n$stackTrace');
+      return const LoginItemSync.rejected();
+    }),
+  );
   void _onAppearance() => unawaited(syncAppearance());
-  void _onAdvanced() => unawaited(syncAdvanced());
+  void _onAdvanced() => unawaited(
+    syncAdvanced().catchError((Object error, StackTrace stackTrace) {
+      debugPrint('Failed to apply local API settings: $error\n$stackTrace');
+      return null;
+    }),
+  );
 
   Future<LoginItemSync> syncGeneral() {
     final inFlight = _generalSync;
     if (inFlight != null) return inFlight;
-    final future = _syncGeneral();
-    _generalSync = future;
-    return future.whenComplete(() {
-      if (identical(_generalSync, future)) _generalSync = null;
+    late final Future<LoginItemSync> completion;
+    completion = _drainGeneral().whenComplete(() {
+      if (identical(_generalSync, completion)) _generalSync = null;
     });
+    _generalSync = completion;
+    return completion;
   }
 
   Future<void> syncAppearance() {
     final inFlight = _appearanceSync;
     if (inFlight != null) return inFlight;
-    final future = _syncAppearance();
-    _appearanceSync = future;
-    return future.whenComplete(() {
-      if (identical(_appearanceSync, future)) _appearanceSync = null;
+    late final Future<void> completion;
+    completion = _drainAppearance().whenComplete(() {
+      if (identical(_appearanceSync, completion)) _appearanceSync = null;
     });
+    _appearanceSync = completion;
+    return completion;
   }
 
   Future<ApiServerInfo?> syncAdvanced() {
     final inFlight = _advancedSync;
     if (inFlight != null) return inFlight;
-    final future = _syncAdvanced();
-    _advancedSync = future;
-    return future.whenComplete(() {
-      if (identical(_advancedSync, future)) _advancedSync = null;
+    late final Future<ApiServerInfo?> completion;
+    completion = _drainAdvanced().whenComplete(() {
+      if (identical(_advancedSync, completion)) _advancedSync = null;
     });
+    _advancedSync = completion;
+    return completion;
+  }
+
+  Future<LoginItemSync> _drainGeneral() async {
+    var result = const LoginItemSync.applied();
+    do {
+      final wanted = _store.general.launchAtLogin;
+      result = await _syncGeneral();
+      if (result.rejected ||
+          _disposed ||
+          _store.general.launchAtLogin == wanted) {
+        return result;
+      }
+    } while (true);
+  }
+
+  Future<void> _drainAppearance() async {
+    do {
+      final wanted = _store.appearance.themeMode;
+      await _syncAppearance();
+      if (_disposed || _store.appearance.themeMode == wanted) return;
+    } while (true);
+  }
+
+  Future<ApiServerInfo?> _drainAdvanced() async {
+    ApiServerInfo? result;
+    do {
+      final wanted = (
+        enabled: _store.advanced.apiServerEnabled,
+        host: _store.advanced.apiServerHost,
+        port: _store.advanced.apiServerPort,
+      );
+      result = await _syncAdvanced();
+      final current = (
+        enabled: _store.advanced.apiServerEnabled,
+        host: _store.advanced.apiServerHost,
+        port: _store.advanced.apiServerPort,
+      );
+      if (_disposed || current == wanted) return result;
+    } while (true);
   }
 
   Future<void> _ensureDefaultTranslationTarget() async {
