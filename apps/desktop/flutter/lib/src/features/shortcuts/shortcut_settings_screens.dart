@@ -8,7 +8,7 @@ import 'package:linguaray_application/linguaray_application.dart';
 
 import '../../i18n/i18n.dart';
 import '../../shared/i18n_labels.dart';
-import '../preferences/settings_view_model.dart';
+import '../preferences/general_settings_view_model.dart';
 import '../preferences/translation_preference_dialogs.dart';
 import 'shortcuts_settings_view.dart';
 import 'shortcuts_view_model.dart';

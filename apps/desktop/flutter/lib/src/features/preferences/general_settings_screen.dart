@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../i18n/i18n.dart';
 import '../../shared/i18n_labels.dart';
 import 'general_settings_view.dart';
-import 'settings_view_model.dart';
+import 'general_settings_view_model.dart';
 
 class GeneralSettingsScreen extends ConsumerWidget {
   const GeneralSettingsScreen({super.key});

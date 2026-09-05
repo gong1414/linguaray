@@ -16,7 +16,7 @@ import 'package:linguaray_desktop/src/features/providers/provider_model_discover
 import 'package:linguaray_desktop/src/features/providers/providers_settings_view.dart';
 import 'package:linguaray_desktop/src/features/services/services_settings_view.dart';
 import 'package:linguaray_desktop/src/features/translation/view_models/translation_view_model.dart';
-import 'package:linguaray_desktop/src/features/updates/updates_screen.dart';
+import 'package:linguaray_desktop/src/features/updates/update_coordinator.dart';
 import 'package:linguaray_desktop/src/platform/credentials/secret_store.dart';
 import 'package:linguaray_desktop/src/platform/platform_types.dart';
 
@@ -44,7 +44,7 @@ void main() {
       final container = ProviderScope.containerOf(
         tester.element(find.byType(SettingsShellView)),
       );
-      final repository = container.read(workspaceSettingsRepositoryProvider);
+      final repository = container.read(providerSettingsRepositoryProvider);
       // Reclaim credentials from interrupted earlier runs in this isolated test
       // directory. IDs come only from this suite's public translation fixtures.
       final previousIds = <String>{};
@@ -216,9 +216,9 @@ void main() {
         Navigator.of(tester.element(find.byType(ProvidersSettingsView))).pop();
         await tester.pumpAndSettle();
 
-        await repository.setDefaultTranslationService(
-          '$providerId+translation',
-        );
+        await container
+            .read(serviceSettingsRepositoryProvider)
+            .setDefaultTranslationService('$providerId+translation');
         final quick = triggerController.trigger(
           TriggerAction.toggleQuickWindow,
         );
@@ -296,12 +296,12 @@ void main() {
         await tester.pumpAndSettle();
         await tester.runAsync(
           () => container
-              .read(updatesViewModelProvider.notifier)
+              .read(updateCoordinatorProvider.notifier)
               .check()
               .timeout(const Duration(seconds: 40)),
         );
         await tester.pumpAndSettle();
-        final update = container.read(updatesViewModelProvider);
+        final update = container.read(updateCoordinatorProvider);
         expect(update.status, isNot(UpdateStatus.checking));
         debugPrint(
           '[deepseek-live] software update check: ${update.status.name}, '
@@ -310,7 +310,9 @@ void main() {
         expect(find.byType(ErrorWidget), findsNothing);
       } finally {
         container.read(translationViewModelProvider.notifier).cancel();
-        await repository.setDefaultTranslationService(null);
+        await container
+            .read(serviceSettingsRepositoryProvider)
+            .setDefaultTranslationService(null);
         await repository.deleteProvider(providerId);
       }
       expect(
@@ -350,7 +352,7 @@ Future<void> _until(
 
 Future<void> _verifyChangingModelList(
   WidgetTester tester,
-  WorkspaceSettingsRepository repository,
+  ProviderSettingsRepository repository,
 ) async {
   // A controlled endpoint proves additions and removals independently of
   // whether DeepSeek happens to deploy a model during this test. No real key

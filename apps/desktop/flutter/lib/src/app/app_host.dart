@@ -1,7 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:linguaray_application/linguaray_application.dart'
+    show UpdateState;
 
+import '../features/updates/update_coordinator.dart';
 import '../i18n/i18n.dart';
 import '../platform/permissions/permission_controller.dart';
 import '../platform/platform_util.dart';
@@ -14,7 +18,7 @@ import 'commands/external_action_controller.dart';
 import 'commands/trigger_controller.dart';
 import 'navigation/app_routes.dart';
 import 'settings/settings_store.dart';
-import 'updates/startup_update_controller.dart';
+import 'updates/automatic_update_schedule.dart';
 import 'windows/app_windows.dart';
 import 'windows/surface_apps.dart';
 
@@ -29,25 +33,38 @@ class RootView extends StatelessWidget {
   }
 }
 
-class _RootBodyView extends StatefulWidget {
+class _RootBodyView extends ConsumerStatefulWidget {
   const _RootBodyView();
 
   @override
-  State<_RootBodyView> createState() => _RootBodyViewState();
+  ConsumerState<_RootBodyView> createState() => _RootBodyViewState();
 }
 
-class _RootBodyViewState extends State<_RootBodyView>
+class _RootBodyViewState extends ConsumerState<_RootBodyView>
     with WidgetsBindingObserver {
-  final AppTrayController _tray = AppTrayController();
+  late final AppTrayController _tray;
+  late final ProviderSubscription<UpdateState> _updateSubscription;
   late bool _showInMenuBar;
+  late final AutomaticUpdateSchedule _updates;
 
   @override
   void initState() {
     super.initState();
+    _updates = AutomaticUpdateSchedule(
+      enabled: () => settingsStore.advanced.checkUpdatesOnLaunch,
+      runCheck: () => ref.read(updateCoordinatorProvider.notifier).check(),
+    );
     WidgetsBinding.instance.addObserver(this);
     _showInMenuBar = _effectiveTrayVisibility;
     settingsStore.addListener(_handleChanged);
+    _tray = AppTrayController(
+      readUpdate: () => ref.read(updateCoordinatorProvider),
+    );
     _tray.initialize(visible: _showInMenuBar);
+    _updateSubscription = ref.listenManual(
+      updateCoordinatorProvider,
+      (_, _) => _tray.rebuildMenu(),
+    );
     MacAppPresentation.setHandlers(
       onReopen: showSettingsWindow,
       onOpenSettings: showSettingsWindow,
@@ -62,7 +79,7 @@ class _RootBodyViewState extends State<_RootBodyView>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (debugInitialDestination == null) {
         initializeResidentApp();
-        startupUpdateController.start();
+        _updates.start();
       } else {
         showSettingsWindow(destination: debugInitialDestination);
       }
@@ -74,7 +91,8 @@ class _RootBodyViewState extends State<_RootBodyView>
     WidgetsBinding.instance.removeObserver(this);
     settingsStore.removeListener(_handleChanged);
     unawaited(ShortcutService.instance.stop());
-    startupUpdateController.stop();
+    _updates.dispose();
+    _updateSubscription.close();
     _tray.dispose();
     super.dispose();
   }
@@ -83,7 +101,7 @@ class _RootBodyViewState extends State<_RootBodyView>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       unawaited(permissionController.refresh());
-      unawaited(startupUpdateController.check());
+      unawaited(_updates.check());
     }
   }
 
@@ -96,7 +114,7 @@ class _RootBodyViewState extends State<_RootBodyView>
       _showInMenuBar = visible;
       _tray.setVisible(visible);
     }
-    unawaited(startupUpdateController.check());
+    unawaited(_updates.check());
     _tray.rebuildMenu();
   }
 

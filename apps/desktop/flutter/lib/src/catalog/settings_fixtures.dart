@@ -22,7 +22,12 @@ class CatalogSettingsFixture extends StatelessWidget {
       overrides: [
         glossaryRepositoryProvider.overrideWithValue(repository),
         vocabularyRepositoryProvider.overrideWithValue(repository),
-        workspaceSettingsRepositoryProvider.overrideWithValue(repository),
+        preferencesRepositoryProvider.overrideWithValue(repository),
+        translationPreferencesRepositoryProvider.overrideWithValue(repository),
+        serviceSettingsRepositoryProvider.overrideWithValue(repository),
+        providerSettingsRepositoryProvider.overrideWithValue(repository),
+        integrationSettingsRepositoryProvider.overrideWithValue(repository),
+        appInfoRepositoryProvider.overrideWithValue(repository),
       ],
       child: ExcludeFocus(child: IgnorePointer(child: child)),
     );
@@ -33,7 +38,12 @@ class _PreviewRepository
     implements
         GlossaryRepository,
         VocabularyRepository,
-        WorkspaceSettingsRepository {
+        PreferencesRepository,
+        TranslationPreferencesRepository,
+        ProviderSettingsRepository,
+        ServiceSettingsRepository,
+        IntegrationSettingsRepository,
+        AppInfoRepository {
   _PreviewRepository(this.empty);
   final bool empty;
 

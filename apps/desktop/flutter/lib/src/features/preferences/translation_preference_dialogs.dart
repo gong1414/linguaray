@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:linguaray_application/linguaray_application.dart';
 
 import '../../i18n/i18n.dart';
-import 'settings_view_model.dart';
+import 'general_settings_view_model.dart';
 
 Future<List<TranslationTargetRule>?> showTranslationTargetsDialog(
   BuildContext context,

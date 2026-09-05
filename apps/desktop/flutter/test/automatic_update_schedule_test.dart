@@ -2,8 +2,7 @@ import 'dart:async';
 
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:linguaray_application/linguaray_application.dart';
-import 'package:linguaray_desktop/src/app/updates/startup_update_controller.dart';
+import 'package:linguaray_desktop/src/app/updates/automatic_update_schedule.dart';
 
 void main() {
   test(
@@ -13,12 +12,11 @@ void main() {
         var enabled = true;
         var calls = 0;
         final clock = time.getClock(DateTime(2026));
-        final controller = StartupUpdateController(
+        final controller = AutomaticUpdateSchedule(
           enabled: () => enabled,
           now: clock.now,
           runCheck: () async {
             calls++;
-            return const UpdateState.idle('0.6.1');
           },
         );
         controller.start();
@@ -44,9 +42,9 @@ void main() {
   );
 
   test('concurrent automatic checks share one request', () async {
-    final pending = Completer<UpdateState>();
+    final pending = Completer<void>();
     var calls = 0;
-    final controller = StartupUpdateController(
+    final controller = AutomaticUpdateSchedule(
       enabled: () => true,
       runCheck: () {
         calls++;
@@ -58,7 +56,7 @@ void main() {
     expect(identical(first, second), isTrue);
     expect(calls, 1);
     controller.dispose();
-    pending.complete(const UpdateState.idle('0.6.1'));
+    pending.complete();
     await first; // Completion after disposal must not notify a dead listener.
   });
 }

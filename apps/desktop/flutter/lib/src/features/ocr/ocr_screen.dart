@@ -1,15 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:nativeapi/nativeapi.dart' as nativeapi;
 
 import '../../app/commands/trigger_controller.dart';
-import '../../app/windows/app_windows.dart';
 import '../../i18n/i18n.dart';
 import '../../platform/platform_types.dart';
 import '../../shared/i18n_labels.dart';
 import 'ocr_controller.dart';
 import 'ocr_view.dart';
+import 'ocr_window_coordinator.dart';
 
 class OcrScreen extends StatefulWidget {
   const OcrScreen({super.key});
@@ -19,29 +18,23 @@ class OcrScreen extends StatefulWidget {
 }
 
 class _OcrScreenState extends State<OcrScreen> {
-  int? _windowBlurredListenerId;
+  late final OcrWindowCoordinator _window;
   bool _pinned = false;
 
   @override
   void initState() {
     super.initState();
     ocrController.addListener(_onStateChanged);
-    _windowBlurredListenerId = nativeapi.WindowManager.instance
-        .on<nativeapi.WindowBlurredEvent>((event) {
-          if (event.windowId == ocrWindowController.window.id &&
-              !ocrController.state.busy &&
-              !_pinned) {
-            hideOcrWindow();
-          }
-        });
+    _window = OcrWindowCoordinator(
+      keepVisible: () => ocrController.state.busy || _pinned,
+    );
+    _window.registerEvents();
   }
 
   @override
   void dispose() {
     ocrController.removeListener(_onStateChanged);
-    if (_windowBlurredListenerId != null) {
-      nativeapi.WindowManager.instance.off(_windowBlurredListenerId!);
-    }
+    _window.dispose();
     super.dispose();
   }
 
@@ -56,7 +49,7 @@ class _OcrScreenState extends State<OcrScreen> {
       pinned: _pinned,
       onTogglePin: () {
         setState(() => _pinned = !_pinned);
-        ocrWindowController.window.isAlwaysOnTop = _pinned;
+        _window.setPinned(_pinned);
       },
       labels: OcrViewLabels(
         pin: t.ui.quick.pin,
@@ -84,7 +77,7 @@ class _OcrScreenState extends State<OcrScreen> {
       onContinuousChanged: ocrController.setContinuous,
       onCopy: () => unawaited(ocrController.copy()),
       onClear: ocrController.clear,
-      onClose: hideOcrWindow,
+      onClose: _window.close,
     );
   }
 }

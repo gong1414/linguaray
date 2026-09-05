@@ -10,15 +10,10 @@ import '../../../platform/windows/window_positioning.dart'
     show fitPopoverToWorkArea;
 
 final class QuickTranslateWindowCoordinator {
-  QuickTranslateWindowCoordinator(
-    this._window,
-    this._isMounted, {
-    this.onDismiss,
-  });
+  QuickTranslateWindowCoordinator(this._isMounted, {this.onDismiss});
 
   final VoidCallback? onDismiss;
 
-  final nativeapi.Window Function() _window;
   final bool Function() _isMounted;
   final GlobalKey toolbarKey = GlobalKey();
   final GlobalKey contentKey = GlobalKey();
@@ -29,25 +24,43 @@ final class QuickTranslateWindowCoordinator {
   int? _focusedListenerId;
   int? _blurredListenerId;
 
-  nativeapi.Window get window => _window();
+  nativeapi.Window get _window => miniTranslatorWindowController.window;
 
-  void startDragging() => window.startDragging();
+  void startDragging() => _window.startDragging();
+
+  void close() => hideMiniTranslatorWindow();
+  void openSettings() => showSettingsWindow();
+  void setPinned(bool pinned) => _window.isAlwaysOnTop = pinned;
+
+  void prepareDictionaryDialog() {
+    if (canResizeMiniTranslatorWindow) {
+      _window.setSize(_window.size.width, 620, animate: true);
+    }
+  }
+
+  void toggleReadingWidth() {
+    _window.setContentSize(
+      _window.contentSize.width >= 600 ? 460 : 760,
+      _window.contentSize.height,
+    );
+    scheduleResize();
+  }
 
   void registerEvents() {
     if (!(kIsMacOS || kIsWindows)) return;
     _resizedListenerId = nativeapi.WindowManager.instance
         .on<nativeapi.WindowResizedEvent>((event) {
-          if (event.windowId == window.id) scheduleResize();
+          if (event.windowId == _window.id) scheduleResize();
         });
     _focusedListenerId = nativeapi.WindowManager.instance
         .on<nativeapi.WindowFocusedEvent>((event) {
-          if (event.windowId == window.id) {
+          if (event.windowId == _window.id) {
             unawaited(permissionController.refresh());
           }
         });
     _blurredListenerId = nativeapi.WindowManager.instance
         .on<nativeapi.WindowBlurredEvent>((event) {
-          if (event.windowId == window.id && !window.isAlwaysOnTop) {
+          if (event.windowId == _window.id && !_window.isAlwaysOnTop) {
             onDismiss?.call();
             hideMiniTranslatorWindow();
           }
@@ -89,13 +102,13 @@ final class QuickTranslateWindowCoordinator {
             180.0,
             800.0,
           );
-      final size = window.contentSize;
-      final outer = window.size;
+      final size = _window.contentSize;
+      final outer = _window.size;
       final frame = Size(
         (outer.width - size.width).clamp(0, double.infinity),
         (outer.height - size.height).clamp(0, double.infinity),
       );
-      final position = window.position;
+      final position = _window.position;
       final displays = nativeapi.DisplayManager.instance.getAll();
       final display =
           displays
@@ -121,10 +134,10 @@ final class QuickTranslateWindowCoordinator {
       );
       if ((size.height - content.height).abs() >= 1 ||
           (size.width - content.width).abs() >= 1) {
-        window.setContentSize(content.width, content.height);
+        _window.setContentSize(content.width, content.height);
       }
       if ((position - fitted.topLeft).distance >= 1) {
-        window.setPosition(fitted.left, fitted.top);
+        _window.setPosition(fitted.left, fitted.top);
       }
     } catch (_) {}
   }

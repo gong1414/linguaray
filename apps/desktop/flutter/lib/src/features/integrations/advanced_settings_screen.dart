@@ -12,76 +12,6 @@ import '../../platform/network/system_proxy.dart';
 import '../../shared/i18n_labels.dart';
 import '../../shared/settings_page.dart';
 import '../../shared/status_message.dart';
-import '../about/about_settings_view.dart';
-import '../permissions/permissions_settings_view.dart';
-import '../permissions/permissions_view_model.dart';
-import '../preferences/settings_view_model.dart';
-
-class PermissionsSettingsScreen extends ConsumerWidget {
-  const PermissionsSettingsScreen({super.key});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return PermissionsSettingsView(
-      labels: permissionsSettingsLabels(),
-      snapshot: ref.watch(permissionsViewModelProvider),
-      onGrantAccessibility: () => unawaited(
-        ref.read(permissionsViewModelProvider.notifier).requestAccessibility(),
-      ),
-      onGrantScreenRecording: () => unawaited(
-        ref
-            .read(permissionsViewModelProvider.notifier)
-            .requestScreenRecording(),
-      ),
-      onRecheck: () =>
-          unawaited(ref.read(permissionsViewModelProvider.notifier).refresh()),
-    );
-  }
-}
-
-class AboutSettingsScreen extends ConsumerStatefulWidget {
-  const AboutSettingsScreen({super.key});
-
-  @override
-  ConsumerState<AboutSettingsScreen> createState() =>
-      _AboutSettingsScreenState();
-}
-
-class _AboutSettingsScreenState extends ConsumerState<AboutSettingsScreen> {
-  bool _copied = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final info = ref.watch(aboutViewModelProvider);
-    if (info == null) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    return AboutSettingsView(
-      labels: aboutSettingsLabels(),
-      info: info,
-      copied: _copied,
-      onCopyVersion: () async {
-        await Clipboard.setData(
-          ClipboardData(text: 'v${info.version} (${info.buildNumber})'),
-        );
-        setState(() => _copied = true);
-      },
-      onOpenWebsite: () =>
-          unawaited(openExternalUrl('https://github.com/gong1414/linguaray')),
-      onOpenChangelog: () => unawaited(
-        openExternalUrl('https://github.com/gong1414/linguaray/releases'),
-      ),
-      onOpenIssues: () => unawaited(
-        openExternalUrl('https://github.com/gong1414/linguaray/issues'),
-      ),
-      onOpenLicense: () => unawaited(
-        openExternalUrl(
-          'https://github.com/gong1414/linguaray/blob/main/LICENSE',
-        ),
-      ),
-    );
-  }
-}
 
 class AdvancedSettingsScreen extends ConsumerStatefulWidget {
   const AdvancedSettingsScreen({super.key});
@@ -116,7 +46,7 @@ class _AdvancedSettingsScreenState
   }
 
   Future<void> _reload() async {
-    final repository = ref.read(workspaceSettingsRepositoryProvider);
+    final repository = ref.read(integrationSettingsRepositoryProvider);
     try {
       final status = await repository.loadApiServer();
       if (!mounted) return;
@@ -160,7 +90,7 @@ class _AdvancedSettingsScreenState
             onChanged: (value) async {
               try {
                 final next = await ref
-                    .read(workspaceSettingsRepositoryProvider)
+                    .read(integrationSettingsRepositoryProvider)
                     .setApiServerEnabled(value);
                 if (!mounted) return;
                 setState(() {
@@ -190,7 +120,7 @@ class _AdvancedSettingsScreenState
                   return;
                 }
                 final next = await ref
-                    .read(workspaceSettingsRepositoryProvider)
+                    .read(integrationSettingsRepositoryProvider)
                     .setApiServerPort(port);
                 if (!mounted) return;
                 setState(() {
@@ -329,7 +259,7 @@ class _AdvancedSettingsScreenState
     }
     try {
       final saved = await ref
-          .read(workspaceSettingsRepositoryProvider)
+          .read(integrationSettingsRepositoryProvider)
           .saveNetworkSettings(
             NetworkSettings(
               proxyMode: network.proxyMode,

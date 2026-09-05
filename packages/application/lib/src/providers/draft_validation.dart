@@ -1,4 +1,4 @@
-import 'package:linguaray_application/linguaray_application.dart';
+import 'package:linguaray_application/src/settings/models.dart';
 
 enum ProviderDraftValidationIssue {
   missingId,

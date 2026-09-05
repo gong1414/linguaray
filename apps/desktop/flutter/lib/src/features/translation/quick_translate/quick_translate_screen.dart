@@ -4,12 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:linguaray_application/linguaray_application.dart';
-import 'package:nativeapi/nativeapi.dart' as nativeapi;
 
 import '../../../app/commands/trigger_controller.dart';
 import '../../../app/dependencies.dart';
-import '../../../app/settings/settings_store.dart';
-import '../../../app/windows/app_windows.dart';
 import '../../../i18n/i18n.dart';
 import '../../../platform/permissions/permission_controller.dart';
 import '../../../platform/platform_types.dart';
@@ -48,8 +45,6 @@ class _QuickTranslateScreenState extends ConsumerState<QuickTranslateScreen>
   late final VocabularyRepository _vocabularyRepository;
   late final QuickTranslateWindowCoordinator _windowCoordinator;
 
-  nativeapi.Window get _window => _windowCoordinator.window;
-
   @override
   void initState() {
     super.initState();
@@ -57,7 +52,6 @@ class _QuickTranslateScreenState extends ConsumerState<QuickTranslateScreen>
     _lookUpWord = ref.read(lookUpWordProvider);
     _vocabularyRepository = ref.read(vocabularyRepositoryProvider);
     _windowCoordinator = QuickTranslateWindowCoordinator(
-      () => miniTranslatorWindowController.window,
       () => mounted,
       onDismiss: () => ref.read(translationViewModelProvider.notifier).cancel(),
     );
@@ -219,9 +213,7 @@ class _QuickTranslateScreenState extends ConsumerState<QuickTranslateScreen>
     final state = ref.read(translationViewModelProvider);
     final run = state.run;
     if (run == null || word.trim().isEmpty) return;
-    if (canResizeMiniTranslatorWindow) {
-      _window.setSize(_window.size.width, 620, animate: true);
-    }
+    _windowCoordinator.prepareDictionaryDialog();
     try {
       final sourceLanguage = run.targetLanguage;
       final targetLanguage = run.detectedLanguage ?? run.sourceLanguage;
@@ -325,9 +317,10 @@ class _QuickTranslateScreenState extends ConsumerState<QuickTranslateScreen>
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(translationViewModelProvider);
+    final preferences = ref.watch(translationInteractionPreferencesProvider);
     final languages = orderLanguagesByPreference(
       state.languages,
-      settingsStore.general.commonLanguages,
+      preferences.commonLanguages,
     );
     ref.listen(translationViewModelProvider, (previous, next) {
       _scheduleWindowResize();
@@ -339,16 +332,10 @@ class _QuickTranslateScreenState extends ConsumerState<QuickTranslateScreen>
       onStartDragging: _windowCoordinator.startDragging,
       onClose: () {
         ref.read(translationViewModelProvider.notifier).cancel();
-        hideMiniTranslatorWindow();
+        _windowCoordinator.close();
       },
       onStop: ref.read(translationViewModelProvider.notifier).cancel,
-      onToggleReading: () {
-        _window.setContentSize(
-          _window.contentSize.width >= 600 ? 460 : 760,
-          _window.contentSize.height,
-        );
-        _scheduleWindowResize();
-      },
+      onToggleReading: _windowCoordinator.toggleReadingWidth,
       onReplace:
           !_replacing &&
               _replacementTarget != null &&
@@ -373,8 +360,8 @@ class _QuickTranslateScreenState extends ConsumerState<QuickTranslateScreen>
       copied: _copied,
       pinned: _pinned,
       notice: _notice,
-      submitWithModifier: settingsStore.inputSubmitMode.name == 'commandEnter',
-      copyResultOnDoubleClick: settingsStore.doubleClickCopyResult,
+      submitWithModifier: preferences.inputSubmitMode.name == 'commandEnter',
+      copyResultOnDoubleClick: preferences.doubleClickCopyResult,
       glossaryMatches: state.glossaryMatches,
       glossaryWarnings: state.glossaryWarnings,
       speechAvailable: _speechAvailable,
@@ -439,15 +426,15 @@ class _QuickTranslateScreenState extends ConsumerState<QuickTranslateScreen>
       onToggleFavorite: () => unawaited(_toggleFavorite()),
       onTogglePin: () {
         setState(() => _pinned = !_pinned);
-        _window.isAlwaysOnTop = _pinned;
+        _windowCoordinator.setPinned(_pinned);
       },
       onCapture: () => unawaited(
         triggerController.trigger(TriggerAction.captureAndTranslate),
       ),
       onClipboard: () =>
           unawaited(triggerController.trigger(TriggerAction.translateInput)),
-      onOpenSettings: showSettingsWindow,
-      onConfigureServices: showSettingsWindow,
+      onOpenSettings: _windowCoordinator.openSettings,
+      onConfigureServices: _windowCoordinator.openSettings,
       onRecheckPermissions: () => unawaited(permissionController.refresh()),
     );
   }
@@ -462,7 +449,7 @@ class _QuickTranslateScreenState extends ConsumerState<QuickTranslateScreen>
     setState(() => _replacing = false);
     if (result == SelectionReplacementResult.replaced) {
       _replacementTarget = null;
-      hideMiniTranslatorWindow();
+      _windowCoordinator.close();
     } else {
       await _showMessage(switch (result) {
         SelectionReplacementResult.changed => t.ui.quick.replace_changed,

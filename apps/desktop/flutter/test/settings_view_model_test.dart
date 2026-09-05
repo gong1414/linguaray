@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:linguaray_application/linguaray_application.dart';
 import 'package:linguaray_desktop/src/app/dependencies.dart';
-import 'package:linguaray_desktop/src/features/preferences/settings_view_model.dart';
+import 'package:linguaray_desktop/src/features/preferences/general_settings_view_model.dart';
+import 'package:linguaray_desktop/src/features/providers/providers_settings_view_model.dart';
+import 'package:linguaray_desktop/src/features/services/services_settings_view_model.dart';
 import 'package:linguaray_desktop/src/features/shortcuts/shortcuts_settings_view.dart';
 import 'package:linguaray_desktop/src/features/shortcuts/shortcuts_view_model.dart';
 import 'package:linguaray_desktop/src/shared/settings_labels.dart';
@@ -12,10 +14,17 @@ void main() {
   test(
     'provider validation prevents repository writes and reports the error',
     () async {
-      final repository = _FakeWorkspaceSettingsRepository();
+      final repository = _FakeSettingsPorts();
       final container = ProviderContainer(
         overrides: [
-          workspaceSettingsRepositoryProvider.overrideWithValue(repository),
+          preferencesRepositoryProvider.overrideWithValue(repository),
+          translationPreferencesRepositoryProvider.overrideWithValue(
+            repository,
+          ),
+          serviceSettingsRepositoryProvider.overrideWithValue(repository),
+          providerSettingsRepositoryProvider.overrideWithValue(repository),
+          integrationSettingsRepositoryProvider.overrideWithValue(repository),
+          appInfoRepositoryProvider.overrideWithValue(repository),
         ],
       );
       addTearDown(container.dispose);
@@ -56,10 +65,17 @@ void main() {
   test(
     'provider save failure is contained and always clears saving state',
     () async {
-      final repository = _FakeWorkspaceSettingsRepository(throwOnSave: true);
+      final repository = _FakeSettingsPorts(throwOnSave: true);
       final container = ProviderContainer(
         overrides: [
-          workspaceSettingsRepositoryProvider.overrideWithValue(repository),
+          preferencesRepositoryProvider.overrideWithValue(repository),
+          translationPreferencesRepositoryProvider.overrideWithValue(
+            repository,
+          ),
+          serviceSettingsRepositoryProvider.overrideWithValue(repository),
+          providerSettingsRepositoryProvider.overrideWithValue(repository),
+          integrationSettingsRepositoryProvider.overrideWithValue(repository),
+          appInfoRepositoryProvider.overrideWithValue(repository),
         ],
       );
       addTearDown(container.dispose);
@@ -182,7 +198,7 @@ void main() {
   });
 
   test('translation service reorder persists the visible order', () async {
-    final repository = _FakeWorkspaceSettingsRepository(
+    final repository = _FakeSettingsPorts(
       services: const [
         ServiceRecord(
           id: 'google-web+translation',
@@ -206,7 +222,12 @@ void main() {
     );
     final container = ProviderContainer(
       overrides: [
-        workspaceSettingsRepositoryProvider.overrideWithValue(repository),
+        preferencesRepositoryProvider.overrideWithValue(repository),
+        translationPreferencesRepositoryProvider.overrideWithValue(repository),
+        serviceSettingsRepositoryProvider.overrideWithValue(repository),
+        providerSettingsRepositoryProvider.overrideWithValue(repository),
+        integrationSettingsRepositoryProvider.overrideWithValue(repository),
+        appInfoRepositoryProvider.overrideWithValue(repository),
       ],
     );
     addTearDown(container.dispose);
@@ -231,10 +252,15 @@ void main() {
   });
 
   test('general settings persists translation target changes', () async {
-    final repository = _FakeWorkspaceSettingsRepository();
+    final repository = _FakeSettingsPorts();
     final container = ProviderContainer(
       overrides: [
-        workspaceSettingsRepositoryProvider.overrideWithValue(repository),
+        preferencesRepositoryProvider.overrideWithValue(repository),
+        translationPreferencesRepositoryProvider.overrideWithValue(repository),
+        serviceSettingsRepositoryProvider.overrideWithValue(repository),
+        providerSettingsRepositoryProvider.overrideWithValue(repository),
+        integrationSettingsRepositoryProvider.overrideWithValue(repository),
+        appInfoRepositoryProvider.overrideWithValue(repository),
       ],
     );
     addTearDown(container.dispose);
@@ -268,12 +294,15 @@ Future<void> _waitFor(bool Function() condition) async {
   fail('Timed out waiting for view-model state.');
 }
 
-final class _FakeWorkspaceSettingsRepository
-    implements WorkspaceSettingsRepository {
-  _FakeWorkspaceSettingsRepository({
-    this.throwOnSave = false,
-    this.services = const [],
-  });
+final class _FakeSettingsPorts
+    implements
+        PreferencesRepository,
+        TranslationPreferencesRepository,
+        ServiceSettingsRepository,
+        ProviderSettingsRepository,
+        IntegrationSettingsRepository,
+        AppInfoRepository {
+  _FakeSettingsPorts({this.throwOnSave = false, this.services = const []});
 
   final bool throwOnSave;
   final List<ServiceRecord> services;

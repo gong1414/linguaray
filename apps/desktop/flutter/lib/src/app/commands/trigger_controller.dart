@@ -46,6 +46,15 @@ class TriggerController {
     null,
   );
 
+  Future<void> translateText(String text) {
+    quickWindowRequest.value = QuickWindowRequest(
+      text: text,
+      submit: true,
+      clearExisting: true,
+    );
+    return showMiniTranslatorWindow();
+  }
+
   Future<void> openInputWindow({Rect? trayBounds}) async {
     quickWindowRequest.value = const QuickWindowRequest(clearExisting: true);
     await showMiniTranslatorWindow(trayBounds: trayBounds);

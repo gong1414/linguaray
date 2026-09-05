@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:linguaray_application/linguaray_application.dart';
-import 'package:linguaray_desktop/src/features/providers/data/provider_catalog.dart';
+import 'package:linguaray_desktop/src/features/providers/provider_labels.dart';
 import 'package:linguaray_desktop/src/features/providers/providers_settings_view.dart';
 import 'package:linguaray_desktop/src/shared/settings_labels.dart';
 

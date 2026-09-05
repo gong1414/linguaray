@@ -1,17 +1,25 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:linguaray_application/linguaray_application.dart';
 
+import '../features/integrations/data/system_settings_adapter.dart';
 import '../features/library/glossary/data/runtime_glossary_repository.dart';
+import '../features/library/glossary/glossary_exchange_controller.dart';
 import '../features/library/history/data/runtime_history_repository.dart';
 import '../features/library/vocabulary/data/runtime_vocabulary_repository.dart';
+import '../features/preferences/data/general_settings_adapter.dart';
+import '../features/providers/data/provider_settings_adapter.dart';
+import '../features/services/data/service_settings_adapter.dart';
 import '../features/translation/data/runtime_dictionary_repository.dart';
 import '../features/translation/data/runtime_translation_repository.dart';
 import '../features/updates/data/github_update_repository.dart';
+import '../platform/credentials/secret_store.dart';
+import '../platform/files/text_file_dialogs.dart';
 import '../platform/network/network_proxy.dart';
 import '../platform/permissions/permission_repository.dart';
 import '../platform/shortcuts/shortcut_repository.dart';
 import '../platform/speech/channel_speech_service.dart';
-import 'settings/workspace_settings_repository.dart';
+import 'env.dart';
+import 'settings/settings_store.dart';
 
 final translationRepositoryProvider = Provider<TranslationRepository>(
   (ref) => RuntimeTranslationRepository(),
@@ -25,10 +33,32 @@ final translateTextProvider = Provider<TranslateText>(
   (ref) => TranslateText(ref.watch(translationRepositoryProvider)),
 );
 
-final workspaceSettingsRepositoryProvider =
-    Provider<WorkspaceSettingsRepository>(
-      (ref) => RuntimeWorkspaceSettingsRepository(),
+final preferencesRepositoryProvider = Provider<PreferencesRepository>(
+  (ref) => RuntimeGeneralSettingsAdapter(settingsStore),
+);
+final translationPreferencesRepositoryProvider =
+    Provider<TranslationPreferencesRepository>(
+      (ref) => RuntimeGeneralSettingsAdapter(settingsStore),
     );
+final appInfoRepositoryProvider = Provider<AppInfoRepository>(
+  (ref) => RuntimeSystemSettingsAdapter(settingsStore),
+);
+final integrationSettingsRepositoryProvider =
+    Provider<IntegrationSettingsRepository>(
+      (ref) => RuntimeSystemSettingsAdapter(settingsStore),
+    );
+final providerSettingsRepositoryProvider = Provider<ProviderSettingsRepository>(
+  (ref) => RuntimeProviderSettingsAdapter(
+    settingsStore,
+    providerCredentialsController,
+  ),
+);
+final serviceSettingsRepositoryProvider = Provider<ServiceSettingsRepository>(
+  (ref) => RuntimeServiceSettingsAdapter(
+    settingsStore,
+    ref.watch(appInfoRepositoryProvider).loadCapabilities,
+  ),
+);
 
 final permissionRepositoryProvider = Provider<PermissionRepository>(
   (ref) => ControllerPermissionRepository(),
@@ -89,4 +119,26 @@ final downloadVerifiedUpdateProvider = Provider<DownloadVerifiedUpdate>(
 
 final parseProtocolLinkProvider = Provider<ParseProtocolLink>(
   (ref) => const ParseProtocolLink(),
+);
+
+final updateCurrentVersionProvider = Provider<String>(
+  (ref) => Env.instance.appVersion,
+);
+
+// Expose an application snapshot to interactive views without leaking the
+// runtime settings object or running OS synchronization during build.
+final translationInteractionPreferencesProvider = Provider<GeneralPreferences>((
+  ref,
+) {
+  void changed() => ref.invalidateSelf();
+  settingsStore.addListener(changed);
+  ref.onDispose(() => settingsStore.removeListener(changed));
+  return RuntimeGeneralSettingsAdapter(settingsStore).currentPreferences;
+});
+
+final glossaryExchangeControllerProvider = Provider<GlossaryExchangeController>(
+  (ref) => GlossaryExchangeController(
+    ref.watch(glossaryRepositoryProvider),
+    const TextFileDialogs(),
+  ),
 );

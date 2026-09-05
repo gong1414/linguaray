@@ -1,7 +1,5 @@
 import 'dart:async';
-import 'dart:convert';
 
-import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:linguaray_application/linguaray_application.dart';
@@ -151,19 +149,11 @@ class _GlossarySettingsScreenState
     GlossaryBookRecord book,
     GlossaryExchangeFormat format,
   ) async {
-    final extension = format.name;
-    final file = await openFile(
-      acceptedTypeGroups: [
-        XTypeGroup(label: extension.toUpperCase(), extensions: [extension]),
-      ],
-    );
-    if (file == null) return;
     try {
-      final report = await _repository.importEntries(
-        bookId: book.id,
-        content: await file.readAsString(),
-        format: format,
-      );
+      final report = await ref
+          .read(glossaryExchangeControllerProvider)
+          .importBook(book.id, format);
+      if (report == null) return;
       await _reloadBooks(select: book.id);
       if (!mounted) return;
       await _showExchangeMessage(
@@ -184,30 +174,11 @@ class _GlossarySettingsScreenState
     GlossaryBookRecord book,
     GlossaryExchangeFormat format,
   ) async {
-    final extension = format.name;
-    final safeName = book.name
-        .replaceAll(RegExp(r'[<>:"/\\|?*\x00-\x1F]'), '-')
-        .replaceAll(RegExp(r'^-+|-+$'), '');
-    final location = await getSaveLocation(
-      suggestedName:
-          '${safeName.isEmpty ? 'linguaray-glossary' : safeName}.$extension',
-      acceptedTypeGroups: [
-        XTypeGroup(label: extension.toUpperCase(), extensions: [extension]),
-      ],
-    );
-    if (location == null) return;
     try {
-      final content = await _repository.exportEntries(
-        bookId: book.id,
-        format: format,
-      );
-      await XFile.fromData(
-        utf8.encode(content),
-        mimeType: format == GlossaryExchangeFormat.csv
-            ? 'text/csv'
-            : 'application/xml',
-        name: location.path.split(RegExp(r'[/\\]')).last,
-      ).saveTo(location.path);
+      final saved = await ref
+          .read(glossaryExchangeControllerProvider)
+          .exportBook(book, format);
+      if (!saved) return;
       if (mounted) {
         await _showExchangeMessage(t.workbench.glossary_page.export_success);
       }

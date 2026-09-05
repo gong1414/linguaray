@@ -5,7 +5,7 @@ import '../../i18n/i18n.dart';
 import '../../shared/settings_labels.dart';
 import '../../shared/settings_page.dart';
 import '../../shared/status_message.dart';
-import 'data/provider_catalog.dart';
+import 'provider_labels.dart';
 
 class ProvidersSettingsView extends StatelessWidget {
   const ProvidersSettingsView({

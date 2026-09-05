@@ -4,7 +4,7 @@ import 'package:linguaray_application/linguaray_application.dart';
 import '../app/navigation/settings_shell_view.dart';
 import '../features/about/about_settings_view.dart';
 import '../features/backup/data_transfer_settings_screen.dart';
-import '../features/integrations/system_settings_screens.dart';
+import '../features/integrations/advanced_settings_screen.dart';
 import '../features/library/glossary/glossary_settings_screen.dart';
 import '../features/library/history/history_view.dart';
 import '../features/library/vocabulary/vocabulary_settings_screen.dart';

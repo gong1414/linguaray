@@ -6,11 +6,13 @@ import '../../../app/env.dart';
 import '../../../app/runtime.dart';
 import '../../../app/settings/settings_store.dart';
 
-final class RuntimeSystemSettingsAdapter {
+final class RuntimeSystemSettingsAdapter
+    implements IntegrationSettingsRepository, AppInfoRepository {
   const RuntimeSystemSettingsAdapter(this._store);
 
   final SettingsStore _store;
 
+  @override
   Future<ApiServerStatus> loadApiServer() async {
     await _store.reloadAdvanced();
     final advanced = _store.advanced;
@@ -32,6 +34,7 @@ final class RuntimeSystemSettingsAdapter {
     }
   }
 
+  @override
   Future<ApiServerStatus> setApiServerEnabled(bool enabled) async {
     await _store.updateAdvanced(
       AdvancedSettingsPatch(apiServerEnabled: enabled),
@@ -39,6 +42,7 @@ final class RuntimeSystemSettingsAdapter {
     return loadApiServer();
   }
 
+  @override
   Future<ApiServerStatus> setApiServerPort(int port) async {
     if (port < 0 || port > 65535) {
       return ApiServerStatus(
@@ -52,6 +56,7 @@ final class RuntimeSystemSettingsAdapter {
     return loadApiServer();
   }
 
+  @override
   Future<NetworkSettings> loadNetworkSettings() async {
     await _store.reloadAdvanced();
     final advanced = _store.advanced;
@@ -67,6 +72,7 @@ final class RuntimeSystemSettingsAdapter {
     );
   }
 
+  @override
   Future<NetworkSettings> saveNetworkSettings(NetworkSettings settings) async {
     await _store.updateAdvanced(
       AdvancedSettingsPatch(
@@ -79,12 +85,14 @@ final class RuntimeSystemSettingsAdapter {
     return loadNetworkSettings();
   }
 
+  @override
   Future<PlatformCapabilities> loadCapabilities() async {
     if (Platform.isWindows) return const PlatformCapabilities.windows();
     if (Platform.isMacOS) return const PlatformCapabilities.macos();
     return const PlatformCapabilities.windows();
   }
 
+  @override
   Future<AboutInfo> loadAbout() async => AboutInfo(
     appName: 'LinguaRay',
     version: Env.instance.appVersion,

@@ -6,76 +6,21 @@ import '../../../app/runtime.dart';
 import '../../../app/settings/settings_store.dart';
 import '../../../platform/credentials/secret_fields.dart';
 import '../../../platform/credentials/secret_store.dart';
-import '../provider_draft_validation.dart';
 import 'provider_catalog.dart';
 import 'provider_util.dart';
 
-final class RuntimeProviderSettingsAdapter {
-  const RuntimeProviderSettingsAdapter(
-    this._store,
-    this._credentials,
-    this._loadCapabilities,
-  );
+final class RuntimeProviderSettingsAdapter
+    implements ProviderSettingsRepository {
+  const RuntimeProviderSettingsAdapter(this._store, this._credentials);
 
   final SettingsStore _store;
   final ProviderCredentialsController _credentials;
-  final Future<PlatformCapabilities> Function() _loadCapabilities;
 
-  Future<List<ServiceRecord>> listServices() async {
-    await Future.wait([
-      _store.reloadGeneral(),
-      _store.reloadServices(),
-      _store.reloadProviders(),
-    ]);
-    final providers = {for (final item in _store.providers) item.id: item};
-    final defaultTranslation = _store.defaultTranslationService;
-    final defaultOcr = _store.defaultOcrService;
-    final capabilities = await _loadCapabilities();
-    return [
-      for (final service in _store.services)
-        if (_isVisibleService(service, capabilities))
-          ServiceRecord(
-            id: service.id,
-            name: service.name.trim().isEmpty ? service.id : service.name,
-            providerId: service.providerId,
-            providerName: providers[service.providerId] == null
-                ? service.providerId
-                : providerTypeDisplayName(providers[service.providerId]!.type),
-            kind: _kindName(service.type),
-            enabled: isServiceEnabled(service),
-            isDefault:
-                service.id == defaultTranslation ||
-                service.id == defaultOcr ||
-                service.id == _store.defaultDirectoryService,
-            synthesized: !service.id.contains('+custom-'),
-            usable: true,
-          ),
-    ];
-  }
-
-  Future<void> setServiceEnabled({
-    required String serviceId,
-    required bool enabled,
-  }) async {
-    final service = _store.services
-        .where((item) => item.id == serviceId)
-        .firstOrNull;
-    if (service == null) return;
-    final fields = Map<String, String>.from(service.fields)
-      ..[kServiceEnabledField] = enabled ? 'true' : 'false';
-    await runtime.settings().updateService(
-      serviceId: service.id,
-      providerId: service.providerId,
-      serviceType: service.type,
-      name: service.name,
-      fields: fields,
-    );
-    await _store.reloadServices();
-  }
-
+  @override
   Future<List<ProviderTypeOption>> listProviderTypes() async =>
       providerTypeOptionsFromCatalog(listProviderCatalog());
 
+  @override
   Future<List<ProviderRecord>> listProviders() async {
     await _store.reloadProviders();
     final catalog = providerTypeOptionsFromCatalog(listProviderCatalog());
@@ -101,6 +46,7 @@ final class RuntimeProviderSettingsAdapter {
     ];
   }
 
+  @override
   Future<void> saveProvider(ProviderDraft draft) async {
     final type = parseProviderType(draft.typeId);
     final existing = _existingProvider(draft.id);
@@ -120,6 +66,7 @@ final class RuntimeProviderSettingsAdapter {
     await Future.wait([_store.reloadProviders(), _store.reloadServices()]);
   }
 
+  @override
   Future<void> deleteProvider(String providerId) async {
     final existing = await runtime.settings().getProvider(
       providerId: providerId,
@@ -132,6 +79,7 @@ final class RuntimeProviderSettingsAdapter {
     await Future.wait([_store.reloadProviders(), _store.reloadServices()]);
   }
 
+  @override
   Future<ProviderTestResult> testProvider(ProviderDraft draft) async {
     try {
       final type = parseProviderType(draft.typeId);
@@ -161,6 +109,7 @@ final class RuntimeProviderSettingsAdapter {
     }
   }
 
+  @override
   Future<ProviderModelDiscovery> discoverProviderModels(
     ProviderDraft draft,
   ) async {
@@ -231,59 +180,9 @@ final class RuntimeProviderSettingsAdapter {
     }
   }
 
+  @override
   Future<List<String>> listProviderModels(String providerId) =>
       runtime.settings().listModels(providerId: providerId);
-
-  Future<void> saveService(ServiceDraft draft) async {
-    final type = switch (draft.kind) {
-      'ocr' => ServiceType.ocr,
-      'dictionary' => ServiceType.dictionary,
-      _ => ServiceType.translation,
-    };
-    await runtime.settings().updateService(
-      serviceId: draft.id ?? '${draft.providerId}+custom-${draft.kind}',
-      providerId: draft.providerId,
-      serviceType: type,
-      name: draft.name,
-      fields: draft.fields,
-    );
-    await _store.reloadServices();
-  }
-
-  Future<void> deleteService(String serviceId) async {
-    await runtime.settings().deleteService(serviceId: serviceId);
-    await _store.reloadServices();
-  }
-
-  Future<void> reorderTranslationServices(List<String> serviceIds) async {
-    await runtime.settings().setTranslationServiceOrder(order: serviceIds);
-    await Future.wait([_store.reloadGeneral(), _store.reloadServices()]);
-  }
-
-  bool _isVisibleService(
-    ServiceConfigEntry service,
-    PlatformCapabilities capabilities,
-  ) {
-    if (service.providerId == 'system' &&
-        service.type == ServiceType.translation &&
-        !capabilities.systemTranslation) {
-      return false;
-    }
-    if (service.providerId == 'system' &&
-        service.type == ServiceType.dictionary &&
-        !capabilities.systemDictionary) {
-      return false;
-    }
-    return service.type == ServiceType.translation ||
-        service.type == ServiceType.ocr ||
-        service.type == ServiceType.dictionary;
-  }
-
-  String _kindName(ServiceType type) => switch (type) {
-    ServiceType.ocr => 'ocr',
-    ServiceType.dictionary => 'dictionary',
-    ServiceType.llm || ServiceType.translation => 'translation',
-  };
 
   ProviderConfigEntry? _existingProvider(String id) =>
       _store.providers.where((item) => item.id == id).firstOrNull;
