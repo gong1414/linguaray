@@ -65,6 +65,38 @@ glossaries, vocabulary, permissions, update checks, and local API integration.
 The quick translator consumes those capabilities through controllers and
 application ports; it does not own provider or persistence logic.
 
+### Feature contracts and state ownership
+
+The application exposes six settings ports: `PreferencesRepository`,
+`TranslationPreferencesRepository`, `ProviderSettingsRepository`,
+`ServiceSettingsRepository`, `IntegrationSettingsRepository` and
+`AppInfoRepository`. The former 42-method workspace facade has been removed.
+`app/dependencies.dart` binds each port to its runtime adapter; views and view
+models do not see a catch-all settings interface. Provider draft validation,
+preset selection and initial public fields are pure application functions.
+Provider credentials and live model discovery remain in the provider adapter;
+service enablement, defaults and order belong to the service adapter.
+
+`features/updates/update_coordinator.dart` owns the single resident update state.
+The settings page and tray observe it. `app/updates/automatic_update_schedule.dart`
+only decides when to send a check command, reading the preference on each
+attempt. Concurrent manual/automatic commands join the active operation; checks
+cannot replace download progress or a verified installer waiting for handoff.
+The root ProviderScope owns the coordinator and network repository, so closing
+and reopening a surface preserves the result. The download use case retains
+manifest, checksum and platform-signature verification before installation.
+
+Quick translation and OCR put window events, pinning, dragging and resizing in
+window coordinators. They do not expose native window handles to widgets.
+Glossary file exchange separates the feature operation from native text-file
+dialogs, encoding and disk I/O. Cancellation returns no imported/exported result.
+
+`app/settings/settings_store.dart` still synchronizes runtime snapshots and OS
+side effects (login items, appearance and the local API). Separating those
+transactions and reducing global notifications is a subsequent behavior change,
+not part of the completed directory/contract migration. Library CRUD state can
+also be extracted further from screens without moving persistence out of Rust.
+
 ### Design system
 
 `packages/ui_flutter` projects LinguaRay's brand onto Flutter's official
@@ -144,3 +176,20 @@ catalog imports in the production graph. This library-level check complements
 the Dart analyzer and Rust Clippy; it does not infer whether every public member
 is used by external consumers. The visual suite renders all settings destinations
 and translation/OCR/provider/update states using production theme font names.
+
+## Dependency checks
+
+`python3 scripts/check_dart_architecture.py` enforces application package purity,
+keeps business/runtime imports out of the design system, prevents feature
+widgets/view models from importing native plugins, runtime settings or data
+adapters, and rejects reintroduction of the old desktop source directories.
+Conditional imports and export/part chains are checked. Application composition
+shells under `app/` may assemble native windows and features; window and file
+controllers own the corresponding platform calls. Testing font loaders remain
+outside the production graph. No migration allowlist is required.
+
+This source check does not infer member-level liveness or replace Dart analysis.
+The Python regression suite tests conditional/barrel leaks, pure ports, directory
+rules and comment handling. CI and release verification run it alongside library
+reachability, package tests and unchanged visual baselines. Both desktop CI
+runners execute the runtime persistence suite, including interrupted writers.

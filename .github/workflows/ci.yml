@@ -46,7 +46,8 @@ jobs:
       - run: dart run melos run dependency_validator
       - run: python3 scripts/check_uniffi_surface.py
       - run: python3 scripts/check_dart_reachability.py
-      - run: python3 -m unittest discover -s scripts -p 'test_dart_reachability.py'
+      - run: python3 scripts/check_dart_architecture.py
+      - run: python3 -m unittest discover -s scripts -p 'test_dart_*.py'
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.13"
@@ -95,7 +96,7 @@ jobs:
         if: runner.os == 'macOS'
         working-directory: .
         run: python3 scripts/format.py --check swift
-      - name: Real system OCR fixture
+      - name: Runtime persistence and system OCR
         working-directory: .
         run: cargo test --locked -p linguaray_runtime
       - name: Desktop integration smoke

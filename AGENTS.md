@@ -122,6 +122,7 @@ cargo clippy --locked --workspace --all-targets -- -D warnings
 cargo test --locked --workspace
 python3 scripts/check_uniffi_surface.py
 python3 scripts/check_dart_reachability.py
+python3 scripts/check_dart_architecture.py
 ```
 
 Use `python3 scripts/format.py --check` to check Dart, Rust, and Swift formatting
