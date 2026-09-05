@@ -7,6 +7,7 @@ import 'package:nativeapi/nativeapi.dart';
 
 import '../utils/language_util.dart';
 import '../utils/platform_util.dart';
+import 'mac_app_presentation.dart';
 import 'runtime.dart' as runtime_service;
 
 /// App-wide settings cache backed by the Rust runtime.
@@ -214,8 +215,17 @@ class SettingsStore extends ChangeNotifier {
     final settings = runtime_service.runtime.settings();
     try {
       _appearance = await settings.getAppearance();
-      notifyListeners();
+      await _applyAppearance();
     } catch (_) {}
+  }
+
+  Future<void> _applyAppearance() async {
+    try {
+      await MacAppPresentation.setThemeMode(themeMode);
+    } catch (error, stackTrace) {
+      debugPrint('Failed to apply native appearance: $error\n$stackTrace');
+    }
+    notifyListeners();
   }
 
   Future<void> reloadShortcuts() async {
@@ -285,7 +295,7 @@ class SettingsStore extends ChangeNotifier {
   Future<void> updateAppearance(AppearanceSettingsPatch patch) async {
     final settings = runtime_service.runtime.settings();
     _appearance = await settings.updateAppearance(patch: patch);
-    notifyListeners();
+    await _applyAppearance();
   }
 
   Future<void> updateShortcuts(ShortcutSettingsPatch patch) async {

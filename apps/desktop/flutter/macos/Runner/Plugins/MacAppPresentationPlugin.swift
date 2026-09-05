@@ -81,6 +81,23 @@ final class MacAppPresentationPlugin: NSObject, FlutterPlugin {
       Task { @MainActor in
         result(NSApp.activationPolicy() == .regular)
       }
+    case "setThemeMode":
+      guard
+        let arguments = call.arguments as? [String: Any],
+        let mode = arguments["mode"] as? String,
+        ["light", "dark", "system"].contains(mode)
+      else {
+        result(FlutterError(code: "bad_args", message: "Expected an app theme mode.", details: nil))
+        return
+      }
+      Task { @MainActor in
+        switch mode {
+        case "light": NSApp.appearance = NSAppearance(named: .aqua)
+        case "dark": NSApp.appearance = NSAppearance(named: .darkAqua)
+        default: NSApp.appearance = nil
+        }
+        result(nil)
+      }
     default:
       result(FlutterMethodNotImplemented)
     }

@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter/services.dart';
 
 /// Thin wrapper over the `MacAppPresentationPlugin` channel.
@@ -26,6 +27,13 @@ class MacAppPresentation {
     await _channel.invokeMethod<void>('setDockIconVisible', {
       'visible': visible,
     });
+  }
+
+  /// Keeps native title bars and system panels in the selected app theme.
+  /// System mode clears the AppKit override so later OS changes still apply.
+  static Future<void> setThemeMode(ThemeMode mode) async {
+    if (!Platform.isMacOS) return;
+    await _channel.invokeMethod<void>('setThemeMode', {'mode': mode.name});
   }
 
   /// Registers what to do when the user clicks the Dock icon ([onReopen]) or
