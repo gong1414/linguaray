@@ -323,6 +323,7 @@ fn system_ocr_recognizes_fixed_catalog_image() {
 
 #[cfg(target_os = "macos")]
 #[test]
+#[cfg(target_os = "macos")]
 fn system_dictionary_lookup_returns_structured_definitions() {
     let runtime = create_runtime();
 
@@ -363,20 +364,22 @@ fn system_dictionary_lookup_returns_structured_definitions() {
                 .expect("failed to look up hello")
         });
 
-    let pronunciations = response.pronunciations.expect("pronunciations");
-    assert_eq!(pronunciations.len(), 2);
-    assert_eq!(pronunciations[0].r#type.as_deref(), Some("uk"));
-    assert_eq!(pronunciations[1].r#type.as_deref(), Some("us"));
-
-    let definitions = response.definitions.expect("definitions");
-    assert!(
-        definitions.iter().any(|definition| definition
-            .values
-            .as_ref()
-            .map(|values| values.iter().any(|value| value.contains("问候")))
-            .unwrap_or(false)),
-        "expected parsed definitions to include the noun translation: {definitions:#?}"
-    );
+    // DictionaryServices uses the dictionaries installed on this machine.
+    // CI may have an English dictionary, while a maintainer has the bilingual
+    // one. Exact BrE/AmE and Chinese parsing remains covered by fixed fixtures
+    // in crates/engine/src/provider/traditional/system/macos.rs.
+    assert_eq!(response.word.as_deref(), Some("hello"));
+    if let Some(pronunciations) = &response.pronunciations {
+        assert!(!pronunciations.is_empty());
+        assert!(pronunciations.iter().all(|item| item
+            .phonetic_symbol
+            .as_deref()
+            .is_some_and(|symbol| !symbol.trim().is_empty())));
+    }
+    let definitions = response
+        .definitions
+        .expect("installed dictionary definitions");
+    assert!(!definitions.is_empty());
     assert!(
         definitions
             .iter()

@@ -11,6 +11,7 @@ void main() {
     expect(isNewerVersion('0.6.1-beta.2', '0.6.1'), isFalse);
     expect(isNewerVersion('0.6.1+20', '0.6.1+19'), isFalse);
     expect(isNewerVersion('invalid', '0.6.1'), isFalse);
+    expect(isNewerVersion('0.6.2+invalid..build', '0.6.1'), isFalse);
     expect(isNewerVersion('0.6.1', 'invalid'), isFalse);
   });
 

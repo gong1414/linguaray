@@ -5,7 +5,8 @@ import 'package:pub_semver/pub_semver.dart';
 bool isNewerVersion(String candidate, String current) {
   Version parse(String value) {
     value = value.trim().replaceFirst(RegExp(r'^[vV]'), '');
-    return Version.parse(value.split('+').first);
+    final parsed = Version.parse(value);
+    return Version.parse(parsed.toString().split('+').first);
   }
 
   try {
