@@ -16,6 +16,7 @@ import '../shared/language_util.dart';
 import 'app_tray_controller.dart';
 import 'commands/external_action_controller.dart';
 import 'commands/trigger_controller.dart';
+import 'dependencies.dart';
 import 'navigation/app_routes.dart';
 import 'settings/settings_section.dart';
 import 'settings/settings_store.dart';
@@ -43,6 +44,7 @@ class _RootBodyView extends ConsumerStatefulWidget {
 
 class _RootBodyViewState extends ConsumerState<_RootBodyView>
     with WidgetsBindingObserver {
+  late final SettingsStore _store;
   late final AppTrayController _tray;
   late final ProviderSubscription<UpdateState> _updateSubscription;
   late bool _showInMenuBar;
@@ -52,13 +54,14 @@ class _RootBodyViewState extends ConsumerState<_RootBodyView>
   @override
   void initState() {
     super.initState();
+    _store = ref.read(settingsStoreProvider);
     _updates = AutomaticUpdateSchedule(
-      enabled: () => settingsStore.advanced.checkUpdatesOnLaunch,
+      enabled: () => _store.advanced.checkUpdatesOnLaunch,
       runCheck: () => ref.read(updateCoordinatorProvider.notifier).check(),
     );
     WidgetsBinding.instance.addObserver(this);
     _showInMenuBar = _effectiveTrayVisibility;
-    _hostSettings = settingsStore.listenablesFor(const [
+    _hostSettings = _store.listenablesFor(const [
       SettingsSection.general,
       SettingsSection.appearance,
       SettingsSection.shortcuts,
@@ -67,7 +70,7 @@ class _RootBodyViewState extends ConsumerState<_RootBodyView>
     _hostSettings.addListener(_handleChanged);
     _tray = AppTrayController(
       readUpdate: () => ref.read(updateCoordinatorProvider),
-      store: settingsStore,
+      store: _store,
     );
     _tray.initialize(visible: _showInMenuBar);
     _updateSubscription = ref.listenManual(
@@ -115,7 +118,7 @@ class _RootBodyViewState extends ConsumerState<_RootBodyView>
   }
 
   Future<void> _handleChanged() async {
-    final newLocale = languageToLocale(settingsStore.appLanguage);
+    final newLocale = languageToLocale(_store.appLanguage);
     if (newLocale != context.locale) await context.setLocale(newLocale);
 
     final visible = _effectiveTrayVisibility;
@@ -128,7 +131,7 @@ class _RootBodyViewState extends ConsumerState<_RootBodyView>
   }
 
   bool get _effectiveTrayVisibility =>
-      kIsWindows || settingsStore.general.showInMenuBar;
+      kIsWindows || _store.general.showInMenuBar;
 
   @override
   Widget build(BuildContext context) {

@@ -1,14 +1,15 @@
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:linguaray_ui/linguaray_ui.dart' show LinguaRayMaterialTheme;
 
 import '../../features/ocr/ocr_screen.dart';
 import '../../i18n/i18n.dart';
+import '../dependencies.dart';
 import '../navigation/app_routes.dart';
 import '../settings/settings_section.dart';
-import '../settings/settings_store.dart';
 import 'app_windows.dart';
 
 class SettingsApp extends StatefulWidget {
@@ -24,50 +25,48 @@ class _SettingsAppState extends State<SettingsApp> {
         ? debugInitialRoute.trim()
         : null,
   );
-  late final Listenable _appearance = settingsStore.listenableFor(
-    SettingsSection.appearance,
-  );
 
   @override
   void initState() {
     super.initState();
     attachSettingsRouter(_router);
-    _appearance.addListener(_onSettingsChanged);
   }
 
   @override
   void dispose() {
     detachSettingsRouter(_router);
-    _appearance.removeListener(_onSettingsChanged);
     super.dispose();
   }
 
-  void _onSettingsChanged() => setState(() {});
-
   @override
   Widget build(BuildContext context) {
-    return MaterialApp.router(
-      debugShowCheckedModeBanner: false,
-      title: kSettingsWindowTitle,
-      theme: LinguaRayMaterialTheme.light(),
-      darkTheme: LinguaRayMaterialTheme.dark(),
-      themeMode: settingsStore.themeMode,
-      builder: (context, child) {
-        final mac = Theme.of(context).platform == TargetPlatform.macOS;
-        return CallbackShortcuts(
-          bindings: {
-            SingleActivator(LogicalKeyboardKey.keyW, meta: mac, control: !mac):
-                hideSettingsWindow,
-            const SingleActivator(LogicalKeyboardKey.escape):
-                hideSettingsWindow,
-          },
-          child: child!,
-        );
-      },
-      routerConfig: _router,
-      localizationsDelegates: context.localizationDelegates,
-      supportedLocales: context.supportedLocales,
-      locale: context.locale,
+    return _AppearanceThemedApp(
+      builder: (context, themeMode) => MaterialApp.router(
+        debugShowCheckedModeBanner: false,
+        title: kSettingsWindowTitle,
+        theme: LinguaRayMaterialTheme.light(),
+        darkTheme: LinguaRayMaterialTheme.dark(),
+        themeMode: themeMode,
+        builder: (context, child) {
+          final mac = Theme.of(context).platform == TargetPlatform.macOS;
+          return CallbackShortcuts(
+            bindings: {
+              SingleActivator(
+                LogicalKeyboardKey.keyW,
+                meta: mac,
+                control: !mac,
+              ): hideSettingsWindow,
+              const SingleActivator(LogicalKeyboardKey.escape):
+                  hideSettingsWindow,
+            },
+            child: child!,
+          );
+        },
+        routerConfig: _router,
+        localizationsDelegates: context.localizationDelegates,
+        supportedLocales: context.supportedLocales,
+        locale: context.locale,
+      ),
     );
   }
 }
@@ -81,78 +80,57 @@ class MiniTranslatorApp extends StatefulWidget {
 
 class _MiniTranslatorAppState extends State<MiniTranslatorApp> {
   late final GoRouter _router = createMiniTranslatorAppRouter();
-  late final Listenable _appearance = settingsStore.listenableFor(
-    SettingsSection.appearance,
-  );
-
-  @override
-  void initState() {
-    super.initState();
-    _appearance.addListener(_onSettingsChanged);
-  }
-
-  @override
-  void dispose() {
-    _appearance.removeListener(_onSettingsChanged);
-    super.dispose();
-  }
-
-  void _onSettingsChanged() => setState(() {});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp.router(
-      debugShowCheckedModeBanner: false,
-      title: kMiniTranslatorWindowTitle,
-      theme: LinguaRayMaterialTheme.light(),
-      darkTheme: LinguaRayMaterialTheme.dark(),
-      themeMode: settingsStore.themeMode,
-      routerConfig: _router,
-      localizationsDelegates: context.localizationDelegates,
-      supportedLocales: context.supportedLocales,
-      locale: context.locale,
+    return _AppearanceThemedApp(
+      builder: (context, themeMode) => MaterialApp.router(
+        debugShowCheckedModeBanner: false,
+        title: kMiniTranslatorWindowTitle,
+        theme: LinguaRayMaterialTheme.light(),
+        darkTheme: LinguaRayMaterialTheme.dark(),
+        themeMode: themeMode,
+        routerConfig: _router,
+        localizationsDelegates: context.localizationDelegates,
+        supportedLocales: context.supportedLocales,
+        locale: context.locale,
+      ),
     );
   }
 }
 
-class OcrApp extends StatefulWidget {
+class OcrApp extends StatelessWidget {
   const OcrApp({super.key});
 
   @override
-  State<OcrApp> createState() => _OcrAppState();
+  Widget build(BuildContext context) {
+    return _AppearanceThemedApp(
+      builder: (context, themeMode) => MaterialApp(
+        debugShowCheckedModeBanner: false,
+        title: kOcrWindowTitle,
+        theme: LinguaRayMaterialTheme.light(),
+        darkTheme: LinguaRayMaterialTheme.dark(),
+        themeMode: themeMode,
+        localizationsDelegates: context.localizationDelegates,
+        supportedLocales: context.supportedLocales,
+        locale: context.locale,
+        home: const OcrScreen(),
+      ),
+    );
+  }
 }
 
-class _OcrAppState extends State<OcrApp> {
-  late final Listenable _appearance = settingsStore.listenableFor(
-    SettingsSection.appearance,
-  );
+class _AppearanceThemedApp extends ConsumerWidget {
+  const _AppearanceThemedApp({required this.builder});
+
+  final Widget Function(BuildContext context, ThemeMode themeMode) builder;
 
   @override
-  void initState() {
-    super.initState();
-    _appearance.addListener(_onSettingsChanged);
-  }
-
-  @override
-  void dispose() {
-    _appearance.removeListener(_onSettingsChanged);
-    super.dispose();
-  }
-
-  void _onSettingsChanged() => setState(() {});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: kOcrWindowTitle,
-      theme: LinguaRayMaterialTheme.light(),
-      darkTheme: LinguaRayMaterialTheme.dark(),
-      themeMode: settingsStore.themeMode,
-      localizationsDelegates: context.localizationDelegates,
-      supportedLocales: context.supportedLocales,
-      locale: context.locale,
-      home: const OcrScreen(),
+  Widget build(BuildContext context, WidgetRef ref) {
+    final store = ref.watch(settingsStoreProvider);
+    return ListenableBuilder(
+      listenable: store.listenableFor(SettingsSection.appearance),
+      builder: (context, _) => builder(context, store.themeMode),
     );
   }
 }
