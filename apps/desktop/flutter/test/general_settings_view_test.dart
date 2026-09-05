@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:linguaray_application/linguaray_application.dart';
-import 'package:linguaray_desktop/src/ui/settings/settings_labels.dart';
-import 'package:linguaray_desktop/src/ui/settings/views/general_settings_view.dart';
+import 'package:linguaray_desktop/src/features/preferences/general_settings_view.dart';
+import 'package:linguaray_desktop/src/shared/settings_labels.dart';
 import 'package:linguaray_ui/linguaray_ui.dart';
 
 void main() {

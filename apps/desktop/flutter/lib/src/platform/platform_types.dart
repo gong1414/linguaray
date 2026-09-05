@@ -1,6 +1,6 @@
 import 'dart:ui';
 
-import 'selection_replacement_controller.dart';
+import 'selection/selection_replacement_controller.dart';
 
 /// Normalized permission state exposed to controllers and widgets.
 enum PermissionState { granted, denied, notRequired, unknown }

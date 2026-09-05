@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:linguaray_application/linguaray_application.dart';
-import 'package:linguaray_desktop/src/data/channel_speech_service.dart';
-import 'package:linguaray_desktop/src/ui/translation/widgets/dictionary_lookup_dialog.dart';
+import 'package:linguaray_desktop/src/features/translation/widgets/dictionary_lookup_dialog.dart';
+import 'package:linguaray_desktop/src/platform/speech/channel_speech_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

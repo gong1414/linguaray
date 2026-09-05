@@ -7,18 +7,18 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:linguaray_application/linguaray_application.dart';
 import 'package:linguaray_desktop/main.dart' as app;
-import 'package:linguaray_desktop/src/config/dependencies.dart';
-import 'package:linguaray_desktop/src/controllers/settings/provider_model_discovery_controller.dart';
+import 'package:linguaray_desktop/src/app/commands/trigger_controller.dart';
+import 'package:linguaray_desktop/src/app/dependencies.dart';
+import 'package:linguaray_desktop/src/app/navigation/settings_shell_view.dart';
+import 'package:linguaray_desktop/src/app/runtime.dart';
+import 'package:linguaray_desktop/src/app/windows/app_windows.dart';
+import 'package:linguaray_desktop/src/features/providers/provider_model_discovery_controller.dart';
+import 'package:linguaray_desktop/src/features/providers/providers_settings_view.dart';
+import 'package:linguaray_desktop/src/features/services/services_settings_view.dart';
+import 'package:linguaray_desktop/src/features/translation/view_models/translation_view_model.dart';
+import 'package:linguaray_desktop/src/features/updates/updates_screen.dart';
+import 'package:linguaray_desktop/src/platform/credentials/secret_store.dart';
 import 'package:linguaray_desktop/src/platform/platform_types.dart';
-import 'package:linguaray_desktop/src/platform/secret_store.dart';
-import 'package:linguaray_desktop/src/platform/trigger_controller.dart';
-import 'package:linguaray_desktop/src/services/app_windows.dart';
-import 'package:linguaray_desktop/src/services/runtime.dart';
-import 'package:linguaray_desktop/src/ui/settings/settings_shell_view.dart';
-import 'package:linguaray_desktop/src/ui/settings/views/providers_settings_view.dart';
-import 'package:linguaray_desktop/src/ui/settings/views/services_settings_view.dart';
-import 'package:linguaray_desktop/src/ui/translation/view_models/translation_view_model.dart';
-import 'package:linguaray_desktop/src/ui/updates/updates_screen.dart';
 
 // Explicitly opt in. Pass a path inside the macOS app container, never the key
 // itself as a Dart define (defines are embedded in build products).

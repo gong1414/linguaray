@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:linguaray_desktop/src/platform/capture_controller.dart';
-import 'package:linguaray_desktop/src/platform/ocr_controller.dart';
+import 'package:linguaray_desktop/src/features/ocr/ocr_controller.dart';
+import 'package:linguaray_desktop/src/platform/capture/capture_controller.dart';
 import 'package:linguaray_desktop/src/platform/platform_types.dart';
 
 void main() {

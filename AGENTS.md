@@ -29,6 +29,11 @@ the local `.git/info/exclude`. They are not part of the product: skip them when
 searching, never edit them, and do not treat them as a reference for current
 behavior.
 
+The desktop source tree uses `app/` for composition and lifecycle,
+`features/` for product capabilities, `platform/` for native implementations,
+`shared/` for common presentation, and `catalog/` for Widgetbook fixtures.
+See `docs/ARCHITECTURE.md` before adding a new source directory.
+
 ## Toolchain
 
 - Flutter 3.47.1 / Dart 3.13.1

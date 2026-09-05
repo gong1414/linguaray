@@ -1,8 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:linguaray_desktop/src/models/settings_navigation.dart';
-import 'package:linguaray_desktop/src/services/app_windows.dart' as windows;
-import 'package:linguaray_desktop/src/ui/settings/settings_labels.dart'
-    as labels;
+import 'package:linguaray_desktop/src/app/navigation/settings_navigation.dart';
+import 'package:linguaray_desktop/src/app/windows/app_windows.dart' as windows;
+import 'package:linguaray_desktop/src/shared/settings_labels.dart' as labels;
 
 void main() {
   test('every settings destination has one unique section and location', () {

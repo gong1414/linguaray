@@ -24,8 +24,24 @@ work can be inspected and changed without rebuilding product logic.
 
 ### Flutter application
 
-`apps/desktop/flutter` contains routes, Riverpod view models, adapters, desktop
-lifecycle code, and platform integrations. Widgets render immutable state and
+`apps/desktop/flutter/lib/src` groups code by product ownership:
+
+```text
+app/        composition, navigation, resident lifecycle, commands, windows
+features/   translation, OCR, providers, services, preferences, libraries,
+            updates, integrations, backup, permissions, shortcuts, about
+platform/   capture, selection, credentials, permissions, speech, shortcuts,
+            networking, native presentation and window positioning
+shared/     page layouts, labels and common presentation helpers
+i18n/       localization sources and generated output
+catalog/    Widgetbook-only states and fixtures
+```
+
+Each feature owns its screens, state and runtime adapters. Small features use
+flat files; `data/` separates runtime/network adapters where needed. `app/`
+assembles the implementations, and `platform/` holds native capabilities.
+Mechanical moves preserve one implementation per library; old import paths
+are removed instead of retained as forwarding files. Widgets render immutable state and
 send user intent to a view model. They do not import generated runtime models,
 read platform permissions, or call plugins directly.
 

@@ -1,9 +1,9 @@
 import 'package:flutter/widgets.dart' show Rect;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:linguaray_application/linguaray_application.dart';
-import 'package:linguaray_desktop/src/platform/external_action_controller.dart';
+import 'package:linguaray_desktop/src/app/commands/external_action_controller.dart';
+import 'package:linguaray_desktop/src/app/commands/trigger_controller.dart';
 import 'package:linguaray_desktop/src/platform/platform_types.dart';
-import 'package:linguaray_desktop/src/platform/trigger_controller.dart';
 
 void main() {
   test('protocol actions share the typed runtime action dispatcher', () async {

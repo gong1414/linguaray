@@ -5,8 +5,8 @@ import 'package:crypto/crypto.dart' as crypto;
 import 'package:cryptography/cryptography.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:linguaray_application/linguaray_application.dart';
-import 'package:linguaray_desktop/src/data/github_update_repository.dart';
-import 'package:linguaray_desktop/src/data/signed_update_feed.dart';
+import 'package:linguaray_desktop/src/features/updates/data/github_update_repository.dart';
+import 'package:linguaray_desktop/src/features/updates/data/signed_update_feed.dart';
 
 void main() {
   late SimpleKeyPair key;

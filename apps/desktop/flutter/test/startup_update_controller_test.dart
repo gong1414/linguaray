@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:linguaray_application/linguaray_application.dart';
-import 'package:linguaray_desktop/src/platform/startup_update_controller.dart';
+import 'package:linguaray_desktop/src/app/updates/startup_update_controller.dart';
 
 void main() {
   test(

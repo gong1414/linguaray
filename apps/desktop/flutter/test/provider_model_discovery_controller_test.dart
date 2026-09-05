@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:linguaray_application/linguaray_application.dart';
-import 'package:linguaray_desktop/src/controllers/settings/provider_model_discovery_controller.dart';
+import 'package:linguaray_desktop/src/features/providers/provider_model_discovery_controller.dart';
 
 void main() {
   const a = ProviderDraft(id: 'a', typeId: 'openai_compatible', fields: {});

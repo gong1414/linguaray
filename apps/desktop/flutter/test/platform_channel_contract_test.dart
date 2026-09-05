@@ -3,11 +3,12 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  final dartSpeech = File('lib/src/data/channel_speech_service.dart')
+  final dartSpeech = File('lib/src/platform/speech/channel_speech_service.dart')
       .readAsStringSync();
-  final dartProtocol = File('lib/src/platform/protocol_controller.dart')
-      .readAsStringSync();
-  final dartProxy = File('lib/src/services/system_proxy.dart')
+  final dartProtocol = File(
+    'lib/src/platform/protocol/protocol_controller.dart',
+  ).readAsStringSync();
+  final dartProxy = File('lib/src/platform/network/system_proxy.dart')
       .readAsStringSync();
   final macHost = File('macos/Runner/Plugins/MacAppPresentationPlugin.swift')
       .readAsStringSync();

@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:linguaray_runtime/linguaray_runtime.dart' as linguaray_runtime;
 
+import 'src/app/env.dart';
+import 'src/app/navigation/app_router.dart';
+import 'src/app/runtime.dart' show initRuntime;
+import 'src/app/settings/settings_store.dart';
 import 'src/i18n/i18n.dart';
-import 'src/platform/secret_store.dart';
-import 'src/routes/app_router.dart';
-import 'src/services/runtime.dart' show initRuntime;
-import 'src/services/settings_store.dart';
-import 'src/services/system_proxy.dart';
-import 'src/utils/env.dart';
-import 'src/utils/language_util.dart';
+import 'src/platform/credentials/secret_store.dart';
+import 'src/platform/network/system_proxy.dart';
+import 'src/shared/language_util.dart';
 
 Future<void> _ensureInitialized() async {
   WidgetsFlutterBinding.ensureInitialized();

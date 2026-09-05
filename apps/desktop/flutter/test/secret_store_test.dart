@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:linguaray_desktop/src/platform/credentials/secret_store.dart';
 import 'package:linguaray_desktop/src/platform/platform_types.dart';
-import 'package:linguaray_desktop/src/platform/secret_store.dart';
 
 class _MemorySecretStore implements SecretStore {
   final values = <String, String>{};

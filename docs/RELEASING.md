@@ -11,7 +11,7 @@ automatic checks off or check manually in Settings → Updates.
 The required `LINGUARAY_UPDATE_SIGNING_KEY` Actions secret contains a base64
 encoded 32-byte Ed25519 private seed. Its matching public key is committed in
 `assets/update/public-key.json` and
-`apps/desktop/flutter/lib/src/config/update_signing_key.dart`.
+`apps/desktop/flutter/lib/src/features/updates/data/update_signing_key.dart`.
 
 The configured key has a recovery copy in the maintainer's macOS Keychain:
 service `io.github.gong1414.linguaray.release-signing`, account `ed25519-v1`.

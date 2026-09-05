@@ -1,6 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:linguaray_desktop/src/services/window_positioning.dart';
+import 'package:linguaray_desktop/src/platform/windows/window_positioning.dart';
 
 void main() {
   test('wide reading window shrinks to a small secondary work area', () {

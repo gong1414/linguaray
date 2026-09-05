@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:linguaray_application/linguaray_application.dart';
-import 'package:linguaray_desktop/src/ui/quick_translate/quick_translate_screen.dart';
-import 'package:linguaray_desktop/src/ui/quick_translate/widgets/quick_translate_view.dart';
+import 'package:linguaray_desktop/src/features/translation/quick_translate/quick_translate_screen.dart';
+import 'package:linguaray_desktop/src/features/translation/quick_translate/widgets/quick_translate_view.dart';
 
 void main() {
   testWidgets('source can be collapsed and restored from the quick menu', (

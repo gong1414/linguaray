@@ -36,10 +36,10 @@ class DartReachabilityTest(unittest.TestCase):
         self.assertEqual(inspect(self.root), ([], []))
 
     def test_catalog_is_only_reachable_from_development_entry(self):
-        preview = self.write("apps/desktop/flutter/lib/src/ui/catalog/preview.dart", "")
-        self.write("apps/desktop/flutter/lib/widgetbook.dart", "import 'src/ui/catalog/preview.dart';")
+        preview = self.write("apps/desktop/flutter/lib/src/catalog/preview.dart", "")
+        self.write("apps/desktop/flutter/lib/widgetbook.dart", "import 'src/catalog/preview.dart';")
         self.assertEqual(inspect(self.root), ([], []))
-        self.write("apps/desktop/flutter/lib/main.dart", "import 'src/ui/catalog/preview.dart';")
+        self.write("apps/desktop/flutter/lib/main.dart", "import 'src/catalog/preview.dart';")
         self.assertEqual(inspect(self.root), ([], [preview]))
 
 

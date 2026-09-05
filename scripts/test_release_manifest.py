@@ -83,7 +83,7 @@ class ReleaseManifestTests(unittest.TestCase):
         data = json.loads(PUBLIC_KEY.read_text())
         self.assertEqual(data['algorithm'], 'Ed25519')
         self.assertEqual(len(base64.b64decode(data['publicKey'], validate=True)), 32)
-        source = (ROOT / 'apps/desktop/flutter/lib/src/config/update_signing_key.dart').read_text()
+        source = (ROOT / 'apps/desktop/flutter/lib/src/features/updates/data/update_signing_key.dart').read_text()
         self.assertIn("'" + data['publicKey'] + "'", source)
 
 

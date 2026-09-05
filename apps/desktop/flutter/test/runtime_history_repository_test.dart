@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:linguaray_application/linguaray_application.dart';
-import 'package:linguaray_desktop/src/data/runtime_history_repository.dart';
+import 'package:linguaray_desktop/src/features/library/history/data/runtime_history_repository.dart';
 import 'package:linguaray_runtime/linguaray_runtime.dart' as rt;
 
 void main() {

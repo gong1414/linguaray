@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:linguaray_desktop/src/ui/catalog/catalog.dart';
-import 'package:linguaray_desktop/src/ui/i18n_labels.dart';
-import 'package:linguaray_desktop/src/ui/settings/settings_labels.dart';
-import 'package:linguaray_desktop/src/ui/settings/settings_shell_view.dart';
+import 'package:linguaray_desktop/src/app/navigation/settings_shell_view.dart';
+import 'package:linguaray_desktop/src/catalog/catalog.dart';
+import 'package:linguaray_desktop/src/shared/i18n_labels.dart';
+import 'package:linguaray_desktop/src/shared/settings_labels.dart';
 import 'package:linguaray_ui/linguaray_ui.dart' show LinguaRayMaterialTheme;
 
 void main() {

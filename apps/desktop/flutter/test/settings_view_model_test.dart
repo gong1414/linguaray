@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:linguaray_application/linguaray_application.dart';
-import 'package:linguaray_desktop/src/config/dependencies.dart';
-import 'package:linguaray_desktop/src/ui/settings/settings_labels.dart';
-import 'package:linguaray_desktop/src/ui/settings/view_models/settings_view_model.dart';
-import 'package:linguaray_desktop/src/ui/settings/view_models/shortcuts_view_model.dart';
-import 'package:linguaray_desktop/src/ui/settings/views/shortcuts_settings_view.dart';
+import 'package:linguaray_desktop/src/app/dependencies.dart';
+import 'package:linguaray_desktop/src/features/preferences/settings_view_model.dart';
+import 'package:linguaray_desktop/src/features/shortcuts/shortcuts_settings_view.dart';
+import 'package:linguaray_desktop/src/features/shortcuts/shortcuts_view_model.dart';
+import 'package:linguaray_desktop/src/shared/settings_labels.dart';
 
 void main() {
   test(

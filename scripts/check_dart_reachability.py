@@ -59,7 +59,7 @@ def inspect(root: Path) -> tuple[list[Path], list[Path]]:
         root / "apps/desktop/flutter/lib/widgetbook.dart",
         root / "packages/ui_flutter/lib/testing.dart",
     ])
-    leaks = [file for file in product if "/ui/catalog/" in file.as_posix() or file.name in {"widgetbook.dart", "golden_fonts.dart"}]
+    leaks = [file for file in product if "/catalog/" in file.as_posix() or file.name in {"widgetbook.dart", "golden_fonts.dart"}]
     return sorted(files - product - development), sorted(leaks)
 
 

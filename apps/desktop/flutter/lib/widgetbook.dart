@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:linguaray_desktop/src/ui/catalog/catalog.dart';
-import 'package:linguaray_desktop/src/ui/settings/settings_labels.dart';
+import 'package:linguaray_desktop/src/catalog/catalog.dart';
+import 'package:linguaray_desktop/src/shared/settings_labels.dart';
 import 'package:linguaray_ui/linguaray_ui.dart' show LinguaRayMaterialTheme;
 import 'package:widgetbook/widgetbook.dart';
 
 import 'src/i18n/i18n.dart';
 
-export 'src/ui/catalog/catalog.dart';
+export 'src/catalog/catalog.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();

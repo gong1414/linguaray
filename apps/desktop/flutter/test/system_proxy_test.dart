@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:linguaray_desktop/src/services/proxy_bypass.dart';
-import 'package:linguaray_desktop/src/services/system_proxy.dart';
+import 'package:linguaray_desktop/src/platform/network/proxy_bypass.dart';
+import 'package:linguaray_desktop/src/platform/network/system_proxy.dart';
 
 void main() {
   test('selects scheme-specific system proxies', () {

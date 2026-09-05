@@ -3,8 +3,8 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:linguaray_application/linguaray_application.dart';
-import 'package:linguaray_desktop/src/config/dependencies.dart';
-import 'package:linguaray_desktop/src/ui/translation/view_models/translation_view_model.dart';
+import 'package:linguaray_desktop/src/app/dependencies.dart';
+import 'package:linguaray_desktop/src/features/translation/view_models/translation_view_model.dart';
 
 void main() {
   test(
