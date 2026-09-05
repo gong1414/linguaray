@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:hotkey_manager/hotkey_manager.dart';
 
+import '../../app/settings/settings_section.dart';
 import '../../app/settings/settings_store.dart';
 import '../platform_types.dart';
 
@@ -19,6 +20,9 @@ class ShortcutService extends ChangeNotifier {
   bool _registrationSuspended = false;
   int _registrationGeneration = 0;
   List<ShortcutBinding> _bindings = const [];
+  final Listenable _shortcutSettings = settingsStore.listenableFor(
+    SettingsSection.shortcuts,
+  );
 
   List<ShortcutBinding> get bindings => List.unmodifiable(_bindings);
 
@@ -26,7 +30,7 @@ class ShortcutService extends ChangeNotifier {
     _handler = onAction;
     if (!_started) {
       _started = true;
-      settingsStore.addListener(_settingsChanged);
+      _shortcutSettings.addListener(_settingsChanged);
     }
     await _registerCurrentSettings();
   }
@@ -37,7 +41,7 @@ class ShortcutService extends ChangeNotifier {
     _handler = null;
     _registrationSuspended = false;
     _registrationGeneration++;
-    settingsStore.removeListener(_settingsChanged);
+    _shortcutSettings.removeListener(_settingsChanged);
     await hotKeyManager.unregisterAll();
     _bindings = const [];
     notifyListeners();

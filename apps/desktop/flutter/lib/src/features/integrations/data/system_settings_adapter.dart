@@ -3,7 +3,9 @@ import 'dart:io';
 import 'package:linguaray_application/linguaray_application.dart';
 
 import '../../../app/env.dart';
-import '../../../app/runtime.dart';
+import '../../../app/runtime.dart' show AdvancedSettingsPatch;
+import '../../../app/settings/settings_effects.dart';
+import '../../../app/settings/settings_section.dart';
 import '../../../app/settings/settings_store.dart';
 
 final class RuntimeSystemSettingsAdapter
@@ -16,8 +18,16 @@ final class RuntimeSystemSettingsAdapter
   Future<ApiServerStatus> loadApiServer() async {
     await _store.reloadAdvanced();
     final advanced = _store.advanced;
+    if (_store.errorFor(SettingsSection.advanced) != null) {
+      return ApiServerStatus(
+        enabled: advanced.apiServerEnabled,
+        host: advanced.apiServerHost,
+        port: advanced.apiServerPort,
+        bindErrorCode: AppErrorCode.apiServerBindFailed.wireName,
+      );
+    }
     try {
-      final info = await applyApiServerSettings(advanced);
+      final info = await settingsEffects.syncAdvanced();
       return ApiServerStatus(
         enabled: advanced.apiServerEnabled,
         host: advanced.apiServerHost,

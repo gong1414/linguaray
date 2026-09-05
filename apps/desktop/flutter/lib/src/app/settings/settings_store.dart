@@ -3,12 +3,10 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' show ThemeMode;
 import 'package:linguaray_runtime/linguaray_runtime.dart';
-import 'package:nativeapi/nativeapi.dart';
 
-import '../../platform/platform_util.dart';
-import '../../platform/windows/mac_app_presentation.dart';
 import '../../shared/language_util.dart';
 import '../runtime.dart' as runtime_service;
+import 'settings_section.dart';
 
 /// App-wide settings cache backed by the Rust runtime.
 ///
@@ -17,20 +15,18 @@ import '../runtime.dart' as runtime_service;
 ///
 ///   * loads the current snapshot at startup ([init])
 ///   * exposes synchronous getters for use in `build` methods
-///   * notifies listeners whenever a value changes
+///   * notifies the changed [SettingsSection] (and [ChangeNotifier] listeners)
+///   * keeps the last load [errorFor] a section without dropping a good cache
 ///
-/// It intentionally does **not** hold any data that does not exist in the
-/// runtime. Anything UI-only (e.g. window sizing) should live elsewhere.
-class SettingsStore extends ChangeNotifier {
-  SettingsStore._() {
-    _launchAtLogin = LaunchAtLogin(
-      id: 'io.github.gong1414.linguaray',
-      displayName: 'LinguaRay',
-    );
-  }
+/// OS login items, native appearance, and the local API server are applied by
+/// `SettingsEffectsCoordinator`. Window sizing and other UI-only state stay
+/// outside this cache.
+class SettingsStore extends ChangeNotifier implements SettingsSnapshotSource {
+  SettingsStore._();
 
   static final SettingsStore instance = SettingsStore._();
-  late final LaunchAtLogin _launchAtLogin;
+  final SettingsSectionListenables _sections = SettingsSectionListenables();
+  final Map<SettingsSection, Object?> _errors = {};
 
   /// Active subscription to runtime [SettingsChange] events. Started by
   /// [init] and stopped by [dispose]; while alive, every change made
@@ -39,7 +35,6 @@ class SettingsStore extends ChangeNotifier {
   /// persisted state.
   SettingsSubscription? _subscription;
   bool _disposed = false;
-  bool _didEnsureDefaultTranslationTarget = false;
 
   GeneralSettings _general = GeneralSettings(
     launchAtLogin: false,
@@ -83,9 +78,12 @@ class SettingsStore extends ChangeNotifier {
   List<ProviderConfigEntry> _providers = const [];
   List<ServiceConfigEntry> _services = const [];
 
+  @override
   GeneralSettings get general => _general;
+  @override
   AppearanceSettings get appearance => _appearance;
   ShortcutSettings get shortcuts => _shortcuts;
+  @override
   AdvancedSettings get advanced => _advanced;
   List<ProviderConfigEntry> get providers => List.unmodifiable(_providers);
   List<ServiceConfigEntry> get services => List.unmodifiable(_services);
@@ -109,10 +107,17 @@ class SettingsStore extends ChangeNotifier {
   String get defaultTranslationService => _general.defaultTranslationService;
   String get defaultDirectoryService => _general.defaultDirectoryService;
 
+  @override
+  Listenable listenableFor(SettingsSection section) => _sections.of(section);
+
+  Listenable listenablesFor(Iterable<SettingsSection> sections) =>
+      _sections.merge(sections);
+
+  Object? errorFor(SettingsSection section) => _errors[section];
+
   Future<void> init() async {
-    // Appearance owns the user's app language. Load it before creating the
-    // first translation target so a Chinese installation does not persist an
-    // English target merely because slang still has its process default.
+    // Appearance owns the user's app language and must load first so the
+    // lifecycle coordinator can seed a matching default translation target.
     await reloadAppearance();
     await Future.wait([
       reloadGeneral(),
@@ -128,7 +133,7 @@ class SettingsStore extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _subscription = null;
-    _launchAtLogin.dispose();
+    _sections.dispose();
     super.dispose();
   }
 
@@ -179,35 +184,12 @@ class SettingsStore extends ChangeNotifier {
     final settings = runtime_service.runtime.settings();
     try {
       _general = await settings.getGeneral();
-      if (!_didEnsureDefaultTranslationTarget &&
-          _general.translationTargets.isEmpty) {
-        _didEnsureDefaultTranslationTarget = true;
-        _general = await settings.updateGeneral(
-          patch: GeneralSettingsPatch(
-            translationTargets: [
-              TranslationTarget(
-                source: kAutoSource,
-                target: defaultTargetLanguageForAppLanguage(
-                  _appearance.language,
-                ),
-                enabled: true,
-              ),
-            ],
-          ),
-        );
-      } else {
-        _didEnsureDefaultTranslationTarget = true;
-      }
-      if (!_applyLaunchAtLogin(_general.launchAtLogin) &&
-          (kIsMacOS || kIsWindows) &&
-          LaunchAtLogin.isSupported) {
-        _general = await settings.updateGeneral(
-          patch: GeneralSettingsPatch(launchAtLogin: _launchAtLogin.isEnabled),
-        );
-      }
-      notifyListeners();
-    } catch (_) {
-      // keep cached defaults
+      _notify(SettingsSection.general);
+    } catch (error, stackTrace) {
+      debugPrint(
+        'SettingsStore failed to reload general settings: $error\n$stackTrace',
+      );
+      _notify(SettingsSection.general, error: error);
     }
   }
 
@@ -215,105 +197,102 @@ class SettingsStore extends ChangeNotifier {
     final settings = runtime_service.runtime.settings();
     try {
       _appearance = await settings.getAppearance();
-      await _applyAppearance();
-    } catch (_) {}
-  }
-
-  Future<void> _applyAppearance() async {
-    try {
-      await MacAppPresentation.setThemeMode(themeMode);
+      _notify(SettingsSection.appearance);
     } catch (error, stackTrace) {
-      debugPrint('Failed to apply native appearance: $error\n$stackTrace');
+      debugPrint(
+        'SettingsStore failed to reload appearance: $error\n$stackTrace',
+      );
+      _notify(SettingsSection.appearance, error: error);
     }
-    notifyListeners();
   }
 
   Future<void> reloadShortcuts() async {
     final settings = runtime_service.runtime.settings();
     try {
       _shortcuts = await settings.getShortcuts();
-      notifyListeners();
-    } catch (_) {}
+      _notify(SettingsSection.shortcuts);
+    } catch (error, stackTrace) {
+      debugPrint(
+        'SettingsStore failed to reload shortcuts: $error\n$stackTrace',
+      );
+      _notify(SettingsSection.shortcuts, error: error);
+    }
   }
 
   Future<void> reloadProviders() async {
     final settings = runtime_service.runtime.settings();
     try {
       _providers = await settings.listProviders();
-      notifyListeners();
-    } catch (_) {}
+      _notify(SettingsSection.providers);
+    } catch (error, stackTrace) {
+      debugPrint(
+        'SettingsStore failed to reload providers: $error\n$stackTrace',
+      );
+      _notify(SettingsSection.providers, error: error);
+    }
   }
 
   Future<void> reloadServices() async {
     final settings = runtime_service.runtime.settings();
     try {
       _services = await settings.listServices();
-      notifyListeners();
-    } catch (_) {}
+      _notify(SettingsSection.services);
+    } catch (error, stackTrace) {
+      debugPrint(
+        'SettingsStore failed to reload services: $error\n$stackTrace',
+      );
+      _notify(SettingsSection.services, error: error);
+    }
   }
 
   Future<void> reloadAdvanced() async {
     final settings = runtime_service.runtime.settings();
     try {
       _advanced = await settings.getAdvanced();
-      await runtime_service.applyApiServerSettings(_advanced);
-      notifyListeners();
+      _notify(SettingsSection.advanced);
     } catch (error, stackTrace) {
-      debugPrint('Failed to reload advanced settings: $error\n$stackTrace');
+      debugPrint(
+        'SettingsStore failed to reload advanced settings: $error\n$stackTrace',
+      );
+      _notify(SettingsSection.advanced, error: error);
     }
   }
 
+  @override
   Future<void> updateGeneral(GeneralSettingsPatch patch) async {
-    final previousLaunchAtLogin = _general.launchAtLogin;
-    final changesLoginItem = patch.launchAtLogin != null;
-    if (patch.launchAtLogin != null &&
-        !_applyLaunchAtLogin(patch.launchAtLogin!)) {
-      throw StateError('The operating system rejected the login item change.');
-    }
-    try {
-      final settings = runtime_service.runtime.settings();
-      _general = await settings.updateGeneral(patch: patch);
-      notifyListeners();
-    } catch (_) {
-      if (changesLoginItem) {
-        _applyLaunchAtLogin(previousLaunchAtLogin);
-      }
-      rethrow;
-    }
-  }
-
-  /// Enables or disables the OS-level launch-at-login feature.
-  ///
-  /// Only applies on macOS and Windows. No-op on other platforms.
-  bool _applyLaunchAtLogin(bool value) {
-    if (!kIsMacOS && !kIsWindows) return false;
-    if (!LaunchAtLogin.isSupported) return false;
-    if (_launchAtLogin.isEnabled == value) return true;
-    return value ? _launchAtLogin.enable() : _launchAtLogin.disable();
+    final settings = runtime_service.runtime.settings();
+    _general = await settings.updateGeneral(patch: patch);
+    _notify(SettingsSection.general);
   }
 
   Future<void> updateAppearance(AppearanceSettingsPatch patch) async {
     final settings = runtime_service.runtime.settings();
     _appearance = await settings.updateAppearance(patch: patch);
-    await _applyAppearance();
+    _notify(SettingsSection.appearance);
   }
 
   Future<void> updateShortcuts(ShortcutSettingsPatch patch) async {
     final settings = runtime_service.runtime.settings();
     _shortcuts = await settings.updateShortcuts(patch: patch);
-    notifyListeners();
+    _notify(SettingsSection.shortcuts);
   }
 
   Future<void> resetShortcuts() async {
     final settings = runtime_service.runtime.settings();
     _shortcuts = await settings.resetShortcuts();
-    notifyListeners();
+    _notify(SettingsSection.shortcuts);
   }
 
   Future<void> updateAdvanced(AdvancedSettingsPatch patch) async {
     final settings = runtime_service.runtime.settings();
     _advanced = await settings.updateAdvanced(patch: patch);
-    await runtime_service.applyApiServerSettings(_advanced);
+    _notify(SettingsSection.advanced);
+  }
+
+  void _notify(SettingsSection section, {Object? error}) {
+    if (_disposed) return;
+    _errors[section] = error;
+    _sections.notify(section);
     notifyListeners();
   }
 }

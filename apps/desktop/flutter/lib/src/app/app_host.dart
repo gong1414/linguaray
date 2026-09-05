@@ -17,6 +17,7 @@ import 'app_tray_controller.dart';
 import 'commands/external_action_controller.dart';
 import 'commands/trigger_controller.dart';
 import 'navigation/app_routes.dart';
+import 'settings/settings_section.dart';
 import 'settings/settings_store.dart';
 import 'updates/automatic_update_schedule.dart';
 import 'windows/app_windows.dart';
@@ -46,6 +47,7 @@ class _RootBodyViewState extends ConsumerState<_RootBodyView>
   late final ProviderSubscription<UpdateState> _updateSubscription;
   late bool _showInMenuBar;
   late final AutomaticUpdateSchedule _updates;
+  late final Listenable _hostSettings;
 
   @override
   void initState() {
@@ -56,7 +58,13 @@ class _RootBodyViewState extends ConsumerState<_RootBodyView>
     );
     WidgetsBinding.instance.addObserver(this);
     _showInMenuBar = _effectiveTrayVisibility;
-    settingsStore.addListener(_handleChanged);
+    _hostSettings = settingsStore.listenablesFor(const [
+      SettingsSection.general,
+      SettingsSection.appearance,
+      SettingsSection.shortcuts,
+      SettingsSection.advanced,
+    ]);
+    _hostSettings.addListener(_handleChanged);
     _tray = AppTrayController(
       readUpdate: () => ref.read(updateCoordinatorProvider),
     );
@@ -89,7 +97,7 @@ class _RootBodyViewState extends ConsumerState<_RootBodyView>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    settingsStore.removeListener(_handleChanged);
+    _hostSettings.removeListener(_handleChanged);
     unawaited(ShortcutService.instance.stop());
     _updates.dispose();
     _updateSubscription.close();

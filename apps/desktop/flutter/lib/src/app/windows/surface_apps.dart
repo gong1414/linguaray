@@ -7,6 +7,7 @@ import 'package:linguaray_ui/linguaray_ui.dart' show LinguaRayMaterialTheme;
 import '../../features/ocr/ocr_screen.dart';
 import '../../i18n/i18n.dart';
 import '../navigation/app_routes.dart';
+import '../settings/settings_section.dart';
 import '../settings/settings_store.dart';
 import 'app_windows.dart';
 
@@ -23,18 +24,21 @@ class _SettingsAppState extends State<SettingsApp> {
         ? debugInitialRoute.trim()
         : null,
   );
+  late final Listenable _appearance = settingsStore.listenableFor(
+    SettingsSection.appearance,
+  );
 
   @override
   void initState() {
     super.initState();
     attachSettingsRouter(_router);
-    settingsStore.addListener(_onSettingsChanged);
+    _appearance.addListener(_onSettingsChanged);
   }
 
   @override
   void dispose() {
     detachSettingsRouter(_router);
-    settingsStore.removeListener(_onSettingsChanged);
+    _appearance.removeListener(_onSettingsChanged);
     super.dispose();
   }
 
@@ -77,16 +81,19 @@ class MiniTranslatorApp extends StatefulWidget {
 
 class _MiniTranslatorAppState extends State<MiniTranslatorApp> {
   late final GoRouter _router = createMiniTranslatorAppRouter();
+  late final Listenable _appearance = settingsStore.listenableFor(
+    SettingsSection.appearance,
+  );
 
   @override
   void initState() {
     super.initState();
-    settingsStore.addListener(_onSettingsChanged);
+    _appearance.addListener(_onSettingsChanged);
   }
 
   @override
   void dispose() {
-    settingsStore.removeListener(_onSettingsChanged);
+    _appearance.removeListener(_onSettingsChanged);
     super.dispose();
   }
 
@@ -116,15 +123,19 @@ class OcrApp extends StatefulWidget {
 }
 
 class _OcrAppState extends State<OcrApp> {
+  late final Listenable _appearance = settingsStore.listenableFor(
+    SettingsSection.appearance,
+  );
+
   @override
   void initState() {
     super.initState();
-    settingsStore.addListener(_onSettingsChanged);
+    _appearance.addListener(_onSettingsChanged);
   }
 
   @override
   void dispose() {
-    settingsStore.removeListener(_onSettingsChanged);
+    _appearance.removeListener(_onSettingsChanged);
     super.dispose();
   }
 

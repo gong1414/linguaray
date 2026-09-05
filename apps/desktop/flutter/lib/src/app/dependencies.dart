@@ -19,6 +19,7 @@ import '../platform/permissions/permission_repository.dart';
 import '../platform/shortcuts/shortcut_repository.dart';
 import '../platform/speech/channel_speech_service.dart';
 import 'env.dart';
+import 'settings/settings_section.dart';
 import 'settings/settings_store.dart';
 
 final translationRepositoryProvider = Provider<TranslationRepository>(
@@ -130,9 +131,13 @@ final updateCurrentVersionProvider = Provider<String>(
 final translationInteractionPreferencesProvider = Provider<GeneralPreferences>((
   ref,
 ) {
+  final listenable = settingsStore.listenablesFor(const [
+    SettingsSection.general,
+    SettingsSection.appearance,
+  ]);
   void changed() => ref.invalidateSelf();
-  settingsStore.addListener(changed);
-  ref.onDispose(() => settingsStore.removeListener(changed));
+  listenable.addListener(changed);
+  ref.onDispose(() => listenable.removeListener(changed));
   return RuntimeGeneralSettingsAdapter(settingsStore).currentPreferences;
 });
 

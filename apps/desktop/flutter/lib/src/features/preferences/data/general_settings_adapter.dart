@@ -4,6 +4,7 @@ import 'package:linguaray_runtime/linguaray_runtime.dart'
     show InputSubmitMode;
 
 import '../../../app/runtime.dart' hide InputSubmitMode;
+import '../../../app/settings/settings_effects.dart';
 import '../../../app/settings/settings_store.dart';
 import '../../../shared/language_util.dart';
 
@@ -52,8 +53,13 @@ final class RuntimeGeneralSettingsAdapter
   );
 
   @override
-  Future<void> setLaunchAtLogin(bool value) =>
-      _store.updateGeneral(GeneralSettingsPatch(launchAtLogin: value));
+  Future<void> setLaunchAtLogin(bool value) async {
+    await _store.updateGeneral(GeneralSettingsPatch(launchAtLogin: value));
+    final sync = await settingsEffects.syncGeneral();
+    if (sync.rejected) {
+      throw StateError('The operating system rejected the login item change.');
+    }
+  }
 
   @override
   Future<void> setShowInMenuBar(bool value) =>
@@ -64,8 +70,8 @@ final class RuntimeGeneralSettingsAdapter
       _store.updateAppearance(AppearanceSettingsPatch(language: language));
 
   @override
-  Future<void> setThemeMode(ThemePreference mode) {
-    return _store.updateAppearance(
+  Future<void> setThemeMode(ThemePreference mode) async {
+    await _store.updateAppearance(
       AppearanceSettingsPatch(
         themeMode: switch (mode) {
           ThemePreference.light => 'light',
@@ -74,6 +80,7 @@ final class RuntimeGeneralSettingsAdapter
         },
       ),
     );
+    await settingsEffects.syncAppearance();
   }
 
   @override

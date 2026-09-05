@@ -5,6 +5,7 @@ import 'package:linguaray_runtime/linguaray_runtime.dart' as linguaray_runtime;
 import 'src/app/env.dart';
 import 'src/app/navigation/app_router.dart';
 import 'src/app/runtime.dart' show initRuntime;
+import 'src/app/settings/settings_effects.dart';
 import 'src/app/settings/settings_store.dart';
 import 'src/i18n/i18n.dart';
 import 'src/platform/credentials/secret_store.dart';
@@ -32,6 +33,7 @@ Future<void> _ensureInitialized() async {
   }
   debugPrint('[LinguaRay] Provider credentials hydrated.');
   await settingsStore.init();
+  await settingsEffects.start();
   debugPrint('[LinguaRay] Settings initialized.');
   await initializeSystemProxy();
   debugPrint('[LinguaRay] Network policy initialized.');
