@@ -21,11 +21,14 @@ final class AppTrayController {
     required this._readUpdate,
     SettingsStore? store,
     TriggerController? triggers,
+    DockIconController? dockIcons,
   }) : _store = store ?? settingsStore,
-       _triggers = triggers ?? triggerController;
+       _triggers = triggers ?? triggerController,
+       _dockIcons = dockIcons ?? dockIconController;
   final UpdateState Function() _readUpdate;
   final SettingsStore _store;
   final TriggerController _triggers;
+  final DockIconController _dockIcons;
   late final TrayIcon _trayIcon;
 
   void initialize({required bool visible}) {
@@ -33,7 +36,7 @@ final class AppTrayController {
     final icon = Image.fromAsset('resources/images/tray_icon.png');
     if (icon != null) _trayIcon.icon = icon;
     _trayIcon.isVisible = visible;
-    dockIconController.setTrayIconVisible(visible);
+    _dockIcons.setTrayIconVisible(visible);
     rebuildMenu();
     _trayIcon.contextMenuTrigger = ContextMenuTrigger.none;
     _trayIcon.on<TrayIconClickedEvent>((_) => _openMenuAfterEvent());
@@ -42,7 +45,7 @@ final class AppTrayController {
 
   void setVisible(bool visible) {
     _trayIcon.isVisible = visible;
-    dockIconController.setTrayIconVisible(visible);
+    _dockIcons.setTrayIconVisible(visible);
   }
 
   void rebuildMenu() {

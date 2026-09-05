@@ -48,6 +48,12 @@ AppSurface _requestedSurface = AppSurface.settings;
 /// frames and stacked settings/quick-window layers.
 final ValueNotifier<AppSurface> appSurface = ValueNotifier(AppSurface.settings);
 
+DockIconController _dockIcons = dockIconController;
+
+void bindDockIconController(DockIconController controller) {
+  _dockIcons = controller;
+}
+
 /// Whether the mounted quick translator still owns native window sizing.
 ///
 /// A settings transition deliberately keeps the compact Flutter surface
@@ -125,7 +131,7 @@ void focusSettingsWindow() {
     _settingsWindowConfigured = true;
     window.center();
   }
-  dockIconController.setSettingsWindowVisible(true);
+  _dockIcons.setSettingsWindowVisible(true);
   if (window.isMinimized) window.restore();
 
   if (switchedSurface) {
@@ -164,13 +170,13 @@ void initializeResidentApp() {
   window.isResizable = true;
   _setMinimumContentSize(window, _kSettingsWindowMinimumSize);
   window.hide();
-  dockIconController.setSettingsWindowVisible(false);
+  _dockIcons.setSettingsWindowVisible(false);
 }
 
 void hideSettingsWindow() {
   if (appSurface.value != AppSurface.settings) return;
   settingsWindowController.window.hide();
-  dockIconController.setSettingsWindowVisible(false);
+  _dockIcons.setSettingsWindowVisible(false);
 }
 
 Future<bool> _mountTransientSurface(Window window, AppSurface surface) async {
@@ -220,7 +226,7 @@ void _presentTransientWindow(Window window, Offset? position) {
   window.opacity = 1;
   window.show();
   window.focus();
-  dockIconController.setSettingsWindowVisible(false);
+  _dockIcons.setSettingsWindowVisible(false);
 }
 
 Future<void> showMiniTranslatorWindow({

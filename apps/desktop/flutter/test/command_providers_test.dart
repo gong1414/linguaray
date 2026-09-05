@@ -8,6 +8,7 @@ import 'package:linguaray_desktop/src/platform/protocol/protocol_controller.dart
 import 'package:linguaray_desktop/src/platform/selection/selection_controller.dart';
 import 'package:linguaray_desktop/src/platform/selection/selection_replacement_controller.dart';
 import 'package:linguaray_desktop/src/platform/shortcuts/shortcut_service.dart';
+import 'package:linguaray_desktop/src/platform/windows/dock_icon_controller.dart';
 
 void main() {
   test('platform action providers expose composition-root instances', () {
@@ -32,6 +33,10 @@ void main() {
       container.read(selectionReplacementControllerProvider),
       same(selectionReplacementController),
     );
+    expect(
+      container.read(dockIconControllerProvider),
+      same(dockIconController),
+    );
   });
 
   test('platform action providers can be overridden', () {
@@ -49,6 +54,7 @@ void main() {
     );
     final shortcuts = ShortcutService();
     final protocol = ProtocolController();
+    final dockIcons = DockIconController();
     final container = ProviderContainer(
       overrides: [
         captureControllerProvider.overrideWithValue(capture),
@@ -58,6 +64,7 @@ void main() {
         selectionControllerProvider.overrideWithValue(selection),
         protocolControllerProvider.overrideWithValue(protocol),
         selectionReplacementControllerProvider.overrideWithValue(replacement),
+        dockIconControllerProvider.overrideWithValue(dockIcons),
       ],
     );
     addTearDown(container.dispose);
@@ -71,6 +78,7 @@ void main() {
       container.read(selectionReplacementControllerProvider),
       same(replacement),
     );
+    expect(container.read(dockIconControllerProvider), same(dockIcons));
     expect(
       container.read(captureControllerProvider),
       isNot(same(captureController)),
@@ -98,6 +106,10 @@ void main() {
     expect(
       container.read(selectionReplacementControllerProvider),
       isNot(same(selectionReplacementController)),
+    );
+    expect(
+      container.read(dockIconControllerProvider),
+      isNot(same(dockIconController)),
     );
   });
 }

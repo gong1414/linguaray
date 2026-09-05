@@ -114,7 +114,8 @@ controller. Incoming `linguaray://` links are owned by
 bound as `captureControllerProvider` and `shortcutServiceProvider`.
 Permission and selection controllers are bound as
 `permissionControllerProvider` and `selectionControllerProvider`.
-Selection replacement is bound as `selectionReplacementControllerProvider`;
+Selection replacement is bound as `selectionReplacementControllerProvider`.
+The macOS Dock accessory policy is bound as `dockIconControllerProvider`;
 tray and shortcut triggers still share those same composition-root instances.
 
 macOS host plugins are split by capability under `macos/Runner/Plugins`

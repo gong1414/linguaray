@@ -78,10 +78,13 @@ class _RootBodyViewState extends ConsumerState<_RootBodyView>
       SettingsSection.advanced,
     ]);
     _hostSettings.addListener(_handleChanged);
+    final dockIcons = ref.read(dockIconControllerProvider);
+    bindDockIconController(dockIcons);
     _tray = AppTrayController(
       readUpdate: () => ref.read(updateCoordinatorProvider),
       store: _store,
       triggers: _triggers,
+      dockIcons: dockIcons,
     );
     _tray.initialize(visible: _showInMenuBar);
     _updateSubscription = ref.listenManual(

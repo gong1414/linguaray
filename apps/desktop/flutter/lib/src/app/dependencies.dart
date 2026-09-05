@@ -29,6 +29,7 @@ import '../platform/selection/selection_replacement_controller.dart';
 import '../platform/shortcuts/shortcut_repository.dart';
 import '../platform/shortcuts/shortcut_service.dart';
 import '../platform/speech/channel_speech_service.dart';
+import '../platform/windows/dock_icon_controller.dart';
 import 'commands/external_action_controller.dart';
 import 'commands/trigger_controller.dart';
 import 'env.dart';
@@ -76,6 +77,10 @@ final selectionReplacementControllerProvider =
 
 final protocolControllerProvider = Provider<ProtocolController>(
   (ref) => protocolController,
+);
+
+final dockIconControllerProvider = Provider<DockIconController>(
+  (ref) => dockIconController,
 );
 
 final translationRepositoryProvider = Provider<TranslationRepository>(
