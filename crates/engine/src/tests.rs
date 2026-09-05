@@ -1,11 +1,18 @@
+#[cfg(feature = "deepl")]
 use std::{
-    collections::BTreeMap,
     env, fs,
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use crate::{from_yaml_str, load_from_file, EngineConfig, EngineError, ProviderConfig};
+#[cfg(feature = "deepl")]
+use crate::load_from_file;
+use crate::{from_yaml_str, EngineError};
+#[cfg(feature = "openai")]
+use crate::{EngineConfig, ProviderConfig};
+#[cfg(feature = "openai")]
+use std::collections::BTreeMap;
 
+#[cfg(feature = "deepl")]
 #[test]
 fn loads_configured_provider() {
     let registry = from_yaml_str(
@@ -24,6 +31,7 @@ providers:
     assert!(registry.require("missing").is_err());
 }
 
+#[cfg(feature = "deepl")]
 #[test]
 fn loads_camel_case_provider_config() {
     let registry = from_yaml_str(
@@ -195,6 +203,7 @@ providers:
     ));
 }
 
+#[cfg(feature = "deepl")]
 #[test]
 fn rejects_empty_api_key() {
     let error = from_yaml_str(
@@ -221,6 +230,7 @@ fn rejects_invalid_yaml() {
     assert!(matches!(error, EngineError::ParseConfig(_)));
 }
 
+#[cfg(feature = "deepl")]
 #[test]
 fn reads_yaml_from_file() {
     let suffix = SystemTime::now()

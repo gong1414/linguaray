@@ -8,7 +8,9 @@ use serde_json::Value;
 #[derive(Clone, Copy, PartialEq)]
 pub(super) enum WireFormat {
     OpenAi,
+    #[cfg(any(feature = "anthropic", test))]
     Anthropic,
+    #[cfg(any(feature = "ollama", test))]
     Ollama,
 }
 
@@ -81,6 +83,7 @@ struct Decoder {
     bytes: Vec<u8>,
     data: String,
     event: String,
+    #[cfg(any(feature = "anthropic", test))]
     stop_reason: String,
     finished: bool,
     recovered: Vec<StreamChunk>,
@@ -93,6 +96,7 @@ impl Decoder {
             bytes: Vec::new(),
             data: String::new(),
             event: String::new(),
+            #[cfg(any(feature = "anthropic", test))]
             stop_reason: "stop".into(),
             finished: false,
             recovered: Vec::new(),
@@ -134,11 +138,14 @@ impl Decoder {
     }
 
     fn line(&mut self, line: &str, chunks: &mut Vec<StreamChunk>) -> Result<(), String> {
+        #[cfg(any(feature = "ollama", test))]
         if self.format == WireFormat::Ollama {
             if !line.trim().is_empty() {
                 self.record(line, chunks)?;
             }
-        } else if line.is_empty() {
+            return Ok(());
+        }
+        if line.is_empty() {
             self.dispatch(chunks)?;
         } else if let Some(data) = line.strip_prefix("data:") {
             if !self.data.is_empty() {
@@ -189,6 +196,7 @@ impl Decoder {
                     }
                 }
             }
+            #[cfg(any(feature = "anthropic", test))]
             WireFormat::Anthropic => match value["type"].as_str().unwrap_or(&self.event) {
                 "content_block_delta" if value["delta"]["type"] == "text_delta" => {
                     self.emit(
@@ -210,6 +218,7 @@ impl Decoder {
                 "message_stop" => self.emit(String::new(), Some(self.stop_reason.clone()), chunks),
                 _ => {}
             },
+            #[cfg(any(feature = "ollama", test))]
             WireFormat::Ollama => {
                 let reason = value["done"]
                     .as_bool()

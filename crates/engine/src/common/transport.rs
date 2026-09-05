@@ -99,7 +99,6 @@ pub struct HttpClient {
     inner: Client,
 }
 
-#[allow(dead_code)]
 impl HttpClient {
     pub fn new(endpoint: impl Into<String>, inner: Client) -> Self {
         Self {

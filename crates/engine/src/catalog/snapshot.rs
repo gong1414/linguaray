@@ -5,7 +5,7 @@ const SNAPSHOT_JSON: &str = include_str!("models_dev_snapshot.json");
 
 #[derive(Clone, Debug, Deserialize)]
 struct SnapshotFile {
-    #[allow(dead_code)]
+    #[cfg(test)]
     commit: String,
     providers: Vec<SnapshotProvider>,
 }

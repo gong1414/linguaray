@@ -1,13 +1,18 @@
+#[cfg(feature = "anthropic")]
 use std::sync::Arc;
 
+#[cfg(feature = "anthropic")]
 use async_trait::async_trait;
+#[cfg(feature = "anthropic")]
 use linguaray_core::{
     ChatMessage, ChatRequest, ChatResponse, ChatRole, LlmError, LlmService, LlmStreamReceiver,
     Provider, ResponseFormat,
 };
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "anthropic")]
 use serde_json::Value;
 
+#[cfg(feature = "anthropic")]
 use super::configured_default_model;
 
 // ── Config ────────────────────────────────────────────────────────────────────
@@ -26,10 +31,12 @@ pub struct AnthropicProviderConfig {
 
 // ── Provider ──────────────────────────────────────────────────────────────────
 
+#[cfg(feature = "anthropic")]
 pub struct AnthropicProvider {
     llm_service: Arc<AnthropicLlmService>,
 }
 
+#[cfg(feature = "anthropic")]
 impl AnthropicProvider {
     pub fn new(config: AnthropicProviderConfig) -> Result<Self, String> {
         if config.api_key.trim().is_empty() {
@@ -54,6 +61,7 @@ impl AnthropicProvider {
     }
 }
 
+#[cfg(feature = "anthropic")]
 #[async_trait]
 impl Provider for AnthropicProvider {
     fn name(&self) -> &'static str {
@@ -71,12 +79,14 @@ impl Provider for AnthropicProvider {
 
 // ── LLM Service (core) ────────────────────────────────────────────────────────
 
+#[cfg(feature = "anthropic")]
 #[derive(Clone)]
 struct HttpClient {
     base_url: String,
     client: reqwest::Client,
 }
 
+#[cfg(feature = "anthropic")]
 impl HttpClient {
     fn new(base_url: &str) -> Result<Self, String> {
         Ok(Self {
@@ -90,6 +100,7 @@ impl HttpClient {
     }
 }
 
+#[cfg(feature = "anthropic")]
 pub struct AnthropicLlmService {
     api_key: String,
     default_model: String,
@@ -97,6 +108,7 @@ pub struct AnthropicLlmService {
     models_url: Option<String>,
 }
 
+#[cfg(feature = "anthropic")]
 impl AnthropicLlmService {
     fn build_anthropic_body(&self, request: &ChatRequest, stream: bool) -> Value {
         // Anthropic does NOT support system role as a message — it's a top-level field.
@@ -241,6 +253,7 @@ impl AnthropicLlmService {
     }
 }
 
+#[cfg(feature = "anthropic")]
 #[async_trait]
 impl LlmService for AnthropicLlmService {
     fn provider_name(&self) -> &'static str {
@@ -321,6 +334,7 @@ impl LlmService for AnthropicLlmService {
 }
 
 /// Parse Anthropic's non-streaming JSON response into a `ChatResponse`.
+#[cfg(feature = "anthropic")]
 fn parse_anthropic_response(raw: &Value) -> ChatResponse {
     let id = raw["id"].as_str().map(|s| s.to_string());
     let model = raw["model"].as_str().unwrap_or("unknown").to_string();

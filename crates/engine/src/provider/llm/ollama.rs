@@ -1,13 +1,18 @@
+#[cfg(feature = "ollama")]
 use std::sync::Arc;
 
+#[cfg(feature = "ollama")]
 use async_trait::async_trait;
+#[cfg(feature = "ollama")]
 use linguaray_core::{
     ChatChoice, ChatMessage, ChatRequest, ChatResponse, ChatRole, LlmError, LlmService,
     LlmStreamReceiver, Provider, ResponseFormat,
 };
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "ollama")]
 use serde_json::Value;
 
+#[cfg(feature = "ollama")]
 use super::configured_default_model;
 
 // ── Config ────────────────────────────────────────────────────────────────────
@@ -22,10 +27,12 @@ pub struct OllamaProviderConfig {
 
 // ── Provider ──────────────────────────────────────────────────────────────────
 
+#[cfg(feature = "ollama")]
 pub struct OllamaProvider {
     llm_service: Arc<OllamaLlmService>,
 }
 
+#[cfg(feature = "ollama")]
 impl OllamaProvider {
     pub fn new(config: OllamaProviderConfig) -> Result<Self, String> {
         let base_url = config
@@ -45,6 +52,7 @@ impl OllamaProvider {
     }
 }
 
+#[cfg(feature = "ollama")]
 #[async_trait]
 impl Provider for OllamaProvider {
     fn name(&self) -> &'static str {
@@ -62,12 +70,14 @@ impl Provider for OllamaProvider {
 
 // ── HTTP Client ───────────────────────────────────────────────────────────────
 
+#[cfg(feature = "ollama")]
 #[derive(Clone)]
 struct HttpClient {
     base_url: String,
     client: reqwest::Client,
 }
 
+#[cfg(feature = "ollama")]
 impl HttpClient {
     fn new(base_url: &str) -> Result<Self, String> {
         Ok(Self {
@@ -83,11 +93,13 @@ impl HttpClient {
 
 // ── LLM Service (core) ────────────────────────────────────────────────────────
 
+#[cfg(feature = "ollama")]
 pub struct OllamaLlmService {
     default_model: String,
     http: HttpClient,
 }
 
+#[cfg(feature = "ollama")]
 impl OllamaLlmService {
     fn build_ollama_body(&self, request: &ChatRequest, stream: bool) -> Value {
         let messages: Vec<Value> = request
@@ -184,6 +196,7 @@ impl OllamaLlmService {
     }
 }
 
+#[cfg(feature = "ollama")]
 impl OllamaLlmService {
     async fn list_models(&self) -> Result<Vec<String>, LlmError> {
         let response = self
@@ -223,6 +236,7 @@ impl OllamaLlmService {
     }
 }
 
+#[cfg(feature = "ollama")]
 #[async_trait]
 impl LlmService for OllamaLlmService {
     fn provider_name(&self) -> &'static str {
