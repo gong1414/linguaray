@@ -6,7 +6,7 @@ DMG="$DIST/LinguaRay-macos.dmg"
 TMP_DIR="${RUNNER_TEMP:?}/linguaray-package-macos"
 mkdir -p "$DIST" "$TMP_DIR"
 # The single macOS download must actually run on both supported architectures.
-lipo -verify_arch arm64 x86_64 "$APP/Contents/MacOS/LinguaRay"
+lipo "$APP/Contents/MacOS/LinguaRay" -verify_arch arm64 x86_64
 SIGNED=false
 CERT_PATH="$TMP_DIR/signing.p12"
 KEYCHAIN="$TMP_DIR/signing.keychain-db"

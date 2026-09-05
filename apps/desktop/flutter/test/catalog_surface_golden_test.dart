@@ -17,14 +17,16 @@ void main() {
     await _loadFont('MaterialIcons', 'fonts/MaterialIcons-Regular.otf');
   });
 
-  // The override lets maintainers refresh both deterministic platform themes
-  // from either desktop host. CI still validates the native host by default.
+  // Native font files determine these baselines. Rendering a Windows theme
+  // with macOS fonts must not overwrite the Windows snapshots.
+  final nativePlatform = Platform.isWindows ? 'windows' : 'macos';
   final requestedPlatform = Platform.environment['LINGUARAY_GOLDEN_PLATFORM'];
-  final targets = requestedPlatform == 'windows'
-      ? const [TargetPlatform.windows]
-      : requestedPlatform == 'macos'
-      ? const [TargetPlatform.macOS]
-      : Platform.isWindows
+  if (requestedPlatform != null && requestedPlatform != nativePlatform) {
+    throw StateError(
+      'Refresh $requestedPlatform goldens on a $requestedPlatform host.',
+    );
+  }
+  final targets = Platform.isWindows
       ? const [TargetPlatform.windows]
       : const [TargetPlatform.macOS];
   for (final target in targets) {

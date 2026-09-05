@@ -71,7 +71,9 @@ void main() {
 
       await expectLater(
         find.byKey(const ValueKey('golden')),
-        matchesGoldenFile('goldens/$name.png'),
+        matchesGoldenFile(
+          'goldens/${Platform.isWindows ? 'windows/' : ''}$name.png',
+        ),
       );
     }
 
