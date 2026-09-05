@@ -103,9 +103,10 @@ stay in the page; load, filter, and CRUD go through the view model to the
 existing Rust-backed repositories.
 
 macOS host plugins are split by capability under `macos/Runner/Plugins`
-(presentation, speech, protocol, system proxy, selection replacement). Windows
-host channels live in matching `windows/runner/*_host.cpp` files. Channel names
-and message shapes stay unchanged.
+(presentation, speech, protocol, system proxy, selection replacement).
+`MainFlutterWindow` registers each plugin. Windows host channels live in
+matching `windows/runner/*_host.cpp` files. Channel names and message shapes
+stay unchanged.
 
 `linguaray-core` keeps capability traits and HTTP status error models. Reqwest
 response classification and secret redaction live in

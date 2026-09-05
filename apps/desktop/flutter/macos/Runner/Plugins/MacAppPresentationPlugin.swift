@@ -23,7 +23,6 @@ final class MacAppPresentationPlugin: NSObject, FlutterPlugin {
   /// threading the instance through the engine registrar.
   private(set) static weak var shared: MacAppPresentationPlugin?
 
-  private var selectionReplacement: SelectionReplacementPlugin?
   private let channel: FlutterMethodChannel
 
   private init(channel: FlutterMethodChannel) {
@@ -37,14 +36,8 @@ final class MacAppPresentationPlugin: NSObject, FlutterPlugin {
       binaryMessenger: registrar.messenger
     )
     let instance = MacAppPresentationPlugin(channel: channel)
-    instance.selectionReplacement = SelectionReplacementPlugin(
-      messenger: registrar.messenger
-    )
     shared = instance
     registrar.addMethodCallDelegate(instance, channel: channel)
-    SpeechPlugin.register(with: registrar)
-    ProtocolPlugin.register(with: registrar)
-    SystemProxyPlugin.register(messenger: registrar.messenger)
   }
 
   func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {

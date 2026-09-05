@@ -4,6 +4,12 @@ import FlutterMacOS
 
 /// Holds one original editable selection. Never pastes into the current focus.
 final class SelectionReplacementPlugin {
+  private(set) static var shared: SelectionReplacementPlugin?
+
+  static func register(with registrar: FlutterPluginRegistrar) {
+    shared = SelectionReplacementPlugin(messenger: registrar.messenger)
+  }
+
   private struct Target {
     let id: String
     let element: AXUIElement

@@ -3,12 +3,14 @@ import SystemConfiguration
 
 enum SystemProxyPlugin {
   static let channelName = "linguaray/system_proxy"
+  private static var channel: FlutterMethodChannel?
 
   static func register(messenger: FlutterBinaryMessenger) {
     let channel = FlutterMethodChannel(
       name: channelName,
       binaryMessenger: messenger
     )
+    self.channel = channel
     channel.setMethodCallHandler { call, result in
       guard call.method == "read" else {
         result(FlutterMethodNotImplemented)
