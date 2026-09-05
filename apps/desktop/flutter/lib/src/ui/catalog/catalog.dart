@@ -38,6 +38,7 @@ Map<String, Widget> buildCatalogGoldenStates({
   TargetPlatform platform = TargetPlatform.macOS,
 }) {
   return {
+    'providers_configured': const ProvidersCatalogPreview(),
     'provider_models_live': const ProviderModelsCatalogPreview(),
     'provider_models_auth_error': const ProviderModelsCatalogPreview(
       failed: true,
@@ -260,6 +261,7 @@ class SettingsCatalogPreview extends StatelessWidget {
       onSectionSelected: (_) {},
       child: switch (section) {
         SettingsSection.general => GeneralSettingsView(
+          pageTitle: english ? 'General' : '常规',
           labels: english ? _generalEn : _generalZh,
           preferences: const GeneralPreferences(
             launchAtLogin: false,
@@ -438,6 +440,47 @@ class SettingsCatalogPreview extends StatelessWidget {
   }
 }
 
+class ProvidersCatalogPreview extends StatelessWidget {
+  const ProvidersCatalogPreview({super.key});
+
+  @override
+  Widget build(BuildContext context) => SettingsShellView(
+    labels: _settingsShellZh,
+    section: SettingsSection.translationServices,
+    onSectionSelected: (_) {},
+    child: ProvidersSettingsView(
+      labels: _providersZh,
+      loading: false,
+      providers: const [
+        ProviderRecord(
+          id: 'openrouter',
+          typeId: 'openai_compatible',
+          displayName: 'OpenRouter',
+          publicFields: {'defaultModel': 'anthropic/claude-sonnet-4-6'},
+          storedSecretKeys: {'apiKey'},
+        ),
+        ProviderRecord(
+          id: 'deepseek',
+          typeId: 'openai_compatible',
+          displayName: 'DeepSeek',
+          publicFields: {'defaultModel': 'deepseek-chat'},
+          storedSecretKeys: {'apiKey'},
+        ),
+        ProviderRecord(
+          id: 'deepl',
+          typeId: 'deepl',
+          displayName: 'DeepL',
+          publicFields: {},
+          storedSecretKeys: {'authKey'},
+        ),
+      ],
+      onAdd: _noop,
+      onEdit: (_) {},
+      onDelete: (_) {},
+    ),
+  );
+}
+
 class ProviderModelsCatalogPreview extends StatelessWidget {
   const ProviderModelsCatalogPreview({super.key, this.failed = false});
   final bool failed;
@@ -559,6 +602,8 @@ class ProviderEditorCatalogPreview extends StatelessWidget {
 
 const _quickZh = QuickTranslateLabels(
   title: '快捷翻译',
+  sourceLabel: '原文',
+  resultLabel: '译文',
   inputHint: '输入、粘贴，或由划词和截图填入',
   translate: '翻译',
   clear: '清空',
@@ -604,6 +649,11 @@ const _settingsShellZh = SettingsShellLabels(
   general: '常规',
   permissions: '权限',
   about: '关于',
+  glossary: '术语表',
+  vocabulary: '生词本',
+  dataTransfer: '导入与导出',
+  integration: '集成',
+  updates: '更新',
 );
 
 const _settingsShellEn = SettingsShellLabels(

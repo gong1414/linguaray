@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:linguaray_application/linguaray_application.dart';
+import 'package:linguaray_ui/linguaray_ui.dart' show BrandLogo;
 
 import '../../shared/status_message.dart';
 import 'quick_translate_models.dart';
@@ -78,6 +79,8 @@ class QuickTranslateCommandHeader extends StatelessWidget {
       children: [
         Row(
           children: [
+            const BrandLogo(size: 18),
+            const SizedBox(width: 8),
             Expanded(
               child: Text(
                 labels.title,
@@ -119,56 +122,82 @@ class QuickTranslateCommandHeader extends StatelessWidget {
             ),
           ],
         ),
-        Row(
-          children: [
-            Expanded(
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  value: sourceItems.any((item) => item.code == sourceLanguage)
-                      ? sourceLanguage
-                      : autoLanguageCode,
-                  isExpanded: true,
-                  isDense: true,
-                  items: [
-                    for (final item in sourceItems)
-                      DropdownMenuItem(
-                        value: item.code,
-                        child: Text(item.name, overflow: TextOverflow.ellipsis),
-                      ),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) onSourceLanguageChanged(value);
-                  },
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value:
+                        sourceItems.any((item) => item.code == sourceLanguage)
+                        ? sourceLanguage
+                        : autoLanguageCode,
+                    isExpanded: true,
+                    isDense: true,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                    icon: const Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      size: 16,
+                    ),
+                    items: [
+                      for (final item in sourceItems)
+                        DropdownMenuItem(
+                          value: item.code,
+                          child: Text(
+                            item.name,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) onSourceLanguageChanged(value);
+                    },
+                  ),
                 ),
               ),
-            ),
-            IconButton(
-              tooltip: labels.swapLanguages,
-              onPressed: onSwapLanguages,
-              icon: const Icon(Icons.swap_horiz_rounded, size: 18),
-            ),
-            Expanded(
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  value: targetItems.any((item) => item.code == targetLanguage)
-                      ? targetLanguage
-                      : automaticTargetCode,
-                  isExpanded: true,
-                  isDense: true,
-                  items: [
-                    for (final item in targetItems)
-                      DropdownMenuItem(
-                        value: item.code,
-                        child: Text(item.name, overflow: TextOverflow.ellipsis),
-                      ),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) onTargetLanguageChanged(value);
-                  },
+              IconButton(
+                tooltip: labels.swapLanguages,
+                onPressed: onSwapLanguages,
+                icon: const Icon(Icons.swap_horiz_rounded, size: 18),
+              ),
+              Expanded(
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value:
+                        targetItems.any((item) => item.code == targetLanguage)
+                        ? targetLanguage
+                        : automaticTargetCode,
+                    isExpanded: true,
+                    isDense: true,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                    icon: const Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      size: 16,
+                    ),
+                    items: [
+                      for (final item in targetItems)
+                        DropdownMenuItem(
+                          value: item.code,
+                          child: Text(
+                            item.name,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) onTargetLanguageChanged(value);
+                    },
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ],
     );

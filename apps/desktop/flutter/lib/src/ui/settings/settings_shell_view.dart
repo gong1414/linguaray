@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
+import 'package:linguaray_ui/linguaray_ui.dart' show BrandLogo;
+
 import 'settings_labels.dart';
 
 /// Native-preferences inspired navigation shared by macOS and Windows.
-/// It deliberately has no product header or main-window navigation.
+/// A quiet navigation rail and an inset content pane share one native window.
 class SettingsShellView extends StatelessWidget {
   const SettingsShellView({
     required this.labels,
@@ -24,15 +26,36 @@ class SettingsShellView extends StatelessWidget {
     final sidebar = theme.colorScheme.surfaceContainerLow;
 
     return Material(
-      color: theme.colorScheme.surface,
+      color: sidebar,
       child: Row(
         children: [
           Container(
-            width: 188,
+            width: 204,
             color: sidebar,
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(10, 48, 10, 18),
+              padding: const EdgeInsets.fromLTRB(12, 44, 12, 22),
               children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 0, 8, 28),
+                  child: Row(
+                    children: [
+                      const BrandLogo(size: 23),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'LinguaRay',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 _GroupLabel(labels.translationGroup),
                 _Destination(
                   icon: Icons.adjust_rounded,
@@ -132,13 +155,23 @@ class SettingsShellView extends StatelessWidget {
               ],
             ),
           ),
-          VerticalDivider(
-            width: 1,
-            thickness: 1,
-            color: theme.dividerColor.withValues(alpha: 0.55),
-          ),
           Expanded(
-            child: Material(color: theme.colorScheme.surface, child: child),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(0, 12, 12, 12),
+              child: Material(
+                color: theme.colorScheme.surfaceContainerLowest,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  side: BorderSide(
+                    color: theme.colorScheme.outlineVariant.withValues(
+                      alpha: 0.6,
+                    ),
+                  ),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: child,
+              ),
+            ),
           ),
         ],
       ),
@@ -158,7 +191,7 @@ class _GroupLabel extends StatelessWidget {
       label,
       style: Theme.of(context).textTheme.labelSmall?.copyWith(
         color: Theme.of(context).colorScheme.onSurfaceVariant,
-        fontWeight: FontWeight.w600,
+        fontWeight: FontWeight.w500,
       ),
     ),
   );
@@ -183,22 +216,27 @@ class _Destination extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 2),
       child: Material(
-        color: selected ? colors.secondaryContainer : Colors.transparent,
-        borderRadius: BorderRadius.circular(7),
+        color: selected ? colors.surfaceContainerLowest : Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(7),
+          side: BorderSide(
+            color: selected
+                ? colors.outlineVariant.withValues(alpha: 0.65)
+                : Colors.transparent,
+          ),
+        ),
         child: InkWell(
           borderRadius: BorderRadius.circular(7),
           onTap: onTap,
           child: SizedBox(
-            height: 34,
+            height: 32,
             child: Row(
               children: [
                 const SizedBox(width: 9),
                 Icon(
                   icon,
-                  size: 18,
-                  color: selected
-                      ? colors.onSecondaryContainer
-                      : colors.onSurfaceVariant,
+                  size: 17,
+                  color: selected ? colors.onSurface : colors.onSurfaceVariant,
                 ),
                 const SizedBox(width: 9),
                 Expanded(
@@ -207,8 +245,8 @@ class _Destination extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: selected ? colors.onSecondaryContainer : null,
-                      fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                      color: colors.onSurface,
+                      fontWeight: selected ? FontWeight.w500 : FontWeight.w400,
                     ),
                   ),
                 ),

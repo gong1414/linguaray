@@ -852,7 +852,9 @@
       "empty_selection": "没有选中文本。",
       "clipboard_unavailable": "无法读取剪贴板。",
       "clipboard_restore_failed": "无法恢复之前的剪贴板内容。",
-      "recheck": "重新检查"
+      "recheck": "重新检查",
+      "source_label": "原文",
+      "result_label": "译文"
     },
     "ocr": {
       "title": "OCR",

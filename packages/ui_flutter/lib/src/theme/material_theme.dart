@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 
 /// Canonical LinguaRay brand colors. These are the only named product hues
@@ -7,8 +8,8 @@ abstract final class LinguaRayPalette {
   static const Color rayTeal = Color(0xFF18A6A6);
   static const Color rayTealDark = Color(0xFF34C0BE);
   static const Color navy = Color(0xFF13233F);
-  static const Color graphite = Color(0xFF172033);
-  static const Color paper = Color(0xFFF7F9FC);
+  static const Color graphite = Color(0xFF24252A);
+  static const Color paper = Color(0xFFF5F5F6);
   static const Color white = Color(0xFFFFFFFF);
 }
 
@@ -27,15 +28,15 @@ final class LinguaRayBrandColors extends ThemeExtension<LinguaRayBrandColors> {
     ray: LinguaRayPalette.rayTeal,
     canvas: LinguaRayPalette.paper,
     ink: LinguaRayPalette.graphite,
-    resultRule: LinguaRayPalette.rayTeal,
+    resultRule: LinguaRayPalette.linguaBlue,
   );
 
   static const dark = LinguaRayBrandColors(
     navy: LinguaRayPalette.navy,
     ray: LinguaRayPalette.rayTealDark,
-    canvas: Color(0xFF101827),
-    ink: Color(0xFFF0F4FA),
-    resultRule: LinguaRayPalette.rayTealDark,
+    canvas: Color(0xFF17181B),
+    ink: Color(0xFFECECF0),
+    resultRule: Color(0xFFA5BBFF),
   );
 
   final Color navy;
@@ -79,7 +80,7 @@ final class LinguaRayMetrics extends ThemeExtension<LinguaRayMetrics> {
   const LinguaRayMetrics({
     this.space = 8,
     this.commandBarHeight = 48,
-    this.settingsNavWidth = 240,
+    this.settingsNavWidth = 204,
     this.quickWidth = 420,
     this.controlHeight = 36,
     this.captionHeight = 32,
@@ -175,12 +176,12 @@ abstract final class LinguaRayMaterialTheme {
       brightness: Brightness.light,
       primary: LinguaRayPalette.linguaBlue,
       onPrimary: Color(0xFFFFFFFF),
-      primaryContainer: Color(0xFFE4EAFC),
+      primaryContainer: Color(0xFFE8EDFC),
       onPrimaryContainer: Color(0xFF19336F),
       secondary: LinguaRayPalette.rayTeal,
       onSecondary: Color(0xFF062E2F),
-      secondaryContainer: Color(0xFFDDF4F3),
-      onSecondaryContainer: Color(0xFF0C5557),
+      secondaryContainer: Color(0xFFEEEFF2),
+      onSecondaryContainer: Color(0xFF343740),
       tertiary: Color(0xFF59677D),
       onTertiary: Color(0xFFFFFFFF),
       tertiaryContainer: Color(0xFFE7ECF3),
@@ -192,13 +193,13 @@ abstract final class LinguaRayMaterialTheme {
       surface: LinguaRayPalette.paper,
       onSurface: LinguaRayPalette.graphite,
       surfaceContainerLowest: Color(0xFFFFFFFF),
-      surfaceContainerLow: Color(0xFFF0F4F8),
-      surfaceContainer: Color(0xFFEAF0F6),
-      surfaceContainerHigh: Color(0xFFE3EAF2),
-      surfaceContainerHighest: Color(0xFFDAE3ED),
-      onSurfaceVariant: Color(0xFF5B6575),
-      outline: Color(0xFF7C8798),
-      outlineVariant: Color(0xFFD5DEE8),
+      surfaceContainerLow: Color(0xFFF0F0F2),
+      surfaceContainer: Color(0xFFECECEF),
+      surfaceContainerHigh: Color(0xFFE5E5E9),
+      surfaceContainerHighest: Color(0xFFDADBE0),
+      onSurfaceVariant: Color(0xFF686B75),
+      outline: Color(0xFF90939D),
+      outlineVariant: Color(0xFFE1E2E6),
       inverseSurface: LinguaRayPalette.navy,
       onInverseSurface: LinguaRayPalette.paper,
       inversePrimary: Color(0xFFB7C7F8),
@@ -211,14 +212,14 @@ abstract final class LinguaRayMaterialTheme {
   static ColorScheme _darkScheme() {
     return const ColorScheme(
       brightness: Brightness.dark,
-      primary: Color(0xFFAFC2FF),
+      primary: Color(0xFFA5BBFF),
       onPrimary: Color(0xFF10275F),
       primaryContainer: Color(0xFF25459C),
       onPrimaryContainer: Color(0xFFE1E8FF),
       secondary: LinguaRayPalette.rayTealDark,
       onSecondary: Color(0xFF003737),
-      secondaryContainer: Color(0xFF134E50),
-      onSecondaryContainer: Color(0xFFB2F3F0),
+      secondaryContainer: Color(0xFF303239),
+      onSecondaryContainer: Color(0xFFE0E1E8),
       tertiary: Color(0xFFB8C4D8),
       onTertiary: Color(0xFF263246),
       tertiaryContainer: Color(0xFF354258),
@@ -227,16 +228,16 @@ abstract final class LinguaRayMaterialTheme {
       onError: Color(0xFF690005),
       errorContainer: Color(0xFF93000A),
       onErrorContainer: Color(0xFFFFDAD6),
-      surface: Color(0xFF101827),
-      onSurface: Color(0xFFF0F4FA),
-      surfaceContainerLowest: Color(0xFF0B111D),
-      surfaceContainerLow: Color(0xFF151E2D),
-      surfaceContainer: Color(0xFF1A2536),
-      surfaceContainerHigh: Color(0xFF202D40),
-      surfaceContainerHighest: Color(0xFF29384D),
-      onSurfaceVariant: Color(0xFFAAB6C7),
+      surface: Color(0xFF17181B),
+      onSurface: Color(0xFFECECF0),
+      surfaceContainerLowest: Color(0xFF202126),
+      surfaceContainerLow: Color(0xFF1C1D21),
+      surfaceContainer: Color(0xFF26272D),
+      surfaceContainerHigh: Color(0xFF2C2D34),
+      surfaceContainerHighest: Color(0xFF34353D),
+      onSurfaceVariant: Color(0xFFAAAEB9),
       outline: Color(0xFF7E8999),
-      outlineVariant: Color(0xFF35445A),
+      outlineVariant: Color(0xFF383A43),
       inverseSurface: Color(0xFFEEF3FA),
       onInverseSurface: LinguaRayPalette.graphite,
       inversePrimary: LinguaRayPalette.linguaBlue,
@@ -252,60 +253,90 @@ abstract final class LinguaRayMaterialTheme {
     final brand = isDark
         ? LinguaRayBrandColors.dark
         : LinguaRayBrandColors.light;
-    final resolvedPlatform = platform ?? TargetPlatform.macOS;
+    final resolvedPlatform = platform ?? defaultTargetPlatform;
     final base = ThemeData(
       useMaterial3: true,
       brightness: brightness,
       colorScheme: scheme,
       scaffoldBackgroundColor: scheme.surface,
       visualDensity: VisualDensity.compact,
-      splashFactory: InkRipple.splashFactory,
+      splashFactory: NoSplash.splashFactory,
+      hoverColor: scheme.onSurface.withValues(alpha: 0.035),
+      highlightColor: scheme.onSurface.withValues(alpha: 0.045),
       platform: resolvedPlatform,
-      fontFamilyFallback: const [
-        '.AppleSystemUIFont',
-        'Segoe UI',
-        'PingFang SC',
-        'Microsoft YaHei UI',
-      ],
+      fontFamily: resolvedPlatform == TargetPlatform.macOS
+          ? 'CupertinoSystemText'
+          : 'Segoe UI',
+      fontFamilyFallback: resolvedPlatform == TargetPlatform.macOS
+          ? const ['PingFang SC', 'Helvetica Neue', 'sans-serif']
+          : const ['Microsoft YaHei UI', 'Microsoft YaHei', 'sans-serif'],
     );
 
+    final displayFamily = resolvedPlatform == TargetPlatform.macOS
+        ? 'CupertinoSystemDisplay'
+        : 'Segoe UI';
     final textTheme = base.textTheme.copyWith(
       headlineMedium: base.textTheme.headlineMedium?.copyWith(
-        fontSize: 22,
+        fontFamily: displayFamily,
+        fontSize: 24,
         height: 1.25,
-        fontWeight: FontWeight.w600,
+        fontWeight: FontWeight.w500,
         letterSpacing: -0.3,
         color: scheme.onSurface,
       ),
       titleLarge: base.textTheme.titleLarge?.copyWith(
-        fontSize: 16,
+        fontFamily: displayFamily,
+        fontSize: 22,
         height: 1.3,
-        fontWeight: FontWeight.w600,
+        letterSpacing: -0.45,
+        fontWeight: FontWeight.w500,
         color: scheme.onSurface,
       ),
       titleMedium: base.textTheme.titleMedium?.copyWith(
         fontSize: 13,
-        height: 1.3,
-        fontWeight: FontWeight.w600,
+        height: 1.4,
+        letterSpacing: 0,
+        fontWeight: FontWeight.w500,
         color: scheme.onSurface,
       ),
       bodyLarge: base.textTheme.bodyLarge?.copyWith(
         fontSize: 14,
         height: 1.5,
+        letterSpacing: 0,
         color: scheme.onSurface,
       ),
       bodyMedium: base.textTheme.bodyMedium?.copyWith(
         fontSize: 13,
         height: 1.45,
+        letterSpacing: 0,
         color: scheme.onSurface,
       ),
+      bodySmall: base.textTheme.bodySmall?.copyWith(
+        fontSize: 12,
+        height: 1.5,
+        color: scheme.onSurfaceVariant,
+        letterSpacing: 0,
+      ),
+      labelSmall: base.textTheme.labelSmall?.copyWith(
+        fontSize: 11,
+        height: 1.4,
+        color: scheme.onSurfaceVariant,
+        letterSpacing: 0.1,
+      ),
+      labelMedium: base.textTheme.labelMedium?.copyWith(
+        fontSize: 12,
+        height: 1.4,
+        color: scheme.onSurfaceVariant,
+        letterSpacing: 0,
+      ),
       labelLarge: base.textTheme.labelLarge?.copyWith(
-        fontWeight: FontWeight.w600,
+        letterSpacing: 0,
+        fontWeight: FontWeight.w500,
         fontSize: 13,
       ),
     );
 
-    const radius = 9.0;
+    const radius = 8.0;
     final outline = OutlineInputBorder(
       borderRadius: BorderRadius.circular(radius),
       borderSide: BorderSide(color: scheme.outlineVariant),
@@ -372,11 +403,18 @@ abstract final class LinguaRayMaterialTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: scheme.surfaceContainerLowest,
+        fillColor: isDark
+            ? scheme.surfaceContainerLow
+            : const Color(0xFFFAFAFB),
+        floatingLabelBehavior: FloatingLabelBehavior.always,
+        labelStyle: textTheme.bodySmall,
         border: outline,
         enabledBorder: outline,
         focusedBorder: outline.copyWith(
-          borderSide: BorderSide(color: scheme.primary, width: 2),
+          borderSide: BorderSide(
+            color: scheme.primary.withValues(alpha: 0.75),
+            width: 1.25,
+          ),
         ),
         errorBorder: outline.copyWith(
           borderSide: BorderSide(color: scheme.error),
@@ -447,12 +485,28 @@ abstract final class LinguaRayMaterialTheme {
         ),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
+      switchTheme: SwitchThemeData(
+        trackOutlineWidth: const WidgetStatePropertyAll(0),
+        trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
+        thumbColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.disabled)
+              ? scheme.onSurface.withValues(alpha: 0.25)
+              : Colors.white,
+        ),
+        trackColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? scheme.primary
+              : scheme.outlineVariant,
+        ),
+      ),
+      dropdownMenuTheme: DropdownMenuThemeData(textStyle: textTheme.bodyMedium),
       dialogTheme: DialogThemeData(
         backgroundColor: scheme.surfaceContainerLowest,
         surfaceTintColor: Colors.transparent,
-        elevation: 0,
+        elevation: 8,
+        shadowColor: Colors.black.withValues(alpha: 0.1),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(14),
           side: BorderSide(color: scheme.outlineVariant),
         ),
       ),
@@ -486,23 +540,12 @@ abstract final class LinguaRayMaterialTheme {
         ),
       ),
       scrollbarTheme: const ScrollbarThemeData(
-        thickness: WidgetStatePropertyAll(8),
+        thickness: WidgetStatePropertyAll(5),
         radius: Radius.circular(8),
         thumbVisibility: WidgetStatePropertyAll(true),
       ),
       focusColor: scheme.primary.withValues(alpha: 0.16),
-      hoverColor: scheme.primary.withValues(alpha: 0.06),
-      switchTheme: SwitchThemeData(
-        thumbColor: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.selected)) return scheme.onPrimary;
-          return scheme.onSurfaceVariant;
-        }),
-        trackColor: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.selected)) return scheme.primary;
-          return scheme.surfaceContainerHighest;
-        }),
-        trackOutlineColor: WidgetStatePropertyAll(scheme.outlineVariant),
-      ),
+      hoverColor: scheme.onSurface.withValues(alpha: 0.035),
       extensions: <ThemeExtension<dynamic>>[brand, LinguaRayMetrics.standard],
     );
   }

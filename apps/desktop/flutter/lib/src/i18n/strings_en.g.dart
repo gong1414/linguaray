@@ -1821,6 +1821,12 @@ class TranslationsUiQuickEn {
 
   /// en: 'Recheck'
   String get recheck => 'Recheck';
+
+  /// en: 'Original'
+  String get source_label => 'Original';
+
+  /// en: 'Translation'
+  String get result_label => 'Translation';
 }
 
 // Path: ui.ocr
@@ -4523,6 +4529,8 @@ extension on Translations {
           'ui.quick.clipboard_restore_failed' =>
             'The previous clipboard contents could not be restored.',
           'ui.quick.recheck' => 'Recheck',
+          'ui.quick.source_label' => 'Original',
+          'ui.quick.result_label' => 'Translation',
           'ui.ocr.title' => 'OCR',
           'ui.ocr.empty_title' => 'No recognized text yet',
           'ui.ocr.empty_description' => 'Capture a region, choose an image, or recognize an image from the clipboard.',

@@ -1565,6 +1565,10 @@ class _TranslationsUiQuickZhHans extends TranslationsUiQuickEn {
   String get clipboard_restore_failed => '无法恢复之前的剪贴板内容。';
   @override
   String get recheck => '重新检查';
+  @override
+  String get source_label => '原文';
+  @override
+  String get result_label => '译文';
 }
 
 // Path: ui.ocr
@@ -3951,6 +3955,8 @@ extension on TranslationsZhHans {
           'ui.quick.clipboard_unavailable' => '无法读取剪贴板。',
           'ui.quick.clipboard_restore_failed' => '无法恢复之前的剪贴板内容。',
           'ui.quick.recheck' => '重新检查',
+          'ui.quick.source_label' => '原文',
+          'ui.quick.result_label' => '译文',
           'ui.ocr.title' => 'OCR',
           'ui.ocr.empty_title' => '还没有识别结果',
           'ui.ocr.empty_description' => '可以框选屏幕区域、选择图片文件，或识别剪贴板中的图片。',

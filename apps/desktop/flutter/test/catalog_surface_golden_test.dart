@@ -39,13 +39,28 @@ void main() {
           tester.view.physicalSize = const Size(1000, 700);
           addTearDown(tester.view.reset);
 
-          final baseTheme = LinguaRayMaterialTheme.forBrightness(brightness);
+          final baseTheme = LinguaRayMaterialTheme.forBrightness(
+            brightness,
+            platform: target,
+          );
           final fixedTextTheme = baseTheme.textTheme.apply(
             fontFamily: 'Golden UI',
             fontFamilyFallback: const ['Golden CJK', 'Golden Symbols'],
           );
           final theme = baseTheme.copyWith(
             platform: target,
+            inputDecorationTheme: baseTheme.inputDecorationTheme.copyWith(
+              labelStyle: fixedTextTheme.bodySmall,
+              hintStyle: fixedTextTheme.bodyMedium?.copyWith(
+                color: baseTheme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            dropdownMenuTheme: DropdownMenuThemeData(
+              textStyle: fixedTextTheme.bodyMedium,
+            ),
+            appBarTheme: baseTheme.appBarTheme.copyWith(
+              titleTextStyle: fixedTextTheme.titleMedium,
+            ),
             textTheme: fixedTextTheme,
             listTileTheme: baseTheme.listTileTheme.copyWith(
               titleTextStyle: fixedTextTheme.titleMedium,

@@ -88,18 +88,17 @@ class _OcrViewState extends State<OcrView> {
   Widget build(BuildContext context) {
     final state = widget.state;
     final labels = widget.labels;
+    final theme = Theme.of(context);
     return Scaffold(
+      backgroundColor: theme.colorScheme.surfaceContainerLowest,
       body: SafeArea(
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(12, 10, 8, 8),
+              padding: const EdgeInsets.fromLTRB(24, 20, 16, 16),
               child: Row(
                 children: [
-                  Text(
-                    labels.title,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
+                  Text(labels.title, style: theme.textTheme.titleLarge),
                   if (state.results.isNotEmpty) ...[
                     const SizedBox(width: 8),
                     Text(
@@ -116,25 +115,24 @@ class _OcrViewState extends State<OcrView> {
                 ],
               ),
             ),
-            const Divider(height: 1),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
               child: Wrap(
-                spacing: 6,
-                runSpacing: 6,
+                spacing: 8,
+                runSpacing: 8,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  FilledButton.tonalIcon(
+                  FilledButton.icon(
                     onPressed: state.busy ? null : widget.onCapture,
                     icon: const Icon(Icons.crop_free_rounded, size: 18),
                     label: Text(labels.capture),
                   ),
-                  OutlinedButton.icon(
+                  TextButton.icon(
                     onPressed: state.busy ? null : widget.onFile,
                     icon: const Icon(Icons.image_outlined, size: 18),
                     label: Text(labels.file),
                   ),
-                  OutlinedButton.icon(
+                  TextButton.icon(
                     onPressed: state.busy ? null : widget.onClipboard,
                     icon: const Icon(Icons.content_paste_rounded, size: 18),
                     label: Text(labels.clipboard),
@@ -158,6 +156,10 @@ class _OcrViewState extends State<OcrView> {
                 ],
               ),
             ),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 24),
+              child: Divider(),
+            ),
             if (state.busy) const LinearProgressIndicator(minHeight: 2),
             if (state.errorCode != null)
               Padding(
@@ -177,7 +179,7 @@ class _OcrViewState extends State<OcrView> {
                       ),
                     )
                   : Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                      padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
                       child: TextField(
                         controller: _controller,
                         expands: true,
@@ -185,9 +187,17 @@ class _OcrViewState extends State<OcrView> {
                         maxLines: null,
                         textAlignVertical: TextAlignVertical.top,
                         onChanged: widget.onTextChanged,
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          fontSize: 16,
+                          height: 1.7,
+                        ),
                         decoration: InputDecoration(
                           hintText: labels.emptyTitle,
-                          border: const OutlineInputBorder(),
+                          filled: false,
+                          contentPadding: EdgeInsets.zero,
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
                         ),
                       ),
                     ),

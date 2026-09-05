@@ -29,7 +29,7 @@ class ProvidersSettingsView extends StatelessWidget {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+          padding: const EdgeInsets.fromLTRB(32, 36, 32, 24),
           child: Row(
             children: [
               Expanded(
@@ -62,17 +62,46 @@ class ProvidersSettingsView extends StatelessWidget {
                   ),
                 )
               : ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
+                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
                   itemCount: providers.length,
-                  separatorBuilder: (_, _) => const Divider(),
+                  separatorBuilder: (_, _) => const Padding(
+                    padding: EdgeInsets.only(left: 60),
+                    child: Divider(),
+                  ),
                   itemBuilder: (context, index) {
                     final provider = providers[index];
+                    final model = provider.publicFields['defaultModel'];
+                    final colors = Theme.of(context).colorScheme;
                     return ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 8,
+                      ),
+                      leading: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: colors.surfaceContainerLow,
+                          borderRadius: BorderRadius.circular(9),
+                        ),
+                        alignment: Alignment.center,
+                        child: Icon(
+                          model == null
+                              ? Icons.translate_rounded
+                              : Icons.auto_awesome_outlined,
+                          size: 18,
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                      onTap: () => onEdit(provider.id),
                       title: Text(provider.displayName),
                       subtitle: Text(
-                        provider.hasStoredSecret
-                            ? '${provider.typeId} · ${labels.secretStored}'
-                            : provider.typeId,
+                        [
+                          if (model != null && model.isNotEmpty) model,
+                          if (provider.hasStoredSecret) labels.secretStored,
+                        ].join(' · '),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,

@@ -141,6 +141,10 @@ final _catalog = WidgetbookCategory(
           ),
         ),
         WidgetbookUseCase(
+          name: 'Providers · configured',
+          builder: (_) => const ProvidersCatalogPreview(),
+        ),
+        WidgetbookUseCase(
           name: 'Provider models · live discovery',
           builder: (_) => const ProviderModelsCatalogPreview(),
         ),

@@ -26,7 +26,7 @@ class PermissionsSettingsView extends StatelessWidget {
         snapshot.screenRecording == AccessState.notRequired;
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 16, 24, 24),
+      padding: const EdgeInsets.fromLTRB(32, 36, 32, 36),
       children: [
         Row(
           children: [

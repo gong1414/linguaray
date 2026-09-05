@@ -47,7 +47,7 @@ class GeneralSettingsView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(30, 48, 30, 36),
+      padding: const EdgeInsets.fromLTRB(32, 36, 32, 36),
       children: [
         if (pageTitle != null) ...[
           Text(pageTitle!, style: Theme.of(context).textTheme.titleLarge),
@@ -81,6 +81,8 @@ class GeneralSettingsView extends StatelessWidget {
               contentPadding: const EdgeInsets.symmetric(horizontal: 12),
               title: Text(labels.language),
               trailing: DropdownButton<String>(
+                underline: const SizedBox.shrink(),
+                style: Theme.of(context).textTheme.bodyMedium,
                 value:
                     languages.any((item) => item.code == preferences.language)
                     ? preferences.language
@@ -287,7 +289,7 @@ class _GeneralCard extends StatelessWidget {
                 height: 1,
                 indent: 12,
                 endIndent: 12,
-                color: theme.dividerColor.withValues(alpha: 0.5),
+                color: theme.colorScheme.outlineVariant,
               ),
             child,
           ],

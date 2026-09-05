@@ -52,7 +52,7 @@ class ServicesSettingsView extends StatelessWidget {
     );
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(30, 48, 30, 36),
+      padding: const EdgeInsets.fromLTRB(32, 36, 32, 36),
       children: [
         Text(pageTitle, style: theme.textTheme.titleLarge),
         const SizedBox(height: 22),

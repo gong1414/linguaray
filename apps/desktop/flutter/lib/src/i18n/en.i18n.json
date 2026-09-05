@@ -852,7 +852,9 @@
       "empty_selection": "No text is selected.",
       "clipboard_unavailable": "The clipboard could not be read.",
       "clipboard_restore_failed": "The previous clipboard contents could not be restored.",
-      "recheck": "Recheck"
+      "recheck": "Recheck",
+      "source_label": "Original",
+      "result_label": "Translation"
     },
     "ocr": {
       "title": "OCR",

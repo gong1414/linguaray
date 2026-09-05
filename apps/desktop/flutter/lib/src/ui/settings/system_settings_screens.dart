@@ -149,7 +149,7 @@ class _AdvancedSettingsScreenState
     final status = _status;
     final advanced = t.settings.advanced;
     return ListView(
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+      padding: const EdgeInsets.fromLTRB(32, 36, 32, 36),
       children: [
         Text(advanced.title, style: Theme.of(context).textTheme.headlineMedium),
         const SizedBox(height: 8),

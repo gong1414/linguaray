@@ -30,7 +30,7 @@ class AboutSettingsView extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return ListView(
-      padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
+      padding: const EdgeInsets.fromLTRB(32, 36, 32, 36),
       children: [
         const Center(child: BrandLogo(size: 48)),
         const SizedBox(height: 16),

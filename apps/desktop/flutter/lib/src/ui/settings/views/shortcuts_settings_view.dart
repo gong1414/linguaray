@@ -34,7 +34,7 @@ class ShortcutsSettingsView extends StatelessWidget {
     final theme = Theme.of(context);
     final cardColor = theme.colorScheme.surfaceContainerLowest;
     return ListView(
-      padding: const EdgeInsets.fromLTRB(30, 48, 30, 36),
+      padding: const EdgeInsets.fromLTRB(32, 36, 32, 36),
       children: [
         Text(title ?? labels.title, style: theme.textTheme.titleLarge),
         const SizedBox(height: 22),

@@ -72,6 +72,8 @@ String appErrorMessage(String? code) {
 QuickTranslateLabels quickTranslateLabels() {
   return QuickTranslateLabels(
     title: t.ui.quick.title,
+    sourceLabel: t.ui.quick.source_label,
+    resultLabel: t.ui.quick.result_label,
     inputHint: t.ui.quick.input_hint,
     translate: t.mini_translator.button.translate,
     clear: t.mini_translator.button.clear,

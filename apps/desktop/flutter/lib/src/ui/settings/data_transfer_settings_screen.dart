@@ -38,7 +38,7 @@ class _DataTransferSettingsScreenState
         state == DataTransferOperation.exporting ||
         state == DataTransferOperation.restoring;
     return ListView(
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+      padding: const EdgeInsets.fromLTRB(32, 36, 32, 36),
       children: [
         Text(labels.title, style: Theme.of(context).textTheme.headlineMedium),
         const SizedBox(height: 8),

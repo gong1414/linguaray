@@ -86,9 +86,36 @@ class _QuickTranslateResultPanelState extends State<QuickTranslateResultPanel> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (resultText.trim().isNotEmpty) ...[
+          const SizedBox(height: 16),
+          Divider(color: Theme.of(context).colorScheme.outlineVariant),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Container(
+                width: 3,
+                height: 12,
+                decoration: BoxDecoration(
+                  color: context.brandColors.resultRule,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(width: 7),
+              Text(
+                widget.labels.resultLabel,
+                style: Theme.of(context).textTheme.labelMedium,
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Text(
+                  widget.selectedResult?.service.name ?? '',
+                  textAlign: TextAlign.right,
+                  style: Theme.of(context).textTheme.labelSmall,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 10),
-          Container(height: 2, color: context.brandColors.resultRule),
-          const SizedBox(height: 8),
           ConstrainedBox(
             constraints: const BoxConstraints(maxHeight: 240),
             child: SingleChildScrollView(
@@ -99,7 +126,8 @@ class _QuickTranslateResultPanelState extends State<QuickTranslateResultPanel> {
                 child: SelectableText(
                   resultText,
                   key: const ValueKey('quick-result'),
-                  style: Theme.of(context).textTheme.bodyLarge,
+                  style: Theme.of(context).textTheme.bodyLarge
+                      ?.copyWith(fontSize: 17, height: 1.65, letterSpacing: 0),
                   onSelectionChanged: (selection, _) {
                     if (selection.isCollapsed) {
                       _selectedText = '';

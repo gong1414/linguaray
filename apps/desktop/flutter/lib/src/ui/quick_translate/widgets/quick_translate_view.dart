@@ -166,9 +166,9 @@ class _QuickTranslateViewState extends State<QuickTranslateView> {
     return CallbackShortcuts(
       bindings: submitBindings,
       child: Material(
-        color: theme.colorScheme.surface,
+        color: theme.colorScheme.surfaceContainerLowest,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+          padding: const EdgeInsets.fromLTRB(18, 10, 18, 14),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -196,7 +196,7 @@ class _QuickTranslateViewState extends State<QuickTranslateView> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 14),
                     QuickTranslateInput(
                       labels: widget.labels,
                       controller: _controller,

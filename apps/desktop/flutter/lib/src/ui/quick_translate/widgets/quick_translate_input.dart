@@ -38,26 +38,19 @@ class QuickTranslateInput extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final speaking = speakingKind == SpeechUtteranceKind.source;
-    return TextField(
-      key: const ValueKey('quick-source-input'),
-      controller: controller,
-      autofocus: true,
-      minLines: 1,
-      maxLines: 4,
-      textInputAction: submitWithModifier
-          ? TextInputAction.newline
-          : TextInputAction.go,
-      onChanged: onSourceTextChanged,
-      decoration: InputDecoration(
-        hintText: labels.inputHint,
-        suffixIcon: Row(
-          mainAxisSize: MainAxisSize.min,
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
           children: [
+            Text(labels.sourceLabel, style: theme.textTheme.labelMedium),
+            const Spacer(),
             if (sourceText.isNotEmpty)
               IconButton(
                 tooltip: labels.clear,
                 onPressed: onClear,
-                icon: const Icon(Icons.close_rounded, size: 18),
+                icon: const Icon(Icons.close_rounded, size: 16),
               ),
             if (speechAvailable && onSpeakSource != null)
               IconButton(
@@ -67,22 +60,85 @@ class QuickTranslateInput extends StatelessWidget {
                   speaking
                       ? Icons.stop_circle_outlined
                       : Icons.volume_up_outlined,
-                  size: 18,
+                  size: 17,
                 ),
               ),
-            IconButton(
-              tooltip: submitting ? labels.translating : labels.translate,
+          ],
+        ),
+        TextField(
+          key: const ValueKey('quick-source-input'),
+          controller: controller,
+          autofocus: true,
+          minLines: 2,
+          maxLines: 5,
+          style: theme.textTheme.bodyLarge?.copyWith(
+            fontSize: 15,
+            height: 1.65,
+          ),
+          textInputAction: submitWithModifier
+              ? TextInputAction.newline
+              : TextInputAction.go,
+          onChanged: onSourceTextChanged,
+          decoration: InputDecoration(
+            hintText: labels.inputHint,
+            filled: false,
+            border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
+            contentPadding: const EdgeInsets.symmetric(vertical: 8),
+            hintStyle: theme.textTheme.bodyLarge?.copyWith(
+              fontSize: 15,
+              height: 1.65,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (submitWithModifier) ...[
+                  Text(
+                    theme.platform == TargetPlatform.macOS ? '⌘' : 'Ctrl',
+                    style: theme.textTheme.labelSmall,
+                  ),
+                  const SizedBox(width: 3),
+                ],
+                Icon(
+                  Icons.keyboard_return_rounded,
+                  size: 13,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ],
+            ),
+            const SizedBox(width: 10),
+            FilledButton(
               onPressed: canTranslate ? onTranslate : null,
-              icon: submitting
-                  ? const SizedBox.square(
-                      dimension: 14,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(0, 30),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(submitting ? labels.translating : labels.translate),
+                  const SizedBox(width: 8),
+                  if (submitting)
+                    const SizedBox.square(
+                      dimension: 13,
+                      child: CircularProgressIndicator(strokeWidth: 1.5),
                     )
-                  : const Icon(Icons.arrow_forward_rounded),
+                  else
+                    const Icon(Icons.arrow_forward_rounded, size: 15),
+                ],
+              ),
             ),
           ],
         ),
-      ),
+      ],
     );
   }
 }
