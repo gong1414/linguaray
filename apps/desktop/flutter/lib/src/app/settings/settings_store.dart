@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' show ThemeMode;
 import 'package:linguaray_runtime/linguaray_runtime.dart';
 
-import '../../shared/language_util.dart';
 import '../runtime.dart' as runtime_service;
 import 'settings_section.dart';
 
@@ -46,7 +45,7 @@ class SettingsStore extends ChangeNotifier implements SettingsSnapshotSource {
     translationTargets: [],
     inputSubmitMode: InputSubmitMode.enter,
     doubleClickCopyResult: true,
-    commonLanguages: defaultCommonLanguages(),
+    commonLanguages: const [],
     translationServiceOrder: const [],
   );
   AppearanceSettings _appearance = AppearanceSettings(
@@ -89,16 +88,7 @@ class SettingsStore extends ChangeNotifier implements SettingsSnapshotSource {
   List<ServiceConfigEntry> get services => List.unmodifiable(_services);
 
   String get appLanguage => _appearance.language;
-  ThemeMode get themeMode {
-    switch (_appearance.themeMode) {
-      case 'light':
-        return ThemeMode.light;
-      case 'dark':
-        return ThemeMode.dark;
-      default:
-        return ThemeMode.system;
-    }
-  }
+  ThemeMode get themeMode => themeModeFromAppearance(_appearance.themeMode);
 
   InputSubmitMode get inputSubmitMode => _general.inputSubmitMode;
   bool get autoCopyDetectedText => _general.autoCopyDetectedText;
@@ -296,6 +286,12 @@ class SettingsStore extends ChangeNotifier implements SettingsSnapshotSource {
     notifyListeners();
   }
 }
+
+ThemeMode themeModeFromAppearance(String themeMode) => switch (themeMode) {
+  'light' => ThemeMode.light,
+  'dark' => ThemeMode.dark,
+  _ => ThemeMode.system,
+};
 
 /// Singleton accessor.
 final settingsStore = SettingsStore.instance;

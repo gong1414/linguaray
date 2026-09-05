@@ -174,6 +174,29 @@ void main() {
       expect(container.read(historyViewModelProvider).selectedIds, isEmpty);
     },
   );
+
+  test(
+    'history load failure is kept in view state instead of spinning',
+    () async {
+      final container = _container(
+        history: _MemoryHistory()..throwOnLoad = true,
+      );
+      addTearDown(container.dispose);
+      final subscription = container.listen(
+        historyViewModelProvider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+      await _waitFor(
+        () => !container.read(historyViewModelProvider).snapshot.loading,
+      );
+      expect(
+        container.read(historyViewModelProvider).snapshot.errorCode,
+        'history_unavailable',
+      );
+    },
+  );
 }
 
 ProviderContainer _container({
@@ -389,21 +412,25 @@ final class _MemoryVocabulary implements VocabularyRepository {
 
 final class _MemoryHistory implements HistoryRepository {
   final records = <HistoryRecord>[];
+  var throwOnLoad = false;
 
   @override
   Future<HistorySnapshot> load({
     HistoryFilter filter = HistoryFilter.all,
     String query = '',
-  }) async => HistorySnapshot(
-    entries: List.of(records),
-    counts: HistoryCounts(
-      all: records.length,
-      favorites: records.where((entry) => entry.favorite).length,
-      edited: records.where((entry) => entry.edited).length,
-    ),
-    filter: filter,
-    query: query,
-  );
+  }) async {
+    if (throwOnLoad) throw StateError('history unavailable');
+    return HistorySnapshot(
+      entries: List.of(records),
+      counts: HistoryCounts(
+        all: records.length,
+        favorites: records.where((entry) => entry.favorite).length,
+        edited: records.where((entry) => entry.edited).length,
+      ),
+      filter: filter,
+      query: query,
+    );
+  }
 
   @override
   Future<HistoryRecord> upsert(HistoryRecordDraft draft) async {

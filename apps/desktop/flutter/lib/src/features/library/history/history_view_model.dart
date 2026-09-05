@@ -16,8 +16,7 @@ final class HistoryViewState {
 }
 
 final class HistoryViewModel extends Notifier<HistoryViewState> {
-  HistoryFilter _filter = HistoryFilter.all;
-  String _query = '';
+  var _generation = 0;
 
   @override
   HistoryViewState build() {
@@ -34,29 +33,66 @@ final class HistoryViewModel extends Notifier<HistoryViewState> {
   }
 
   Future<void> reload() async {
+    final generation = ++_generation;
+    final filter = state.snapshot.filter;
+    final query = state.snapshot.query;
     state = HistoryViewState(
       snapshot: HistorySnapshot(
         entries: state.snapshot.entries,
         counts: state.snapshot.counts,
-        filter: _filter,
-        query: _query,
+        filter: filter,
+        query: query,
+        loading: true,
+        errorCode: state.snapshot.errorCode,
+      ),
+      selectedIds: state.selectedIds,
+    );
+    try {
+      final snapshot = await ref
+          .read(historyRepositoryProvider)
+          .load(filter: filter, query: query);
+      if (generation != _generation) return;
+      state = HistoryViewState(snapshot: snapshot);
+    } catch (_) {
+      if (generation != _generation) return;
+      state = HistoryViewState(
+        snapshot: HistorySnapshot(
+          entries: state.snapshot.entries,
+          counts: state.snapshot.counts,
+          filter: filter,
+          query: query,
+          loading: false,
+          errorCode: AppErrorCode.historyUnavailable.wireName,
+        ),
+      );
+    }
+  }
+
+  Future<void> setFilter(HistoryFilter filter) async {
+    state = HistoryViewState(
+      snapshot: HistorySnapshot(
+        entries: state.snapshot.entries,
+        counts: state.snapshot.counts,
+        filter: filter,
+        query: state.snapshot.query,
         loading: true,
         errorCode: state.snapshot.errorCode,
       ),
     );
-    final snapshot = await ref
-        .read(historyRepositoryProvider)
-        .load(filter: _filter, query: _query);
-    state = HistoryViewState(snapshot: snapshot);
-  }
-
-  Future<void> setFilter(HistoryFilter filter) async {
-    _filter = filter;
     await reload();
   }
 
   Future<void> setQuery(String query) async {
-    _query = query;
+    state = HistoryViewState(
+      snapshot: HistorySnapshot(
+        entries: state.snapshot.entries,
+        counts: state.snapshot.counts,
+        filter: state.snapshot.filter,
+        query: query,
+        loading: true,
+        errorCode: state.snapshot.errorCode,
+      ),
+    );
     await reload();
   }
 

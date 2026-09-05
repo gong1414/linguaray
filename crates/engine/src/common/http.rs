@@ -44,23 +44,19 @@ pub trait ClassifyHttpResponse: Sized {
     }
 }
 
-impl ClassifyHttpResponse for TranslationError {
-    fn classify_status(provider: &'static str, status: u16, message: String) -> Self {
-        TranslationError::from_http_status(provider, status, message)
-    }
+macro_rules! impl_classify_http_response {
+    ($ty:ty) => {
+        impl ClassifyHttpResponse for $ty {
+            fn classify_status(provider: &'static str, status: u16, message: String) -> Self {
+                <$ty>::from_http_status(provider, status, message)
+            }
+        }
+    };
 }
 
-impl ClassifyHttpResponse for DictionaryError {
-    fn classify_status(provider: &'static str, status: u16, message: String) -> Self {
-        DictionaryError::from_http_status(provider, status, message)
-    }
-}
-
-impl ClassifyHttpResponse for OcrError {
-    fn classify_status(provider: &'static str, status: u16, message: String) -> Self {
-        OcrError::from_http_status(provider, status, message)
-    }
-}
+impl_classify_http_response!(TranslationError);
+impl_classify_http_response!(DictionaryError);
+impl_classify_http_response!(OcrError);
 
 #[cfg(test)]
 mod tests {

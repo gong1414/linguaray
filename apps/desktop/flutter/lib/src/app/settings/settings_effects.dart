@@ -178,13 +178,10 @@ final class SettingsEffectsCoordinator {
 
   Future<void> _syncAppearance() async {
     if (_disposed) return;
-    final mode = switch (_store.appearance.themeMode) {
-      'light' => ThemeMode.light,
-      'dark' => ThemeMode.dark,
-      _ => ThemeMode.system,
-    };
     try {
-      await _effects.applyAppearance(mode);
+      await _effects.applyAppearance(
+        themeModeFromAppearance(_store.appearance.themeMode),
+      );
     } catch (error, stackTrace) {
       debugPrint('Failed to apply native appearance: $error\n$stackTrace');
     }

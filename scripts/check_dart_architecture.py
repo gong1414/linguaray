@@ -109,7 +109,7 @@ def inspect(root: Path) -> list[Violation]:
                         found.add(Violation(path, target, "application-purity"))
                 if path.startswith(UI) and "/testing/" not in path and (target.startswith((APPLICATION, DESKTOP, "packages/runtime/lib/")) or native):
                     found.add(Violation(path, target, "design-system-purity"))
-                implementation = target in {SOURCE + "app/runtime.dart", SOURCE + "app/settings/settings_store.dart"} or target.startswith(SOURCE + "app/windows/") or target.startswith(SOURCE + "features/") and "/data/" in target
+                implementation = target in {SOURCE + "app/runtime.dart", SOURCE + "app/settings/settings_store.dart", SOURCE + "app/settings/settings_effects.dart"} or target.startswith(SOURCE + "app/windows/") or target.startswith(SOURCE + "features/") and "/data/" in target
                 if presentation and (native or implementation):
                     found.add(Violation(path, target, "presentation-port"))
     return sorted(found)

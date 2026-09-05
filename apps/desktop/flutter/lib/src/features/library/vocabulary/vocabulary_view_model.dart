@@ -11,8 +11,7 @@ final vocabularyViewModelProvider =
     );
 
 final class VocabularyViewModel extends Notifier<VocabularySnapshot> {
-  VocabularyFilter _filter = VocabularyFilter.all;
-  String _query = '';
+  var _generation = 0;
 
   @override
   VocabularySnapshot build() {
@@ -26,22 +25,28 @@ final class VocabularyViewModel extends Notifier<VocabularySnapshot> {
   }
 
   Future<void> reload() async {
+    final generation = ++_generation;
+    final filter = state.filter;
+    final query = state.query;
     state = VocabularySnapshot(
       entries: state.entries,
-      filter: _filter,
-      query: _query,
+      filter: filter,
+      query: query,
       loading: true,
       errorCode: state.errorCode,
     );
     try {
-      state = await ref
+      final snapshot = await ref
           .read(vocabularyRepositoryProvider)
-          .load(filter: _filter, query: _query);
+          .load(filter: filter, query: query);
+      if (generation != _generation) return;
+      state = snapshot;
     } catch (_) {
+      if (generation != _generation) return;
       state = VocabularySnapshot(
         entries: state.entries,
-        filter: _filter,
-        query: _query,
+        filter: filter,
+        query: query,
         loading: false,
         errorCode: AppErrorCode.vocabularyUnavailable.wireName,
       );
@@ -49,12 +54,24 @@ final class VocabularyViewModel extends Notifier<VocabularySnapshot> {
   }
 
   Future<void> setFilter(VocabularyFilter filter) async {
-    _filter = filter;
+    state = VocabularySnapshot(
+      entries: state.entries,
+      filter: filter,
+      query: state.query,
+      loading: true,
+      errorCode: state.errorCode,
+    );
     await reload();
   }
 
   Future<void> setQuery(String query) async {
-    _query = query;
+    state = VocabularySnapshot(
+      entries: state.entries,
+      filter: state.filter,
+      query: query,
+      loading: true,
+      errorCode: state.errorCode,
+    );
     await reload();
   }
 
