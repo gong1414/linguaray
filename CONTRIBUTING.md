@@ -74,6 +74,7 @@ dart run melos run dependency_validator
 cargo fmt --all -- --check
 cargo clippy --locked --workspace --all-targets -- -D warnings
 cargo test --locked --workspace
+python3 scripts/check_uniffi_surface.py
 ```
 
 Interface changes should include or deliberately update Widgetbook states and

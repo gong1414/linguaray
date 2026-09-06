@@ -9,14 +9,19 @@
 //! per language pair. The cache is keyed on a generation counter that every
 //! mutation bumps, so callers never have to invalidate it by hand.
 
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use aho_corasick::{AhoCorasick, MatchKind};
 use serde::{Deserialize, Serialize};
+
+mod compliance;
+mod matcher;
+
+pub use compliance::check_compliance;
+use matcher::{language_applies, CompiledMatcher, MatcherCache, MatcherKey, PatternSet};
 
 /// Directory under `data_dir` holding one JSON file per book.
 const GLOSSARY_DIR: &str = "glossary";
@@ -96,6 +101,14 @@ pub struct GlossaryEntryInput {
     pub note: Option<String>,
     pub case_sensitive: bool,
     pub whole_word: bool,
+}
+
+/// Summary returned after merging an external glossary into a book.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, uniffi::Record)]
+pub struct GlossaryImportReport {
+    pub inserted: u32,
+    pub updated: u32,
+    pub skipped: u32,
 }
 
 /// A term found in a source text.
@@ -201,6 +214,33 @@ pub struct GlossaryStore {
 }
 
 impl GlossaryStore {
+    pub(crate) fn validate_backup(data_dir: impl AsRef<Path>) -> Result<(), String> {
+        let dir = data_dir.as_ref().join(GLOSSARY_DIR);
+        if !dir.exists() {
+            return Ok(());
+        }
+        let listing = fs::read_dir(&dir).map_err(|error| {
+            format!(
+                "failed to read glossary directory `{}`: {error}",
+                dir.display()
+            )
+        })?;
+        for entry in listing {
+            let entry = entry.map_err(|error| {
+                format!(
+                    "failed to read glossary directory `{}`: {error}",
+                    dir.display()
+                )
+            })?;
+            let path = entry.path();
+            if path.extension().and_then(|ext| ext.to_str()) == Some("json") {
+                load_book_file(&path)
+                    .map_err(|error| format!("invalid `{}`: {error}", path.display()))?;
+            }
+        }
+        Ok(())
+    }
+
     /// Loads every book under `<data_dir>/glossary`. A missing directory is
     /// an empty glossary, not an error; it is created on first write.
     pub fn load(data_dir: impl AsRef<Path>) -> Result<Self, String> {
@@ -382,6 +422,42 @@ impl GlossaryStore {
         let entry = self.apply_entry(book_id, input, now_secs())?;
         self.commit(book_id)?;
         Ok(entry)
+    }
+
+    /// Merges many entries and writes the book once. Existing terms are
+    /// matched case-insensitively, which is the same rule used by interactive
+    /// entry editing.
+    pub fn import_entries(
+        &mut self,
+        book_id: &str,
+        entries: Vec<GlossaryEntryInput>,
+    ) -> Result<GlossaryImportReport, String> {
+        validate_book_id(book_id)?;
+        self.require_book(book_id)?;
+        let mut report = GlossaryImportReport::default();
+        let now = now_secs();
+
+        for entry in entries {
+            let term = entry.term.trim();
+            if term.is_empty() || entry.translation.trim().is_empty() {
+                report.skipped += 1;
+                continue;
+            }
+            let existed = self.books[book_id]
+                .entries
+                .iter()
+                .any(|saved| saved.term.eq_ignore_ascii_case(term));
+            match self.apply_entry(book_id, entry, now) {
+                Ok(_) if existed => report.updated += 1,
+                Ok(_) => report.inserted += 1,
+                Err(_) => report.skipped += 1,
+            }
+        }
+
+        if report.inserted > 0 || report.updated > 0 {
+            self.commit(book_id)?;
+        }
+        Ok(report)
     }
 
     /// Removes an entry. Returns `false` if it did not exist.
@@ -630,21 +706,10 @@ impl GlossaryStore {
     }
 
     fn write_book(&self, book: &BookFile) -> Result<(), String> {
-        fs::create_dir_all(&self.dir).map_err(|error| {
-            format!(
-                "failed to create glossary directory `{}`: {error}",
-                self.dir.display()
-            )
-        })?;
         let path = self.book_path(&book.id);
         let content = serde_json::to_string_pretty(book)
             .map_err(|error| format!("failed to encode glossary book `{}`: {error}", book.id))?;
-        fs::write(&path, content).map_err(|error| {
-            format!(
-                "failed to write glossary book `{}`: {error}",
-                path.display()
-            )
-        })
+        crate::storage::write_bytes(&path, content.as_bytes())
     }
 
     fn book_path(&self, book_id: &str) -> PathBuf {
@@ -669,234 +734,6 @@ fn next_id(id_seq: &mut u64, taken: impl Fn(&str) -> bool) -> String {
             return id;
         }
     }
-}
-
-/// Reports which glossary rules `translated` breaks, at most one issue per
-/// entry per kind however often the term occurs in the source.
-pub fn check_compliance(
-    matches: &[GlossaryMatch],
-    translated: &str,
-) -> Vec<GlossaryComplianceIssue> {
-    let haystack = translated.to_lowercase();
-    let mut issues = Vec::new();
-    let mut seen = HashSet::new();
-
-    for hit in matches {
-        if !seen.insert((hit.book_id.as_str(), hit.entry_id.as_str())) {
-            continue;
-        }
-        if !haystack.contains(&hit.translation.to_lowercase()) {
-            issues.push(GlossaryComplianceIssue {
-                book_id: hit.book_id.clone(),
-                entry_id: hit.entry_id.clone(),
-                kind: GlossaryIssueKind::MissingTranslation,
-                term: hit.term.clone(),
-                expected: hit.translation.clone(),
-                found: None,
-            });
-        }
-        for forbidden in &hit.forbidden {
-            if haystack.contains(&forbidden.to_lowercase()) {
-                issues.push(GlossaryComplianceIssue {
-                    book_id: hit.book_id.clone(),
-                    entry_id: hit.entry_id.clone(),
-                    kind: GlossaryIssueKind::ForbiddenUsed,
-                    term: hit.term.clone(),
-                    expected: hit.translation.clone(),
-                    found: Some(forbidden.clone()),
-                });
-            }
-        }
-    }
-    issues
-}
-
-// ── Matcher internals ────────────────────────────────────────────────────────
-
-#[derive(Default)]
-struct MatcherCache {
-    generation: u64,
-    entries: HashMap<MatcherKey, Arc<CompiledMatcher>>,
-}
-
-#[derive(Clone, PartialEq, Eq, Hash)]
-struct MatcherKey {
-    source: Option<String>,
-    target: Option<String>,
-}
-
-impl MatcherKey {
-    fn new(source: Option<&str>, target: Option<&str>) -> Self {
-        Self {
-            source: normalize_language(source),
-            target: normalize_language(target),
-        }
-    }
-}
-
-/// One term's identity, parallel to the automaton's pattern list.
-#[derive(Clone)]
-struct PatternInfo {
-    book_id: String,
-    entry_id: String,
-    term: String,
-    translation: String,
-    forbidden: Vec<String>,
-    whole_word: bool,
-}
-
-#[derive(Default)]
-struct PatternSet {
-    patterns: Vec<String>,
-    infos: Vec<PatternInfo>,
-}
-
-impl PatternSet {
-    fn push(&mut self, book_id: String, entry: &GlossaryEntry) {
-        self.patterns.push(entry.term.clone());
-        self.infos.push(PatternInfo {
-            book_id,
-            entry_id: entry.id.clone(),
-            term: entry.term.clone(),
-            translation: entry.translation.clone(),
-            forbidden: entry.forbidden.clone(),
-            whole_word: entry.whole_word,
-        });
-    }
-
-    fn build(self, case_insensitive: bool) -> Option<Automaton> {
-        if self.patterns.is_empty() {
-            return None;
-        }
-        // Building can only fail on pathological inputs (e.g. a pattern set
-        // too large for the chosen automaton); a glossary that cannot compile
-        // is better skipped than fatal to translation.
-        let automaton = AhoCorasick::builder()
-            .match_kind(MatchKind::LeftmostLongest)
-            .ascii_case_insensitive(case_insensitive)
-            .build(&self.patterns)
-            .map_err(|error| eprintln!("[glossary] failed to build matcher: {error}"))
-            .ok()?;
-        Some(Automaton {
-            automaton,
-            infos: self.infos,
-        })
-    }
-}
-
-struct Automaton {
-    automaton: AhoCorasick,
-    infos: Vec<PatternInfo>,
-}
-
-/// Two automatons because Aho-Corasick sets case sensitivity for the whole
-/// set, not per pattern. Case-insensitivity is ASCII-only, which covers the
-/// Latin terms it matters for; CJK terms are unaffected by casing.
-pub struct CompiledMatcher {
-    sensitive: Option<Automaton>,
-    insensitive: Option<Automaton>,
-}
-
-impl CompiledMatcher {
-    fn find(&self, text: &str) -> Vec<GlossaryMatch> {
-        let mut raw: Vec<(usize, usize, &PatternInfo)> = Vec::new();
-        for automaton in [self.sensitive.as_ref(), self.insensitive.as_ref()]
-            .into_iter()
-            .flatten()
-        {
-            for found in automaton.automaton.find_iter(text) {
-                let info = &automaton.infos[found.pattern().as_usize()];
-                if info.whole_word
-                    && !is_word_boundary(text, found.start(), found.end(), &info.term)
-                {
-                    continue;
-                }
-                raw.push((found.start(), found.end(), info));
-            }
-        }
-
-        // Longest match wins at a given position, and once a span is taken
-        // nothing overlapping it may also match.
-        raw.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| b.1.cmp(&a.1)));
-        let mut matches = Vec::new();
-        let mut consumed_to = 0usize;
-        for (start, end, info) in raw {
-            if start < consumed_to {
-                continue;
-            }
-            consumed_to = end;
-            matches.push(GlossaryMatch {
-                book_id: info.book_id.clone(),
-                entry_id: info.entry_id.clone(),
-                term: info.term.clone(),
-                matched_text: text[start..end].to_owned(),
-                translation: info.translation.clone(),
-                forbidden: info.forbidden.clone(),
-                start: start as u32,
-                end: end as u32,
-            });
-        }
-        matches
-    }
-}
-
-/// Checks that a match is not embedded in a longer word. Only the sides where
-/// the term itself ends in an ASCII alphanumeric are checked, so terms
-/// wrapped in punctuation and CJK terms are never rejected.
-fn is_word_boundary(text: &str, start: usize, end: usize, term: &str) -> bool {
-    let is_word_char = |c: char| c.is_ascii_alphanumeric() || c == '_';
-
-    if term
-        .chars()
-        .next()
-        .is_some_and(|c| c.is_ascii_alphanumeric())
-    {
-        if let Some(prev) = text[..start].chars().next_back() {
-            if is_word_char(prev) {
-                return false;
-            }
-        }
-    }
-    if term
-        .chars()
-        .next_back()
-        .is_some_and(|c| c.is_ascii_alphanumeric())
-    {
-        if let Some(next) = text[end..].chars().next() {
-            if is_word_char(next) {
-                return false;
-            }
-        }
-    }
-    true
-}
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-/// A book restricted to a language still applies when the request's language
-/// is unknown: dropping the constraint silently is worse than applying it.
-fn language_applies(book: Option<&str>, request: Option<&str>) -> bool {
-    let Some(book) = book.map(str::trim).filter(|value| !value.is_empty()) else {
-        return true;
-    };
-    let Some(request) = request.map(str::trim).filter(|value| !value.is_empty()) else {
-        return true;
-    };
-    if request.eq_ignore_ascii_case("auto") || book.eq_ignore_ascii_case(request) {
-        return true;
-    }
-    primary_subtag(book).eq_ignore_ascii_case(primary_subtag(request))
-}
-
-/// `zh-Hans` and `zh` are the same language for glossary purposes.
-fn primary_subtag(language: &str) -> &str {
-    language.split(['-', '_']).next().unwrap_or(language)
-}
-
-fn normalize_language(language: Option<&str>) -> Option<String> {
-    language
-        .map(|value| value.trim().to_lowercase())
-        .filter(|value| !value.is_empty())
 }
 
 fn normalize_optional(value: Option<String>) -> Option<String> {
@@ -977,347 +814,5 @@ fn now_millis() -> u64 {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use std::sync::atomic::{AtomicU64, Ordering};
-
-    static NEXT_TEMP_DIR_ID: AtomicU64 = AtomicU64::new(0);
-
-    fn temp_data_dir() -> PathBuf {
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("time went backwards")
-            .as_nanos();
-        let sequence = NEXT_TEMP_DIR_ID.fetch_add(1, Ordering::Relaxed);
-        std::env::temp_dir().join(format!(
-            "linguaray-glossary-{}-{timestamp}-{sequence}",
-            std::process::id()
-        ))
-    }
-
-    fn book_input(name: &str) -> GlossaryBookInput {
-        GlossaryBookInput {
-            id: None,
-            name: name.to_owned(),
-            enabled: true,
-            source_language: None,
-            target_language: None,
-        }
-    }
-
-    fn entry_input(term: &str, translation: &str) -> GlossaryEntryInput {
-        GlossaryEntryInput {
-            id: None,
-            term: term.to_owned(),
-            translation: translation.to_owned(),
-            forbidden: Vec::new(),
-            note: None,
-            case_sensitive: false,
-            whole_word: true,
-        }
-    }
-
-    fn store_with_terms(terms: &[(&str, &str)]) -> (GlossaryStore, String) {
-        let mut store = GlossaryStore::load(temp_data_dir()).expect("failed to load glossary");
-        let book = store.upsert_book(book_input("测试")).expect("upsert book");
-        for (term, translation) in terms {
-            store
-                .upsert_entry(&book.id, entry_input(term, translation))
-                .expect("upsert entry");
-        }
-        (store, book.id)
-    }
-
-    #[test]
-    fn load_missing_directory_returns_empty_glossary() {
-        let store = GlossaryStore::load(temp_data_dir()).expect("failed to load glossary");
-        assert!(store.list_books().is_empty());
-    }
-
-    #[test]
-    fn books_and_entries_round_trip_through_disk() {
-        let dir = temp_data_dir();
-        let book_id = {
-            let mut store = GlossaryStore::load(&dir).expect("failed to load glossary");
-            let book = store
-                .upsert_book(book_input("机器学习"))
-                .expect("upsert book");
-            store
-                .upsert_entry(&book.id, entry_input("token", "词元"))
-                .expect("upsert entry");
-            book.id
-        };
-
-        let store = GlossaryStore::load(&dir).expect("failed to reload glossary");
-        let books = store.list_books();
-        assert_eq!(books.len(), 1);
-        assert_eq!(books[0].name, "机器学习");
-        assert_eq!(books[0].entry_count, 1);
-
-        let entries = store.list_entries(&book_id, None, 0, 0).expect("entries");
-        assert_eq!(entries.len(), 1);
-        assert_eq!(entries[0].term, "token");
-        assert_eq!(entries[0].translation, "词元");
-    }
-
-    #[test]
-    fn delete_book_removes_its_file() {
-        let dir = temp_data_dir();
-        let mut store = GlossaryStore::load(&dir).expect("failed to load glossary");
-        let book = store.upsert_book(book_input("临时")).expect("upsert book");
-        let path = dir.join(GLOSSARY_DIR).join(format!("{}.json", book.id));
-        assert!(path.exists());
-
-        assert!(store.delete_book(&book.id).expect("delete book"));
-        assert!(!path.exists());
-        assert!(!store.delete_book(&book.id).expect("delete missing book"));
-    }
-
-    #[test]
-    fn upsert_entry_updates_the_existing_term_instead_of_duplicating() {
-        let (mut store, book_id) = store_with_terms(&[("token", "词元")]);
-        store
-            .upsert_entry(&book_id, entry_input("TOKEN", "标记"))
-            .expect("upsert entry");
-
-        let entries = store.list_entries(&book_id, None, 0, 0).expect("entries");
-        assert_eq!(entries.len(), 1);
-        assert_eq!(entries[0].term, "TOKEN");
-        assert_eq!(entries[0].translation, "标记");
-    }
-
-    #[test]
-    fn renaming_an_entry_onto_another_term_is_rejected() {
-        let (mut store, book_id) = store_with_terms(&[("token", "词元"), ("embedding", "嵌入")]);
-        let entries = store.list_entries(&book_id, None, 0, 0).expect("entries");
-        let embedding = entries
-            .iter()
-            .find(|entry| entry.term == "embedding")
-            .expect("embedding entry");
-
-        let mut input = entry_input("token", "词元");
-        input.id = Some(embedding.id.clone());
-        let error = store.upsert_entry(&book_id, input).unwrap_err();
-        assert!(
-            error.contains("already exists"),
-            "unexpected error: {error}"
-        );
-    }
-
-    #[test]
-    fn list_entries_filters_by_query_and_paginates() {
-        let (store, book_id) = store_with_terms(&[
-            ("token", "词元"),
-            ("embedding", "嵌入"),
-            ("prompt", "提示词"),
-        ]);
-
-        let filtered = store
-            .list_entries(&book_id, Some("嵌入"), 0, 0)
-            .expect("entries");
-        assert_eq!(filtered.len(), 1);
-        assert_eq!(filtered[0].term, "embedding");
-
-        assert_eq!(store.count_entries(&book_id, None).expect("count"), 3);
-        assert_eq!(
-            store
-                .list_entries(&book_id, None, 1, 1)
-                .expect("page")
-                .len(),
-            1
-        );
-        assert!(store
-            .list_entries(&book_id, None, 9, 1)
-            .expect("page past end")
-            .is_empty());
-    }
-
-    #[test]
-    fn matching_prefers_the_longest_term() {
-        let (store, _) = store_with_terms(&[("fine", "美好"), ("fine-tune", "微调")]);
-        let matches = store.match_text("we fine-tune the model", None, None);
-        assert_eq!(matches.len(), 1);
-        assert_eq!(matches[0].term, "fine-tune");
-        assert_eq!(matches[0].translation, "微调");
-    }
-
-    #[test]
-    fn matching_is_case_insensitive_by_default() {
-        let (store, _) = store_with_terms(&[("token", "词元")]);
-        let matches = store.match_text("A Token and a TOKEN", None, None);
-        assert_eq!(matches.len(), 2);
-        assert_eq!(matches[0].matched_text, "Token");
-        assert_eq!(matches[1].matched_text, "TOKEN");
-    }
-
-    #[test]
-    fn case_sensitive_entries_only_match_their_own_casing() {
-        let mut store = GlossaryStore::load(temp_data_dir()).expect("failed to load glossary");
-        let book = store.upsert_book(book_input("品牌")).expect("upsert book");
-        let mut input = entry_input("IT", "信息技术");
-        input.case_sensitive = true;
-        store.upsert_entry(&book.id, input).expect("upsert entry");
-
-        let matches = store.match_text("IT is what it is", None, None);
-        assert_eq!(matches.len(), 1);
-        assert_eq!(matches[0].start, 0);
-    }
-
-    #[test]
-    fn whole_word_matching_rejects_terms_inside_longer_words() {
-        let (store, _) = store_with_terms(&[("art", "艺术")]);
-        assert!(store.match_text("started", None, None).is_empty());
-        assert_eq!(store.match_text("modern art.", None, None).len(), 1);
-    }
-
-    #[test]
-    fn whole_word_matching_does_not_block_cjk_terms() {
-        let (store, _) = store_with_terms(&[("词元", "token")]);
-        assert_eq!(store.match_text("这个词元很重要", None, None).len(), 1);
-    }
-
-    #[test]
-    fn books_only_apply_to_their_language_pair() {
-        let mut store = GlossaryStore::load(temp_data_dir()).expect("failed to load glossary");
-        let book = store
-            .upsert_book(GlossaryBookInput {
-                id: None,
-                name: "英译中".to_owned(),
-                enabled: true,
-                source_language: Some("en".to_owned()),
-                target_language: Some("zh-Hans".to_owned()),
-            })
-            .expect("upsert book");
-        store
-            .upsert_entry(&book.id, entry_input("token", "词元"))
-            .expect("upsert entry");
-
-        // Exact pair, primary-subtag match, unknown and `auto` all apply.
-        assert_eq!(
-            store.match_text("token", Some("en"), Some("zh-Hans")).len(),
-            1
-        );
-        assert_eq!(store.match_text("token", Some("en"), Some("zh")).len(), 1);
-        assert_eq!(store.match_text("token", None, None).len(), 1);
-        assert_eq!(
-            store
-                .match_text("token", Some("auto"), Some("zh-Hans"))
-                .len(),
-            1
-        );
-        // A different target language does not.
-        assert!(store.match_text("token", Some("en"), Some("ja")).is_empty());
-    }
-
-    #[test]
-    fn disabled_books_do_not_match() {
-        let (mut store, book_id) = store_with_terms(&[("token", "词元")]);
-        assert_eq!(store.match_text("token", None, None).len(), 1);
-
-        let book = store.get_book(&book_id).expect("book");
-        store
-            .upsert_book(GlossaryBookInput {
-                id: Some(book.id),
-                name: book.name,
-                enabled: false,
-                source_language: None,
-                target_language: None,
-            })
-            .expect("disable book");
-        assert!(store.match_text("token", None, None).is_empty());
-    }
-
-    #[test]
-    fn edits_invalidate_the_compiled_matcher() {
-        let (mut store, book_id) = store_with_terms(&[("token", "词元")]);
-        assert_eq!(store.match_text("token", None, None).len(), 1);
-
-        let entries = store.list_entries(&book_id, None, 0, 0).expect("entries");
-        store
-            .delete_entry(&book_id, &entries[0].id)
-            .expect("delete entry");
-        assert!(store.match_text("token", None, None).is_empty());
-    }
-
-    #[test]
-    fn compliance_reports_missing_and_forbidden_translations() {
-        let mut store = GlossaryStore::load(temp_data_dir()).expect("failed to load glossary");
-        let book = store
-            .upsert_book(book_input("机器学习"))
-            .expect("upsert book");
-        let mut input = entry_input("token", "词元");
-        input.forbidden = vec!["标记".to_owned(), "令牌".to_owned()];
-        store.upsert_entry(&book.id, input).expect("upsert entry");
-
-        let matches = store.match_text("a token here", None, None);
-        assert!(check_compliance(&matches, "这里有一个词元").is_empty());
-
-        let issues = check_compliance(&matches, "这里有一个标记");
-        assert_eq!(issues.len(), 2);
-        assert_eq!(issues[0].kind, GlossaryIssueKind::MissingTranslation);
-        assert_eq!(issues[1].kind, GlossaryIssueKind::ForbiddenUsed);
-        assert_eq!(issues[1].found.as_deref(), Some("标记"));
-    }
-
-    #[test]
-    fn compliance_reports_each_entry_once_however_often_it_matched() {
-        let (store, _) = store_with_terms(&[("token", "词元")]);
-        let matches = store.match_text("token token token", None, None);
-        assert_eq!(matches.len(), 3);
-        assert_eq!(check_compliance(&matches, "空译文").len(), 1);
-    }
-
-    #[test]
-    fn record_hits_counts_every_occurrence() {
-        let (mut store, book_id) = store_with_terms(&[("token", "词元")]);
-        let matches = store.match_text("token and token", None, None);
-        store.record_hits(&matches);
-        store.flush_hits().expect("flush hits");
-
-        let entries = store.list_entries(&book_id, None, 0, 0).expect("entries");
-        assert_eq!(entries[0].hits, 2);
-    }
-
-    #[test]
-    fn hit_counts_survive_a_reload() {
-        let dir = temp_data_dir();
-        let book_id = {
-            let mut store = GlossaryStore::load(&dir).expect("failed to load glossary");
-            let book = store
-                .upsert_book(book_input("机器学习"))
-                .expect("upsert book");
-            store
-                .upsert_entry(&book.id, entry_input("token", "词元"))
-                .expect("upsert entry");
-            let matches = store.match_text("token", None, None);
-            store.record_hits(&matches);
-            store.flush_hits().expect("flush hits");
-            book.id
-        };
-
-        let store = GlossaryStore::load(&dir).expect("failed to reload glossary");
-        let entries = store.list_entries(&book_id, None, 0, 0).expect("entries");
-        assert_eq!(entries[0].hits, 1);
-    }
-
-    #[test]
-    fn book_ids_that_could_escape_the_directory_are_rejected() {
-        let mut store = GlossaryStore::load(temp_data_dir()).expect("failed to load glossary");
-        assert!(store.delete_book("../settings").is_err());
-        assert!(store
-            .upsert_entry("../settings", entry_input("token", "词元"))
-            .is_err());
-    }
-
-    #[test]
-    fn a_corrupt_book_does_not_break_the_rest_of_the_glossary() {
-        let dir = temp_data_dir();
-        let mut store = GlossaryStore::load(&dir).expect("failed to load glossary");
-        store.upsert_book(book_input("好的")).expect("upsert book");
-        fs::write(dir.join(GLOSSARY_DIR).join("broken.json"), "{not json")
-            .expect("failed to write corrupt book");
-
-        let store = GlossaryStore::load(&dir).expect("failed to reload glossary");
-        assert_eq!(store.list_books().len(), 1);
-    }
-}
+#[path = "glossary/tests.rs"]
+mod tests;

@@ -13,6 +13,22 @@ void main() {
     expect(settings.action, ProtocolAction.settings);
   });
 
+  test('parses every supported action link', () {
+    const actions = {
+      'selection-translate': ProtocolAction.translateSelection,
+      'input-translate': ProtocolAction.translateInput,
+      'clipboard-translate': ProtocolAction.translateClipboard,
+      'capture-translate': ProtocolAction.captureTranslate,
+      'capture-ocr': ProtocolAction.captureOcr,
+      'clipboard-ocr': ProtocolAction.clipboardOcr,
+      'show-translation': ProtocolAction.showTranslationWindow,
+      'show-ocr': ProtocolAction.showOcrWindow,
+    };
+    for (final entry in actions.entries) {
+      expect(parse('linguaray://${entry.key}').action, entry.value);
+    }
+  });
+
   test('ignores unknown actions without throwing', () {
     final ignored = parse('linguaray://replace-selection?text=no');
     expect(ignored.action, ProtocolAction.ignored);

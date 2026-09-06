@@ -1,4 +1,4 @@
-use crate::common::http_client::HttpClient;
+use crate::common::{ClassifyHttpResponse, HttpClient};
 use async_trait::async_trait;
 use linguaray_core::{
     Provider, TextTranslation, TranslateRequest, TranslateResponse, TranslationError,
@@ -20,8 +20,6 @@ pub struct DeepLProviderConfig {
 }
 
 pub struct DeepLProvider {
-    #[allow(dead_code)]
-    config: DeepLProviderConfig,
     translation_service: DeepLTranslationService,
 }
 
@@ -36,15 +34,13 @@ impl DeepLProvider {
             return Err("api_key must not be empty".to_owned());
         }
         Ok(Self {
-            config: config.clone(),
             translation_service: DeepLTranslationService {
                 api_key: config.api_key,
-                http: HttpClient::new(
+                http: HttpClient::proxy_aware(
                     config
                         .base_url
                         .unwrap_or_else(|| "https://api.deepl.com".to_owned()),
-                    Default::default(),
-                ),
+                )?,
             },
         })
     }

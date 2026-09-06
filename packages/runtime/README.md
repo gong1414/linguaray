@@ -111,27 +111,20 @@ class AppDelegate: FlutterAppDelegate {
   Call the Swift binding after `RegisterGeneratedPlugins(...)` so the bundled
   runtime has already been loaded.
 
-> iOS support follows the same pattern. Drop a mirror of
-> `macos/linguaray_runtime/` under `ios/linguaray_runtime/` and add
-> `pluginClass: LinguarayRuntimePlugin` to the iOS entry in `pubspec.yaml`.
-
 ## Caveats
 
 1. **Native assets are experimental.** Enable them once per machine:
    ```bash
    flutter config --enable-native-assets
    ```
-2. **Cross-compilation Rust toolchains** must be installed for whichever
-   targets you build. For example:
+2. **Desktop Rust targets** must be installed for the platform and
+   architecture you build. For example:
    ```bash
-   rustup target add aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-darwin aarch64-apple-darwin
-   rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android i686-linux-android
+   rustup target add x86_64-apple-darwin aarch64-apple-darwin
+   rustup target add x86_64-pc-windows-msvc aarch64-pc-windows-msvc
    ```
-   Android also needs the NDK on your `PATH` (`cargo-ndk` is the easiest
-   path; the hook will fall back to a clear error if it can't find a
-   suitable linker).
 3. **The Swift binding** at [`swift/Generated/`](swift/Generated/) is a
-   standalone artifact. iOS / macOS host code that wants to call into Rust
+   standalone artifact. macOS host code that wants to call into Rust
    directly (outside of Flutter, e.g. from a share extension) can compile
    those `.swift` and `.h` files alongside the same `liblinguaray_runtime.dylib`
    that native_assets bundles.

@@ -560,7 +560,130 @@ private struct FfiConverterString: FfiConverter {
   }
 }
 
+public protocol ExternalActionSubscriptionProtocol: AnyObject, Sendable {
+
+  func next() async throws -> ExternalActionRequest?
+
+}
+open class ExternalActionSubscription: ExternalActionSubscriptionProtocol, @unchecked Sendable {
+  fileprivate let handle: UInt64
+
+  /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
+  #if swift(>=5.8)
+    @_documentation(visibility: private)
+  #endif
+  public struct NoHandle {
+    public init() {}
+  }
+
+  // TODO: We'd like this to be `private` but for Swifty reasons,
+  // we can't implement `FfiConverter` without making this `required` and we can't
+  // make it `required` without making it `public`.
+  #if swift(>=5.8)
+    @_documentation(visibility: private)
+  #endif
+  required public init(unsafeFromHandle handle: UInt64) {
+    self.handle = handle
+  }
+
+  // This constructor can be used to instantiate a fake object.
+  // - Parameter noHandle: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+  //
+  // - Warning:
+  //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing handle the FFI lower functions will crash.
+  #if swift(>=5.8)
+    @_documentation(visibility: private)
+  #endif
+  public init(noHandle: NoHandle) {
+    self.handle = 0
+  }
+
+  #if swift(>=5.8)
+    @_documentation(visibility: private)
+  #endif
+  public func uniffiCloneHandle() -> UInt64 {
+    return try! rustCall {
+      uniffi_linguaray_runtime_fn_clone_externalactionsubscription(self.handle, $0)
+    }
+  }
+  // No primary constructor declared for this class.
+
+  deinit {
+    if handle == 0 {
+      // Mock objects have handle=0 don't try to free them
+      return
+    }
+
+    try! rustCall { uniffi_linguaray_runtime_fn_free_externalactionsubscription(handle, $0) }
+  }
+
+  open func next() async throws -> ExternalActionRequest? {
+    return
+      try await uniffiRustCallAsync(
+        rustFutureFunc: {
+          uniffi_linguaray_runtime_fn_method_externalactionsubscription_next(
+            self.uniffiCloneHandle()
+
+          )
+        },
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
+        liftFunc: FfiConverterOptionTypeExternalActionRequest.lift,
+        errorHandler: FfiConverterTypeRuntimeError_lift
+      )
+  }
+
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeExternalActionSubscription: FfiConverter {
+  typealias FfiType = UInt64
+  typealias SwiftType = ExternalActionSubscription
+
+  public static func lift(_ handle: UInt64) throws -> ExternalActionSubscription {
+    return ExternalActionSubscription(unsafeFromHandle: handle)
+  }
+
+  public static func lower(_ value: ExternalActionSubscription) -> UInt64 {
+    return value.uniffiCloneHandle()
+  }
+
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws
+    -> ExternalActionSubscription
+  {
+    let handle: UInt64 = try readInt(&buf)
+    return try lift(handle)
+  }
+
+  public static func write(_ value: ExternalActionSubscription, into buf: inout [UInt8]) {
+    writeInt(&buf, lower(value))
+  }
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeExternalActionSubscription_lift(_ handle: UInt64) throws
+  -> ExternalActionSubscription
+{
+  return try FfiConverterTypeExternalActionSubscription.lift(handle)
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeExternalActionSubscription_lower(_ value: ExternalActionSubscription)
+  -> UInt64
+{
+  return FfiConverterTypeExternalActionSubscription.lower(value)
+}
+
 public protocol RuntimeProtocol: AnyObject, Sendable {
+
+  func backup() -> RuntimeBackup
 
   func dictionary(providerId: String) throws -> RuntimeDictionary
 
@@ -587,6 +710,8 @@ public protocol RuntimeProtocol: AnyObject, Sendable {
   func settings() -> RuntimeSettings
 
   func startApiServer(host: String, port: UInt16) throws -> RuntimeApiServer
+
+  func subscribeActions() -> ExternalActionSubscription
 
   func textExtractor() -> RuntimeTextExtractor
 
@@ -651,6 +776,15 @@ open class Runtime: RuntimeProtocol, @unchecked Sendable {
     }
 
     try! rustCall { uniffi_linguaray_runtime_fn_free_runtime(handle, $0) }
+  }
+
+  open func backup() -> RuntimeBackup {
+    return try! FfiConverterTypeRuntimeBackup_lift(
+      try! rustCall {
+        uniffi_linguaray_runtime_fn_method_runtime_backup(
+          self.uniffiCloneHandle(), $0
+        )
+      })
   }
 
   open func dictionary(providerId: String) throws -> RuntimeDictionary {
@@ -750,6 +884,15 @@ open class Runtime: RuntimeProtocol, @unchecked Sendable {
           self.uniffiCloneHandle(),
           FfiConverterString.lower(host),
           FfiConverterUInt16.lower(port), $0
+        )
+      })
+  }
+
+  open func subscribeActions() -> ExternalActionSubscription {
+    return try! FfiConverterTypeExternalActionSubscription_lift(
+      try! rustCall {
+        uniffi_linguaray_runtime_fn_method_runtime_subscribe_actions(
+          self.uniffiCloneHandle(), $0
         )
       })
   }
@@ -940,6 +1083,139 @@ public func FfiConverterTypeRuntimeApiServer_lower(_ value: RuntimeApiServer) ->
   return FfiConverterTypeRuntimeApiServer.lower(value)
 }
 
+public protocol RuntimeBackupProtocol: AnyObject, Sendable {
+
+  func exportTo(destinationPath: String) async throws -> BackupSummary
+
+  func restoreFrom(sourcePath: String) async throws -> RestoreSummary
+
+}
+open class RuntimeBackup: RuntimeBackupProtocol, @unchecked Sendable {
+  fileprivate let handle: UInt64
+
+  /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
+  #if swift(>=5.8)
+    @_documentation(visibility: private)
+  #endif
+  public struct NoHandle {
+    public init() {}
+  }
+
+  // TODO: We'd like this to be `private` but for Swifty reasons,
+  // we can't implement `FfiConverter` without making this `required` and we can't
+  // make it `required` without making it `public`.
+  #if swift(>=5.8)
+    @_documentation(visibility: private)
+  #endif
+  required public init(unsafeFromHandle handle: UInt64) {
+    self.handle = handle
+  }
+
+  // This constructor can be used to instantiate a fake object.
+  // - Parameter noHandle: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+  //
+  // - Warning:
+  //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing handle the FFI lower functions will crash.
+  #if swift(>=5.8)
+    @_documentation(visibility: private)
+  #endif
+  public init(noHandle: NoHandle) {
+    self.handle = 0
+  }
+
+  #if swift(>=5.8)
+    @_documentation(visibility: private)
+  #endif
+  public func uniffiCloneHandle() -> UInt64 {
+    return try! rustCall { uniffi_linguaray_runtime_fn_clone_runtimebackup(self.handle, $0) }
+  }
+  // No primary constructor declared for this class.
+
+  deinit {
+    if handle == 0 {
+      // Mock objects have handle=0 don't try to free them
+      return
+    }
+
+    try! rustCall { uniffi_linguaray_runtime_fn_free_runtimebackup(handle, $0) }
+  }
+
+  open func exportTo(destinationPath: String) async throws -> BackupSummary {
+    return
+      try await uniffiRustCallAsync(
+        rustFutureFunc: {
+          uniffi_linguaray_runtime_fn_method_runtimebackup_export_to(
+            self.uniffiCloneHandle(),
+            FfiConverterString.lower(destinationPath)
+          )
+        },
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
+        liftFunc: FfiConverterTypeBackupSummary_lift,
+        errorHandler: FfiConverterTypeRuntimeError_lift
+      )
+  }
+
+  open func restoreFrom(sourcePath: String) async throws -> RestoreSummary {
+    return
+      try await uniffiRustCallAsync(
+        rustFutureFunc: {
+          uniffi_linguaray_runtime_fn_method_runtimebackup_restore_from(
+            self.uniffiCloneHandle(),
+            FfiConverterString.lower(sourcePath)
+          )
+        },
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
+        liftFunc: FfiConverterTypeRestoreSummary_lift,
+        errorHandler: FfiConverterTypeRuntimeError_lift
+      )
+  }
+
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeRuntimeBackup: FfiConverter {
+  typealias FfiType = UInt64
+  typealias SwiftType = RuntimeBackup
+
+  public static func lift(_ handle: UInt64) throws -> RuntimeBackup {
+    return RuntimeBackup(unsafeFromHandle: handle)
+  }
+
+  public static func lower(_ value: RuntimeBackup) -> UInt64 {
+    return value.uniffiCloneHandle()
+  }
+
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RuntimeBackup
+  {
+    let handle: UInt64 = try readInt(&buf)
+    return try lift(handle)
+  }
+
+  public static func write(_ value: RuntimeBackup, into buf: inout [UInt8]) {
+    writeInt(&buf, lower(value))
+  }
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRuntimeBackup_lift(_ handle: UInt64) throws -> RuntimeBackup {
+  return try FfiConverterTypeRuntimeBackup.lift(handle)
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRuntimeBackup_lower(_ value: RuntimeBackup) -> UInt64 {
+  return FfiConverterTypeRuntimeBackup.lower(value)
+}
+
 public protocol RuntimeDictionaryProtocol: AnyObject, Sendable {
 
   func lookup(request: LookUpRequest) async throws -> LookUpResponse
@@ -1081,12 +1357,24 @@ public protocol RuntimeGlossaryProtocol: AnyObject, Sendable {
   func deleteEntry(bookId: String, entryId: String) async throws -> Bool
 
   /**
+   * Exports a complete book as UTF-8 CSV or TBX.
+   */
+  func exportEntries(bookId: String, format: GlossaryExchangeFormat) async throws -> String
+
+  /**
    * Writes any hit counts still held in memory. Worth calling before the
    * app quits; everything else flushes on its own schedule.
    */
   func flushHits() async throws
 
   func getBook(bookId: String) async throws -> GlossaryBook?
+
+  /**
+   * Merges UTF-8 CSV or TBX into a book. A matching source term updates the
+   * existing row; malformed or empty rows are counted as skipped.
+   */
+  func importEntries(bookId: String, content: String, format: GlossaryExchangeFormat) async throws
+    -> GlossaryImportReport
 
   func listBooks() async throws -> [GlossaryBook]
 
@@ -1254,6 +1542,26 @@ open class RuntimeGlossary: RuntimeGlossaryProtocol, @unchecked Sendable {
   }
 
   /**
+   * Exports a complete book as UTF-8 CSV or TBX.
+   */
+  open func exportEntries(bookId: String, format: GlossaryExchangeFormat) async throws -> String {
+    return
+      try await uniffiRustCallAsync(
+        rustFutureFunc: {
+          uniffi_linguaray_runtime_fn_method_runtimeglossary_export_entries(
+            self.uniffiCloneHandle(),
+            FfiConverterString.lower(bookId), FfiConverterTypeGlossaryExchangeFormat_lower(format)
+          )
+        },
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
+        liftFunc: FfiConverterString.lift,
+        errorHandler: FfiConverterTypeRuntimeError_lift
+      )
+  }
+
+  /**
    * Writes any hit counts still held in memory. Worth calling before the
    * app quits; everything else flushes on its own schedule.
    */
@@ -1287,6 +1595,30 @@ open class RuntimeGlossary: RuntimeGlossaryProtocol, @unchecked Sendable {
         completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
         freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
         liftFunc: FfiConverterOptionTypeGlossaryBook.lift,
+        errorHandler: FfiConverterTypeRuntimeError_lift
+      )
+  }
+
+  /**
+   * Merges UTF-8 CSV or TBX into a book. A matching source term updates the
+   * existing row; malformed or empty rows are counted as skipped.
+   */
+  open func importEntries(bookId: String, content: String, format: GlossaryExchangeFormat)
+    async throws -> GlossaryImportReport
+  {
+    return
+      try await uniffiRustCallAsync(
+        rustFutureFunc: {
+          uniffi_linguaray_runtime_fn_method_runtimeglossary_import_entries(
+            self.uniffiCloneHandle(),
+            FfiConverterString.lower(bookId), FfiConverterString.lower(content),
+            FfiConverterTypeGlossaryExchangeFormat_lower(format)
+          )
+        },
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
+        liftFunc: FfiConverterTypeGlossaryImportReport_lift,
         errorHandler: FfiConverterTypeRuntimeError_lift
       )
   }
@@ -1662,6 +1994,12 @@ public protocol RuntimeLlmProtocol: AnyObject, Sendable {
 
   func polish(text: String, style: String) async throws -> String
 
+  func startTranslation(sourceLang: String, targetLang: String, text: String) -> TranslationTask
+
+  /**
+   * Legacy callback API retained for existing native clients.
+   * Dart clients must use start_translation and TranslationTask.next.
+   */
   func translateStream(
     sourceLang: String, targetLang: String, text: String, callback: StreamCallback)
 
@@ -1788,6 +2126,24 @@ open class RuntimeLlm: RuntimeLlmProtocol, @unchecked Sendable {
       )
   }
 
+  open func startTranslation(sourceLang: String, targetLang: String, text: String)
+    -> TranslationTask
+  {
+    return try! FfiConverterTypeTranslationTask_lift(
+      try! rustCall {
+        uniffi_linguaray_runtime_fn_method_runtimellm_start_translation(
+          self.uniffiCloneHandle(),
+          FfiConverterString.lower(sourceLang),
+          FfiConverterString.lower(targetLang),
+          FfiConverterString.lower(text), $0
+        )
+      })
+  }
+
+  /**
+   * Legacy callback API retained for existing native clients.
+   * Dart clients must use start_translation and TranslationTask.next.
+   */
   open func translateStream(
     sourceLang: String, targetLang: String, text: String, callback: StreamCallback
   ) {
@@ -1845,6 +2201,11 @@ public func FfiConverterTypeRuntimeLlm_lower(_ value: RuntimeLlm) -> UInt64 {
 
 public protocol RuntimeOcrProtocol: AnyObject, Sendable {
 
+  /**
+   * Recognizes an image currently stored in the system clipboard.
+   */
+  func recognizeClipboardImage() async throws -> RecognizeTextResponse
+
   func recognizeText(request: RecognizeTextRequest) async throws -> RecognizeTextResponse
 
 }
@@ -1896,6 +2257,26 @@ open class RuntimeOcr: RuntimeOcrProtocol, @unchecked Sendable {
     }
 
     try! rustCall { uniffi_linguaray_runtime_fn_free_runtimeocr(handle, $0) }
+  }
+
+  /**
+   * Recognizes an image currently stored in the system clipboard.
+   */
+  open func recognizeClipboardImage() async throws -> RecognizeTextResponse {
+    return
+      try await uniffiRustCallAsync(
+        rustFutureFunc: {
+          uniffi_linguaray_runtime_fn_method_runtimeocr_recognize_clipboard_image(
+            self.uniffiCloneHandle()
+
+          )
+        },
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
+        liftFunc: FfiConverterTypeRecognizeTextResponse_lift,
+        errorHandler: FfiConverterTypeRuntimeError_lift
+      )
   }
 
   open func recognizeText(request: RecognizeTextRequest) async throws -> RecognizeTextResponse {
@@ -2239,9 +2620,9 @@ public protocol RuntimeSettingsProtocol: AnyObject, Sendable {
    * the process-wide runtime engine. The caller supplies credentials read
    * from secure storage; they live only in this temporary provider object.
    *
-   * LLM providers are probed by listing models. Traditional translation
-   * providers translate a small fixed phrase. The returned number is the
-   * model count for LLM providers and zero for traditional providers.
+   * LLM providers send a short message to the selected model. Translation,
+   * dictionary, and OCR-only providers execute a small capability-specific
+   * request. Returns zero on success (kept for FFI compatibility).
    */
   func testProvider(providerId: String, providerType: String, fields: [String: String]) async throws
     -> UInt32
@@ -2665,9 +3046,9 @@ open class RuntimeSettings: RuntimeSettingsProtocol, @unchecked Sendable {
    * the process-wide runtime engine. The caller supplies credentials read
    * from secure storage; they live only in this temporary provider object.
    *
-   * LLM providers are probed by listing models. Traditional translation
-   * providers translate a small fixed phrase. The returned number is the
-   * model count for LLM providers and zero for traditional providers.
+   * LLM providers send a short message to the selected model. Translation,
+   * dictionary, and OCR-only providers execute a small capability-specific
+   * request. Returns zero on success (kept for FFI compatibility).
    */
   open func testProvider(providerId: String, providerType: String, fields: [String: String])
     async throws -> UInt32
@@ -2855,24 +3236,10 @@ public protocol RuntimeTextExtractorProtocol: AnyObject, Sendable {
   func extractFromClipboard() async throws -> String
 
   /**
-   * Capture a screenshot and recognize text using the default OCR service.
-   *
-   * 1. Interactively captures a screen region (via `screencapture` on macOS
-   * or `import` on Linux; unsupported on Windows).
-   * 2. Sends the captured image to the configured default OCR service.
-   * 3. Returns the recognized text.
-   *
-   * The user must have a default OCR service configured in settings.
-   */
-  func extractFromScreenCapture() async throws -> String
-
-  /**
    * Extract text from the current screen selection.
    *
    * **macOS / Windows:** Simulates Cmd+C / Ctrl+C, polls the clipboard
    * until content changes (or 3s timeout), then returns the text.
-   *
-   * **Linux:** Reads the PRIMARY selection directly via `xclip`.
    */
   func extractFromScreenSelection() async throws -> String
 
@@ -2958,39 +3325,10 @@ open class RuntimeTextExtractor: RuntimeTextExtractorProtocol, @unchecked Sendab
   }
 
   /**
-   * Capture a screenshot and recognize text using the default OCR service.
-   *
-   * 1. Interactively captures a screen region (via `screencapture` on macOS
-   * or `import` on Linux; unsupported on Windows).
-   * 2. Sends the captured image to the configured default OCR service.
-   * 3. Returns the recognized text.
-   *
-   * The user must have a default OCR service configured in settings.
-   */
-  open func extractFromScreenCapture() async throws -> String {
-    return
-      try await uniffiRustCallAsync(
-        rustFutureFunc: {
-          uniffi_linguaray_runtime_fn_method_runtimetextextractor_extract_from_screen_capture(
-            self.uniffiCloneHandle()
-
-          )
-        },
-        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
-        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
-        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
-        liftFunc: FfiConverterString.lift,
-        errorHandler: FfiConverterTypeRuntimeError_lift
-      )
-  }
-
-  /**
    * Extract text from the current screen selection.
    *
    * **macOS / Windows:** Simulates Cmd+C / Ctrl+C, polls the clipboard
    * until content changes (or 3s timeout), then returns the text.
-   *
-   * **Linux:** Reads the PRIMARY selection directly via `xclip`.
    */
   open func extractFromScreenSelection() async throws -> String {
     return
@@ -3552,17 +3890,154 @@ public func FfiConverterTypeSettingsSubscription_lower(_ value: SettingsSubscrip
   return FfiConverterTypeSettingsSubscription.lower(value)
 }
 
+public protocol TranslationTaskProtocol: AnyObject, Sendable {
+
+  func cancel()
+
+  func next() async -> TranslationEvent?
+
+}
+open class TranslationTask: TranslationTaskProtocol, @unchecked Sendable {
+  fileprivate let handle: UInt64
+
+  /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
+  #if swift(>=5.8)
+    @_documentation(visibility: private)
+  #endif
+  public struct NoHandle {
+    public init() {}
+  }
+
+  // TODO: We'd like this to be `private` but for Swifty reasons,
+  // we can't implement `FfiConverter` without making this `required` and we can't
+  // make it `required` without making it `public`.
+  #if swift(>=5.8)
+    @_documentation(visibility: private)
+  #endif
+  required public init(unsafeFromHandle handle: UInt64) {
+    self.handle = handle
+  }
+
+  // This constructor can be used to instantiate a fake object.
+  // - Parameter noHandle: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+  //
+  // - Warning:
+  //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing handle the FFI lower functions will crash.
+  #if swift(>=5.8)
+    @_documentation(visibility: private)
+  #endif
+  public init(noHandle: NoHandle) {
+    self.handle = 0
+  }
+
+  #if swift(>=5.8)
+    @_documentation(visibility: private)
+  #endif
+  public func uniffiCloneHandle() -> UInt64 {
+    return try! rustCall { uniffi_linguaray_runtime_fn_clone_translationtask(self.handle, $0) }
+  }
+  // No primary constructor declared for this class.
+
+  deinit {
+    if handle == 0 {
+      // Mock objects have handle=0 don't try to free them
+      return
+    }
+
+    try! rustCall { uniffi_linguaray_runtime_fn_free_translationtask(handle, $0) }
+  }
+
+  open func cancel() {
+    try! rustCall {
+      uniffi_linguaray_runtime_fn_method_translationtask_cancel(
+        self.uniffiCloneHandle(), $0
+      )
+    }
+  }
+
+  open func next() async -> TranslationEvent? {
+    return
+      try! await uniffiRustCallAsync(
+        rustFutureFunc: {
+          uniffi_linguaray_runtime_fn_method_translationtask_next(
+            self.uniffiCloneHandle()
+
+          )
+        },
+        pollFunc: ffi_linguaray_runtime_rust_future_poll_rust_buffer,
+        completeFunc: ffi_linguaray_runtime_rust_future_complete_rust_buffer,
+        freeFunc: ffi_linguaray_runtime_rust_future_free_rust_buffer,
+        liftFunc: FfiConverterOptionTypeTranslationEvent.lift,
+        errorHandler: nil
+
+      )
+  }
+
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeTranslationTask: FfiConverter {
+  typealias FfiType = UInt64
+  typealias SwiftType = TranslationTask
+
+  public static func lift(_ handle: UInt64) throws -> TranslationTask {
+    return TranslationTask(unsafeFromHandle: handle)
+  }
+
+  public static func lower(_ value: TranslationTask) -> UInt64 {
+    return value.uniffiCloneHandle()
+  }
+
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws
+    -> TranslationTask
+  {
+    let handle: UInt64 = try readInt(&buf)
+    return try lift(handle)
+  }
+
+  public static func write(_ value: TranslationTask, into buf: inout [UInt8]) {
+    writeInt(&buf, lower(value))
+  }
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTranslationTask_lift(_ handle: UInt64) throws -> TranslationTask {
+  return try FfiConverterTypeTranslationTask.lift(handle)
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTranslationTask_lower(_ value: TranslationTask) -> UInt64 {
+  return FfiConverterTypeTranslationTask.lower(value)
+}
+
 public struct AdvancedSettings: Equatable, Hashable {
   public var apiServerEnabled: Bool
   public var apiServerHost: String
   public var apiServerPort: UInt16
+  public var proxyMode: String
+  public var proxyUrl: String
+  public var proxyBypass: String
+  public var checkUpdatesOnLaunch: Bool
 
   // Default memberwise initializers are never public by default, so we
   // declare one manually.
-  public init(apiServerEnabled: Bool, apiServerHost: String, apiServerPort: UInt16) {
+  public init(
+    apiServerEnabled: Bool, apiServerHost: String, apiServerPort: UInt16, proxyMode: String,
+    proxyUrl: String, proxyBypass: String, checkUpdatesOnLaunch: Bool
+  ) {
     self.apiServerEnabled = apiServerEnabled
     self.apiServerHost = apiServerHost
     self.apiServerPort = apiServerPort
+    self.proxyMode = proxyMode
+    self.proxyUrl = proxyUrl
+    self.proxyBypass = proxyBypass
+    self.checkUpdatesOnLaunch = checkUpdatesOnLaunch
   }
 
 }
@@ -3582,7 +4057,11 @@ public struct FfiConverterTypeAdvancedSettings: FfiConverterRustBuffer {
       try AdvancedSettings(
         apiServerEnabled: FfiConverterBool.read(from: &buf),
         apiServerHost: FfiConverterString.read(from: &buf),
-        apiServerPort: FfiConverterUInt16.read(from: &buf)
+        apiServerPort: FfiConverterUInt16.read(from: &buf),
+        proxyMode: FfiConverterString.read(from: &buf),
+        proxyUrl: FfiConverterString.read(from: &buf),
+        proxyBypass: FfiConverterString.read(from: &buf),
+        checkUpdatesOnLaunch: FfiConverterBool.read(from: &buf)
       )
   }
 
@@ -3590,6 +4069,10 @@ public struct FfiConverterTypeAdvancedSettings: FfiConverterRustBuffer {
     FfiConverterBool.write(value.apiServerEnabled, into: &buf)
     FfiConverterString.write(value.apiServerHost, into: &buf)
     FfiConverterUInt16.write(value.apiServerPort, into: &buf)
+    FfiConverterString.write(value.proxyMode, into: &buf)
+    FfiConverterString.write(value.proxyUrl, into: &buf)
+    FfiConverterString.write(value.proxyBypass, into: &buf)
+    FfiConverterBool.write(value.checkUpdatesOnLaunch, into: &buf)
   }
 }
 
@@ -3611,13 +4094,24 @@ public struct AdvancedSettingsPatch: Equatable, Hashable {
   public var apiServerEnabled: Bool?
   public var apiServerHost: String?
   public var apiServerPort: UInt16?
+  public var proxyMode: String?
+  public var proxyUrl: String?
+  public var proxyBypass: String?
+  public var checkUpdatesOnLaunch: Bool?
 
   // Default memberwise initializers are never public by default, so we
   // declare one manually.
-  public init(apiServerEnabled: Bool?, apiServerHost: String?, apiServerPort: UInt16?) {
+  public init(
+    apiServerEnabled: Bool?, apiServerHost: String?, apiServerPort: UInt16?, proxyMode: String?,
+    proxyUrl: String?, proxyBypass: String?, checkUpdatesOnLaunch: Bool?
+  ) {
     self.apiServerEnabled = apiServerEnabled
     self.apiServerHost = apiServerHost
     self.apiServerPort = apiServerPort
+    self.proxyMode = proxyMode
+    self.proxyUrl = proxyUrl
+    self.proxyBypass = proxyBypass
+    self.checkUpdatesOnLaunch = checkUpdatesOnLaunch
   }
 
 }
@@ -3637,7 +4131,11 @@ public struct FfiConverterTypeAdvancedSettingsPatch: FfiConverterRustBuffer {
       try AdvancedSettingsPatch(
         apiServerEnabled: FfiConverterOptionBool.read(from: &buf),
         apiServerHost: FfiConverterOptionString.read(from: &buf),
-        apiServerPort: FfiConverterOptionUInt16.read(from: &buf)
+        apiServerPort: FfiConverterOptionUInt16.read(from: &buf),
+        proxyMode: FfiConverterOptionString.read(from: &buf),
+        proxyUrl: FfiConverterOptionString.read(from: &buf),
+        proxyBypass: FfiConverterOptionString.read(from: &buf),
+        checkUpdatesOnLaunch: FfiConverterOptionBool.read(from: &buf)
       )
   }
 
@@ -3645,6 +4143,10 @@ public struct FfiConverterTypeAdvancedSettingsPatch: FfiConverterRustBuffer {
     FfiConverterOptionBool.write(value.apiServerEnabled, into: &buf)
     FfiConverterOptionString.write(value.apiServerHost, into: &buf)
     FfiConverterOptionUInt16.write(value.apiServerPort, into: &buf)
+    FfiConverterOptionString.write(value.proxyMode, into: &buf)
+    FfiConverterOptionString.write(value.proxyUrl, into: &buf)
+    FfiConverterOptionString.write(value.proxyBypass, into: &buf)
+    FfiConverterOptionBool.write(value.checkUpdatesOnLaunch, into: &buf)
   }
 }
 
@@ -3844,6 +4346,60 @@ public func FfiConverterTypeAppearanceSettingsPatch_lower(_ value: AppearanceSet
   -> RustBuffer
 {
   return FfiConverterTypeAppearanceSettingsPatch.lower(value)
+}
+
+public struct BackupSummary: Equatable, Hashable {
+  public var createdAt: UInt64
+  public var fileCount: UInt32
+  public var includesSecrets: Bool
+
+  // Default memberwise initializers are never public by default, so we
+  // declare one manually.
+  public init(createdAt: UInt64, fileCount: UInt32, includesSecrets: Bool) {
+    self.createdAt = createdAt
+    self.fileCount = fileCount
+    self.includesSecrets = includesSecrets
+  }
+
+}
+
+#if compiler(>=6)
+  extension BackupSummary: Sendable {}
+#endif
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeBackupSummary: FfiConverterRustBuffer {
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> BackupSummary
+  {
+    return
+      try BackupSummary(
+        createdAt: FfiConverterUInt64.read(from: &buf),
+        fileCount: FfiConverterUInt32.read(from: &buf),
+        includesSecrets: FfiConverterBool.read(from: &buf)
+      )
+  }
+
+  public static func write(_ value: BackupSummary, into buf: inout [UInt8]) {
+    FfiConverterUInt64.write(value.createdAt, into: &buf)
+    FfiConverterUInt32.write(value.fileCount, into: &buf)
+    FfiConverterBool.write(value.includesSecrets, into: &buf)
+  }
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeBackupSummary_lift(_ buf: RustBuffer) throws -> BackupSummary {
+  return try FfiConverterTypeBackupSummary.lift(buf)
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeBackupSummary_lower(_ value: BackupSummary) -> RustBuffer {
+  return FfiConverterTypeBackupSummary.lower(value)
 }
 
 public struct CatalogFieldSpec: Equatable, Hashable {
@@ -4413,6 +4969,61 @@ public func FfiConverterTypeDetectLanguageResponse_lower(_ value: DetectLanguage
   -> RustBuffer
 {
   return FfiConverterTypeDetectLanguageResponse.lower(value)
+}
+
+public struct ExternalActionRequest: Equatable, Hashable {
+  public var kind: ExternalActionKind
+  public var text: String?
+
+  // Default memberwise initializers are never public by default, so we
+  // declare one manually.
+  public init(kind: ExternalActionKind, text: String?) {
+    self.kind = kind
+    self.text = text
+  }
+
+}
+
+#if compiler(>=6)
+  extension ExternalActionRequest: Sendable {}
+#endif
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeExternalActionRequest: FfiConverterRustBuffer {
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws
+    -> ExternalActionRequest
+  {
+    return
+      try ExternalActionRequest(
+        kind: FfiConverterTypeExternalActionKind.read(from: &buf),
+        text: FfiConverterOptionString.read(from: &buf)
+      )
+  }
+
+  public static func write(_ value: ExternalActionRequest, into buf: inout [UInt8]) {
+    FfiConverterTypeExternalActionKind.write(value.kind, into: &buf)
+    FfiConverterOptionString.write(value.text, into: &buf)
+  }
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeExternalActionRequest_lift(_ buf: RustBuffer) throws
+  -> ExternalActionRequest
+{
+  return try FfiConverterTypeExternalActionRequest.lift(buf)
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeExternalActionRequest_lower(_ value: ExternalActionRequest)
+  -> RustBuffer
+{
+  return FfiConverterTypeExternalActionRequest.lower(value)
 }
 
 public struct GeneralSettings: Equatable, Hashable {
@@ -5051,6 +5662,65 @@ public func FfiConverterTypeGlossaryEntryInput_lift(_ buf: RustBuffer) throws ->
 #endif
 public func FfiConverterTypeGlossaryEntryInput_lower(_ value: GlossaryEntryInput) -> RustBuffer {
   return FfiConverterTypeGlossaryEntryInput.lower(value)
+}
+
+/// Summary returned after merging an external glossary into a book.
+public struct GlossaryImportReport: Equatable, Hashable {
+  public var inserted: UInt32
+  public var updated: UInt32
+  public var skipped: UInt32
+
+  // Default memberwise initializers are never public by default, so we
+  // declare one manually.
+  public init(inserted: UInt32, updated: UInt32, skipped: UInt32) {
+    self.inserted = inserted
+    self.updated = updated
+    self.skipped = skipped
+  }
+
+}
+
+#if compiler(>=6)
+  extension GlossaryImportReport: Sendable {}
+#endif
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeGlossaryImportReport: FfiConverterRustBuffer {
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws
+    -> GlossaryImportReport
+  {
+    return
+      try GlossaryImportReport(
+        inserted: FfiConverterUInt32.read(from: &buf),
+        updated: FfiConverterUInt32.read(from: &buf),
+        skipped: FfiConverterUInt32.read(from: &buf)
+      )
+  }
+
+  public static func write(_ value: GlossaryImportReport, into buf: inout [UInt8]) {
+    FfiConverterUInt32.write(value.inserted, into: &buf)
+    FfiConverterUInt32.write(value.updated, into: &buf)
+    FfiConverterUInt32.write(value.skipped, into: &buf)
+  }
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeGlossaryImportReport_lift(_ buf: RustBuffer) throws
+  -> GlossaryImportReport
+{
+  return try FfiConverterTypeGlossaryImportReport.lift(buf)
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeGlossaryImportReport_lower(_ value: GlossaryImportReport) -> RustBuffer
+{
+  return FfiConverterTypeGlossaryImportReport.lower(value)
 }
 
 /// A term found in a source text.
@@ -5896,6 +6566,56 @@ public func FfiConverterTypeRecognizedRect_lower(_ value: RecognizedRect) -> Rus
   return FfiConverterTypeRecognizedRect.lower(value)
 }
 
+public struct RestoreSummary: Equatable, Hashable {
+  public var createdAt: UInt64
+  public var includesSecrets: Bool
+
+  // Default memberwise initializers are never public by default, so we
+  // declare one manually.
+  public init(createdAt: UInt64, includesSecrets: Bool) {
+    self.createdAt = createdAt
+    self.includesSecrets = includesSecrets
+  }
+
+}
+
+#if compiler(>=6)
+  extension RestoreSummary: Sendable {}
+#endif
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeRestoreSummary: FfiConverterRustBuffer {
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RestoreSummary
+  {
+    return
+      try RestoreSummary(
+        createdAt: FfiConverterUInt64.read(from: &buf),
+        includesSecrets: FfiConverterBool.read(from: &buf)
+      )
+  }
+
+  public static func write(_ value: RestoreSummary, into buf: inout [UInt8]) {
+    FfiConverterUInt64.write(value.createdAt, into: &buf)
+    FfiConverterBool.write(value.includesSecrets, into: &buf)
+  }
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRestoreSummary_lift(_ buf: RustBuffer) throws -> RestoreSummary {
+  return try FfiConverterTypeRestoreSummary.lift(buf)
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRestoreSummary_lower(_ value: RestoreSummary) -> RustBuffer {
+  return FfiConverterTypeRestoreSummary.lower(value)
+}
+
 public struct SelectionExtraction: Equatable, Hashable {
   public var text: String
   public var readMethod: String
@@ -6038,6 +6758,10 @@ public struct ShortcutSettings: Equatable, Hashable {
   public var extractTextFromScreenSelection: String
   public var extractTextFromScreenCapture: String
   public var captureOcr: String
+  public var silentCaptureOcr: String
+  public var fileOcr: String
+  public var clipboardOcr: String
+  public var showOcrWindow: String
   public var extractTextFromClipboard: String
   public var translateInputContent: String
 
@@ -6045,13 +6769,18 @@ public struct ShortcutSettings: Equatable, Hashable {
   // declare one manually.
   public init(
     toggleMiniTranslator: String, extractTextFromScreenSelection: String,
-    extractTextFromScreenCapture: String, captureOcr: String, extractTextFromClipboard: String,
+    extractTextFromScreenCapture: String, captureOcr: String, silentCaptureOcr: String,
+    fileOcr: String, clipboardOcr: String, showOcrWindow: String, extractTextFromClipboard: String,
     translateInputContent: String
   ) {
     self.toggleMiniTranslator = toggleMiniTranslator
     self.extractTextFromScreenSelection = extractTextFromScreenSelection
     self.extractTextFromScreenCapture = extractTextFromScreenCapture
     self.captureOcr = captureOcr
+    self.silentCaptureOcr = silentCaptureOcr
+    self.fileOcr = fileOcr
+    self.clipboardOcr = clipboardOcr
+    self.showOcrWindow = showOcrWindow
     self.extractTextFromClipboard = extractTextFromClipboard
     self.translateInputContent = translateInputContent
   }
@@ -6075,6 +6804,10 @@ public struct FfiConverterTypeShortcutSettings: FfiConverterRustBuffer {
         extractTextFromScreenSelection: FfiConverterString.read(from: &buf),
         extractTextFromScreenCapture: FfiConverterString.read(from: &buf),
         captureOcr: FfiConverterString.read(from: &buf),
+        silentCaptureOcr: FfiConverterString.read(from: &buf),
+        fileOcr: FfiConverterString.read(from: &buf),
+        clipboardOcr: FfiConverterString.read(from: &buf),
+        showOcrWindow: FfiConverterString.read(from: &buf),
         extractTextFromClipboard: FfiConverterString.read(from: &buf),
         translateInputContent: FfiConverterString.read(from: &buf)
       )
@@ -6085,6 +6818,10 @@ public struct FfiConverterTypeShortcutSettings: FfiConverterRustBuffer {
     FfiConverterString.write(value.extractTextFromScreenSelection, into: &buf)
     FfiConverterString.write(value.extractTextFromScreenCapture, into: &buf)
     FfiConverterString.write(value.captureOcr, into: &buf)
+    FfiConverterString.write(value.silentCaptureOcr, into: &buf)
+    FfiConverterString.write(value.fileOcr, into: &buf)
+    FfiConverterString.write(value.clipboardOcr, into: &buf)
+    FfiConverterString.write(value.showOcrWindow, into: &buf)
     FfiConverterString.write(value.extractTextFromClipboard, into: &buf)
     FfiConverterString.write(value.translateInputContent, into: &buf)
   }
@@ -6109,6 +6846,10 @@ public struct ShortcutSettingsPatch: Equatable, Hashable {
   public var extractTextFromScreenSelection: String?
   public var extractTextFromScreenCapture: String?
   public var captureOcr: String?
+  public var silentCaptureOcr: String?
+  public var fileOcr: String?
+  public var clipboardOcr: String?
+  public var showOcrWindow: String?
   public var extractTextFromClipboard: String?
   public var translateInputContent: String?
 
@@ -6116,13 +6857,18 @@ public struct ShortcutSettingsPatch: Equatable, Hashable {
   // declare one manually.
   public init(
     toggleMiniTranslator: String?, extractTextFromScreenSelection: String?,
-    extractTextFromScreenCapture: String?, captureOcr: String?, extractTextFromClipboard: String?,
-    translateInputContent: String?
+    extractTextFromScreenCapture: String?, captureOcr: String?, silentCaptureOcr: String?,
+    fileOcr: String?, clipboardOcr: String?, showOcrWindow: String?,
+    extractTextFromClipboard: String?, translateInputContent: String?
   ) {
     self.toggleMiniTranslator = toggleMiniTranslator
     self.extractTextFromScreenSelection = extractTextFromScreenSelection
     self.extractTextFromScreenCapture = extractTextFromScreenCapture
     self.captureOcr = captureOcr
+    self.silentCaptureOcr = silentCaptureOcr
+    self.fileOcr = fileOcr
+    self.clipboardOcr = clipboardOcr
+    self.showOcrWindow = showOcrWindow
     self.extractTextFromClipboard = extractTextFromClipboard
     self.translateInputContent = translateInputContent
   }
@@ -6146,6 +6892,10 @@ public struct FfiConverterTypeShortcutSettingsPatch: FfiConverterRustBuffer {
         extractTextFromScreenSelection: FfiConverterOptionString.read(from: &buf),
         extractTextFromScreenCapture: FfiConverterOptionString.read(from: &buf),
         captureOcr: FfiConverterOptionString.read(from: &buf),
+        silentCaptureOcr: FfiConverterOptionString.read(from: &buf),
+        fileOcr: FfiConverterOptionString.read(from: &buf),
+        clipboardOcr: FfiConverterOptionString.read(from: &buf),
+        showOcrWindow: FfiConverterOptionString.read(from: &buf),
         extractTextFromClipboard: FfiConverterOptionString.read(from: &buf),
         translateInputContent: FfiConverterOptionString.read(from: &buf)
       )
@@ -6156,6 +6906,10 @@ public struct FfiConverterTypeShortcutSettingsPatch: FfiConverterRustBuffer {
     FfiConverterOptionString.write(value.extractTextFromScreenSelection, into: &buf)
     FfiConverterOptionString.write(value.extractTextFromScreenCapture, into: &buf)
     FfiConverterOptionString.write(value.captureOcr, into: &buf)
+    FfiConverterOptionString.write(value.silentCaptureOcr, into: &buf)
+    FfiConverterOptionString.write(value.fileOcr, into: &buf)
+    FfiConverterOptionString.write(value.clipboardOcr, into: &buf)
+    FfiConverterOptionString.write(value.showOcrWindow, into: &buf)
     FfiConverterOptionString.write(value.extractTextFromClipboard, into: &buf)
     FfiConverterOptionString.write(value.translateInputContent, into: &buf)
   }
@@ -6435,6 +7189,62 @@ public func FfiConverterTypeTranslateResponse_lift(_ buf: RustBuffer) throws -> 
 #endif
 public func FfiConverterTypeTranslateResponse_lower(_ value: TranslateResponse) -> RustBuffer {
   return FfiConverterTypeTranslateResponse.lower(value)
+}
+
+/// One event read on the caller's async executor; no foreign-thread Dart callbacks.
+public struct TranslationEvent: Equatable, Hashable {
+  public var content: String
+  public var finishReason: String?
+  public var error: String?
+
+  // Default memberwise initializers are never public by default, so we
+  // declare one manually.
+  public init(content: String, finishReason: String?, error: String?) {
+    self.content = content
+    self.finishReason = finishReason
+    self.error = error
+  }
+
+}
+
+#if compiler(>=6)
+  extension TranslationEvent: Sendable {}
+#endif
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeTranslationEvent: FfiConverterRustBuffer {
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws
+    -> TranslationEvent
+  {
+    return
+      try TranslationEvent(
+        content: FfiConverterString.read(from: &buf),
+        finishReason: FfiConverterOptionString.read(from: &buf),
+        error: FfiConverterOptionString.read(from: &buf)
+      )
+  }
+
+  public static func write(_ value: TranslationEvent, into buf: inout [UInt8]) {
+    FfiConverterString.write(value.content, into: &buf)
+    FfiConverterOptionString.write(value.finishReason, into: &buf)
+    FfiConverterOptionString.write(value.error, into: &buf)
+  }
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTranslationEvent_lift(_ buf: RustBuffer) throws -> TranslationEvent {
+  return try FfiConverterTypeTranslationEvent.lift(buf)
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTranslationEvent_lower(_ value: TranslationEvent) -> RustBuffer {
+  return FfiConverterTypeTranslationEvent.lower(value)
 }
 
 public struct TranslationTarget: Equatable, Hashable {
@@ -7387,6 +8197,185 @@ public func FfiConverterTypeChatRole_lift(_ buf: RustBuffer) throws -> ChatRole 
 #endif
 public func FfiConverterTypeChatRole_lower(_ value: ChatRole) -> RustBuffer {
   return FfiConverterTypeChatRole.lower(value)
+}
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * A UI action requested by a loopback API client. The runtime transports
+ * intent only; Flutter remains responsible for windows and platform input.
+ */
+
+public enum ExternalActionKind: Equatable, Hashable {
+
+  case translateText
+  case translateSelection
+  case translateInput
+  case translateClipboard
+  case captureTranslate
+  case captureOcr
+  case clipboardOcr
+  case showTranslationWindow
+  case showOcrWindow
+  case openSettings
+
+}
+
+#if compiler(>=6)
+  extension ExternalActionKind: Sendable {}
+#endif
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeExternalActionKind: FfiConverterRustBuffer {
+  typealias SwiftType = ExternalActionKind
+
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws
+    -> ExternalActionKind
+  {
+    let variant: Int32 = try readInt(&buf)
+    switch variant {
+
+    case 1: return .translateText
+
+    case 2: return .translateSelection
+
+    case 3: return .translateInput
+
+    case 4: return .translateClipboard
+
+    case 5: return .captureTranslate
+
+    case 6: return .captureOcr
+
+    case 7: return .clipboardOcr
+
+    case 8: return .showTranslationWindow
+
+    case 9: return .showOcrWindow
+
+    case 10: return .openSettings
+
+    default: throw UniffiInternalError.unexpectedEnumCase
+    }
+  }
+
+  public static func write(_ value: ExternalActionKind, into buf: inout [UInt8]) {
+    switch value {
+
+    case .translateText:
+      writeInt(&buf, Int32(1))
+
+    case .translateSelection:
+      writeInt(&buf, Int32(2))
+
+    case .translateInput:
+      writeInt(&buf, Int32(3))
+
+    case .translateClipboard:
+      writeInt(&buf, Int32(4))
+
+    case .captureTranslate:
+      writeInt(&buf, Int32(5))
+
+    case .captureOcr:
+      writeInt(&buf, Int32(6))
+
+    case .clipboardOcr:
+      writeInt(&buf, Int32(7))
+
+    case .showTranslationWindow:
+      writeInt(&buf, Int32(8))
+
+    case .showOcrWindow:
+      writeInt(&buf, Int32(9))
+
+    case .openSettings:
+      writeInt(&buf, Int32(10))
+
+    }
+  }
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeExternalActionKind_lift(_ buf: RustBuffer) throws -> ExternalActionKind
+{
+  return try FfiConverterTypeExternalActionKind.lift(buf)
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeExternalActionKind_lower(_ value: ExternalActionKind) -> RustBuffer {
+  return FfiConverterTypeExternalActionKind.lower(value)
+}
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
+public enum GlossaryExchangeFormat: Equatable, Hashable {
+
+  case csv
+  case tbx
+
+}
+
+#if compiler(>=6)
+  extension GlossaryExchangeFormat: Sendable {}
+#endif
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeGlossaryExchangeFormat: FfiConverterRustBuffer {
+  typealias SwiftType = GlossaryExchangeFormat
+
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws
+    -> GlossaryExchangeFormat
+  {
+    let variant: Int32 = try readInt(&buf)
+    switch variant {
+
+    case 1: return .csv
+
+    case 2: return .tbx
+
+    default: throw UniffiInternalError.unexpectedEnumCase
+    }
+  }
+
+  public static func write(_ value: GlossaryExchangeFormat, into buf: inout [UInt8]) {
+    switch value {
+
+    case .csv:
+      writeInt(&buf, Int32(1))
+
+    case .tbx:
+      writeInt(&buf, Int32(2))
+
+    }
+  }
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeGlossaryExchangeFormat_lift(_ buf: RustBuffer) throws
+  -> GlossaryExchangeFormat
+{
+  return try FfiConverterTypeGlossaryExchangeFormat.lift(buf)
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+public func FfiConverterTypeGlossaryExchangeFormat_lower(_ value: GlossaryExchangeFormat)
+  -> RustBuffer
+{
+  return FfiConverterTypeGlossaryExchangeFormat.lower(value)
 }
 
 // Note that we don't yet support `indirect` for enums.
@@ -8446,6 +9435,30 @@ private struct FfiConverterOptionTypeChatUsage: FfiConverterRustBuffer {
 #if swift(>=5.8)
   @_documentation(visibility: private)
 #endif
+private struct FfiConverterOptionTypeExternalActionRequest: FfiConverterRustBuffer {
+  typealias SwiftType = ExternalActionRequest?
+
+  public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+    guard let value = value else {
+      writeInt(&buf, Int8(0))
+      return
+    }
+    writeInt(&buf, Int8(1))
+    FfiConverterTypeExternalActionRequest.write(value, into: &buf)
+  }
+
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+    switch try readInt(&buf) as Int8 {
+    case 0: return nil
+    case 1: return try FfiConverterTypeExternalActionRequest.read(from: &buf)
+    default: throw UniffiInternalError.unexpectedOptionalTag
+    }
+  }
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
 private struct FfiConverterOptionTypeGlossaryBook: FfiConverterRustBuffer {
   typealias SwiftType = GlossaryBook?
 
@@ -8558,6 +9571,30 @@ private struct FfiConverterOptionTypeServiceConfigEntry: FfiConverterRustBuffer 
     switch try readInt(&buf) as Int8 {
     case 0: return nil
     case 1: return try FfiConverterTypeServiceConfigEntry.read(from: &buf)
+    default: throw UniffiInternalError.unexpectedOptionalTag
+    }
+  }
+}
+
+#if swift(>=5.8)
+  @_documentation(visibility: private)
+#endif
+private struct FfiConverterOptionTypeTranslationEvent: FfiConverterRustBuffer {
+  typealias SwiftType = TranslationEvent?
+
+  public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+    guard let value = value else {
+      writeInt(&buf, Int8(0))
+      return
+    }
+    writeInt(&buf, Int8(1))
+    FfiConverterTypeTranslationEvent.write(value, into: &buf)
+  }
+
+  public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+    switch try readInt(&buf) as Int8 {
+    case 0: return nil
+    case 1: return try FfiConverterTypeTranslationEvent.read(from: &buf)
     default: throw UniffiInternalError.unexpectedOptionalTag
     }
   }
@@ -10047,6 +11084,12 @@ private let initializationResult: InitializationResult = {
   if uniffi_linguaray_runtime_checksum_method_runtimeapiserver_stop() != 49630 {
     return InitializationResult.apiChecksumMismatch
   }
+  if uniffi_linguaray_runtime_checksum_method_externalactionsubscription_next() != 12983 {
+    return InitializationResult.apiChecksumMismatch
+  }
+  if uniffi_linguaray_runtime_checksum_method_runtime_backup() != 18823 {
+    return InitializationResult.apiChecksumMismatch
+  }
   if uniffi_linguaray_runtime_checksum_method_runtime_dictionary() != 16423 {
     return InitializationResult.apiChecksumMismatch
   }
@@ -10077,6 +11120,9 @@ private let initializationResult: InitializationResult = {
   if uniffi_linguaray_runtime_checksum_method_runtime_start_api_server() != 6527 {
     return InitializationResult.apiChecksumMismatch
   }
+  if uniffi_linguaray_runtime_checksum_method_runtime_subscribe_actions() != 17652 {
+    return InitializationResult.apiChecksumMismatch
+  }
   if uniffi_linguaray_runtime_checksum_method_runtime_text_extractor() != 60762 {
     return InitializationResult.apiChecksumMismatch
   }
@@ -10084,6 +11130,12 @@ private let initializationResult: InitializationResult = {
     return InitializationResult.apiChecksumMismatch
   }
   if uniffi_linguaray_runtime_checksum_method_runtime_vocabulary() != 24687 {
+    return InitializationResult.apiChecksumMismatch
+  }
+  if uniffi_linguaray_runtime_checksum_method_runtimebackup_export_to() != 60991 {
+    return InitializationResult.apiChecksumMismatch
+  }
+  if uniffi_linguaray_runtime_checksum_method_runtimebackup_restore_from() != 54995 {
     return InitializationResult.apiChecksumMismatch
   }
   if uniffi_linguaray_runtime_checksum_method_runtimedictionary_lookup() != 41773 {
@@ -10101,10 +11153,16 @@ private let initializationResult: InitializationResult = {
   if uniffi_linguaray_runtime_checksum_method_runtimeglossary_delete_entry() != 58587 {
     return InitializationResult.apiChecksumMismatch
   }
+  if uniffi_linguaray_runtime_checksum_method_runtimeglossary_export_entries() != 64657 {
+    return InitializationResult.apiChecksumMismatch
+  }
   if uniffi_linguaray_runtime_checksum_method_runtimeglossary_flush_hits() != 14399 {
     return InitializationResult.apiChecksumMismatch
   }
   if uniffi_linguaray_runtime_checksum_method_runtimeglossary_get_book() != 17114 {
+    return InitializationResult.apiChecksumMismatch
+  }
+  if uniffi_linguaray_runtime_checksum_method_runtimeglossary_import_entries() != 15704 {
     return InitializationResult.apiChecksumMismatch
   }
   if uniffi_linguaray_runtime_checksum_method_runtimeglossary_list_books() != 59735 {
@@ -10152,7 +11210,13 @@ private let initializationResult: InitializationResult = {
   if uniffi_linguaray_runtime_checksum_method_runtimellm_polish() != 54993 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_linguaray_runtime_checksum_method_runtimellm_translate_stream() != 19511 {
+  if uniffi_linguaray_runtime_checksum_method_runtimellm_start_translation() != 35918 {
+    return InitializationResult.apiChecksumMismatch
+  }
+  if uniffi_linguaray_runtime_checksum_method_runtimellm_translate_stream() != 18453 {
+    return InitializationResult.apiChecksumMismatch
+  }
+  if uniffi_linguaray_runtime_checksum_method_runtimeocr_recognize_clipboard_image() != 5310 {
     return InitializationResult.apiChecksumMismatch
   }
   if uniffi_linguaray_runtime_checksum_method_runtimeocr_recognize_text() != 38562 {
@@ -10239,7 +11303,7 @@ private let initializationResult: InitializationResult = {
   if uniffi_linguaray_runtime_checksum_method_runtimesettings_subscribe() != 61804 {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_linguaray_runtime_checksum_method_runtimesettings_test_provider() != 54690 {
+  if uniffi_linguaray_runtime_checksum_method_runtimesettings_test_provider() != 38376 {
     return InitializationResult.apiChecksumMismatch
   }
   if uniffi_linguaray_runtime_checksum_method_runtimesettings_update_advanced() != 40958 {
@@ -10264,13 +11328,8 @@ private let initializationResult: InitializationResult = {
   {
     return InitializationResult.apiChecksumMismatch
   }
-  if uniffi_linguaray_runtime_checksum_method_runtimetextextractor_extract_from_screen_capture()
-    != 15072
-  {
-    return InitializationResult.apiChecksumMismatch
-  }
   if uniffi_linguaray_runtime_checksum_method_runtimetextextractor_extract_from_screen_selection()
-    != 5216
+    != 5501
   {
     return InitializationResult.apiChecksumMismatch
   }
@@ -10301,6 +11360,12 @@ private let initializationResult: InitializationResult = {
     return InitializationResult.apiChecksumMismatch
   }
   if uniffi_linguaray_runtime_checksum_method_settingssubscription_next() != 52040 {
+    return InitializationResult.apiChecksumMismatch
+  }
+  if uniffi_linguaray_runtime_checksum_method_translationtask_cancel() != 18760 {
+    return InitializationResult.apiChecksumMismatch
+  }
+  if uniffi_linguaray_runtime_checksum_method_translationtask_next() != 55434 {
     return InitializationResult.apiChecksumMismatch
   }
   if uniffi_linguaray_runtime_checksum_constructor_runtime_new() != 29932 {

@@ -1,0 +1,12 @@
+{
+  "name": "LinguaRay Translation",
+  "identifier": "io.github.gong1414.linguaray.snipdo",
+  "icon": "LinguaRay.png",
+  "actions": [
+    {
+      "title": "Translate with LinguaRay",
+      "icon": "LinguaRay.png",
+      "powershellFile": "linguaray.ps1"
+    }
+  ]
+}

@@ -69,7 +69,13 @@ final class TranslationQuery {
   final String? targetLanguage;
 }
 
-enum TranslationResultStatus { waiting, translating, completed, failed }
+enum TranslationResultStatus {
+  waiting,
+  translating,
+  completed,
+  failed,
+  cancelled,
+}
 
 final class ServiceTranslationResult {
   const ServiceTranslationResult({

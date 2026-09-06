@@ -86,6 +86,10 @@
         "clipboard_translation": "Clipboard Translation",
         "show_translation_window": "Show Translation Window",
         "capture_ocr": "Screenshot OCR",
+        "silent_capture_ocr": "Silent Screenshot OCR",
+        "file_ocr": "Image File OCR",
+        "clipboard_ocr": "Clipboard OCR",
+        "show_ocr_window": "Show OCR Window",
         "preferences": "Preferences...",
         "about": "About LinguaRay",
         "dev_tools": {
@@ -205,6 +209,7 @@
       "select": "Select",
       "selected_count": "$count selected",
       "exit_select": "Exit selection",
+      "clear_all": "Clear all",
       "add_to_glossary": "Add to glossary",
       "favorite": "Favorite",
       "unfavorite": "Unfavorite",
@@ -228,8 +233,8 @@
       "settings": "Settings"
     },
     "placeholder": {
-      "history": "Favorites and history will be available in a future release",
-      "glossary": "Glossary management is being built"
+      "history": "Review, edit, favorite, and reuse previous translations",
+      "glossary": "Manage required terms and forbidden alternatives"
     },
     "glossary_page": {
       "add_entry": "New entry",
@@ -275,6 +280,12 @@
       "seed_blank_note": "Once it exists you can add entries one by one, or drop a CSV / TBX onto the list to merge.",
       "seed_file_note": "Imports the $format file right after creating · duplicates take the file’s translation",
       "choose_file": "Choose file…",
+      "import_file": "Import",
+      "export_file": "Export",
+      "import_success": "Imported $inserted new terms, updated $updated, and skipped $skipped.",
+      "import_failed": "The glossary file could not be imported. Check its format and try again.",
+      "export_success": "The glossary was exported.",
+      "export_failed": "The glossary could not be exported. Try another location.",
       "create": "Create",
       "add_entry_subtitle": "A term outranks anything a service returns",
       "book": "Glossary",
@@ -304,7 +315,7 @@
       "service_unavailable": "Service unavailable",
       "waiting": "Waiting to translate",
       "copy": "Copy",
-      "favorite_unavailable": "Favorites will be available in a future release",
+      "favorite_unavailable": "The favorite could not be updated. Try again.",
       "preferred": "Preferred translation",
       "other_services": "Other services",
       "copy_result": "Copy translation",
@@ -353,7 +364,8 @@
       "ocr_settings": "OCR Settings",
       "ocr_services": "Services",
       "general_group": "General",
-      "general_settings": "General Settings"
+      "general_settings": "General Settings",
+      "library_group": "Library"
     },
     "general": {
       "title": "General",
@@ -445,6 +457,10 @@
         "extract_text_from_screen_selection": "Selection Translation",
         "extract_text_from_screen_capture": "Screenshot Translation",
         "capture_ocr": "Screenshot OCR",
+        "silent_capture_ocr": "Silent Screenshot OCR",
+        "file_ocr": "Image File OCR",
+        "clipboard_ocr": "Clipboard OCR",
+        "show_ocr_window": "Show OCR Window",
         "extract_text_from_clipboard": "Clipboard Translation",
         "translate_input": "Input Translation"
       },
@@ -454,6 +470,10 @@
         "input": "Clear the translation window and open it for manual input.",
         "capture": "Select a screen region, recognize its text, and translate it.",
         "capture_ocr": "Select a screen region and show only the recognized text.",
+        "silent_capture_ocr": "Select a screen region, recognize it in the background, and copy the text.",
+        "file_ocr": "Choose an image file and recognize its text.",
+        "clipboard_ocr": "Recognize an image currently stored in the clipboard.",
+        "show_ocr_window": "Show the OCR window without starting a new recognition.",
         "clipboard": "Translate text currently stored in the clipboard."
       },
       "reset_dialog": {
@@ -485,7 +505,35 @@
       "enable": "Enable",
       "port": "Port",
       "running_at": "Running at {url}",
-      "disabled": "Disabled"
+      "disabled": "Disabled",
+      "network": "Network",
+      "proxy_mode": "Proxy mode",
+      "proxy_system": "Use system proxy",
+      "proxy_direct": "Direct connection",
+      "proxy_custom": "Custom HTTP proxy",
+      "proxy_url": "Proxy URL",
+      "proxy_url_hint": "For example, http://127.0.0.1:7890",
+      "proxy_bypass": "Do not proxy",
+      "proxy_bypass_hint": "Comma-separated domains or IP addresses",
+      "check_updates_on_launch": "Automatically check for updates (at startup and every 6 hours)",
+      "save_network": "Save network settings"
+    },
+    "data_transfer": {
+      "title": "Import & Export",
+      "description": "Move LinguaRay settings and local data between installations.",
+      "export_title": "Export backup",
+      "export_description": "Save settings, history, favorites, vocabulary, and glossaries in one ZIP archive.",
+      "export_action": "Export…",
+      "restore_title": "Restore backup",
+      "restore_description": "Replace current local data with a LinguaRay backup.",
+      "restore_action": "Restore…",
+      "restore_confirm_title": "Restore this backup?",
+      "restore_confirm_description": "Current settings and local records will be replaced. The operation is rolled back if installation fails.",
+      "secrets_notice": "API keys and proxy credentials are never included. Re-enter provider keys on another computer.",
+      "working": "Working…",
+      "exported": "Backup exported",
+      "restored": "Backup restored",
+      "failed": "The backup operation failed"
     },
     "services": {
       "title": "Services",
@@ -554,8 +602,8 @@
       "verify": "Verify connection",
       "save_without_verify": "Save",
       "model_manual": "Enter a model id",
-      "model_empty": "No models yet. Fetch from the provider or enter one manually.",
-      "model_failed": "Could not fetch models. You can still enter a model id and save.",
+      "model_empty": "No matching models. You can enter a model ID manually.",
+      "model_failed": "Could not fetch models. Check the API address, proxy and response format.",
       "add_directly": "Add",
       "switch_to_google_web": "Switch to Google Web",
       "fields": {
@@ -583,6 +631,7 @@
         "deepl_pro": "DeepL API Pro.",
         "google_cloud": "Google Cloud Translation API.",
         "baidu": "Baidu Translate API.",
+        "baidu_ocr": "Baidu General OCR with text-line positions.",
         "tencent_cloud": "Tencent Cloud Machine Translation.",
         "youdao": "Youdao Zhiyun translation, dictionary, and OCR.",
         "caiyun": "Caiyun Xiaoyi translation API.",
@@ -607,7 +656,13 @@
         "llama_cpp": "Local llama.cpp server.",
         "litellm": "Local LiteLLM proxy.",
         "libretranslate": "Self-hosted LibreTranslate. Default http://127.0.0.1:5000. Not a public instance.",
-        "mtranserver": "Self-hosted MTranServer. Default http://127.0.0.1:8989."
+        "mtranserver": "Self-hosted MTranServer. Default http://127.0.0.1:8989.",
+        "minimax": "MiniMax API using the Anthropic compatible protocol.",
+        "stepfun": "StepFun API using the OpenAI compatible protocol.",
+        "mistral": "Mistral API using the OpenAI compatible protocol.",
+        "together": "Together AI API using the OpenAI compatible protocol.",
+        "fireworks": "Fireworks AI API using the OpenAI compatible protocol.",
+        "custom": "Connect a custom gateway or another OpenAI compatible service."
       },
       "item": {
         "empty": "No providers configured. Add one to enable translation services.",
@@ -701,7 +756,21 @@
       "delete_dialog": {
         "title": "Delete \"{}\"?",
         "message": "This action cannot be undone."
-      }
+      },
+      "model_auto_hint": "Models are fetched automatically when credentials are ready. You can also enter a model ID. Listing does not verify translation access.",
+      "model_auth_failed": "Authentication failed (401/403). Check this provider’s API key and permissions.",
+      "model_rate_limited": "The provider is rate limiting requests. Please retry later.",
+      "model_unsupported": "This endpoint does not offer a model list (404/405). Enter the model ID manually or configure a models URL.",
+      "model_timeout": "Model query timed out. Check the API address or proxy and retry.",
+      "model_reference": "Offline reference catalog · access not verified",
+      "model_live": "Models returned by this provider",
+      "model_search": "Search all model IDs",
+      "model_updated": "Queried at",
+      "test": "Test connection",
+      "test_passed": "Connection succeeded",
+      "test_model": "Test selected model",
+      "test_model_passed": "Selected model responded",
+      "test_model_hint": "Sends a short test message to verify the selected model can respond."
     },
     "layout": {
       "title": "Settings",
@@ -753,7 +822,7 @@
       "accessibility": "Accessibility",
       "screen_recording": "Screen Recording",
       "shortcuts_title": "Global shortcuts",
-      "shortcuts_body": "The four first-release actions are ready. Conflicts can be fixed later in Settings.",
+      "shortcuts_body": "Core translation and OCR actions are ready. Conflicts can be fixed later in Settings.",
       "services_title": "Translation services",
       "services_body": "Enable at least one translation service.",
       "granted": "Granted",
@@ -784,7 +853,34 @@
       "empty_selection": "No text is selected.",
       "clipboard_unavailable": "The clipboard could not be read.",
       "clipboard_restore_failed": "The previous clipboard contents could not be restored.",
-      "recheck": "Recheck"
+      "recheck": "Recheck",
+      "source_label": "Original",
+      "result_label": "Translation",
+      "result_placeholder": "Your translation appears here",
+      "close": "Close",
+      "collapse_source": "Hide source",
+      "show_source": "Show source",
+      "expand_reading": "Expand to two columns",
+      "compact_reading": "Compact window",
+      "font_larger": "Larger text",
+      "font_smaller": "Smaller text",
+      "font_reset": "Reset text size",
+      "stop": "Stop translation",
+      "stopped": "Translation stopped",
+      "replace": "Replace original",
+      "replace_changed": "The original text or selection has changed. Select it again to translate.",
+      "replace_unsupported": "This app cannot replace the original selection. Copy the translation instead.",
+      "service_hint": "Choose a service to translate on demand"
+    },
+    "ocr": {
+      "title": "OCR",
+      "empty_title": "No recognized text yet",
+      "empty_description": "Capture a region, choose an image, or recognize an image from the clipboard.",
+      "capture": "Capture",
+      "file": "Image file",
+      "clipboard": "Clipboard image",
+      "continuous": "Continuous",
+      "result_count": "$count results"
     },
     "errors": {
       "accessibility_denied": "Accessibility permission is required to read selected text.",
@@ -800,6 +896,7 @@
       "unsupported_language_pair": "This service does not support the selected language pair.",
       "language_pack_missing": "Install this language pair in macOS Language & Region, then try again.",
       "network_failure": "The service could not be reached. Check your connection.",
+      "proxy_configuration_invalid": "Enter an HTTP or HTTPS proxy URL without credentials.",
       "provider_auth_failed": "Authentication failed. Check the provider key in Settings.",
       "translation_failed": "Translation failed. Check the service and try again.",
       "empty_result": "The service returned no translation.",
@@ -813,13 +910,17 @@
       "speech_interrupted": "Speech was interrupted.",
       "speech_failed": "Speech playback failed.",
       "update_check_failed": "The update check failed.",
+      "update_download_failed": "The update could not be downloaded.",
       "update_checksum_missing": "This update has no checksum and will not be installed.",
       "update_checksum_mismatch": "The downloaded file did not match its checksum.",
+      "update_signature_invalid": "The update signature is invalid or the publisher identity has changed.",
+      "update_install_failed": "The verified installer could not be started.",
       "protocol_invalid": "This LinguaRay link is not valid.",
       "protocol_too_large": "The linked text is too large to open.",
       "api_server_bind_failed": "The local API server could not bind to that port.",
       "invalid_port": "Enter 0 for an automatic port, or a port from 1 to 65535.",
-      "unknown": "Something went wrong. Try again."
+      "unknown": "Something went wrong. Try again.",
+      "translation_incomplete": "The output did not finish normally. Received text is preserved; adjust the output limit or choose another model and retry."
     },
     "recovery": {
       "retry": "Try again",

@@ -11,7 +11,21 @@ use linguaray_api_core::{error_envelope, success_envelope, ApiError};
 use linguaray_core::{DetectLanguageRequest, LookUpRequest, TranslateRequest};
 use serde::Serialize;
 
-use crate::runtime::{Runtime, RuntimeError};
+use crate::runtime::{ExternalActionKind, ExternalActionRequest, Runtime, RuntimeError};
+
+const MAX_ACTION_TEXT_BYTES: usize = 32 * 1024;
+const MAX_REQUEST_BODY_BYTES: usize = 1024 * 1024;
+const MAX_REQUEST_HEADER_BYTES: usize = 64 * 1024;
+
+#[derive(Debug, serde::Deserialize)]
+struct TextActionBody {
+    text: String,
+}
+
+#[derive(Debug, Serialize)]
+struct AcceptedAction {
+    accepted: bool,
+}
 
 #[derive(Clone, Debug, uniffi::Record)]
 pub struct ApiServerInfo {
@@ -187,7 +201,7 @@ fn read_request(stream: &mut TcpStream) -> Result<HttpRequest, String> {
         if let Some(index) = find_header_end(&buffer) {
             break index;
         }
-        if buffer.len() > 1024 * 1024 {
+        if buffer.len() > MAX_REQUEST_HEADER_BYTES {
             return Err("request headers are too large".to_owned());
         }
     };
@@ -218,9 +232,15 @@ fn read_request(stream: &mut TcpStream) -> Result<HttpRequest, String> {
             }
         }
     }
+    if content_length > MAX_REQUEST_BODY_BYTES {
+        return Err("request body is too large".to_owned());
+    }
 
     let body_start = header_end + 4;
-    while buffer.len() < body_start + content_length {
+    let expected_length = body_start
+        .checked_add(content_length)
+        .ok_or_else(|| "invalid content-length".to_owned())?;
+    while buffer.len() < expected_length {
         let read = stream
             .read(&mut chunk)
             .map_err(|error| format!("failed to read request body: {error}"))?;
@@ -229,12 +249,14 @@ fn read_request(stream: &mut TcpStream) -> Result<HttpRequest, String> {
         }
         buffer.extend_from_slice(&chunk[..read]);
     }
+    if buffer.len() < expected_length {
+        return Err("incomplete request body".to_owned());
+    }
 
-    let body_end = body_start.saturating_add(content_length).min(buffer.len());
     Ok(HttpRequest {
         method,
         path,
-        body: buffer[body_start..body_end].to_vec(),
+        body: buffer[body_start..expected_length].to_vec(),
     })
 }
 
@@ -248,6 +270,37 @@ fn dispatch(request: HttpRequest, runtime: Runtime) -> HttpResponse {
     }
 
     match (request.method.as_str(), request.path.as_str()) {
+        ("POST", "/") | ("POST", "/translate") => {
+            dispatch_text_action(request.body, runtime, false)
+        }
+        ("POST", "/actions/translate") => dispatch_text_action(request.body, runtime, true),
+        ("GET", "/config") | ("POST", "/actions/settings") => {
+            accept_action(runtime, ExternalActionKind::OpenSettings, None)
+        }
+        ("GET", "/selection_translate") | ("POST", "/actions/translate-selection") => {
+            accept_action(runtime, ExternalActionKind::TranslateSelection, None)
+        }
+        ("GET", "/input_translate") | ("POST", "/actions/translate-input") => {
+            accept_action(runtime, ExternalActionKind::TranslateInput, None)
+        }
+        ("GET", "/clipboard_translate") | ("POST", "/actions/translate-clipboard") => {
+            accept_action(runtime, ExternalActionKind::TranslateClipboard, None)
+        }
+        ("GET", "/ocr_translate") | ("POST", "/actions/capture-translate") => {
+            accept_action(runtime, ExternalActionKind::CaptureTranslate, None)
+        }
+        ("GET", "/ocr_recognize") | ("POST", "/actions/capture-ocr") => {
+            accept_action(runtime, ExternalActionKind::CaptureOcr, None)
+        }
+        ("GET", "/clipboard_ocr") | ("POST", "/actions/clipboard-ocr") => {
+            accept_action(runtime, ExternalActionKind::ClipboardOcr, None)
+        }
+        ("GET", "/show_translate") | ("POST", "/actions/show-translation-window") => {
+            accept_action(runtime, ExternalActionKind::ShowTranslationWindow, None)
+        }
+        ("GET", "/show_ocr") | ("POST", "/actions/show-ocr-window") => {
+            accept_action(runtime, ExternalActionKind::ShowOcrWindow, None)
+        }
         ("GET", "/") => json_ok(linguaray_api_core::index("/")),
         ("GET", "/health") => json_ok(linguaray_api_core::health()),
         ("GET", "/openapi.json") => match linguaray_api_core::openapi_document() {
@@ -260,6 +313,48 @@ fn dispatch(request: HttpRequest, runtime: Runtime) -> HttpResponse {
             body: linguaray_api_core::reference_html().into_bytes(),
         },
         _ => dispatch_provider_route(request, runtime),
+    }
+}
+
+fn dispatch_text_action(body: Vec<u8>, runtime: Runtime, json: bool) -> HttpResponse {
+    let text = if json {
+        match serde_json::from_slice::<TextActionBody>(&body) {
+            Ok(body) => body.text,
+            Err(error) => {
+                return json_error(ApiError::bad_request("INVALID_JSON", error.to_string()));
+            }
+        }
+    } else {
+        match String::from_utf8(body) {
+            Ok(text) => text,
+            Err(error) => {
+                return json_error(ApiError::bad_request("INVALID_REQUEST", error.to_string()));
+            }
+        }
+    };
+    let text = text.trim().to_owned();
+    if text.is_empty() {
+        return json_error(ApiError::bad_request(
+            "INVALID_REQUEST",
+            "`text` is required",
+        ));
+    }
+    if text.len() > MAX_ACTION_TEXT_BYTES {
+        return json_error(ApiError::bad_request(
+            "PAYLOAD_TOO_LARGE",
+            "action text exceeds 32 KiB",
+        ));
+    }
+    accept_action(runtime, ExternalActionKind::TranslateText, Some(text))
+}
+
+fn accept_action(runtime: Runtime, kind: ExternalActionKind, text: Option<String>) -> HttpResponse {
+    runtime.emit_external_action(ExternalActionRequest { kind, text });
+    HttpResponse {
+        status: 202,
+        content_type: "application/json",
+        body: serde_json::to_vec(&success_envelope(AcceptedAction { accepted: true }))
+            .unwrap_or_default(),
     }
 }
 
@@ -373,6 +468,7 @@ fn write_response(
 ) -> std::io::Result<()> {
     let reason = match status {
         200 => "OK",
+        202 => "Accepted",
         204 => "No Content",
         400 => "Bad Request",
         401 => "Unauthorized",
@@ -388,9 +484,6 @@ fn write_response(
         "HTTP/1.1 {status} {reason}\r\n\
          Content-Type: {content_type}\r\n\
          Content-Length: {}\r\n\
-         Access-Control-Allow-Origin: *\r\n\
-         Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n\
-         Access-Control-Allow-Headers: content-type\r\n\
          Connection: close\r\n\
          \r\n",
         body.len()
@@ -439,5 +532,32 @@ mod tests {
         assert!(response.contains(r#""ok":true"#));
 
         server.stop();
+    }
+
+    #[test]
+    fn action_request_is_broadcast_without_echoing_text() {
+        let runtime = Runtime::new(unique_data_dir().display().to_string())
+            .expect("failed to create runtime");
+        let subscription = runtime.subscribe_actions();
+        let response = dispatch(
+            HttpRequest {
+                method: "POST".to_owned(),
+                path: "/actions/translate".to_owned(),
+                body: br#"{"text":"private text"}"#.to_vec(),
+            },
+            (*runtime).clone(),
+        );
+        assert_eq!(response.status, 202);
+        assert!(!String::from_utf8_lossy(&response.body).contains("private text"));
+
+        let action = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("runtime")
+            .block_on(subscription.next())
+            .expect("action result")
+            .expect("action");
+        assert_eq!(action.kind, ExternalActionKind::TranslateText);
+        assert_eq!(action.text.as_deref(), Some("private text"));
     }
 }

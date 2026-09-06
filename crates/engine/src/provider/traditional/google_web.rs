@@ -8,7 +8,7 @@ use linguaray_core::{
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::common::http_client::HttpClient;
+use crate::common::{ClassifyHttpResponse, HttpClient};
 
 const USER_AGENT: &str = "LinguaRay/1.0";
 
@@ -35,7 +35,7 @@ impl GoogleWebProvider {
             .unwrap_or_else(|| "https://translate.google.com".to_owned());
         Ok(Self {
             translation_service: GoogleWebTranslationService {
-                http: HttpClient::new(base_url, Default::default()),
+                http: HttpClient::proxy_aware(base_url)?,
             },
         })
     }

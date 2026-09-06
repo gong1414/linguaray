@@ -29,6 +29,11 @@ the local `.git/info/exclude`. They are not part of the product: skip them when
 searching, never edit them, and do not treat them as a reference for current
 behavior.
 
+The desktop source tree uses `app/` for composition and lifecycle,
+`features/` for product capabilities, `platform/` for native implementations,
+`shared/` for common presentation, and `catalog/` for Widgetbook fixtures.
+See `docs/ARCHITECTURE.md` before adding a new source directory.
+
 ## Toolchain
 
 - Flutter 3.47.1 / Dart 3.13.1
@@ -115,11 +120,17 @@ dart run melos run dependency_validator
 cargo fmt --all -- --check
 cargo clippy --locked --workspace --all-targets -- -D warnings
 cargo test --locked --workspace
+python3 scripts/check_uniffi_surface.py
+python3 scripts/check_dart_reachability.py
+python3 scripts/check_dart_architecture.py
 ```
 
 Use `python3 scripts/format.py --check` to check Dart, Rust, and Swift formatting
 together. UI changes need Widgetbook coverage and deliberate golden updates.
 Platform changes need desktop integration coverage where practical.
+Use `LinguaRayMaterialTheme` for all surfaces and `SettingsPage` for settings
+layouts. Catalog fixtures must stay reachable only from the Widgetbook entry,
+and tests must not be the only callers keeping a product library alive.
 
 ## Git practices
 

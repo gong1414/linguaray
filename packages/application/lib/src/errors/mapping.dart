@@ -58,11 +58,6 @@ AppErrorCode mapErrorCode(String? raw) {
   };
 }
 
-AppFailure mapFailure(String? raw) {
-  final code = mapErrorCode(raw);
-  return AppFailure(code, recovery: recoveryFor(code));
-}
-
 AppErrorCode _inferFromMessage(String message) {
   if (message.contains('accessibility')) {
     return AppErrorCode.accessibilityDenied;

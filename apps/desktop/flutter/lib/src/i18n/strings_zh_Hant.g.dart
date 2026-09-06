@@ -675,9 +675,9 @@ class _TranslationsWorkbenchPlaceholderZhHant
 
   // Translations
   @override
-  String get history => '收藏與歷史將在後續版本提供';
+  String get history => '查看、編輯、收藏並重用以往譯文';
   @override
-  String get glossary => '術語庫管理正在建置中';
+  String get glossary => '管理指定譯法和禁用譯法';
 }
 
 // Path: workbench.glossary_page
@@ -789,7 +789,7 @@ class _TranslationsWorkbenchTranslationZhHant
   @override
   String get copy => '複製';
   @override
-  String get favorite_unavailable => '收藏功能將在後續版本提供';
+  String get favorite_unavailable => '無法更新收藏狀態，請重試';
   @override
   String get preferred => '首選譯文';
   @override
@@ -2339,8 +2339,8 @@ extension on TranslationsZhHant {
       'workbench.not_configured' => '尚未設定',
       'workbench.subtitle.translate' => '工作台 · 多服務對照',
       'workbench.subtitle.settings' => '設定',
-      'workbench.placeholder.history' => '收藏與歷史將在後續版本提供',
-      'workbench.placeholder.glossary' => '術語庫管理正在建置中',
+      'workbench.placeholder.history' => '查看、編輯、收藏並重用以往譯文',
+      'workbench.placeholder.glossary' => '管理指定譯法和禁用譯法',
       'workbench.glossary_page.add_entry' => '新增條目',
       'workbench.glossary_page.term' => '原文',
       'workbench.glossary_page.translation' => '指定譯法',
@@ -2393,7 +2393,7 @@ extension on TranslationsZhHant {
       'workbench.translation.service_unavailable' => '服務暫不可用',
       'workbench.translation.waiting' => '等待翻譯',
       'workbench.translation.copy' => '複製',
-      'workbench.translation.favorite_unavailable' => '收藏功能將在後續版本提供',
+      'workbench.translation.favorite_unavailable' => '無法更新收藏狀態，請重試',
       'workbench.translation.preferred' => '首選譯文',
       'workbench.translation.other_services' => '其他服務',
       'workbench.translation.copy_result' => '複製譯文',

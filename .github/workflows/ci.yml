@@ -5,6 +5,12 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      refresh_windows_goldens:
+        description: "Generate Windows font baselines for visual review (does not commit them)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -18,7 +24,8 @@ env:
 
 jobs:
   quality:
-    runs-on: ubuntu-latest
+    if: ${{ !inputs.refresh_windows_goldens }}
+    runs-on: macos-26
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -30,8 +37,6 @@ jobs:
       - uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
         with:
           components: rustfmt, clippy
-      - name: Linux build dependencies
-        run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev
       - run: dart pub get
       - run: dart run melos run analyze
       - run: dart format --output=none --set-exit-if-changed $(git ls-files '*.dart')
@@ -39,8 +44,18 @@ jobs:
       - run: cargo clippy --locked --workspace --all-targets -- -D warnings
       - run: cargo test --locked --workspace
       - run: dart run melos run dependency_validator
+      - run: python3 scripts/check_uniffi_surface.py
+      - run: python3 scripts/check_dart_reachability.py
+      - run: python3 scripts/check_dart_architecture.py
+      - run: python3 -m unittest discover -s scripts -p 'test_dart_*.py'
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.13"
+      - run: python3 -m pip install -r scripts/release-requirements.txt
+      - run: python3 -m unittest discover -s scripts -p 'test_release_manifest.py'
 
   desktop:
+    if: ${{ !inputs.refresh_windows_goldens }}
     name: desktop-${{ matrix.device }}
     strategy:
       fail-fast: false
@@ -81,9 +96,9 @@ jobs:
         if: runner.os == 'macOS'
         working-directory: .
         run: python3 scripts/format.py --check swift
-      - name: Real system OCR fixture
+      - name: Runtime persistence and system OCR
         working-directory: .
-        run: cargo test -p linguaray_runtime system_ocr_recognizes_fixed_catalog_image
+        run: cargo test --locked -p linguaray_runtime
       - name: Desktop integration smoke
         run: flutter test integration_test/app_smoke_test.dart -d ${{ matrix.device }}
       # Integration testing replaces the local app bundle with its test
@@ -98,3 +113,26 @@ jobs:
             apps/desktop/flutter/build/windows/x64/runner/Debug
             apps/desktop/flutter/test/failures
           if-no-files-found: ignore
+
+  windows-goldens:
+    if: inputs.refresh_windows_goldens
+    runs-on: windows-2022
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
+      - run: dart pub get
+      - name: Render desktop snapshots with native Windows fonts
+        working-directory: apps/desktop/flutter
+        run: flutter test --update-goldens test/catalog_surface_golden_test.dart
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: windows-golden-review
+          path: |
+            apps/desktop/flutter/test/goldens/catalog/*_windows.png
+          if-no-files-found: error

@@ -15,6 +15,10 @@ import json
 import re
 import sys
 import zipfile
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib  # Python < 3.11: install tomli for catalog generation
 from pathlib import Path
 from urllib.request import urlopen
 
@@ -38,72 +42,25 @@ PROVIDER_IDS = [
     "siliconflow",
     "modelscope",
     "lmstudio",
+    "minimax",
+    "stepfun-ai",
+    "mistral",
+    "togetherai",
+    "fireworks-ai",
 ]
 
 
-def parse_simple_toml(text: str) -> dict:
-    data: dict = {}
-    section = None
-    for raw in text.splitlines():
-        line = raw.split("#", 1)[0].strip()
-        if not line:
+def read_model(path: Path, root: Path) -> dict:
+    # Git archives store upstream symlinks as a one-line relative target.
+    # Resolve only model TOMLs inside the pinned source tree.
+    for _ in range(16):
+        text = path.read_text(encoding="utf-8").strip()
+        if text.startswith("../") and "\n" not in text and text.endswith(".toml"):
+            path = (path.parent / text).resolve()
+            path.relative_to(root.resolve())
             continue
-        if line.startswith("[") and line.endswith("]"):
-            section = line[1:-1].strip()
-            data.setdefault(section, {})
-            continue
-        if "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        key = key.strip()
-        parsed = parse_value(value.strip())
-        if section:
-            if isinstance(data.get(section), dict):
-                data[section][key] = parsed
-        else:
-            data[key] = parsed
-    return data
-
-
-def parse_value(value: str):
-    if value.startswith("[") and value.endswith("]"):
-        inner = value[1:-1].strip()
-        if not inner:
-            return []
-        return [parse_value(part.strip()) for part in split_list(inner)]
-    if (value.startswith('"') and value.endswith('"')) or (
-        value.startswith("'") and value.endswith("'")
-    ):
-        return value[1:-1]
-    if value in ("true", "false"):
-        return value == "true"
-    return value
-
-
-def split_list(inner: str) -> list[str]:
-    parts = []
-    buf = []
-    in_str = False
-    quote = ""
-    for char in inner:
-        if in_str:
-            buf.append(char)
-            if char == quote:
-                in_str = False
-            continue
-        if char in "\"'":
-            in_str = True
-            quote = char
-            buf.append(char)
-            continue
-        if char == ",":
-            parts.append("".join(buf))
-            buf = []
-            continue
-        buf.append(char)
-    if buf:
-        parts.append("".join(buf))
-    return parts
+        return tomllib.loads(text)
+    raise ValueError(f"Model link cycle: {path}")
 
 
 def read_modalities(parsed: dict) -> dict:
@@ -123,7 +80,7 @@ def load_lab_models(root: Path) -> dict[str, dict]:
         return labs
     for path in models_dir.rglob("*.toml"):
         rel = path.relative_to(models_dir).with_suffix("")
-        labs[str(rel).replace("\\", "/")] = parse_simple_toml(path.read_text(encoding="utf-8"))
+        labs[str(rel).replace("\\", "/")] = read_model(path, root)
     return labs
 
 
@@ -133,8 +90,12 @@ def collect_provider(root: Path, provider_id: str, labs: dict[str, dict]) -> lis
         return []
     collected = []
     for path in models_dir.rglob("*.toml"):
-        parsed = parse_simple_toml(path.read_text(encoding="utf-8"))
-        model_id = path.stem
+        try:
+            parsed = read_model(path, root)
+        except FileNotFoundError:
+            print(f"warning: skipping broken upstream model link: {path.relative_to(root)}", file=sys.stderr)
+            continue
+        model_id = path.relative_to(models_dir).with_suffix("").as_posix()
         base = {}
         base_model = parsed.get("base_model")
         if isinstance(base_model, str) and base_model in labs:
@@ -159,7 +120,7 @@ def collect_provider(root: Path, provider_id: str, labs: dict[str, dict]) -> lis
             {
                 "id": model_id,
                 "name": merged.get("name") or model_id,
-                "release_date": merged.get("release_date"),
+                "release_date": str(merged["release_date"]) if merged.get("release_date") else None,
                 "status": status,
                 "modalities": modalities,
             }
@@ -177,7 +138,7 @@ def _date_key(value) -> int:
 
 def download_tree(dest: Path) -> Path:
     dest.mkdir(parents=True, exist_ok=True)
-    with urlopen(ARCHIVE_URL) as response:
+    with urlopen(ARCHIVE_URL, timeout=60) as response:
         payload = response.read()
     with zipfile.ZipFile(io.BytesIO(payload)) as archive:
         archive.extractall(dest)

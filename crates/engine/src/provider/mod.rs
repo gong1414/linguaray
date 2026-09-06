@@ -1,12 +1,7 @@
-//! Translation providers.
-//!
-//! LLM providers ([`llm`]) are the primary translation path; traditional
-//! API-based providers live under [`traditional`].
-
 pub mod llm;
+pub mod prompt;
 pub mod traditional;
 
-pub use llm::prompt;
 #[cfg(feature = "anthropic")]
 pub use llm::AnthropicProvider;
 pub use llm::AnthropicProviderConfig;

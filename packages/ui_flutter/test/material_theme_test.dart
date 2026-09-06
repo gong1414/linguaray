@@ -1,18 +1,30 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:linguaray_ui/linguaray_ui.dart';
 
 void main() {
-  test('material theme projects the canonical brand palette', () {
+  test('theme follows the desktop host when no platform is supplied', () {
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    for (final target in [TargetPlatform.macOS, TargetPlatform.windows]) {
+      debugDefaultTargetPlatformOverride = target;
+      final theme = LinguaRayMaterialTheme.light();
+      expect(theme.platform, target);
+      expect(
+        theme.textTheme.bodyMedium?.fontFamily,
+        target == TargetPlatform.macOS ? 'CupertinoSystemText' : 'Segoe UI',
+      );
+    }
+  });
+
+  test('material theme uses the light workbench action palette', () {
     final light = LinguaRayMaterialTheme.light();
     final dark = LinguaRayMaterialTheme.dark();
 
-    expect(light.colorScheme.primary, LinguaRayPalette.linguaBlue);
-    expect(light.colorScheme.secondary, LinguaRayPalette.rayTeal);
+    expect(light.colorScheme.primary, LinguaRayPalette.actionOrange);
     expect(light.scaffoldBackgroundColor, LinguaRayPalette.paper);
     expect(light.colorScheme.onSurface, LinguaRayPalette.graphite);
-    expect(dark.colorScheme.secondary, LinguaRayPalette.rayTealDark);
-    expect(dark.colorScheme.inversePrimary, LinguaRayPalette.linguaBlue);
+    expect(dark.colorScheme.inversePrimary, LinguaRayPalette.actionOrange);
   });
 
   test('core foreground pairs meet desktop contrast requirements', () {
@@ -22,6 +34,10 @@ void main() {
     ]) {
       final scheme = theme.colorScheme;
       expect(_contrast(scheme.onSurface, scheme.surface), greaterThan(7));
+      expect(
+        _contrast(scheme.onSurfaceVariant, scheme.surfaceContainerLowest),
+        greaterThan(4.5),
+      );
       expect(_contrast(scheme.onPrimary, scheme.primary), greaterThan(4.5));
       expect(
         _contrast(scheme.onSecondaryContainer, scheme.secondaryContainer),

@@ -1,4 +1,9 @@
 {
+  "_metadata": {
+    "source": "Unicode CLDR language display names, normalized for LinguaRay",
+    "license": "Unicode-3.0",
+    "url": "https://cldr.unicode.org/"
+  },
   "ar": {
     "local_name": "العربية",
     "translations": {

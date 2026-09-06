@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:linguaray_desktop/src/platform/menu_accelerator.dart';
+import 'package:linguaray_desktop/src/platform/shortcuts/menu_accelerator.dart';
 
 void main() {
   test('parses configured shortcuts for the native menu column', () {

@@ -208,8 +208,8 @@
       "settings": "설정"
     },
     "placeholder": {
-      "history": "즐겨찾기와 기록은 향후 버전에서 제공됩니다",
-      "glossary": "용어집 관리를 개발 중입니다"
+      "history": "이전 번역을 확인, 편집, 즐겨찾기하고 다시 사용합니다",
+      "glossary": "지정 번역과 금지 번역을 관리합니다"
     },
     "glossary_page": {
       "add_entry": "용어 추가",
@@ -256,7 +256,7 @@
       "service_unavailable": "서비스를 사용할 수 없음",
       "waiting": "번역 대기",
       "copy": "복사",
-      "favorite_unavailable": "즐겨찾기는 향후 버전에서 제공됩니다",
+      "favorite_unavailable": "즐겨찾기를 업데이트하지 못했습니다. 다시 시도하세요.",
       "preferred": "기본 번역",
       "other_services": "다른 서비스",
       "copy_result": "번역 복사",

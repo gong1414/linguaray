@@ -1,23 +1,23 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:linguaray_application/linguaray_application.dart';
 import 'package:linguaray_desktop/main.dart' as app;
-import 'package:linguaray_desktop/src/config/dependencies.dart';
-import 'package:linguaray_desktop/src/platform/permission_controller.dart';
+import 'package:linguaray_desktop/src/app/dependencies.dart';
+import 'package:linguaray_desktop/src/app/navigation/library_settings_screens.dart';
+import 'package:linguaray_desktop/src/app/navigation/settings_screens.dart';
+import 'package:linguaray_desktop/src/app/navigation/settings_shell_view.dart';
+import 'package:linguaray_desktop/src/app/runtime.dart';
+import 'package:linguaray_desktop/src/app/windows/app_windows.dart';
+import 'package:linguaray_desktop/src/features/translation/data/llm_stream.dart';
+import 'package:linguaray_desktop/src/features/translation/quick_translate/quick_translate_screen.dart';
+import 'package:linguaray_desktop/src/platform/credentials/secret_store.dart';
 import 'package:linguaray_desktop/src/platform/platform_types.dart';
-import 'package:linguaray_desktop/src/platform/trigger_controller.dart';
-import 'package:linguaray_desktop/src/services/app_windows.dart';
-import 'package:linguaray_desktop/src/services/runtime.dart';
-import 'package:linguaray_desktop/src/services/shortcut_service/shortcut_service.dart';
-import 'package:linguaray_desktop/src/ui/quick_translate/quick_translate_screen.dart';
-import 'package:linguaray_desktop/src/ui/settings/library_settings_screens.dart';
-import 'package:linguaray_desktop/src/ui/settings/settings_screens.dart';
-import 'package:linguaray_desktop/src/ui/settings/settings_shell_view.dart';
 
 const _testSystemServices = bool.fromEnvironment(
   'LINGUARAY_SYSTEM_SERVICES_SMOKE',
@@ -40,30 +40,120 @@ void main() {
     expect(find.byType(SettingsShellView), findsOneWidget);
     expect(find.byType(ErrorWidget), findsNothing);
     expect(settingsWindowController.window.isVisible, isFalse);
+    final providerContainer = ProviderScope.containerOf(
+      tester.element(find.byType(SettingsShellView)),
+    );
 
     await tester.runAsync(() async {
+      final storage = NativeSecretStore();
+      final id = 'vault-smoke-${DateTime.now().microsecondsSinceEpoch}';
+      try {
+        await storage.write(
+          providerId: id,
+          field: 'apiKey',
+          value: 'public-vault-fixture',
+        );
+        expect(
+          await NativeSecretStore().read(providerId: id, field: 'apiKey'),
+          'public-vault-fixture',
+        );
+      } finally {
+        await storage.delete(providerId: id, field: 'apiKey');
+      }
+      expect(await storage.read(providerId: id, field: 'apiKey'), isNull);
+    });
+    debugPrint('[smoke] native credential storage roundtrip passed');
+
+    await tester.runAsync(() async {
+      final shortcuts = providerContainer.read(shortcutServiceProvider);
       final deadline = DateTime.now().add(const Duration(seconds: 10));
-      while (ShortcutService.instance.bindings.length != 6 &&
+      while (shortcuts.bindings.length != TriggerAction.values.length &&
           DateTime.now().isBefore(deadline)) {
         await Future<void>.delayed(const Duration(milliseconds: 100));
       }
     });
-    expect(ShortcutService.instance.bindings, hasLength(6));
+    final shortcutBindings = providerContainer
+        .read(shortcutServiceProvider)
+        .bindings;
+    expect(shortcutBindings, hasLength(TriggerAction.values.length));
+    final configuredShortcuts = shortcutBindings
+        .where((binding) => binding.accelerator.isNotEmpty)
+        .toList(growable: false);
+    expect(configuredShortcuts.length, greaterThanOrEqualTo(6));
     expect(
-      ShortcutService.instance.bindings.every(
+      configuredShortcuts.every(
         (binding) => binding.state == ShortcutRegistrationState.registered,
       ),
       isTrue,
     );
+    expect(
+      shortcutBindings
+          .where((binding) => binding.accelerator.isEmpty)
+          .every(
+            (binding) =>
+                binding.state == ShortcutRegistrationState.unregistered,
+          ),
+      isTrue,
+    );
 
-    final permissions = await permissionController.refresh();
+    await tester.runAsync(() async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      server.listen((request) async {
+        await request.drain<void>();
+        request.response.headers.contentType = ContentType(
+          'text',
+          'event-stream',
+          charset: 'utf-8',
+        );
+        request.response.write(
+          'data: {"choices":[{"index":0,"delta":{"content":"本地测试译文"},"finish_reason":"stop"}]}\n\n',
+        );
+        await request.response.close();
+      });
+      try {
+        await runtime.settings().updateProvider(
+          providerId: 'resident-smoke',
+          providerType: 'openai_compatible',
+          presetId: null,
+          fields: {
+            'baseUrl': 'http://127.0.0.1:${server.port}/v1',
+            'defaultModel': 'local-test',
+          },
+        );
+        final chunks = await LlmStream.translate(
+          providerId: 'resident-smoke',
+          sourceLang: 'en',
+          targetLang: 'zh-Hans',
+          text: 'Public smoke test',
+        ).toList().timeout(const Duration(seconds: 8));
+        expect(chunks.map((chunk) => chunk.content).join(), '本地测试译文');
+        expect(chunks.last.finishReason, 'stop');
+        final pending = runtime
+            .llm(providerId: 'resident-smoke')
+            .startTranslation(
+              sourceLang: 'en',
+              targetLang: 'zh-Hans',
+              text: 'Cancel smoke test',
+            );
+        final next = pending.next();
+        pending.cancel();
+        expect(await next.timeout(const Duration(seconds: 3)), isNull);
+      } finally {
+        await runtime.settings().deleteProvider(providerId: 'resident-smoke');
+        await server.close(force: true);
+      }
+    });
+    debugPrint(
+      '[smoke] Dart to Rust cancellable stream delivered local response',
+    );
+
+    final permissions = await providerContainer
+        .read(permissionControllerProvider)
+        .refresh();
     debugPrint('[smoke] permissions refreshed');
     expect(permissions.accessibility, isNot(PermissionState.unknown));
     expect(permissions.screenRecording, isNot(PermissionState.unknown));
 
-    final providerContainer = ProviderScope.containerOf(
-      tester.element(find.byType(SettingsShellView)),
-    );
     final speech = providerContainer.read(speechServiceProvider);
     expect(await speech.isAvailable(), isTrue);
     debugPrint('[smoke] speech available');
@@ -152,9 +242,9 @@ void main() {
       }
     }
 
-    final showQuickWindow = triggerController.trigger(
-      TriggerAction.toggleQuickWindow,
-    );
+    final showQuickWindow = providerContainer
+        .read(triggerControllerProvider)
+        .trigger(TriggerAction.toggleQuickWindow);
     await tester.pump();
     await showQuickWindow;
     await tester.pumpAndSettle();
@@ -162,6 +252,33 @@ void main() {
     expect(appSurface.value, AppSurface.miniTranslator);
     expect(find.byType(QuickTranslateScreen), findsOneWidget);
     expect(find.byType(ErrorWidget), findsNothing);
+    final sourcePane = tester.getRect(
+      find.byKey(const ValueKey('quick-source-pane')),
+    );
+    final resultPane = tester.getRect(
+      find.byKey(const ValueKey('quick-result-pane')),
+    );
+    expect(resultPane.top, greaterThanOrEqualTo(sourcePane.bottom));
+    expect(miniTranslatorWindowController.window.contentSize.width, 460);
+    expect(miniTranslatorWindowController.window.isResizable, isTrue);
+    if (Platform.isMacOS) {
+      expect(
+        await const MethodChannel('linguaray/mac_app_presentation')
+            .invokeMethod<bool>('isDockIconVisible'),
+        isFalse,
+      );
+    }
+    miniTranslatorWindowController.window.setContentSize(760, 420);
+    await tester.pumpAndSettle();
+    expect(
+      tester.getRect(find.byKey(const ValueKey('quick-result-pane'))).left,
+      greaterThanOrEqualTo(
+        tester.getRect(find.byKey(const ValueKey('quick-source-pane'))).right,
+      ),
+    );
+    debugPrint(
+      '[smoke] native quick window uses the two-column reading layout',
+    );
 
     showSettingsWindow();
     await tester.pumpAndSettle();
@@ -169,6 +286,13 @@ void main() {
     expect(appSurface.value, AppSurface.settings);
     expect(find.byType(ErrorWidget), findsNothing);
     expect(settingsWindowController.window.isVisible, isTrue);
+    if (Platform.isMacOS) {
+      expect(
+        await const MethodChannel('linguaray/mac_app_presentation')
+            .invokeMethod<bool>('isDockIconVisible'),
+        isFalse,
+      );
+    }
     expect(
       settingsWindowController.window.size.width,
       greaterThanOrEqualTo(840),

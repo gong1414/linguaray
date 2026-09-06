@@ -15,24 +15,43 @@ pub fn build_from_settings_with_secrets(
     settings: &Settings,
     provider_secrets: &HashMap<String, HashMap<String, String>>,
 ) -> Result<Engine, String> {
-    let mut providers = BTreeMap::new();
-    for (provider_id, provider) in &settings.providers {
-        let provider_id = provider_id.trim();
-        if provider_id.is_empty() {
-            return Err("provider id is required".to_owned());
+    let proxy_mode = match settings.advanced.proxy_mode.trim() {
+        "" | "system" => linguaray_engine::NetworkProxyMode::System,
+        "direct" => linguaray_engine::NetworkProxyMode::Direct,
+        "custom" => linguaray_engine::NetworkProxyMode::Custom,
+        other => return Err(format!("unknown proxy mode `{other}`")),
+    };
+    let previous_proxy = linguaray_engine::current_network_proxy()?;
+    linguaray_engine::configure_network_proxy(linguaray_engine::NetworkProxyConfig {
+        mode: proxy_mode,
+        url: settings.advanced.proxy_url.clone(),
+        bypass: settings.advanced.proxy_bypass.clone(),
+    })?;
+
+    let result = (|| {
+        let mut providers = BTreeMap::new();
+        for (provider_id, provider) in &settings.providers {
+            let provider_id = provider_id.trim();
+            if provider_id.is_empty() {
+                return Err("provider id is required".to_owned());
+            }
+
+            let mut hydrated = provider.clone();
+            if let Some(secrets) = provider_secrets.get(provider_id) {
+                hydrated.fields.extend(secrets.clone());
+            }
+            providers.insert(
+                provider_id.to_owned(),
+                provider_config_from_settings(&hydrated)?,
+            );
         }
 
-        let mut hydrated = provider.clone();
-        if let Some(secrets) = provider_secrets.get(provider_id) {
-            hydrated.fields.extend(secrets.clone());
-        }
-        providers.insert(
-            provider_id.to_owned(),
-            provider_config_from_settings(&hydrated)?,
-        );
+        build_from_engine_config(EngineConfig { providers })
+    })();
+    if result.is_err() {
+        let _ = linguaray_engine::configure_network_proxy(previous_proxy);
     }
-
-    build_from_engine_config(EngineConfig { providers })
+    result
 }
 
 pub fn build_from_engine_config(config: EngineConfig) -> Result<Engine, String> {

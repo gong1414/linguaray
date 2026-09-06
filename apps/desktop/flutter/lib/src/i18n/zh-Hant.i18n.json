@@ -208,8 +208,8 @@
       "settings": "設定"
     },
     "placeholder": {
-      "history": "收藏與歷史將在後續版本提供",
-      "glossary": "術語庫管理正在建置中"
+      "history": "查看、編輯、收藏並重用以往譯文",
+      "glossary": "管理指定譯法和禁用譯法"
     },
     "glossary_page": {
       "add_entry": "新增條目",
@@ -256,7 +256,7 @@
       "service_unavailable": "服務暫不可用",
       "waiting": "等待翻譯",
       "copy": "複製",
-      "favorite_unavailable": "收藏功能將在後續版本提供",
+      "favorite_unavailable": "無法更新收藏狀態，請重試",
       "preferred": "首選譯文",
       "other_services": "其他服務",
       "copy_result": "複製譯文",

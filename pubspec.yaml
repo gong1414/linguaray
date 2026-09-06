@@ -45,3 +45,7 @@ melos:
     dependency_validator:
       run: dart run dependency_validator -C apps/desktop/flutter
       description: Validate dependencies for workspace packages.
+
+    uniffi_surface_check:
+      run: python3 scripts/check_uniffi_surface.py
+      description: Verify that the generated UniFFI API matches its baseline.

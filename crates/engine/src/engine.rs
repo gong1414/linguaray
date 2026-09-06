@@ -16,6 +16,7 @@ use crate::provider::traditional::BaiduProviderConfig;
 #[cfg(feature = "caiyun")]
 use crate::provider::traditional::CaiyunProvider;
 use crate::provider::traditional::CaiyunProviderConfig;
+#[cfg(feature = "deepl")]
 use crate::provider::traditional::DeepLProvider;
 use crate::provider::traditional::DeepLProviderConfig;
 use crate::provider::traditional::EcdictProvider;
