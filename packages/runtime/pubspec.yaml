@@ -26,15 +26,6 @@ dev_dependencies:
 flutter:
   plugin:
     platforms:
-      android:
-        ffiPlugin: true
-      ios:
-        # iOS is FFI-only for now. To call the Swift binding from native iOS
-        # code, mirror the macOS setup: drop a `Package.swift` under
-        # `ios/linguaray_runtime/` and add `pluginClass: LinguarayRuntimePlugin` here.
-        ffiPlugin: true
-      linux:
-        ffiPlugin: true
       macos:
         # `pluginClass` makes Flutter's macOS tooling pick up the SPM
         # package shipped at `macos/linguaray_runtime/`. The class itself is a

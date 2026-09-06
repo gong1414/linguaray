@@ -5,6 +5,7 @@
 /// immutable output models through a view model.
 library;
 
+export 'src/about/ports.dart';
 export 'src/dictionary/look_up_word.dart';
 export 'src/dictionary/models.dart';
 export 'src/dictionary/ports.dart';
@@ -15,8 +16,14 @@ export 'src/glossary/ports.dart';
 export 'src/history/models.dart';
 export 'src/history/ports.dart';
 export 'src/history/record_completed_translation.dart';
+export 'src/integrations/ports.dart';
+export 'src/preferences/ports.dart';
 export 'src/protocol/models.dart';
 export 'src/protocol/parse.dart';
+export 'src/providers/catalog_selection.dart';
+export 'src/providers/draft_validation.dart';
+export 'src/providers/ports.dart';
+export 'src/services/ports.dart';
 export 'src/settings/models.dart';
 export 'src/settings/ports.dart';
 export 'src/speech/models.dart';
@@ -25,6 +32,7 @@ export 'src/translation/load_translation_catalog.dart';
 export 'src/translation/models.dart';
 export 'src/translation/ports.dart';
 export 'src/translation/translate_text.dart';
+export 'src/translation_preferences/ports.dart';
 export 'src/updates/check_for_update.dart';
 export 'src/updates/models.dart';
 export 'src/updates/ports.dart';

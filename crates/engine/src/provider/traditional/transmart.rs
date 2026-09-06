@@ -8,7 +8,7 @@ use linguaray_core::{
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-use crate::common::http_client::HttpClient;
+use crate::common::{ClassifyHttpResponse, HttpClient};
 
 const USER_AGENT: &str = "LinguaRay/1.0";
 
@@ -43,7 +43,7 @@ impl TransmartProvider {
             translation_service: TransmartTranslationService {
                 username: config.username.trim().to_owned(),
                 token: config.token.trim().to_owned(),
-                http: HttpClient::new(base_url, Default::default()),
+                http: HttpClient::proxy_aware(base_url)?,
             },
         })
     }

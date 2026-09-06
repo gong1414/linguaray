@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:linguaray_desktop/src/ui/catalog/catalog.dart';
-import 'package:linguaray_desktop/src/ui/settings/settings_labels.dart';
+import 'package:linguaray_desktop/src/catalog/catalog.dart';
+import 'package:linguaray_desktop/src/shared/settings_labels.dart';
 import 'package:linguaray_ui/linguaray_ui.dart' show LinguaRayMaterialTheme;
 import 'package:widgetbook/widgetbook.dart';
 
-export 'src/ui/catalog/catalog.dart';
+import 'src/i18n/i18n.dart';
 
-void main() {
+export 'src/catalog/catalog.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await LocaleSettings.setLocaleRaw('zh-Hans');
   runApp(
     Widgetbook.material(
       directories: [_catalog],
@@ -52,9 +56,23 @@ void main() {
             platform: TargetPlatform.windows,
           ),
           ViewportData(
+            name: 'Reading window',
+            width: 720,
+            height: 420,
+            pixelRatio: 2,
+            platform: TargetPlatform.macOS,
+          ),
+          ViewportData(
             name: 'Quick translate',
             width: 396,
             height: 640,
+            pixelRatio: 2,
+            platform: TargetPlatform.macOS,
+          ),
+          ViewportData(
+            name: 'OCR window',
+            width: 600,
+            height: 520,
             pixelRatio: 2,
             platform: TargetPlatform.macOS,
           ),
@@ -95,6 +113,16 @@ final _catalog = WidgetbookCategory(
       ],
     ),
     WidgetbookComponent(
+      name: 'OCR',
+      useCases: [
+        for (final scenario in CatalogOcrScenario.values)
+          WidgetbookUseCase(
+            name: scenario.name,
+            builder: (_) => OcrCatalogPreview(scenario: scenario),
+          ),
+      ],
+    ),
+    WidgetbookComponent(
       name: 'Settings',
       useCases: [
         for (final section in SettingsSection.values)
@@ -122,6 +150,18 @@ final _catalog = WidgetbookCategory(
             section: SettingsSection.translation,
             shortcutConflict: true,
           ),
+        ),
+        WidgetbookUseCase(
+          name: 'Providers · configured',
+          builder: (_) => const ProvidersCatalogPreview(),
+        ),
+        WidgetbookUseCase(
+          name: 'Provider models · live discovery',
+          builder: (_) => const ProviderModelsCatalogPreview(),
+        ),
+        WidgetbookUseCase(
+          name: 'Provider models · authentication failure',
+          builder: (_) => const ProviderModelsCatalogPreview(failed: true),
         ),
         WidgetbookUseCase(
           name: 'Provider editor · secret stored',

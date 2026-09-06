@@ -4,6 +4,7 @@
 #![allow(clippy::large_const_arrays)]
 
 mod api_server;
+mod backup;
 mod catalog;
 pub use catalog::{
     list_catalog_snapshot_models, list_provider_catalog, CatalogCategory, CatalogFieldSpec,
@@ -12,11 +13,13 @@ pub use catalog::{
 pub mod domain;
 mod remote;
 pub mod runtime;
+mod storage;
 pub use api_server::{ApiServerInfo, RuntimeApiServer};
 pub use runtime::{
-    Runtime, RuntimeDictionary, RuntimeError, RuntimeGlossary, RuntimeHistory, RuntimeLlm,
-    RuntimeOcr, RuntimePermission, RuntimeSettings, RuntimeTextExtractor, RuntimeTranslation,
-    RuntimeVocabulary, SettingsChange, SettingsSubscription, StreamCallback,
+    BackupSummary, RestoreSummary, Runtime, RuntimeBackup, RuntimeDictionary, RuntimeError,
+    RuntimeGlossary, RuntimeHistory, RuntimeLlm, RuntimeOcr, RuntimePermission, RuntimeSettings,
+    RuntimeTextExtractor, RuntimeTranslation, RuntimeVocabulary, SettingsChange,
+    SettingsSubscription, StreamCallback, TranslationEvent, TranslationTask,
 };
 
 use linguaray_core::{

@@ -3,6 +3,7 @@
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use crate::common::ClassifyHttpResponse;
 use async_trait::async_trait;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine as _;
@@ -33,7 +34,6 @@ struct BingWebTranslationService {
 #[derive(Clone)]
 struct CachedToken {
     value: String,
-    #[allow(dead_code)]
     exp: u64,
 }
 
@@ -41,7 +41,7 @@ impl BingWebProvider {
     pub fn new(_config: BingWebProviderConfig) -> Result<Self, String> {
         Ok(Self {
             translation_service: BingWebTranslationService {
-                client: reqwest::Client::new(),
+                client: crate::common::build_http_client()?,
                 token: Mutex::new(None),
             },
         })
@@ -64,10 +64,8 @@ pub fn jwt_expiry_unix(token: &str) -> Option<u64> {
     value.get("exp").and_then(Value::as_u64)
 }
 
-pub fn token_still_valid(token: &str, now_unix: u64) -> bool {
-    jwt_expiry_unix(token)
-        .map(|exp| now_unix + 60 < exp)
-        .unwrap_or(false)
+fn cached_token_still_valid(token: &CachedToken, now_unix: u64) -> bool {
+    now_unix + 60 < token.exp
 }
 
 pub fn parse_bing_translate_response(
@@ -106,7 +104,7 @@ impl BingWebTranslationService {
         {
             let guard = self.token.lock().unwrap_or_else(|error| error.into_inner());
             if let Some(cached) = guard.as_ref() {
-                if token_still_valid(&cached.value, Self::now_unix()) {
+                if cached_token_still_valid(cached, Self::now_unix()) {
                     return Ok(cached.value.clone());
                 }
             }
@@ -238,8 +236,12 @@ mod tests {
     fn reads_jwt_exp_and_caches_until_60s_before() {
         let token = sample_jwt(1_700_000_060);
         assert_eq!(jwt_expiry_unix(&token), Some(1_700_000_060));
-        assert!(token_still_valid(&token, 1_699_999_999));
-        assert!(!token_still_valid(&token, 1_700_000_000));
+        let cached = CachedToken {
+            value: token,
+            exp: 1_700_000_060,
+        };
+        assert!(cached_token_still_valid(&cached, 1_699_999_999));
+        assert!(!cached_token_still_valid(&cached, 1_700_000_000));
     }
 
     #[test]

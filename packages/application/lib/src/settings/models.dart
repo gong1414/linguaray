@@ -284,6 +284,22 @@ final class ProviderDraft {
   final String? presetId;
 }
 
+/// Endpoint results and offline reference IDs stay separate. A listed model can
+/// still require account permissions or a different inference capability.
+final class ProviderModelDiscovery {
+  const ProviderModelDiscovery({
+    this.liveModels = const [],
+    this.referenceModels = const [],
+    this.queriedAt,
+    this.errorCode,
+  });
+  final List<String> liveModels;
+  final List<String> referenceModels;
+  final DateTime? queriedAt;
+  final String? errorCode;
+  bool get succeeded => queriedAt != null && errorCode == null;
+}
+
 final class ProviderTestResult {
   const ProviderTestResult({
     required this.status,
@@ -344,6 +360,22 @@ final class ApiServerStatus {
   final String? bindErrorCode;
 
   bool get running => baseUrl != null && baseUrl!.isNotEmpty;
+}
+
+enum NetworkProxyMode { system, direct, custom }
+
+final class NetworkSettings {
+  const NetworkSettings({
+    required this.proxyMode,
+    required this.proxyUrl,
+    required this.proxyBypass,
+    required this.checkUpdatesOnLaunch,
+  });
+
+  final NetworkProxyMode proxyMode;
+  final String proxyUrl;
+  final String proxyBypass;
+  final bool checkUpdatesOnLaunch;
 }
 
 final class PlatformCapabilities {

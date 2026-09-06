@@ -1,0 +1,44 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:linguaray_desktop/src/platform/network/proxy_bypass.dart';
+import 'package:linguaray_desktop/src/platform/network/system_proxy.dart';
+
+void main() {
+  test('selects scheme-specific system proxies', () {
+    const proxy = SystemProxySnapshot(
+      http: '127.0.0.1:8080',
+      https: '127.0.0.1:8443',
+    );
+
+    expect(
+      proxy.resolve(Uri.parse('http://example.com')),
+      'PROXY 127.0.0.1:8080; DIRECT',
+    );
+    expect(
+      proxy.resolve(Uri.parse('https://example.com')),
+      'PROXY 127.0.0.1:8443; DIRECT',
+    );
+  });
+
+  test('honours local and domain bypass rules', () {
+    const proxy = SystemProxySnapshot(
+      http: '127.0.0.1:8080',
+      bypass: ['<local>', '*.example.test'],
+    );
+
+    expect(proxy.resolve(Uri.parse('http://printer')), 'DIRECT');
+    expect(proxy.resolve(Uri.parse('http://api.example.test')), 'DIRECT');
+    expect(
+      proxy.resolve(Uri.parse('http://example.com')),
+      'PROXY 127.0.0.1:8080; DIRECT',
+    );
+  });
+
+  test('shares normalized bypass matching with custom proxy settings', () {
+    final rules = ' <LOCAL>, *.Example.Test, .internal.test '.split(',');
+
+    expect(bypassesProxy('printer', rules), isTrue);
+    expect(bypassesProxy('API.EXAMPLE.TEST', rules), isTrue);
+    expect(bypassesProxy('internal.test', rules), isTrue);
+    expect(bypassesProxy('example.com', rules), isFalse);
+  });
+}

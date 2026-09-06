@@ -8,7 +8,15 @@
 pub mod anthropic;
 pub mod ollama;
 pub mod openai_compatible;
-pub mod prompt;
+mod streaming;
+
+fn configured_default_model(default_model: &str) -> Result<String, String> {
+    let default_model = default_model.trim().to_owned();
+    if default_model.is_empty() {
+        return Err("default_model must be configured".to_owned());
+    }
+    Ok(default_model)
+}
 
 #[cfg(feature = "anthropic")]
 pub use anthropic::AnthropicProvider;
@@ -20,6 +28,5 @@ pub use openai_compatible::{
     specs, OpenAiCompatibleProvider, OpenAiCompatibleProviderConfig, OpenAiCompatibleSpec,
 };
 
-/// Back-compat aliases from the pre-`openai_compatible` era.
 pub type OpenAiProviderConfig = OpenAiCompatibleProviderConfig;
 pub type XAiProviderConfig = OpenAiCompatibleProviderConfig;

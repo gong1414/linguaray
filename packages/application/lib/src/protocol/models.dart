@@ -1,4 +1,16 @@
-enum ProtocolAction { translate, settings, ignored }
+enum ProtocolAction {
+  translate,
+  translateSelection,
+  translateInput,
+  translateClipboard,
+  captureTranslate,
+  captureOcr,
+  clipboardOcr,
+  showTranslationWindow,
+  showOcrWindow,
+  settings,
+  ignored,
+}
 
 /// Maximum decoded `text` payload accepted from a `linguaray://` URL.
 const int kProtocolMaxTextBytes = 32 * 1024;
@@ -14,6 +26,8 @@ final class ProtocolCommand {
     : action = ProtocolAction.settings,
       text = null,
       errorCode = null;
+
+  const ProtocolCommand.action(this.action) : text = null, errorCode = null;
 
   const ProtocolCommand.ignored([this.errorCode])
     : action = ProtocolAction.ignored,

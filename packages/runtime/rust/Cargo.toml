@@ -15,13 +15,19 @@ uniffi = { version = "=0.31.2", features = ["cli"] }
 uniffi-dart = { git = "https://github.com/Uniffi-Dart/uniffi-dart.git", branch = "main" }
 aho-corasick.workspace = true
 anyhow = "1"
+base64.workspace = true
 camino = "1"
+csv = "1"
+png = "0.18"
+quick-xml = "0.42"
 serde.workspace = true
 serde_json.workspace = true
 serde_yaml.workspace = true
 struct-patch.workspace = true
 thiserror.workspace = true
+tempfile = "3.27.0"
 tokio.workspace = true
+zip = { version = "=8.6.0", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 arboard = "=3.6.1"
@@ -31,6 +37,7 @@ objc2 = "0.6"
 arboard = "=3.6.1"
 
 [build-dependencies]
+camino = "1"
 uniffi-dart = { git = "https://github.com/Uniffi-Dart/uniffi-dart.git", branch = "main", features = [
   "build",
 ] }

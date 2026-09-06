@@ -19,6 +19,17 @@ abstract interface class GlossaryRepository {
 
   Future<void> deleteEntry({required String bookId, required String entryId});
 
+  Future<String> exportEntries({
+    required String bookId,
+    required GlossaryExchangeFormat format,
+  });
+
+  Future<GlossaryImportSummary> importEntries({
+    required String bookId,
+    required String content,
+    required GlossaryExchangeFormat format,
+  });
+
   Future<List<GlossaryMatchHit>> matchText({
     required String text,
     String? sourceLanguage,

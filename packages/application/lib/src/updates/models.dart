@@ -16,6 +16,10 @@ final class UpdateManifest {
     required this.assetUrl,
     this.checksumSha256,
     this.publishedAt,
+    this.byteLength,
+    this.platformSigned = true,
+    this.signedPayload,
+    this.signatureBase64,
   });
 
   final String version;
@@ -24,6 +28,10 @@ final class UpdateManifest {
   final String assetUrl;
   final String? checksumSha256;
   final String? publishedAt;
+  final int? byteLength;
+  final bool platformSigned;
+  final String? signedPayload;
+  final String? signatureBase64;
 
   bool get hasChecksum =>
       checksumSha256 != null && checksumSha256!.trim().isNotEmpty;

@@ -67,6 +67,25 @@ pub struct VocabularyStore {
 }
 
 impl VocabularyStore {
+    pub(crate) fn validate_backup(data_dir: impl AsRef<Path>) -> Result<(), String> {
+        let path = data_dir.as_ref().join(VOCABULARY_FILE);
+        if !path.exists() {
+            return Ok(());
+        }
+        let content = fs::read_to_string(&path)
+            .map_err(|error| format!("failed to read `{}`: {error}", path.display()))?;
+        let file = serde_json::from_str::<VocabularyFile>(&content)
+            .map_err(|error| format!("failed to parse `{}`: {error}", path.display()))?;
+        if file.version != VOCABULARY_VERSION {
+            return Err(format!(
+                "unsupported vocabulary version {} in `{}`",
+                file.version,
+                path.display()
+            ));
+        }
+        Ok(())
+    }
+
     pub fn load(data_dir: impl AsRef<Path>) -> Self {
         let path = data_dir.as_ref().join(VOCABULARY_FILE);
         let file = match fs::read_to_string(&path) {
@@ -244,48 +263,12 @@ impl VocabularyStore {
     }
 
     fn persist(&self) -> Result<(), String> {
-        let parent = self
-            .path
-            .parent()
-            .ok_or_else(|| "vocabulary path has no parent".to_owned())?;
-        fs::create_dir_all(parent).map_err(|error| {
-            format!(
-                "failed to create vocabulary directory `{}`: {error}",
-                parent.display()
-            )
-        })?;
         let content = serde_json::to_string_pretty(&VocabularyFile {
             version: VOCABULARY_VERSION,
             entries: self.entries.clone(),
         })
         .map_err(|error| format!("failed to encode vocabulary: {error}"))?;
-        let temporary = self.path.with_file_name(format!(
-            ".{}.tmp",
-            self.path
-                .file_name()
-                .and_then(|name| name.to_str())
-                .unwrap_or("vocabulary.json")
-        ));
-        fs::write(&temporary, content).map_err(|error| {
-            format!(
-                "failed to write vocabulary `{}`: {error}",
-                temporary.display()
-            )
-        })?;
-        if self.path.exists() {
-            fs::remove_file(&self.path).map_err(|error| {
-                format!(
-                    "failed to replace vocabulary `{}`: {error}",
-                    self.path.display()
-                )
-            })?;
-        }
-        fs::rename(&temporary, &self.path).map_err(|error| {
-            format!(
-                "failed to commit vocabulary `{}`: {error}",
-                self.path.display()
-            )
-        })
+        crate::storage::write_bytes(&self.path, content.as_bytes())
     }
 }
 
@@ -331,11 +314,16 @@ mod tests {
     use super::*;
 
     fn temp_data_dir() -> PathBuf {
+        static NEXT_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let sequence = NEXT_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let unique = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("time went backwards")
             .as_nanos();
-        let dir = std::env::temp_dir().join(format!("linguaray-vocabulary-{unique}"));
+        let dir = std::env::temp_dir().join(format!(
+            "linguaray-vocabulary-{}-{unique}-{sequence}",
+            std::process::id()
+        ));
         fs::create_dir_all(&dir).expect("create vocabulary test dir");
         dir
     }

@@ -2,10 +2,12 @@ openapi: 3.1.0
 info:
   title: LinguaRay API
   version: 0.1.0
-  description: HTTP API for translation and dictionary lookups.
+  description: Loopback API for LinguaRay actions, translation, and dictionary lookups.
 servers:
   - url: /
 tags:
+  - name: actions
+    description: Ask the running desktop app to perform a user-visible action.
   - name: system
     description: System and documentation endpoints.
   - name: dictionaries
@@ -13,6 +15,94 @@ tags:
   - name: translations
     description: Translation-related endpoints.
 paths:
+  /actions/translate:
+    post:
+      tags: [actions]
+      operationId: requestTextTranslation
+      summary: Show LinguaRay and translate supplied text
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TextActionRequest'
+      responses:
+        '202':
+          $ref: '#/components/responses/ActionAccepted'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+  /actions/translate-selection:
+    post:
+      tags: [actions]
+      operationId: requestSelectionTranslation
+      summary: Translate the current system selection
+      responses:
+        '202':
+          $ref: '#/components/responses/ActionAccepted'
+  /actions/translate-input:
+    post:
+      tags: [actions]
+      operationId: requestInputTranslation
+      summary: Open a cleared input translation window
+      responses:
+        '202':
+          $ref: '#/components/responses/ActionAccepted'
+  /actions/translate-clipboard:
+    post:
+      tags: [actions]
+      operationId: requestClipboardTranslation
+      summary: Translate text from the clipboard
+      responses:
+        '202':
+          $ref: '#/components/responses/ActionAccepted'
+  /actions/capture-translate:
+    post:
+      tags: [actions]
+      operationId: requestCaptureTranslation
+      summary: Capture a region, run OCR, and translate the text
+      responses:
+        '202':
+          $ref: '#/components/responses/ActionAccepted'
+  /actions/capture-ocr:
+    post:
+      tags: [actions]
+      operationId: requestCaptureOcr
+      summary: Capture a region and show OCR text
+      responses:
+        '202':
+          $ref: '#/components/responses/ActionAccepted'
+  /actions/clipboard-ocr:
+    post:
+      tags: [actions]
+      operationId: requestClipboardOcr
+      summary: Recognize an image from the clipboard
+      responses:
+        '202':
+          $ref: '#/components/responses/ActionAccepted'
+  /actions/show-translation-window:
+    post:
+      tags: [actions]
+      operationId: showTranslationWindow
+      summary: Show the existing quick translation window
+      responses:
+        '202':
+          $ref: '#/components/responses/ActionAccepted'
+  /actions/show-ocr-window:
+    post:
+      tags: [actions]
+      operationId: showOcrWindow
+      summary: Show the existing OCR window
+      responses:
+        '202':
+          $ref: '#/components/responses/ActionAccepted'
+  /actions/settings:
+    post:
+      tags: [actions]
+      operationId: openSettings
+      summary: Open LinguaRay settings
+      responses:
+        '202':
+          $ref: '#/components/responses/ActionAccepted'
   /health:
     get:
       tags:
@@ -166,6 +256,12 @@ paths:
           $ref: '#/components/responses/ErrorResponse'
 components:
   responses:
+    ActionAccepted:
+      description: The running desktop app accepted the action.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ActionAcceptedEnvelope'
     ErrorResponse:
       description: Error response
       content:
@@ -173,6 +269,28 @@ components:
           schema:
             $ref: '#/components/schemas/ErrorResponseEnvelope'
   schemas:
+    TextActionRequest:
+      type: object
+      required: [text]
+      properties:
+        text:
+          type: string
+          minLength: 1
+          maxLength: 32768
+    ActionAcceptedEnvelope:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          type: object
+          required: [accepted]
+          properties:
+            accepted:
+              type: boolean
+              const: true
     HealthResponseEnvelope:
       type: object
       required:

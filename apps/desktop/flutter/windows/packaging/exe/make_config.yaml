@@ -1,8 +1,0 @@
-appId: 9DD27DE6-0D88-4CA9-8150-6454E5F2951D
-publisher: LinguaRay contributors
-publisher_url: https://github.com/gong1414/linguaray
-display_name: LinguaRay
-create_desktop_icon: true
-install_dir_name: "{autopf64}\\LinguaRay"
-locales:
-  - zh-Hans

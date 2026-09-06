@@ -15,10 +15,8 @@ class AppDelegate: FlutterAppDelegate {
     return false
   }
 
-  /// Reached when the user clicks the Dock icon, which only exists while
-  /// `DockIconController` has promoted the app to `.regular`. Dart decides what
-  /// to bring forward; returning false stops AppKit from unhiding windows on
-  /// its own.
+  /// Reopening the running accessory app shows Settings on demand.
+  /// Returning false prevents AppKit from restoring another surface.
   override func applicationShouldHandleReopen(
     _ sender: NSApplication,
     hasVisibleWindows flag: Bool

@@ -6,7 +6,7 @@ use linguaray_core::{
     TranslateRequest, TranslateResponse, TranslationError, TranslationService,
 };
 
-use crate::common::http_client::HttpClient;
+use crate::common::{ClassifyHttpResponse, HttpClient};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
@@ -19,8 +19,6 @@ pub struct GoogleProviderConfig {
 }
 
 pub struct GoogleProvider {
-    #[allow(dead_code)]
-    config: GoogleProviderConfig,
     translation_service: GoogleTranslationService,
 }
 
@@ -35,15 +33,13 @@ impl GoogleProvider {
             return Err("api_key must not be empty".to_owned());
         }
         Ok(Self {
-            config: config.clone(),
             translation_service: GoogleTranslationService {
                 api_key: config.api_key,
-                http: HttpClient::new(
+                http: HttpClient::proxy_aware(
                     config
                         .base_url
                         .unwrap_or_else(|| "https://translation.googleapis.com".to_owned()),
-                    Default::default(),
-                ),
+                )?,
             },
         })
     }

@@ -668,9 +668,9 @@ class _TranslationsWorkbenchPlaceholderKo
 
   // Translations
   @override
-  String get history => '즐겨찾기와 기록은 향후 버전에서 제공됩니다';
+  String get history => '이전 번역을 확인, 편집, 즐겨찾기하고 다시 사용합니다';
   @override
-  String get glossary => '용어집 관리를 개발 중입니다';
+  String get glossary => '지정 번역과 금지 번역을 관리합니다';
 }
 
 // Path: workbench.glossary_page
@@ -785,7 +785,7 @@ class _TranslationsWorkbenchTranslationKo
   @override
   String get copy => '복사';
   @override
-  String get favorite_unavailable => '즐겨찾기는 향후 버전에서 제공됩니다';
+  String get favorite_unavailable => '즐겨찾기를 업데이트하지 못했습니다. 다시 시도하세요.';
   @override
   String get preferred => '기본 번역';
   @override
@@ -2330,8 +2330,8 @@ extension on TranslationsKo {
       'workbench.not_configured' => '설정되지 않음',
       'workbench.subtitle.translate' => '워크벤치 · 서비스 비교',
       'workbench.subtitle.settings' => '설정',
-      'workbench.placeholder.history' => '즐겨찾기와 기록은 향후 버전에서 제공됩니다',
-      'workbench.placeholder.glossary' => '용어집 관리를 개발 중입니다',
+      'workbench.placeholder.history' => '이전 번역을 확인, 편집, 즐겨찾기하고 다시 사용합니다',
+      'workbench.placeholder.glossary' => '지정 번역과 금지 번역을 관리합니다',
       'workbench.glossary_page.add_entry' => '용어 추가',
       'workbench.glossary_page.term' => '원문',
       'workbench.glossary_page.translation' => '지정 번역',
@@ -2385,7 +2385,8 @@ extension on TranslationsKo {
       'workbench.translation.service_unavailable' => '서비스를 사용할 수 없음',
       'workbench.translation.waiting' => '번역 대기',
       'workbench.translation.copy' => '복사',
-      'workbench.translation.favorite_unavailable' => '즐겨찾기는 향후 버전에서 제공됩니다',
+      'workbench.translation.favorite_unavailable' =>
+        '즐겨찾기를 업데이트하지 못했습니다. 다시 시도하세요.',
       'workbench.translation.preferred' => '기본 번역',
       'workbench.translation.other_services' => '다른 서비스',
       'workbench.translation.copy_result' => '번역 복사',

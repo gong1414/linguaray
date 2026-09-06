@@ -1,6 +1,6 @@
 #![cfg_attr(not(feature = "youdao"), allow(dead_code))]
 
-use crate::common::http_client::HttpClient;
+use crate::common::{ClassifyHttpResponse, HttpClient};
 use async_trait::async_trait;
 use base64::Engine;
 use linguaray_core::{
@@ -28,8 +28,6 @@ pub struct YoudaoProviderConfig {
 }
 
 pub struct YoudaoProvider {
-    #[allow(dead_code)]
-    config: YoudaoProviderConfig,
     dictionary_service: YoudaoDictionaryService,
     ocr_service: YoudaoOcrService,
     translation_service: YoudaoTranslationService,
@@ -62,14 +60,13 @@ impl YoudaoProvider {
         if config.app_secret.trim().is_empty() {
             return Err("app_secret must not be empty".to_owned());
         }
-        let client = reqwest::Client::default();
+        let client = crate::common::build_http_client()?;
         let base_url = config
             .base_url
             .clone()
             .unwrap_or_else(|| "https://openapi.youdao.com".to_owned());
 
         Ok(Self {
-            config: config.clone(),
             dictionary_service: YoudaoDictionaryService {
                 app_key: config.app_key.clone(),
                 app_secret: config.app_secret.clone(),

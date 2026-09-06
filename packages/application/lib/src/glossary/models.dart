@@ -78,6 +78,20 @@ final class GlossaryEntryDraft {
   final bool wholeWord;
 }
 
+enum GlossaryExchangeFormat { csv, tbx }
+
+final class GlossaryImportSummary {
+  const GlossaryImportSummary({
+    required this.inserted,
+    required this.updated,
+    required this.skipped,
+  });
+
+  final int inserted;
+  final int updated;
+  final int skipped;
+}
+
 final class GlossaryMatchHit {
   const GlossaryMatchHit({
     required this.bookId,

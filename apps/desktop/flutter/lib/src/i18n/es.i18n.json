@@ -208,8 +208,8 @@
       "settings": "Ajustes"
     },
     "placeholder": {
-      "history": "Favoritos e historial estarán disponibles más adelante",
-      "glossary": "La gestión del glosario está en desarrollo"
+      "history": "Revisa, edita, guarda y reutiliza traducciones anteriores",
+      "glossary": "Gestiona términos obligatorios y alternativas prohibidas"
     },
     "glossary_page": {
       "add_entry": "Nueva entrada",
@@ -256,7 +256,7 @@
       "service_unavailable": "Servicio no disponible",
       "waiting": "Esperando traducción",
       "copy": "Copiar",
-      "favorite_unavailable": "Favoritos estará disponible más adelante",
+      "favorite_unavailable": "No se pudo actualizar el favorito. Inténtalo de nuevo.",
       "preferred": "Traducción preferida",
       "other_services": "Otros servicios",
       "copy_result": "Copiar traducción",

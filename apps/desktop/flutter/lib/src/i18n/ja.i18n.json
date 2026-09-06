@@ -208,8 +208,8 @@
       "settings": "設定"
     },
     "placeholder": {
-      "history": "お気に入りと履歴は今後のリリースで提供します",
-      "glossary": "用語集管理は開発中です"
+      "history": "以前の翻訳を確認、編集、お気に入り登録して再利用します",
+      "glossary": "指定訳と禁止する別訳を管理します"
     },
     "glossary_page": {
       "add_entry": "用語を追加",
@@ -256,7 +256,7 @@
       "service_unavailable": "サービスを利用できません",
       "waiting": "翻訳待ち",
       "copy": "コピー",
-      "favorite_unavailable": "お気に入りは今後のリリースで提供します",
+      "favorite_unavailable": "お気に入りを更新できませんでした。もう一度お試しください。",
       "preferred": "優先訳文",
       "other_services": "他のサービス",
       "copy_result": "訳文をコピー",

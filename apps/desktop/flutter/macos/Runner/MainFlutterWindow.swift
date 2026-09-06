@@ -9,17 +9,21 @@ class MainFlutterWindow: NSWindow {
     setFrame(windowFrame, display: true)
 
     RegisterGeneratedPlugins(registry: flutterViewController)
-    MacWindowAppearancePlugin.register(
-      with: flutterViewController.registrar(forPlugin: "MacWindowAppearancePlugin")
+    let presentation = flutterViewController.registrar(
+      forPlugin: "MacAppPresentationPlugin"
     )
-    NativeTextFieldPlugin.register(
-      with: flutterViewController.registrar(forPlugin: "NativeTextFieldPlugin")
+    MacAppPresentationPlugin.register(with: presentation)
+    SpeechPlugin.register(
+      with: flutterViewController.registrar(forPlugin: "SpeechPlugin")
     )
-    NativeTextPlugin.register(
-      with: flutterViewController.registrar(forPlugin: "NativeTextPlugin")
+    ProtocolPlugin.register(
+      with: flutterViewController.registrar(forPlugin: "ProtocolPlugin")
     )
-    MacAppPresentationPlugin.register(
-      with: flutterViewController.registrar(forPlugin: "MacAppPresentationPlugin")
+    SystemProxyPlugin.register(messenger: presentation.messenger)
+    SelectionReplacementPlugin.register(
+      with: flutterViewController.registrar(
+        forPlugin: "SelectionReplacementPlugin"
+      )
     )
 
     super.awakeFromNib()
