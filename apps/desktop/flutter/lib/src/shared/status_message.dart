@@ -37,12 +37,13 @@ class StatusMessage extends StatelessWidget {
         heightFactor: 1,
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: scheme.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: scheme.outlineVariant),
+            color: kind == StatusKind.error
+                ? scheme.errorContainer.withValues(alpha: 0.35)
+                : scheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(12),
           ),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+            padding: const EdgeInsets.all(20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,

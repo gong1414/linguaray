@@ -1,0 +1,12 @@
+[
+  {
+    "date": "2026-09-11",
+    "scope": "app",
+    "genre": "modern-minimal",
+    "designSystem": "DESIGN.md",
+    "structure": "grouped settings directory; source-result reading sheets; OCR document editor",
+    "palette": "neutral white, gray and graphite",
+    "critique": {"philosophy": 4, "hierarchy": 4, "execution": 4, "specificity": 3, "restraint": 5, "variety": 4},
+    "verification": "Native widget and golden tests; web-only gates do not apply. Windows native recapture outstanding."
+  }
+]

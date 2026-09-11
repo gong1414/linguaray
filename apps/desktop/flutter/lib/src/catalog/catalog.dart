@@ -6,6 +6,7 @@ import '../features/about/about_settings_view.dart';
 import '../features/backup/data_transfer_view.dart';
 import '../features/backup/data_transfer_view_model.dart';
 import '../features/integrations/advanced_settings_screen.dart';
+import '../features/library/glossary/glossary_dialogs.dart';
 import '../features/library/glossary/glossary_settings_screen.dart';
 import '../features/library/history/history_view.dart';
 import '../features/library/vocabulary/vocabulary_settings_screen.dart';
@@ -17,6 +18,7 @@ import '../features/providers/providers_settings_view.dart';
 import '../features/services/services_settings_view.dart';
 import '../features/shortcuts/shortcuts_settings_view.dart';
 import '../features/translation/quick_translate/widgets/quick_translate_view.dart';
+import '../features/translation/widgets/dictionary_lookup_dialog.dart';
 import '../features/updates/updates_view.dart';
 import '../platform/platform_types.dart';
 import '../shared/i18n_labels.dart';
@@ -41,6 +43,28 @@ enum CatalogOcrScenario { empty, recognizing, success, continuous, error }
 
 Map<String, Widget> buildCatalogGoldenStates() {
   return {
+    'glossary_book_dialog': const GlossaryBookDialog(
+      languages: [
+        LanguageOption(code: 'en', name: 'English'),
+        LanguageOption(code: 'zh-Hans', name: '简体中文'),
+      ],
+    ),
+    'glossary_entry_dialog': const GlossaryEntryDialog(),
+    'dictionary_dialog': const DictionaryCatalogPreview(),
+    'service_editor_dialog': ServiceEditorView(
+      providers: const [
+        ProviderRecord(
+          id: 'deepl',
+          typeId: 'deepl',
+          displayName: 'DeepL',
+          publicFields: {},
+          storedSecretKeys: {},
+        ),
+      ],
+      serviceKind: 'translation',
+      onSave: (_) {},
+      onCancel: () {},
+    ),
     'providers_configured': const ProvidersCatalogPreview(),
     'provider_models_live': const ProviderModelsCatalogPreview(),
     'provider_models_auth_error': const ProviderModelsCatalogPreview(
@@ -1045,5 +1069,45 @@ class _CatalogShell extends StatelessWidget {
     section: section,
     onSectionSelected: (_) {},
     child: child,
+  );
+}
+
+/// Synthetic fixture for the production dictionary dialog; no provider calls.
+class DictionaryCatalogPreview extends StatelessWidget {
+  const DictionaryCatalogPreview({super.key});
+
+  @override
+  Widget build(BuildContext context) => DictionaryLookupDialog(
+    labels: const DictionaryLookupDialogLabels(
+      title: '词典',
+      pronunciation: '发音',
+      speak: '朗读',
+      definitions: '释义',
+      save: '保存到生词本',
+      saved: '已保存',
+      close: '关闭',
+      empty: '暂无结果',
+      lookupFailed: '查询失败',
+      saveFailed: '保存失败',
+    ),
+    lookup: Future.value(
+      const DictionaryEntry(
+        word: 'language',
+        providerName: 'ECDICT',
+        serviceId: 'ecdict+dictionary',
+        translations: ['语言；表达方式'],
+        pronunciations: [
+          DictionaryPronunciation(text: '/ˈlæŋɡwɪdʒ/', accent: 'US'),
+        ],
+        definitions: [
+          DictionaryDefinition(
+            partOfSpeech: 'noun',
+            values: ['A system of words used to communicate.'],
+          ),
+        ],
+      ),
+    ),
+    onSave: (_) async {},
+    onSpeak: (_) async {},
   );
 }

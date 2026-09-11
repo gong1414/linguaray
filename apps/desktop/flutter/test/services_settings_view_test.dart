@@ -3,8 +3,59 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:linguaray_application/linguaray_application.dart';
 import 'package:linguaray_desktop/src/features/services/services_settings_view.dart';
 import 'package:linguaray_desktop/src/shared/settings_labels.dart';
+import 'package:linguaray_ui/linguaray_ui.dart';
 
 void main() {
+  testWidgets(
+    'service editor keeps provider selection and trims a custom name',
+    (tester) async {
+      tester.view
+        ..devicePixelRatio = 1
+        ..physicalSize = const Size(440, 520);
+      addTearDown(tester.view.reset);
+      ServiceDraft? saved;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: LinguaRayMaterialTheme.light(),
+          home: ServiceEditorView(
+            providers: const [
+              ProviderRecord(
+                id: 'first',
+                typeId: 'deepl',
+                displayName: 'First',
+                publicFields: {},
+                storedSecretKeys: {},
+              ),
+              ProviderRecord(
+                id: 'second',
+                typeId: 'deepl',
+                displayName: 'Second',
+                publicFields: {},
+                storedSecretKeys: {},
+              ),
+            ],
+            serviceKind: 'ocr',
+            onSave: (value) => saved = value,
+            onCancel: () {},
+          ),
+        ),
+      );
+      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Second').last);
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), '  My OCR  ');
+      await tester.tap(find.byType(FilledButton));
+      expect(saved?.providerId, 'second');
+      expect(saved?.kind, 'ocr');
+      expect(saved?.name, 'My OCR');
+      await tester.enterText(find.byType(TextField), ' ');
+      await tester.tap(find.byType(FilledButton));
+      expect(saved?.name, 'second ocr');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('translation services page exposes the built-in dictionary', (
     tester,
   ) async {

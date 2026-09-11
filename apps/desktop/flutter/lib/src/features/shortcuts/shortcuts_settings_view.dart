@@ -35,7 +35,7 @@ class ShortcutsSettingsView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final cardColor = theme.colorScheme.surfaceContainerLowest;
+    final cardColor = theme.colorScheme.surfaceContainerLow;
     return SettingsPage(
       title: title ?? labels.title,
       children: [
@@ -60,8 +60,7 @@ class ShortcutsSettingsView extends StatelessWidget {
         DecoratedBox(
           decoration: BoxDecoration(
             color: cardColor,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: theme.colorScheme.outlineVariant),
+            borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
             children: [

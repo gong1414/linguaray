@@ -56,6 +56,44 @@ LinguaRay 启动后常驻菜单栏，不会自动弹出主界面。翻译动作�
 旧 Tauri 原型的数据迁移，以及自动用译文替换选中原文明确不在当前范围内。尚未达到
 功能测试与平台验收标准的入口会保持隐藏，不以半成品对外展示。
 
+## 界面预览
+
+界面采用中性白与石墨灰，统一分组导航、翻译阅读区以及浅色和深色主题。以下为使用示例内容的 Widgetbook 截图，分别在对应操作系统上生成。
+
+### macOS
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="apps/desktop/flutter/test/goldens/catalog/quick_success_dark_macos.png">
+  <img alt="macOS · 快捷翻译" src="apps/desktop/flutter/test/goldens/catalog/quick_success_light_macos.png" width="880">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="apps/desktop/flutter/test/goldens/catalog/settings_general_dark_macos.png">
+  <img alt="macOS · 偏好设置" src="apps/desktop/flutter/test/goldens/catalog/settings_general_light_macos.png" width="880">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="apps/desktop/flutter/test/goldens/catalog/ocr_success_dark_macos.png">
+  <img alt="macOS · 文字识别" src="apps/desktop/flutter/test/goldens/catalog/ocr_success_light_macos.png" width="880">
+</picture>
+
+### Windows
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="apps/desktop/flutter/test/goldens/catalog/quick_success_dark_windows.png">
+  <img alt="Windows · 快捷翻译" src="apps/desktop/flutter/test/goldens/catalog/quick_success_light_windows.png" width="880">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="apps/desktop/flutter/test/goldens/catalog/settings_general_dark_windows.png">
+  <img alt="Windows · 偏好设置" src="apps/desktop/flutter/test/goldens/catalog/settings_general_light_windows.png" width="880">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="apps/desktop/flutter/test/goldens/catalog/ocr_success_dark_windows.png">
+  <img alt="Windows · 文字识别" src="apps/desktop/flutter/test/goldens/catalog/ocr_success_light_windows.png" width="880">
+</picture>
+
 ## 平台支持
 
 | 平台 | 最低版本 | 构建状态 |

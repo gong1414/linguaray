@@ -87,7 +87,7 @@ class QuickTranslateCommandHeader extends StatelessWidget {
       children: [
         Row(
           children: [
-            const BrandLogo(size: 18),
+            const BrandLogo(size: 22),
             const SizedBox(width: 8),
             Expanded(
               child: GestureDetector(
@@ -148,10 +148,10 @@ class QuickTranslateCommandHeader extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(8),
+            color: Theme.of(context).colorScheme.surfaceContainerLowest,
+            borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
             children: [

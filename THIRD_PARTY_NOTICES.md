@@ -1,5 +1,14 @@
 # Third-party notices
 
+## Project-local design skills
+
+`.agents/skills/hallmark` is from [Hallmark](https://github.com/nutlope/hallmark)
+by Together AI, under the MIT license (included in that directory).
+`.agents/skills/impeccable` is from
+[Impeccable](https://github.com/pbakaus/impeccable) by Paul Bakaus, under
+Apache-2.0 (LICENSE and NOTICE.md included in that directory). These are
+development skills, not dependencies shipped with the desktop application.
+
 ## Flutter desktop templates
 
 The macOS and Windows runner scaffolding was generated from the Flutter SDK

@@ -31,3 +31,16 @@ __pycache__/
 
 # Flutter golden comparison artifacts
 **/test/failures/
+
+# Project-local design tooling: retain skills and shared design contracts.
+.impeccable/runtime/
+.impeccable/config.local.json
+.impeccable/hook.cache.json
+.impeccable/hook.pending.json
+.impeccable/*.png
+.impeccable/review/
+.impeccable/questions/
+.impeccable/live/server.json
+.impeccable/live/sessions/
+.impeccable/live/previews/
+.impeccable/live/cache/

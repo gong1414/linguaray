@@ -129,7 +129,7 @@ class _OcrViewState extends State<OcrView> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
-                    Icons.text_snippet_outlined,
+                    Icons.document_scanner_outlined,
                     size: 40,
                     color: theme.colorScheme.outline,
                   ),
@@ -152,7 +152,7 @@ class _OcrViewState extends State<OcrView> {
               textAlignVertical: TextAlignVertical.top,
               onChanged: widget.onTextChanged,
               style: theme.textTheme.bodyLarge?.copyWith(
-                fontSize: 17,
+                fontSize: 18,
                 height: 1.7,
               ),
               decoration: InputDecoration(
@@ -181,7 +181,7 @@ class _OcrViewState extends State<OcrView> {
       child: Focus(
         autofocus: true,
         child: Scaffold(
-          backgroundColor: theme.colorScheme.surfaceContainerLowest,
+          backgroundColor: theme.colorScheme.surface,
           body: SafeArea(
             child: Column(
               children: [
@@ -244,45 +244,21 @@ class _OcrViewState extends State<OcrView> {
                       title: labels.errorMessage(state.errorCode),
                     ),
                   ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Wrap(spacing: 8, runSpacing: 8, children: sources),
+                  ),
+                ),
                 Expanded(
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      if (constraints.maxWidth < 560) {
-                        return Column(
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: Wrap(
-                                spacing: 8,
-                                runSpacing: 6,
-                                children: sources,
-                              ),
-                            ),
-                            Expanded(child: editor),
-                          ],
-                        );
-                      }
-                      return Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Container(
-                            width: 166,
-                            color: theme.colorScheme.surface,
-                            child: ListView(
-                              padding: const EdgeInsets.all(16),
-                              children: [
-                                for (final source in sources)
-                                  Padding(
-                                    padding: const EdgeInsets.only(bottom: 12),
-                                    child: source,
-                                  ),
-                              ],
-                            ),
-                          ),
-                          Expanded(child: editor),
-                        ],
-                      );
-                    },
+                  child: Container(
+                    margin: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceContainerLowest,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: editor,
                   ),
                 ),
               ],

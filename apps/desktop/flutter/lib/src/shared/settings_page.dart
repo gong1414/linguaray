@@ -25,13 +25,13 @@ class SettingsPage extends StatelessWidget {
     return Material(
       color: theme.colorScheme.surfaceContainerLowest,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(32, 32, 32, 32),
+        padding: const EdgeInsets.fromLTRB(28, 28, 28, 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             LayoutBuilder(
               builder: (context, constraints) {
-                final stacked = constraints.maxWidth < 760;
+                final stacked = constraints.maxWidth < 620;
                 final buttons = Wrap(
                   spacing: 8,
                   runSpacing: 8,
@@ -69,6 +69,8 @@ class SettingsPage extends StatelessWidget {
                 );
               },
             ),
+            const SizedBox(height: 16),
+            const Divider(),
             const SizedBox(height: 24),
             if (toolbar != null) ...[toolbar!, const SizedBox(height: 20)],
             Expanded(
@@ -81,4 +83,90 @@ class SettingsPage extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Open sections group related settings without nesting cards inside pages.
+class SettingsSectionBlock extends StatelessWidget {
+  const SettingsSectionBlock({
+    required this.title,
+    required this.children,
+    this.description,
+    super.key,
+  });
+
+  final String title;
+  final String? description;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 28),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(title, style: Theme.of(context).textTheme.titleMedium),
+        if (description != null) ...[
+          const SizedBox(height: 6),
+          Text(description!, style: Theme.of(context).textTheme.bodySmall),
+        ],
+        const SizedBox(height: 16),
+        ...children,
+      ],
+    ),
+  );
+}
+
+/// Settings actions wrap below their description when a desktop pane narrows.
+class SettingsActionRow extends StatelessWidget {
+  const SettingsActionRow({
+    required this.title,
+    required this.description,
+    required this.action,
+    this.leading,
+    super.key,
+  });
+
+  final String title;
+  final String description;
+  final Widget action;
+  final Widget? leading;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 20),
+    child: LayoutBuilder(
+      builder: (context, constraints) {
+        final text = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: Theme.of(context).textTheme.titleMedium),
+            if (description.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(description, style: Theme.of(context).textTheme.bodySmall),
+            ],
+          ],
+        );
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (leading != null) ...[leading!, const SizedBox(width: 16)],
+            Expanded(
+              child: constraints.maxWidth < 540
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [text, const SizedBox(height: 12), action],
+                    )
+                  : Row(
+                      children: [
+                        Expanded(child: text),
+                        const SizedBox(width: 24),
+                        action,
+                      ],
+                    ),
+            ),
+          ],
+        );
+      },
+    ),
+  );
 }

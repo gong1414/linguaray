@@ -1,0 +1,424 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-11T11:59:57.323071+00:00",
+  "title": "Design System: LinguaRay",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Primary"
+      },
+      "on-primary": {
+        "role": "primary",
+        "displayName": "On Primary"
+      },
+      "primary-container": {
+        "role": "primary",
+        "displayName": "Primary Container"
+      },
+      "secondary": {
+        "role": "secondary",
+        "displayName": "Secondary"
+      },
+      "warning": {
+        "role": "tertiary",
+        "displayName": "Warning"
+      },
+      "warning-container": {
+        "role": "tertiary",
+        "displayName": "Warning Container"
+      },
+      "error": {
+        "role": "error",
+        "displayName": "Error"
+      },
+      "error-container": {
+        "role": "error",
+        "displayName": "Error Container"
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Surface"
+      },
+      "surface-container-lowest": {
+        "role": "neutral",
+        "displayName": "Surface Container Lowest"
+      },
+      "surface-container-low": {
+        "role": "neutral",
+        "displayName": "Surface Container Low"
+      },
+      "surface-container": {
+        "role": "neutral",
+        "displayName": "Surface Container"
+      },
+      "surface-container-high": {
+        "role": "neutral",
+        "displayName": "Surface Container High"
+      },
+      "surface-container-highest": {
+        "role": "neutral",
+        "displayName": "Surface Container Highest"
+      },
+      "on-surface": {
+        "role": "neutral",
+        "displayName": "On Surface"
+      },
+      "on-surface-variant": {
+        "role": "neutral",
+        "displayName": "On Surface Variant"
+      },
+      "outline": {
+        "role": "neutral",
+        "displayName": "Outline"
+      },
+      "outline-variant": {
+        "role": "neutral",
+        "displayName": "Outline Variant"
+      },
+      "field-fill": {
+        "role": "neutral",
+        "displayName": "Field Fill"
+      },
+      "dark-primary": {
+        "role": "primary",
+        "displayName": "Dark Primary"
+      },
+      "dark-on-primary": {
+        "role": "primary",
+        "displayName": "Dark On Primary"
+      },
+      "dark-primary-container": {
+        "role": "primary",
+        "displayName": "Dark Primary Container"
+      },
+      "dark-secondary": {
+        "role": "secondary",
+        "displayName": "Dark Secondary"
+      },
+      "dark-warning": {
+        "role": "tertiary",
+        "displayName": "Dark Warning"
+      },
+      "dark-warning-container": {
+        "role": "tertiary",
+        "displayName": "Dark Warning Container"
+      },
+      "dark-error": {
+        "role": "error",
+        "displayName": "Dark Error"
+      },
+      "dark-error-container": {
+        "role": "error",
+        "displayName": "Dark Error Container"
+      },
+      "dark-surface": {
+        "role": "neutral",
+        "displayName": "Dark Surface"
+      },
+      "dark-surface-container-lowest": {
+        "role": "neutral",
+        "displayName": "Dark Surface Container Lowest"
+      },
+      "dark-surface-container-low": {
+        "role": "neutral",
+        "displayName": "Dark Surface Container Low"
+      },
+      "dark-surface-container": {
+        "role": "neutral",
+        "displayName": "Dark Surface Container"
+      },
+      "dark-surface-container-high": {
+        "role": "neutral",
+        "displayName": "Dark Surface Container High"
+      },
+      "dark-surface-container-highest": {
+        "role": "neutral",
+        "displayName": "Dark Surface Container Highest"
+      },
+      "dark-on-surface": {
+        "role": "neutral",
+        "displayName": "Dark On Surface"
+      },
+      "dark-on-surface-variant": {
+        "role": "neutral",
+        "displayName": "Dark On Surface Variant"
+      },
+      "dark-outline": {
+        "role": "neutral",
+        "displayName": "Dark Outline"
+      },
+      "dark-outline-variant": {
+        "role": "neutral",
+        "displayName": "Dark Outline Variant"
+      }
+    },
+    "typographyMeta": {
+      "headline-medium": {
+        "displayName": "Medium headline",
+        "purpose": "Display family; Material headlineMedium."
+      },
+      "title-large": {
+        "displayName": "Page title",
+        "purpose": "Display family; SettingsPage heading."
+      },
+      "title-medium": {
+        "displayName": "Section or row title",
+        "purpose": "System text family."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Shared bodyLarge and bodyMedium dimensions."
+      },
+      "translation-source": {
+        "displayName": "Translation source",
+        "purpose": "Feature override of body text."
+      },
+      "translation-result": {
+        "displayName": "Translation result",
+        "purpose": "Primary reading content; feature override."
+      },
+      "ocr-editor": {
+        "displayName": "OCR editor",
+        "purpose": "Expanding editable text; feature override."
+      }
+    },
+    "breakpoints": [
+      {
+        "name": "settings-sidebar",
+        "value": "900px"
+      },
+      {
+        "name": "settings-header-actions",
+        "value": "620px"
+      },
+      {
+        "name": "settings-action-row",
+        "value": "540px"
+      },
+      {
+        "name": "translation-columns",
+        "value": "568px"
+      }
+    ],
+    "native": {
+      "platform": "Flutter desktop / Material 3",
+      "units": "Flutter logical pixels; px in portable frontmatter does not mean CSS pixels.",
+      "source": "packages/ui_flutter/lib/src/theme/material_theme.dart",
+      "fonts": {
+        "macOS": {
+          "display": "CupertinoSystemDisplay",
+          "text": "CupertinoSystemText",
+          "fallback": [
+            "PingFang SC",
+            "Helvetica Neue",
+            "sans-serif"
+          ]
+        },
+        "Windows": {
+          "display": "Segoe UI",
+          "text": "Segoe UI",
+          "fallback": [
+            "Microsoft YaHei UI",
+            "Microsoft YaHei",
+            "sans-serif"
+          ]
+        }
+      },
+      "density": {
+        "value": "VisualDensity.compact",
+        "note": "minimumSize is an input to native layout, not a rendered size or hit-target guarantee. SegmentedButton explicitly uses shrinkWrap tap targets."
+      },
+      "breakpointContexts": {
+        "settings-sidebar": "Shell maxWidth below threshold narrows sidebar.",
+        "settings-header-actions": "Heading content maxWidth below threshold moves actions below title.",
+        "settings-action-row": "Row maxWidth below threshold stacks action below description.",
+        "translation-columns": "Content maxWidth at least threshold and visible source produces equal-width columns."
+      },
+      "elevation": {
+        "flat": {
+          "value": 0,
+          "uses": [
+            "card",
+            "search bar",
+            "app bar",
+            "dialog"
+          ]
+        },
+        "popup-menu": {
+          "value": 4,
+          "uses": [
+            "PopupMenuThemeData"
+          ]
+        }
+      },
+      "stateTreatment": {
+        "splash": "NoSplash.splashFactory",
+        "hover": "onSurface alpha 0.035",
+        "highlight": "onSurface alpha 0.045",
+        "focus": "primary alpha 0.16",
+        "selection": "primary alpha 0.22",
+        "focusedFieldBorder": "primary alpha 0.75, width 1.25",
+        "note": "Material controls may resolve component-specific state overlays."
+      },
+      "timing": {
+        "tooltipWaitMilliseconds": 400,
+        "note": "No custom global motion curve or duration is defined."
+      },
+      "components": [
+        {
+          "name": "Filled button",
+          "kind": "button",
+          "refersTo": "button-primary",
+          "source": "packages/ui_flutter/lib/src/theme/material_theme.dart",
+          "widget": "FilledButton",
+          "description": "Primary action using the active scheme; the dark variant resolves dark-primary and dark-on-primary.",
+          "minimumSize": {
+            "width": 0,
+            "height": 36
+          }
+        },
+        {
+          "name": "Outlined button",
+          "kind": "button",
+          "source": "packages/ui_flutter/lib/src/theme/material_theme.dart",
+          "widget": "OutlinedButton",
+          "description": "Secondary action with control corners and 12 horizontal padding.",
+          "minimumSize": {
+            "width": 0,
+            "height": 36
+          }
+        },
+        {
+          "name": "Text button",
+          "kind": "button",
+          "source": "packages/ui_flutter/lib/src/theme/material_theme.dart",
+          "widget": "TextButton",
+          "description": "Quiet action with 10 horizontal padding; shape stays inherited unless locally overridden.",
+          "minimumSize": {
+            "width": 0,
+            "height": 32
+          }
+        },
+        {
+          "name": "Text field",
+          "kind": "input",
+          "refersTo": "input",
+          "source": "packages/ui_flutter/lib/src/theme/material_theme.dart",
+          "widget": "InputDecorationTheme",
+          "description": "Persistent floating label and outline-variant border; dark fill uses surfaceContainerLow."
+        },
+        {
+          "name": "Search",
+          "kind": "input",
+          "refersTo": "search",
+          "source": "packages/ui_flutter/lib/src/theme/material_theme.dart",
+          "widget": "SearchBarThemeData",
+          "description": "Constrained height with a fine outline and no elevation."
+        },
+        {
+          "name": "Settings destination",
+          "kind": "nav",
+          "refersTo": "settings-destination-selected",
+          "source": "apps/desktop/flutter/lib/src/app/navigation/settings_shell_view.dart",
+          "widget": "TextButton",
+          "description": "Selected semantics, primary fill, on-primary label; inactive labels use onSurfaceVariant.",
+          "minimumSize": {
+            "width": 0,
+            "height": 36
+          }
+        },
+        {
+          "name": "Chip",
+          "kind": "chip",
+          "source": "packages/ui_flutter/lib/src/theme/material_theme.dart",
+          "widget": "ChipThemeData",
+          "description": "Small-control corners, outlineVariant stroke and primaryContainer selection; showCheckmark is false."
+        },
+        {
+          "name": "Card",
+          "kind": "card",
+          "refersTo": "card",
+          "source": "packages/ui_flutter/lib/src/theme/material_theme.dart",
+          "widget": "CardThemeData",
+          "description": "Flat, zero-margin surface with an outlineVariant border; use open sections for settings groups."
+        },
+        {
+          "name": "Reading sheets",
+          "kind": "custom",
+          "refersTo": "reading-sheet",
+          "source": "apps/desktop/flutter/lib/src/features/translation/quick_translate/widgets/quick_translate_view.dart",
+          "widget": "Container",
+          "description": "Subdued source sheet and clear result sheet; layout changes with content width and source visibility."
+        },
+        {
+          "name": "Dialog",
+          "kind": "custom",
+          "refersTo": "dialog",
+          "source": "packages/ui_flutter/lib/src/theme/material_theme.dart",
+          "widget": "DialogThemeData",
+          "description": "Flat bordered surface with titleLarge-derived 20 logical-pixel title."
+        }
+      ],
+      "previewPolicy": "Native components are described here. HTML/CSS component previews and synthetic tonal ramps are intentionally omitted because they would not validate Flutter rendering.",
+      "validation": {
+        "source": "Implementation and finish-review handoff; documentation agent did not independently inspect pixels.",
+        "macOSGoldens": 92,
+        "workspaceTests": 244,
+        "macOSDebugBuild": "passed",
+        "finishReview": "No further macOS visual fixes reported.",
+        "settingsLayoutCoverage": "14 destinations at 780x520 and 1000x700 in light/dark and macOS/Windows theme variants on the macOS test host.",
+        "windowsNativeRecapture": "outstanding",
+        "limitation": "Windows theme variants on macOS are not native Windows visual evidence.",
+        "analysis": "dart run melos run analyze passed",
+        "reviewRecord": ".impeccable/critique/desktop.md"
+      }
+    }
+  },
+  "components": [],
+  "narrative": {
+    "northStar": "A quiet desktop reading instrument",
+    "overview": "White, cool gray and graphite keep the controls legible and let translated text\ncarry the page. Light and dark themes share the same hierarchy: a subdued window\ncanvas, a distinct reading surface and strong neutral actions. The canonical\nLinguaRay mark remains an identity asset; its colors do not become interface accents.\n\nThis is a native Flutter Material 3 system. The frontmatter records implemented\ntokens from `packages/ui_flutter/lib/src/theme/material_theme.dart` and the shared\ndesktop components. Values written as `px` are Flutter logical pixels, not CSS or\nphysical display pixels. Update this record with the executable source when tokens\nchange; unspecified Material properties retain their framework defaults.",
+    "keyCharacteristics": [
+      "Neutral action contrast in both themes.",
+      "System typography with distinct display and text families on macOS.",
+      "Flat sections, fine borders and readable text sheets.",
+      "Compact desktop controls with responsive wrapping."
+    ],
+    "rules": [
+      {
+        "name": "The Semantic Color Rule",
+        "body": "Product widgets consume the active ColorScheme;\nreusable palette changes belong in LinguaRayMaterialTheme.",
+        "section": "colors"
+      },
+      {
+        "name": "The Reading Role Rule",
+        "body": "Translation source, translation result and OCR editor\nsizes are feature-specific overrides of body text, not global body replacements.\n",
+        "section": "typography"
+      },
+      {
+        "name": "The Density Rule",
+        "body": "`VisualDensity.compact` modifies component constraints.\nButton minimum sizes are style inputs, not guaranteed painted or hit-target\ndimensions; measure the native widget when verifying target size.\n",
+        "section": "layout"
+      },
+      {
+        "name": "The Flat Surface Rule",
+        "body": "Use spacing, surface roles and fine borders to group\ncontent; reserve popup elevation for the implemented transient menu treatment.\n",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do use LinguaRayMaterialTheme and the shared settings frame for new surfaces.",
+      "Do preserve localized labels, focus behavior and loading, empty and error states.",
+      "Do keep the canonical LinguaRay brand assets and native window contract.",
+      "Do verify native layouts in Widgetbook, widget tests and host-specific goldens.",
+      "Do recapture Windows baselines on Windows before claiming Windows visual validation."
+    ],
+    "donts": [
+      "Don't add decorative gradients, colored status stripes or nested settings cards.",
+      "Don't infer rendered hit-target dimensions from minimumSize alone.",
+      "Don't add duplicate title chrome or an additional onboarding window.",
+      "Don't treat a browser detector or successful golden generation as a native visual verdict."
+    ]
+  }
+}

@@ -45,6 +45,7 @@ class PermissionsSettingsView extends StatelessWidget {
             labels: labels,
             onGrant: onGrantAccessibility,
           ),
+          const Divider(),
           _PermissionTile(
             title: labels.screenRecording,
             hint: labels.screenRecordingHint,
@@ -98,14 +99,27 @@ class _PermissionTile extends StatelessWidget {
       ),
     };
 
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      title: Text(title),
-      subtitle: Text('$hint\n$status', style: TextStyle(color: color)),
-      isThreeLine: true,
-      trailing: grant
-          ? FilledButton(onPressed: onGrant, child: Text(labels.grant))
-          : Icon(Icons.check_circle_outline_rounded, color: color),
+    return SettingsActionRow(
+      title: title,
+      description: hint,
+      leading: Icon(
+        grant ? Icons.lock_outline_rounded : Icons.verified_user_outlined,
+        color: color,
+      ),
+      action: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            status,
+            style: Theme.of(context).textTheme.labelMedium
+                ?.copyWith(color: color),
+          ),
+          if (grant) ...[
+            const SizedBox(height: 8),
+            FilledButton(onPressed: onGrant, child: Text(labels.grant)),
+          ],
+        ],
+      ),
     );
   }
 }

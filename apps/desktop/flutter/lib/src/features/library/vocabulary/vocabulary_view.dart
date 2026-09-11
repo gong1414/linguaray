@@ -110,7 +110,16 @@ class VocabularyView extends StatelessWidget {
       itemBuilder: (context, index) {
         final entry = snapshot.entries[index];
         return ListTile(
-          title: Text(entry.word),
+          leading: const Icon(Icons.bookmark_border_rounded, size: 20),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 16,
+          ),
+          title: Text(
+            entry.word,
+            style: Theme.of(context).textTheme.titleMedium
+                ?.copyWith(fontSize: 18),
+          ),
           subtitle: Text(
             [
               entry.translation,

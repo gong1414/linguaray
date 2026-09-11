@@ -272,10 +272,10 @@ class _QuickTranslateViewState extends State<QuickTranslateView> {
       child: CallbackShortcuts(
         bindings: submitBindings,
         child: Material(
-          color: theme.colorScheme.surfaceContainerLowest,
+          color: theme.colorScheme.surface,
           child: SingleChildScrollView(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -359,7 +359,11 @@ class _QuickTranslateViewState extends State<QuickTranslateView> {
                             final sourcePane = Container(
                               key: const ValueKey('quick-source-pane'),
                               constraints: const BoxConstraints(minHeight: 0),
-                              padding: const EdgeInsets.all(12),
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.surfaceContainerLow,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                               child: _sourceVisible
                                   ? input
                                   : InkWell(
@@ -390,48 +394,35 @@ class _QuickTranslateViewState extends State<QuickTranslateView> {
                             final resultPane = Container(
                               key: const ValueKey('quick-result-pane'),
                               constraints: const BoxConstraints(minHeight: 0),
-                              padding: const EdgeInsets.all(12),
-                              color: theme.colorScheme.surface,
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.surfaceContainerLowest,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                               child: result,
                             );
-                            return DecoratedBox(
-                              decoration: BoxDecoration(
-                                border: Border.all(
-                                  color: theme.colorScheme.outlineVariant,
-                                ),
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(16),
-                                child: wide
-                                    ? IntrinsicHeight(
-                                        child: Row(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.stretch,
-                                          children: [
-                                            Expanded(child: sourcePane),
-                                            VerticalDivider(
-                                              width: 1,
-                                              color: theme
-                                                  .colorScheme
-                                                  .outlineVariant,
-                                            ),
-                                            Expanded(child: resultPane),
-                                          ],
-                                        ),
-                                      )
-                                    : Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.stretch,
-                                        children: [
-                                          sourcePane,
-                                          const Divider(),
-                                          resultPane,
-                                        ],
-                                      ),
-                              ),
-                            );
+                            return wide
+                                ? IntrinsicHeight(
+                                    child: Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        Expanded(child: sourcePane),
+                                        const SizedBox(width: 12),
+                                        Expanded(child: resultPane),
+                                      ],
+                                    ),
+                                  )
+                                : Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      sourcePane,
+                                      const SizedBox(height: 12),
+                                      resultPane,
+                                    ],
+                                  );
                           },
                         ),
                         if (widget.notice != QuickTranslateNotice.none)

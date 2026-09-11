@@ -1,0 +1,12 @@
+{
+  "framework": "Flutter desktop with Material 3",
+  "scope": "apps/desktop/flutter and packages/ui_flutter",
+  "fontSource": "packages/ui_flutter/lib/src/theme/material_theme.dart",
+  "fonts": ["CupertinoSystemDisplay", "CupertinoSystemText", "Segoe UI"],
+  "designSystem": "DESIGN.md",
+  "brandSource": "assets/brand/linguaray",
+  "motion": "native Material state transitions",
+  "oldStructure": "80px icon rail and horizontal second-level navigation",
+  "replacementStructure": "grouped direct-navigation sidebar and open sections",
+  "userConstraint": "No navy interface palette"
+}

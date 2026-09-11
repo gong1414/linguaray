@@ -83,118 +83,125 @@ class AdvancedSettingsView extends StatelessWidget {
     return SettingsPage(
       title: labels.title,
       children: [
-        Text(labels.apiServerDescription),
-        if (status != null)
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text(labels.enable),
-            value: status.enabled,
-            onChanged: onApiEnabledChanged,
-          ),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          title: Text(labels.port),
-          trailing: SizedBox(
-            width: 96,
-            child: TextField(
-              controller: portController,
-              keyboardType: TextInputType.number,
-              onSubmitted: onPortSubmitted,
-            ),
-          ),
-        ),
-        if (status?.baseUrl != null) ...[
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text('${labels.runningAt} ${status!.baseUrl}'),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  tooltip: labels.copied,
-                  onPressed: () =>
-                      Clipboard.setData(ClipboardData(text: status.baseUrl!)),
-                  icon: const Icon(Icons.copy_rounded),
-                ),
-                IconButton(
-                  onPressed: () => onOpenUrl(status.baseUrl!),
-                  icon: const Icon(Icons.open_in_new_rounded),
-                ),
-              ],
-            ),
-          ),
-        ],
-        if (state.apiError != null)
-          StatusMessage(
-            kind: StatusKind.error,
-            title: labels.errorMessage(state.apiError),
-          ),
-        const SizedBox(height: 24),
-        const Divider(),
-        const SizedBox(height: 16),
-        Text(labels.network, style: Theme.of(context).textTheme.titleMedium),
-        if (network != null) ...[
-          const SizedBox(height: 8),
-          DropdownButtonFormField<NetworkProxyMode>(
-            initialValue: network.proxyMode,
-            decoration: InputDecoration(labelText: labels.proxyMode),
-            items: [
-              DropdownMenuItem(
-                value: NetworkProxyMode.system,
-                child: Text(labels.proxySystem),
+        SettingsSectionBlock(
+          title: labels.enable,
+          description: labels.apiServerDescription,
+          children: [
+            if (status != null)
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(labels.enable),
+                value: status.enabled,
+                onChanged: onApiEnabledChanged,
               ),
-              DropdownMenuItem(
-                value: NetworkProxyMode.direct,
-                child: Text(labels.proxyDirect),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(labels.port),
+              trailing: SizedBox(
+                width: 96,
+                child: TextField(
+                  controller: portController,
+                  keyboardType: TextInputType.number,
+                  onSubmitted: onPortSubmitted,
+                ),
               ),
-              DropdownMenuItem(
-                value: NetworkProxyMode.custom,
-                child: Text(labels.proxyCustom),
+            ),
+            if (status?.baseUrl != null) ...[
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text('${labels.runningAt} ${status!.baseUrl}'),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      tooltip: labels.copied,
+                      onPressed: () => Clipboard.setData(
+                        ClipboardData(text: status.baseUrl!),
+                      ),
+                      icon: const Icon(Icons.copy_rounded),
+                    ),
+                    IconButton(
+                      onPressed: () => onOpenUrl(status.baseUrl!),
+                      icon: const Icon(Icons.open_in_new_rounded),
+                    ),
+                  ],
+                ),
               ),
             ],
-            onChanged: (mode) {
-              if (mode != null) onProxyModeChanged(mode);
-            },
-          ),
-          if (network.proxyMode == NetworkProxyMode.custom) ...[
-            const SizedBox(height: 12),
-            TextField(
-              controller: proxyUrlController,
-              decoration: InputDecoration(
-                labelText: labels.proxyUrl,
-                hintText: labels.proxyUrlHint,
+            if (state.apiError != null)
+              StatusMessage(
+                kind: StatusKind.error,
+                title: labels.errorMessage(state.apiError),
               ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: proxyBypassController,
-              decoration: InputDecoration(
-                labelText: labels.proxyBypass,
-                hintText: labels.proxyBypassHint,
+          ],
+        ),
+        SettingsSectionBlock(
+          title: labels.network,
+          children: [
+            if (network != null) ...[
+              const SizedBox(height: 8),
+              DropdownButtonFormField<NetworkProxyMode>(
+                initialValue: network.proxyMode,
+                decoration: InputDecoration(labelText: labels.proxyMode),
+                items: [
+                  DropdownMenuItem(
+                    value: NetworkProxyMode.system,
+                    child: Text(labels.proxySystem),
+                  ),
+                  DropdownMenuItem(
+                    value: NetworkProxyMode.direct,
+                    child: Text(labels.proxyDirect),
+                  ),
+                  DropdownMenuItem(
+                    value: NetworkProxyMode.custom,
+                    child: Text(labels.proxyCustom),
+                  ),
+                ],
+                onChanged: (mode) {
+                  if (mode != null) onProxyModeChanged(mode);
+                },
               ),
-            ),
+              if (network.proxyMode == NetworkProxyMode.custom) ...[
+                const SizedBox(height: 12),
+                TextField(
+                  controller: proxyUrlController,
+                  decoration: InputDecoration(
+                    labelText: labels.proxyUrl,
+                    hintText: labels.proxyUrlHint,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: proxyBypassController,
+                  decoration: InputDecoration(
+                    labelText: labels.proxyBypass,
+                    hintText: labels.proxyBypassHint,
+                  ),
+                ),
+              ],
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(labels.checkUpdatesOnLaunch),
+                value: network.checkUpdatesOnLaunch,
+                onChanged: onCheckUpdatesChanged,
+              ),
+              Align(
+                alignment: Alignment.centerRight,
+                child: FilledButton(
+                  onPressed: onSaveNetwork,
+                  child: Text(labels.saveNetwork),
+                ),
+              ),
+              if (state.networkError != null) ...[
+                const SizedBox(height: 12),
+                StatusMessage(
+                  kind: StatusKind.error,
+                  title: labels.errorMessage(state.networkError),
+                ),
+              ],
+            ],
           ],
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text(labels.checkUpdatesOnLaunch),
-            value: network.checkUpdatesOnLaunch,
-            onChanged: onCheckUpdatesChanged,
-          ),
-          Align(
-            alignment: Alignment.centerRight,
-            child: FilledButton(
-              onPressed: onSaveNetwork,
-              child: Text(labels.saveNetwork),
-            ),
-          ),
-          if (state.networkError != null) ...[
-            const SizedBox(height: 12),
-            StatusMessage(
-              kind: StatusKind.error,
-              title: labels.errorMessage(state.networkError),
-            ),
-          ],
-        ],
+        ),
       ],
     );
   }

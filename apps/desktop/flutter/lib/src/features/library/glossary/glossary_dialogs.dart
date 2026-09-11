@@ -49,14 +49,14 @@ class _GlossaryBookDialogState extends State<GlossaryBookDialog> {
                 hintText: page.name_placeholder,
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             DropdownButtonFormField<String?>(
               initialValue: _sourceLanguage,
               decoration: InputDecoration(labelText: page.source_language),
               items: languageItems,
               onChanged: (value) => setState(() => _sourceLanguage = value),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             DropdownButtonFormField<String?>(
               initialValue: _targetLanguage,
               decoration: InputDecoration(labelText: page.target_language),
@@ -139,12 +139,12 @@ class _GlossaryEntryDialogState extends State<GlossaryEntryDialog> {
               autofocus: true,
               decoration: InputDecoration(labelText: page.term),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 16),
             TextField(
               controller: _translation,
               decoration: InputDecoration(labelText: page.translation),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 16),
             TextField(
               controller: _forbidden,
               decoration: InputDecoration(
