@@ -32,21 +32,20 @@ the inspected captures, not an assertion of native Windows verification.
   reachability and UniFFI surface checks passed.
 - No new runtime interface or localization keys were introduced.
 
-## Remaining platform evidence
+## Native Windows evidence
 
-Windows native goldens still describe the previous visual system. Do not copy
-macOS PNGs over them or bypass comparison. On a Windows checkout, run from
-`apps/desktop/flutter`:
-
-```powershell
-flutter test test/catalog_surface_golden_test.dart --update-goldens
-flutter test
-flutter build windows --debug
-```
-
-Review and commit the resulting Windows snapshots before merging or releasing
-this redesign. No Windows build or native interaction result is claimed here.
-The Impeccable HTML/CSS detector has no verdict on native Dart layouts.
+[Windows CI capture](https://github.com/gong1414/linguaray/actions/runs/34597770235) succeeded
+on the redesign commit. It generated 92 native Windows snapshots: 84 replacements
+and eight new dialog states. File names match the complete macOS state set.
+Representative settings, quick translation, OCR and service-dialog captures were
+visually inspected after download. macOS images were not copied to Windows paths.
+An independent finish reviewer inspected nine native Windows captures and returned
+a ship verdict, with no clipping, overlap, missing glyphs, wordmark overflow or
+inconsistent palette found. This static review does not establish native keyboard,
+window or accessibility behavior.
+Full Windows workspace tests, desktop integration and debug build are separate
+required pull-request checks. The Impeccable HTML/CSS detector has no verdict on
+native Dart layouts.
 
 ## Follow-up residual audit
 
@@ -62,4 +61,4 @@ forms now scroll within constrained windows.
 After this follow-up, the desktop suite passed 213 tests (including 92 macOS
 goldens), desktop static analysis and the macOS production debug build passed.
 The unchanged application/runtime/UI package suites previously passed 31 tests.
-The 84 existing Windows native baselines remain outstanding as described above.
+All 92 Windows baselines were subsequently captured as described above.

@@ -6,7 +6,14 @@
     "designSystem": "DESIGN.md",
     "structure": "grouped settings directory; source-result reading sheets; OCR document editor",
     "palette": "neutral white, gray and graphite",
-    "critique": {"philosophy": 4, "hierarchy": 4, "execution": 4, "specificity": 3, "restraint": 5, "variety": 4},
-    "verification": "Native widget and golden tests; web-only gates do not apply. Windows native recapture outstanding."
+    "critique": {
+      "philosophy": 4,
+      "hierarchy": 4,
+      "execution": 4,
+      "specificity": 3,
+      "restraint": 5,
+      "variety": 4
+    },
+    "verification": "Native widget and golden tests; 92 macOS and 92 native Windows snapshots. Windows capture: https://github.com/gong1414/linguaray/actions/runs/34597770235. Web-only gates do not apply."
   }
 ]

@@ -287,6 +287,8 @@ tests, a passing `dart run melos run analyze` and a successful macOS debug
 production build. Its finish reviewer reported
 no further macOS visual fixes. All 14 settings destinations passed layout checks at
 780 × 520 and 1000 × 700 in both themes with macOS and Windows theme variants.
-These theme variants are not native Windows captures. Windows goldens have not
-been recaptured; that platform's visual validation remains outstanding. This
-documentation pass extracted source values and did not independently review pixels.
+Native Windows CI subsequently rendered all 92 Windows goldens with Windows
+fonts ([capture run](https://github.com/gong1414/linguaray/actions/runs/34597770235)). The former 84
+baselines were replaced and eight dialog baselines added. Representative settings,
+translation, OCR and service-dialog captures were visually checked. Full desktop
+build and integration results are recorded by the pull request's required CI checks.

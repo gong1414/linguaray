@@ -368,10 +368,12 @@
         "macOSDebugBuild": "passed",
         "finishReview": "No further macOS visual fixes reported.",
         "settingsLayoutCoverage": "14 destinations at 780x520 and 1000x700 in light/dark and macOS/Windows theme variants on the macOS test host.",
-        "windowsNativeRecapture": "outstanding",
-        "limitation": "Windows theme variants on macOS are not native Windows visual evidence.",
+        "windowsNativeRecapture": "passed",
+        "limitation": "Native Windows goldens validate sampled rendering; desktop build and integration checks remain separate CI gates.",
         "analysis": "dart run melos run analyze passed",
-        "reviewRecord": ".impeccable/critique/desktop.md"
+        "reviewRecord": ".impeccable/critique/desktop.md",
+        "windowsGoldens": 92,
+        "windowsCaptureRun": "https://github.com/gong1414/linguaray/actions/runs/34597770235"
       }
     }
   },
