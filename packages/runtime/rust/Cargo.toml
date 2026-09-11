@@ -12,7 +12,8 @@ linguaray-core = { path = "../../../crates/core" }
 linguaray-api-core = { path = "../../../crates/api-core" }
 linguaray-engine = { path = "../../../crates/engine" }
 uniffi = { version = "=0.31.2", features = ["cli"] }
-uniffi-dart = { git = "https://github.com/Uniffi-Dart/uniffi-dart.git", branch = "main" }
+# Pinned to an immutable revision: upstream `main` moves, which would make bindings non-reproducible.
+uniffi-dart = { git = "https://github.com/Uniffi-Dart/uniffi-dart.git", rev = "1ded89be15e2d18346df8701df2b9cfcae918316" }
 aho-corasick.workspace = true
 anyhow = "1"
 base64.workspace = true
@@ -38,12 +39,12 @@ arboard = "=3.6.1"
 
 [build-dependencies]
 camino = "1"
-uniffi-dart = { git = "https://github.com/Uniffi-Dart/uniffi-dart.git", branch = "main", features = [
+uniffi-dart = { git = "https://github.com/Uniffi-Dart/uniffi-dart.git", rev = "1ded89be15e2d18346df8701df2b9cfcae918316", features = [
   "build",
 ] }
 
 [dev-dependencies]
-uniffi-dart = { git = "https://github.com/Uniffi-Dart/uniffi-dart.git", branch = "main", features = [
+uniffi-dart = { git = "https://github.com/Uniffi-Dart/uniffi-dart.git", rev = "1ded89be15e2d18346df8701df2b9cfcae918316", features = [
   "bindgen-tests",
 ] }
 uniffi = { version = "=0.31.2", features = ["bindgen-tests"] }
