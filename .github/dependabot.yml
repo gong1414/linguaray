@@ -34,3 +34,7 @@ updates:
     directory: /assets/brand/linguaray
     schedule:
       interval: monthly
+  - package-ecosystem: pip
+    directory: /scripts
+    schedule:
+      interval: monthly
