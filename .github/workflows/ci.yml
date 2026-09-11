@@ -54,6 +54,46 @@ jobs:
       - run: python3 -m pip install -r scripts/release-requirements.txt
       - run: python3 -m unittest discover -s scripts -p 'test_release_manifest.py'
 
+  # Regenerating from the pinned toolchain must reproduce the committed output.
+  # This catches stale bindings or localization after a generator, dependency,
+  # or interface change.
+  generated-sources:
+    if: ${{ !inputs.refresh_windows_goldens }}
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
+      - run: dart pub get
+      - name: Regenerate and check for drift
+        run: |
+          python3 scripts/codegen.py
+          if [ -n "$(git status --porcelain -- \
+            packages/runtime/lib/src/generated \
+            apps/desktop/flutter/lib/src/i18n \
+            packages/runtime/macos/linguaray_runtime/Sources/linguaray_runtime/Generated \
+            packages/runtime/macos/linguaray_runtime/Sources/linguaray_runtimeFFI \
+            crates/engine/src/languages.rs)" ]; then
+            echo "::error::Generated sources are stale. Run python3 scripts/codegen.py and commit the result."
+            git --no-pager status --porcelain -- \
+              packages/runtime/lib/src/generated \
+              apps/desktop/flutter/lib/src/i18n \
+              packages/runtime/macos/linguaray_runtime/Sources/linguaray_runtime/Generated \
+              packages/runtime/macos/linguaray_runtime/Sources/linguaray_runtimeFFI \
+              crates/engine/src/languages.rs
+            git --no-pager diff -- \
+              packages/runtime/lib/src/generated \
+              apps/desktop/flutter/lib/src/i18n \
+              crates/engine/src/languages.rs
+            exit 1
+          fi
+          echo "Generated sources reproduce the committed output."
+
   desktop:
     if: ${{ !inputs.refresh_windows_goldens }}
     name: desktop-${{ matrix.device }}

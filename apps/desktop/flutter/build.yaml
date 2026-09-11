@@ -16,6 +16,9 @@ targets:
           flutter_integration: true
           string_interpolation: dart
           flat_map: true
+          # Keep generated sources byte-identical across runs so committed
+          # output can be verified against the generator.
+          timestamp: false
           format:
             enabled: true
             width: 80

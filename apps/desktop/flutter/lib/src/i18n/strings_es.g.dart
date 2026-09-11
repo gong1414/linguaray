@@ -24,7 +24,7 @@ class TranslationsEs extends Translations
          overrides == null,
          'Set "translation_overrides: true" in order to enable this feature.',
        ),
-       $meta =
+       _meta =
            meta ??
            TranslationMetadata(
              locale: AppLocale.es,
@@ -36,20 +36,17 @@ class TranslationsEs extends Translations
          cardinalResolver: cardinalResolver,
          ordinalResolver: ordinalResolver,
        ) {
-    super.$meta.setFlatMapFunction(
-      $meta.getTranslation,
-    ); // copy base translations to super.$meta
-    $meta.setFlatMapFunction(_flatMapFunction);
+    _meta.setFlatMapFunction(_flatMapFunction);
   }
 
   /// Metadata for the translations of <es>.
+  final TranslationMetadata<AppLocale, Translations> _meta;
   @override
-  final TranslationMetadata<AppLocale, Translations> $meta;
+  TranslationMetadata<AppLocale, Translations> get $meta => _meta;
 
   /// Access flat map
   @override
-  dynamic operator [](String key) =>
-      $meta.getTranslation(key) ?? super.$meta.getTranslation(key);
+  dynamic operator [](String key) => _meta.getTranslation(key) ?? super[key];
 
   late final TranslationsEs _root = this; // ignore: unused_field
 
@@ -60,25 +57,24 @@ class TranslationsEs extends Translations
 
   // Translations
   @override
-  late final _TranslationsCommonEs common = _TranslationsCommonEs._(_root);
+  late final _Translations$common$es common = _Translations$common$es._(_root);
   @override
-  late final _TranslationsAppEs app = _TranslationsAppEs._(_root);
+  late final _Translations$app$es app = _Translations$app$es._(_root);
   @override
-  late final _TranslationsMiniTranslatorEs mini_translator =
-      _TranslationsMiniTranslatorEs._(_root);
+  late final _Translations$mini_translator$es mini_translator =
+      _Translations$mini_translator$es._(_root);
   @override
-  late final _TranslationsWorkbenchEs workbench = _TranslationsWorkbenchEs._(
-    _root,
-  );
+  late final _Translations$workbench$es workbench =
+      _Translations$workbench$es._(_root);
   @override
-  late final _TranslationsSettingsEs settings = _TranslationsSettingsEs._(
+  late final _Translations$settings$es settings = _Translations$settings$es._(
     _root,
   );
 }
 
 // Path: common
-class _TranslationsCommonEs extends TranslationsCommonEn {
-  _TranslationsCommonEs._(TranslationsEs root)
+class _Translations$common$es extends Translations$common$en {
+  _Translations$common$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -86,24 +82,26 @@ class _TranslationsCommonEs extends TranslationsCommonEn {
 
   // Translations
   @override
-  late final _TranslationsCommonUiEs ui = _TranslationsCommonUiEs._(_root);
+  late final _Translations$common$ui$es ui = _Translations$common$ui$es._(
+    _root,
+  );
   @override
-  late final _TranslationsCommonLanguageEs language =
-      _TranslationsCommonLanguageEs._(_root);
+  late final _Translations$common$language$es language =
+      _Translations$common$language$es._(_root);
   @override
-  late final _TranslationsCommonThemeModeEs theme_mode =
-      _TranslationsCommonThemeModeEs._(_root);
+  late final _Translations$common$theme_mode$es theme_mode =
+      _Translations$common$theme_mode$es._(_root);
   @override
-  late final _TranslationsCommonThemeStyleEs theme_style =
-      _TranslationsCommonThemeStyleEs._(_root);
+  late final _Translations$common$theme_style$es theme_style =
+      _Translations$common$theme_style$es._(_root);
   @override
-  late final _TranslationsCommonProviderEs provider =
-      _TranslationsCommonProviderEs._(_root);
+  late final _Translations$common$provider$es provider =
+      _Translations$common$provider$es._(_root);
 }
 
 // Path: app
-class _TranslationsAppEs extends TranslationsAppEn {
-  _TranslationsAppEs._(TranslationsEs root)
+class _Translations$app$es extends Translations$app$en {
+  _Translations$app$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -111,12 +109,14 @@ class _TranslationsAppEs extends TranslationsAppEn {
 
   // Translations
   @override
-  late final _TranslationsAppTrayEs tray = _TranslationsAppTrayEs._(_root);
+  late final _Translations$app$tray$es tray = _Translations$app$tray$es._(
+    _root,
+  );
 }
 
 // Path: mini_translator
-class _TranslationsMiniTranslatorEs extends TranslationsMiniTranslatorEn {
-  _TranslationsMiniTranslatorEs._(TranslationsEs root)
+class _Translations$mini_translator$es extends Translations$mini_translator$en {
+  _Translations$mini_translator$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -124,31 +124,31 @@ class _TranslationsMiniTranslatorEs extends TranslationsMiniTranslatorEn {
 
   // Translations
   @override
-  late final _TranslationsMiniTranslatorLimitedBannerEs limited_banner =
-      _TranslationsMiniTranslatorLimitedBannerEs._(_root);
+  late final _Translations$mini_translator$limited_banner$es limited_banner =
+      _Translations$mini_translator$limited_banner$es._(_root);
   @override
-  late final _TranslationsMiniTranslatorInputEs input =
-      _TranslationsMiniTranslatorInputEs._(_root);
+  late final _Translations$mini_translator$input$es input =
+      _Translations$mini_translator$input$es._(_root);
   @override
-  late final _TranslationsMiniTranslatorToolbarEs toolbar =
-      _TranslationsMiniTranslatorToolbarEs._(_root);
+  late final _Translations$mini_translator$toolbar$es toolbar =
+      _Translations$mini_translator$toolbar$es._(_root);
   @override
-  late final _TranslationsMiniTranslatorButtonEs button =
-      _TranslationsMiniTranslatorButtonEs._(_root);
+  late final _Translations$mini_translator$button$es button =
+      _Translations$mini_translator$button$es._(_root);
   @override
-  late final _TranslationsMiniTranslatorLanguageEs language =
-      _TranslationsMiniTranslatorLanguageEs._(_root);
+  late final _Translations$mini_translator$language$es language =
+      _Translations$mini_translator$language$es._(_root);
   @override
-  late final _TranslationsMiniTranslatorMessageEs message =
-      _TranslationsMiniTranslatorMessageEs._(_root);
+  late final _Translations$mini_translator$message$es message =
+      _Translations$mini_translator$message$es._(_root);
   @override
-  late final _TranslationsMiniTranslatorResultEs result =
-      _TranslationsMiniTranslatorResultEs._(_root);
+  late final _Translations$mini_translator$result$es result =
+      _Translations$mini_translator$result$es._(_root);
 }
 
 // Path: workbench
-class _TranslationsWorkbenchEs extends TranslationsWorkbenchEn {
-  _TranslationsWorkbenchEs._(TranslationsEs root)
+class _Translations$workbench$es extends Translations$workbench$en {
+  _Translations$workbench$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -162,8 +162,8 @@ class _TranslationsWorkbenchEs extends TranslationsWorkbenchEn {
   @override
   String get history => 'Historial';
   @override
-  late final _TranslationsWorkbenchHistoryPageEs history_page =
-      _TranslationsWorkbenchHistoryPageEs._(_root);
+  late final _Translations$workbench$history_page$es history_page =
+      _Translations$workbench$history_page$es._(_root);
   @override
   String get glossary => 'Glosario';
   @override
@@ -171,20 +171,20 @@ class _TranslationsWorkbenchEs extends TranslationsWorkbenchEn {
   @override
   String get not_configured => 'Sin configurar';
   @override
-  late final _TranslationsWorkbenchSubtitleEs subtitle =
-      _TranslationsWorkbenchSubtitleEs._(_root);
+  late final _Translations$workbench$subtitle$es subtitle =
+      _Translations$workbench$subtitle$es._(_root);
   @override
-  late final _TranslationsWorkbenchPlaceholderEs placeholder =
-      _TranslationsWorkbenchPlaceholderEs._(_root);
+  late final _Translations$workbench$placeholder$es placeholder =
+      _Translations$workbench$placeholder$es._(_root);
   @override
-  late final _TranslationsWorkbenchGlossaryPageEs glossary_page =
-      _TranslationsWorkbenchGlossaryPageEs._(_root);
+  late final _Translations$workbench$glossary_page$es glossary_page =
+      _Translations$workbench$glossary_page$es._(_root);
   @override
-  late final _TranslationsWorkbenchTranslationEs translation =
-      _TranslationsWorkbenchTranslationEs._(_root);
+  late final _Translations$workbench$translation$es translation =
+      _Translations$workbench$translation$es._(_root);
   @override
-  late final _TranslationsWorkbenchStatusEs status =
-      _TranslationsWorkbenchStatusEs._(_root);
+  late final _Translations$workbench$status$es status =
+      _Translations$workbench$status$es._(_root);
   @override
   String get version_latest => 'Actualizado';
   @override
@@ -194,8 +194,8 @@ class _TranslationsWorkbenchEs extends TranslationsWorkbenchEn {
 }
 
 // Path: settings
-class _TranslationsSettingsEs extends TranslationsSettingsEn {
-  _TranslationsSettingsEs._(TranslationsEs root)
+class _Translations$settings$es extends Translations$settings$en {
+  _Translations$settings$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -205,34 +205,34 @@ class _TranslationsSettingsEs extends TranslationsSettingsEn {
   @override
   String get version => 'v{} (Build {})';
   @override
-  late final _TranslationsSettingsGeneralEs general =
-      _TranslationsSettingsGeneralEs._(_root);
+  late final _Translations$settings$general$es general =
+      _Translations$settings$general$es._(_root);
   @override
-  late final _TranslationsSettingsAppearanceEs appearance =
-      _TranslationsSettingsAppearanceEs._(_root);
+  late final _Translations$settings$appearance$es appearance =
+      _Translations$settings$appearance$es._(_root);
   @override
-  late final _TranslationsSettingsShortcutsEs shortcuts =
-      _TranslationsSettingsShortcutsEs._(_root);
+  late final _Translations$settings$shortcuts$es shortcuts =
+      _Translations$settings$shortcuts$es._(_root);
   @override
-  late final _TranslationsSettingsAdvancedEs advanced =
-      _TranslationsSettingsAdvancedEs._(_root);
+  late final _Translations$settings$advanced$es advanced =
+      _Translations$settings$advanced$es._(_root);
   @override
-  late final _TranslationsSettingsServicesEs services =
-      _TranslationsSettingsServicesEs._(_root);
+  late final _Translations$settings$services$es services =
+      _Translations$settings$services$es._(_root);
   @override
-  late final _TranslationsSettingsProvidersEs providers =
-      _TranslationsSettingsProvidersEs._(_root);
+  late final _Translations$settings$providers$es providers =
+      _Translations$settings$providers$es._(_root);
   @override
-  late final _TranslationsSettingsLayoutEs layout =
-      _TranslationsSettingsLayoutEs._(_root);
+  late final _Translations$settings$layout$es layout =
+      _Translations$settings$layout$es._(_root);
   @override
-  late final _TranslationsSettingsAboutEs about =
-      _TranslationsSettingsAboutEs._(_root);
+  late final _Translations$settings$about$es about =
+      _Translations$settings$about$es._(_root);
 }
 
 // Path: common.ui
-class _TranslationsCommonUiEs extends TranslationsCommonUiEn {
-  _TranslationsCommonUiEs._(TranslationsEs root)
+class _Translations$common$ui$es extends Translations$common$ui$en {
+  _Translations$common$ui$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -240,16 +240,16 @@ class _TranslationsCommonUiEs extends TranslationsCommonUiEn {
 
   // Translations
   @override
-  late final _TranslationsCommonUiButtonEs button =
-      _TranslationsCommonUiButtonEs._(_root);
+  late final _Translations$common$ui$button$es button =
+      _Translations$common$ui$button$es._(_root);
   @override
-  late final _TranslationsCommonUiFeedbackEs feedback =
-      _TranslationsCommonUiFeedbackEs._(_root);
+  late final _Translations$common$ui$feedback$es feedback =
+      _Translations$common$ui$feedback$es._(_root);
 }
 
 // Path: common.language
-class _TranslationsCommonLanguageEs extends TranslationsCommonLanguageEn {
-  _TranslationsCommonLanguageEs._(TranslationsEs root)
+class _Translations$common$language$es extends Translations$common$language$en {
+  _Translations$common$language$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -329,8 +329,9 @@ class _TranslationsCommonLanguageEs extends TranslationsCommonLanguageEn {
 }
 
 // Path: common.theme_mode
-class _TranslationsCommonThemeModeEs extends TranslationsCommonThemeModeEn {
-  _TranslationsCommonThemeModeEs._(TranslationsEs root)
+class _Translations$common$theme_mode$es
+    extends Translations$common$theme_mode$en {
+  _Translations$common$theme_mode$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -346,8 +347,9 @@ class _TranslationsCommonThemeModeEs extends TranslationsCommonThemeModeEn {
 }
 
 // Path: common.theme_style
-class _TranslationsCommonThemeStyleEs extends TranslationsCommonThemeStyleEn {
-  _TranslationsCommonThemeStyleEs._(TranslationsEs root)
+class _Translations$common$theme_style$es
+    extends Translations$common$theme_style$en {
+  _Translations$common$theme_style$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -361,8 +363,8 @@ class _TranslationsCommonThemeStyleEs extends TranslationsCommonThemeStyleEn {
 }
 
 // Path: common.provider
-class _TranslationsCommonProviderEs extends TranslationsCommonProviderEn {
-  _TranslationsCommonProviderEs._(TranslationsEs root)
+class _Translations$common$provider$es extends Translations$common$provider$en {
+  _Translations$common$provider$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -396,8 +398,8 @@ class _TranslationsCommonProviderEs extends TranslationsCommonProviderEn {
 }
 
 // Path: app.tray
-class _TranslationsAppTrayEs extends TranslationsAppTrayEn {
-  _TranslationsAppTrayEs._(TranslationsEs root)
+class _Translations$app$tray$es extends Translations$app$tray$en {
+  _Translations$app$tray$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -405,14 +407,14 @@ class _TranslationsAppTrayEs extends TranslationsAppTrayEn {
 
   // Translations
   @override
-  late final _TranslationsAppTrayContextMenuEs context_menu =
-      _TranslationsAppTrayContextMenuEs._(_root);
+  late final _Translations$app$tray$context_menu$es context_menu =
+      _Translations$app$tray$context_menu$es._(_root);
 }
 
 // Path: mini_translator.limited_banner
-class _TranslationsMiniTranslatorLimitedBannerEs
-    extends TranslationsMiniTranslatorLimitedBannerEn {
-  _TranslationsMiniTranslatorLimitedBannerEs._(TranslationsEs root)
+class _Translations$mini_translator$limited_banner$es
+    extends Translations$mini_translator$limited_banner$en {
+  _Translations$mini_translator$limited_banner$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -420,26 +422,30 @@ class _TranslationsMiniTranslatorLimitedBannerEs
 
   // Translations
   @override
-  late final _TranslationsMiniTranslatorLimitedBannerPermissionEs permission =
-      _TranslationsMiniTranslatorLimitedBannerPermissionEs._(_root);
+  late final _Translations$mini_translator$limited_banner$permission$es
+  permission = _Translations$mini_translator$limited_banner$permission$es._(
+    _root,
+  );
   @override
-  late final _TranslationsMiniTranslatorLimitedBannerInstructionEs instruction =
-      _TranslationsMiniTranslatorLimitedBannerInstructionEs._(_root);
+  late final _Translations$mini_translator$limited_banner$instruction$es
+  instruction = _Translations$mini_translator$limited_banner$instruction$es._(
+    _root,
+  );
   @override
-  late final _TranslationsMiniTranslatorLimitedBannerActionEs action =
-      _TranslationsMiniTranslatorLimitedBannerActionEs._(_root);
+  late final _Translations$mini_translator$limited_banner$action$es action =
+      _Translations$mini_translator$limited_banner$action$es._(_root);
   @override
-  late final _TranslationsMiniTranslatorLimitedBannerFeedbackEs feedback =
-      _TranslationsMiniTranslatorLimitedBannerFeedbackEs._(_root);
+  late final _Translations$mini_translator$limited_banner$feedback$es feedback =
+      _Translations$mini_translator$limited_banner$feedback$es._(_root);
   @override
-  late final _TranslationsMiniTranslatorLimitedBannerTooltipEs tooltip =
-      _TranslationsMiniTranslatorLimitedBannerTooltipEs._(_root);
+  late final _Translations$mini_translator$limited_banner$tooltip$es tooltip =
+      _Translations$mini_translator$limited_banner$tooltip$es._(_root);
 }
 
 // Path: mini_translator.input
-class _TranslationsMiniTranslatorInputEs
-    extends TranslationsMiniTranslatorInputEn {
-  _TranslationsMiniTranslatorInputEs._(TranslationsEs root)
+class _Translations$mini_translator$input$es
+    extends Translations$mini_translator$input$en {
+  _Translations$mini_translator$input$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -456,9 +462,9 @@ class _TranslationsMiniTranslatorInputEs
 }
 
 // Path: mini_translator.toolbar
-class _TranslationsMiniTranslatorToolbarEs
-    extends TranslationsMiniTranslatorToolbarEn {
-  _TranslationsMiniTranslatorToolbarEs._(TranslationsEs root)
+class _Translations$mini_translator$toolbar$es
+    extends Translations$mini_translator$toolbar$en {
+  _Translations$mini_translator$toolbar$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -466,17 +472,17 @@ class _TranslationsMiniTranslatorToolbarEs
 
   // Translations
   @override
-  late final _TranslationsMiniTranslatorToolbarTooltipEs tooltip =
-      _TranslationsMiniTranslatorToolbarTooltipEs._(_root);
+  late final _Translations$mini_translator$toolbar$tooltip$es tooltip =
+      _Translations$mini_translator$toolbar$tooltip$es._(_root);
   @override
-  late final _TranslationsMiniTranslatorToolbarMenuEs menu =
-      _TranslationsMiniTranslatorToolbarMenuEs._(_root);
+  late final _Translations$mini_translator$toolbar$menu$es menu =
+      _Translations$mini_translator$toolbar$menu$es._(_root);
 }
 
 // Path: mini_translator.button
-class _TranslationsMiniTranslatorButtonEs
-    extends TranslationsMiniTranslatorButtonEn {
-  _TranslationsMiniTranslatorButtonEs._(TranslationsEs root)
+class _Translations$mini_translator$button$es
+    extends Translations$mini_translator$button$en {
+  _Translations$mini_translator$button$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -498,9 +504,9 @@ class _TranslationsMiniTranslatorButtonEs
 }
 
 // Path: mini_translator.language
-class _TranslationsMiniTranslatorLanguageEs
-    extends TranslationsMiniTranslatorLanguageEn {
-  _TranslationsMiniTranslatorLanguageEs._(TranslationsEs root)
+class _Translations$mini_translator$language$es
+    extends Translations$mini_translator$language$en {
+  _Translations$mini_translator$language$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -524,9 +530,9 @@ class _TranslationsMiniTranslatorLanguageEs
 }
 
 // Path: mini_translator.message
-class _TranslationsMiniTranslatorMessageEs
-    extends TranslationsMiniTranslatorMessageEn {
-  _TranslationsMiniTranslatorMessageEs._(TranslationsEs root)
+class _Translations$mini_translator$message$es
+    extends Translations$mini_translator$message$en {
+  _Translations$mini_translator$message$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -547,9 +553,9 @@ class _TranslationsMiniTranslatorMessageEs
 }
 
 // Path: mini_translator.result
-class _TranslationsMiniTranslatorResultEs
-    extends TranslationsMiniTranslatorResultEn {
-  _TranslationsMiniTranslatorResultEs._(TranslationsEs root)
+class _Translations$mini_translator$result$es
+    extends Translations$mini_translator$result$en {
+  _Translations$mini_translator$result$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -579,9 +585,9 @@ class _TranslationsMiniTranslatorResultEs
 }
 
 // Path: workbench.history_page
-class _TranslationsWorkbenchHistoryPageEs
-    extends TranslationsWorkbenchHistoryPageEn {
-  _TranslationsWorkbenchHistoryPageEs._(TranslationsEs root)
+class _Translations$workbench$history_page$es
+    extends Translations$workbench$history_page$en {
+  _Translations$workbench$history_page$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -651,8 +657,9 @@ class _TranslationsWorkbenchHistoryPageEs
 }
 
 // Path: workbench.subtitle
-class _TranslationsWorkbenchSubtitleEs extends TranslationsWorkbenchSubtitleEn {
-  _TranslationsWorkbenchSubtitleEs._(TranslationsEs root)
+class _Translations$workbench$subtitle$es
+    extends Translations$workbench$subtitle$en {
+  _Translations$workbench$subtitle$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -666,9 +673,9 @@ class _TranslationsWorkbenchSubtitleEs extends TranslationsWorkbenchSubtitleEn {
 }
 
 // Path: workbench.placeholder
-class _TranslationsWorkbenchPlaceholderEs
-    extends TranslationsWorkbenchPlaceholderEn {
-  _TranslationsWorkbenchPlaceholderEs._(TranslationsEs root)
+class _Translations$workbench$placeholder$es
+    extends Translations$workbench$placeholder$en {
+  _Translations$workbench$placeholder$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -684,9 +691,9 @@ class _TranslationsWorkbenchPlaceholderEs
 }
 
 // Path: workbench.glossary_page
-class _TranslationsWorkbenchGlossaryPageEs
-    extends TranslationsWorkbenchGlossaryPageEn {
-  _TranslationsWorkbenchGlossaryPageEs._(TranslationsEs root)
+class _Translations$workbench$glossary_page$es
+    extends Translations$workbench$glossary_page$en {
+  _Translations$workbench$glossary_page$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -758,9 +765,9 @@ class _TranslationsWorkbenchGlossaryPageEs
 }
 
 // Path: workbench.translation
-class _TranslationsWorkbenchTranslationEs
-    extends TranslationsWorkbenchTranslationEn {
-  _TranslationsWorkbenchTranslationEs._(TranslationsEs root)
+class _Translations$workbench$translation$es
+    extends Translations$workbench$translation$en {
+  _Translations$workbench$translation$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -842,8 +849,9 @@ class _TranslationsWorkbenchTranslationEs
 }
 
 // Path: workbench.status
-class _TranslationsWorkbenchStatusEs extends TranslationsWorkbenchStatusEn {
-  _TranslationsWorkbenchStatusEs._(TranslationsEs root)
+class _Translations$workbench$status$es
+    extends Translations$workbench$status$en {
+  _Translations$workbench$status$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -859,8 +867,9 @@ class _TranslationsWorkbenchStatusEs extends TranslationsWorkbenchStatusEn {
 }
 
 // Path: settings.general
-class _TranslationsSettingsGeneralEs extends TranslationsSettingsGeneralEn {
-  _TranslationsSettingsGeneralEs._(TranslationsEs root)
+class _Translations$settings$general$es
+    extends Translations$settings$general$en {
+  _Translations$settings$general$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -870,26 +879,26 @@ class _TranslationsSettingsGeneralEs extends TranslationsSettingsGeneralEn {
   @override
   String get title => 'General';
   @override
-  late final _TranslationsSettingsGeneralSectionEs section =
-      _TranslationsSettingsGeneralSectionEs._(_root);
+  late final _Translations$settings$general$section$es section =
+      _Translations$settings$general$section$es._(_root);
   @override
-  late final _TranslationsSettingsGeneralRowEs row =
-      _TranslationsSettingsGeneralRowEs._(_root);
+  late final _Translations$settings$general$row$es row =
+      _Translations$settings$general$row$es._(_root);
   @override
-  late final _TranslationsSettingsGeneralButtonEs button =
-      _TranslationsSettingsGeneralButtonEs._(_root);
+  late final _Translations$settings$general$button$es button =
+      _Translations$settings$general$button$es._(_root);
   @override
-  late final _TranslationsSettingsGeneralOptionEs option =
-      _TranslationsSettingsGeneralOptionEs._(_root);
+  late final _Translations$settings$general$option$es option =
+      _Translations$settings$general$option$es._(_root);
   @override
-  late final _TranslationsSettingsGeneralEditorEs editor =
-      _TranslationsSettingsGeneralEditorEs._(_root);
+  late final _Translations$settings$general$editor$es editor =
+      _Translations$settings$general$editor$es._(_root);
 }
 
 // Path: settings.appearance
-class _TranslationsSettingsAppearanceEs
-    extends TranslationsSettingsAppearanceEn {
-  _TranslationsSettingsAppearanceEs._(TranslationsEs root)
+class _Translations$settings$appearance$es
+    extends Translations$settings$appearance$en {
+  _Translations$settings$appearance$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -899,15 +908,16 @@ class _TranslationsSettingsAppearanceEs
   @override
   String get title => 'Apariencia';
   @override
-  late final _TranslationsSettingsAppearanceSectionEs section =
-      _TranslationsSettingsAppearanceSectionEs._(_root);
+  late final _Translations$settings$appearance$section$es section =
+      _Translations$settings$appearance$section$es._(_root);
   @override
   String get footer => 'Los cambios se aplican de inmediato a toda la ventana.';
 }
 
 // Path: settings.shortcuts
-class _TranslationsSettingsShortcutsEs extends TranslationsSettingsShortcutsEn {
-  _TranslationsSettingsShortcutsEs._(TranslationsEs root)
+class _Translations$settings$shortcuts$es
+    extends Translations$settings$shortcuts$en {
+  _Translations$settings$shortcuts$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -917,24 +927,25 @@ class _TranslationsSettingsShortcutsEs extends TranslationsSettingsShortcutsEn {
   @override
   String get title => 'Atajos';
   @override
-  late final _TranslationsSettingsShortcutsSectionEs section =
-      _TranslationsSettingsShortcutsSectionEs._(_root);
+  late final _Translations$settings$shortcuts$section$es section =
+      _Translations$settings$shortcuts$section$es._(_root);
   @override
-  late final _TranslationsSettingsShortcutsRowEs row =
-      _TranslationsSettingsShortcutsRowEs._(_root);
+  late final _Translations$settings$shortcuts$row$es row =
+      _Translations$settings$shortcuts$row$es._(_root);
   @override
-  late final _TranslationsSettingsShortcutsResetDialogEs reset_dialog =
-      _TranslationsSettingsShortcutsResetDialogEs._(_root);
+  late final _Translations$settings$shortcuts$reset_dialog$es reset_dialog =
+      _Translations$settings$shortcuts$reset_dialog$es._(_root);
   @override
-  late final _TranslationsSettingsShortcutsGroupEs group =
-      _TranslationsSettingsShortcutsGroupEs._(_root);
+  late final _Translations$settings$shortcuts$group$es group =
+      _Translations$settings$shortcuts$group$es._(_root);
   @override
   String get reset => 'Restaurar valores predeterminados...';
 }
 
 // Path: settings.advanced
-class _TranslationsSettingsAdvancedEs extends TranslationsSettingsAdvancedEn {
-  _TranslationsSettingsAdvancedEs._(TranslationsEs root)
+class _Translations$settings$advanced$es
+    extends Translations$settings$advanced$en {
+  _Translations$settings$advanced$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -959,8 +970,9 @@ class _TranslationsSettingsAdvancedEs extends TranslationsSettingsAdvancedEn {
 }
 
 // Path: settings.services
-class _TranslationsSettingsServicesEs extends TranslationsSettingsServicesEn {
-  _TranslationsSettingsServicesEs._(TranslationsEs root)
+class _Translations$settings$services$es
+    extends Translations$settings$services$en {
+  _Translations$settings$services$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -970,27 +982,28 @@ class _TranslationsSettingsServicesEs extends TranslationsSettingsServicesEn {
   @override
   String get title => 'Servicios';
   @override
-  late final _TranslationsSettingsServicesButtonEs button =
-      _TranslationsSettingsServicesButtonEs._(_root);
+  late final _Translations$settings$services$button$es button =
+      _Translations$settings$services$button$es._(_root);
   @override
-  late final _TranslationsSettingsServicesSectionEs section =
-      _TranslationsSettingsServicesSectionEs._(_root);
+  late final _Translations$settings$services$section$es section =
+      _Translations$settings$services$section$es._(_root);
   @override
-  late final _TranslationsSettingsServicesEditorEs editor =
-      _TranslationsSettingsServicesEditorEs._(_root);
+  late final _Translations$settings$services$editor$es editor =
+      _Translations$settings$services$editor$es._(_root);
   @override
-  late final _TranslationsSettingsServicesDetailEs detail =
-      _TranslationsSettingsServicesDetailEs._(_root);
+  late final _Translations$settings$services$detail$es detail =
+      _Translations$settings$services$detail$es._(_root);
   @override
   String get make_default => 'Establecer como predeterminado';
   @override
-  late final _TranslationsSettingsServicesItemEs item =
-      _TranslationsSettingsServicesItemEs._(_root);
+  late final _Translations$settings$services$item$es item =
+      _Translations$settings$services$item$es._(_root);
 }
 
 // Path: settings.providers
-class _TranslationsSettingsProvidersEs extends TranslationsSettingsProvidersEn {
-  _TranslationsSettingsProvidersEs._(TranslationsEs root)
+class _Translations$settings$providers$es
+    extends Translations$settings$providers$en {
+  _Translations$settings$providers$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -1000,40 +1013,40 @@ class _TranslationsSettingsProvidersEs extends TranslationsSettingsProvidersEn {
   @override
   String get title => 'Proveedores';
   @override
-  late final _TranslationsSettingsProvidersSectionEs section =
-      _TranslationsSettingsProvidersSectionEs._(_root);
+  late final _Translations$settings$providers$section$es section =
+      _Translations$settings$providers$section$es._(_root);
   @override
-  late final _TranslationsSettingsProvidersItemEs item =
-      _TranslationsSettingsProvidersItemEs._(_root);
+  late final _Translations$settings$providers$item$es item =
+      _Translations$settings$providers$item$es._(_root);
   @override
-  late final _TranslationsSettingsProvidersButtonEs button =
-      _TranslationsSettingsProvidersButtonEs._(_root);
+  late final _Translations$settings$providers$button$es button =
+      _Translations$settings$providers$button$es._(_root);
   @override
-  late final _TranslationsSettingsProvidersAlertEs alert =
-      _TranslationsSettingsProvidersAlertEs._(_root);
+  late final _Translations$settings$providers$alert$es alert =
+      _Translations$settings$providers$alert$es._(_root);
   @override
-  late final _TranslationsSettingsProvidersIntroEs intro =
-      _TranslationsSettingsProvidersIntroEs._(_root);
+  late final _Translations$settings$providers$intro$es intro =
+      _Translations$settings$providers$intro$es._(_root);
   @override
-  late final _TranslationsSettingsProvidersEditorEs editor =
-      _TranslationsSettingsProvidersEditorEs._(_root);
+  late final _Translations$settings$providers$editor$es editor =
+      _Translations$settings$providers$editor$es._(_root);
   @override
-  late final _TranslationsSettingsProvidersDetailEs detail =
-      _TranslationsSettingsProvidersDetailEs._(_root);
+  late final _Translations$settings$providers$detail$es detail =
+      _Translations$settings$providers$detail$es._(_root);
   @override
-  late final _TranslationsSettingsProvidersCapabilityEs capability =
-      _TranslationsSettingsProvidersCapabilityEs._(_root);
+  late final _Translations$settings$providers$capability$es capability =
+      _Translations$settings$providers$capability$es._(_root);
   @override
-  late final _TranslationsSettingsProvidersDescriptionEs description =
-      _TranslationsSettingsProvidersDescriptionEs._(_root);
+  late final _Translations$settings$providers$description$es description =
+      _Translations$settings$providers$description$es._(_root);
   @override
-  late final _TranslationsSettingsProvidersDeleteDialogEs delete_dialog =
-      _TranslationsSettingsProvidersDeleteDialogEs._(_root);
+  late final _Translations$settings$providers$delete_dialog$es delete_dialog =
+      _Translations$settings$providers$delete_dialog$es._(_root);
 }
 
 // Path: settings.layout
-class _TranslationsSettingsLayoutEs extends TranslationsSettingsLayoutEn {
-  _TranslationsSettingsLayoutEs._(TranslationsEs root)
+class _Translations$settings$layout$es extends Translations$settings$layout$en {
+  _Translations$settings$layout$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -1043,8 +1056,8 @@ class _TranslationsSettingsLayoutEs extends TranslationsSettingsLayoutEn {
   @override
   String get title => 'Configuración';
   @override
-  late final _TranslationsSettingsLayoutEmptyEs empty =
-      _TranslationsSettingsLayoutEmptyEs._(_root);
+  late final _Translations$settings$layout$empty$es empty =
+      _Translations$settings$layout$empty$es._(_root);
   @override
   String get groups => 'Grupos';
   @override
@@ -1057,8 +1070,8 @@ class _TranslationsSettingsLayoutEs extends TranslationsSettingsLayoutEn {
 }
 
 // Path: settings.about
-class _TranslationsSettingsAboutEs extends TranslationsSettingsAboutEn {
-  _TranslationsSettingsAboutEs._(TranslationsEs root)
+class _Translations$settings$about$es extends Translations$settings$about$en {
+  _Translations$settings$about$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -1090,8 +1103,9 @@ class _TranslationsSettingsAboutEs extends TranslationsSettingsAboutEn {
 }
 
 // Path: common.ui.button
-class _TranslationsCommonUiButtonEs extends TranslationsCommonUiButtonEn {
-  _TranslationsCommonUiButtonEs._(TranslationsEs root)
+class _Translations$common$ui$button$es
+    extends Translations$common$ui$button$en {
+  _Translations$common$ui$button$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -1117,8 +1131,9 @@ class _TranslationsCommonUiButtonEs extends TranslationsCommonUiButtonEn {
 }
 
 // Path: common.ui.feedback
-class _TranslationsCommonUiFeedbackEs extends TranslationsCommonUiFeedbackEn {
-  _TranslationsCommonUiFeedbackEs._(TranslationsEs root)
+class _Translations$common$ui$feedback$es
+    extends Translations$common$ui$feedback$en {
+  _Translations$common$ui$feedback$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -1130,9 +1145,9 @@ class _TranslationsCommonUiFeedbackEs extends TranslationsCommonUiFeedbackEn {
 }
 
 // Path: app.tray.context_menu
-class _TranslationsAppTrayContextMenuEs
-    extends TranslationsAppTrayContextMenuEn {
-  _TranslationsAppTrayContextMenuEs._(TranslationsEs root)
+class _Translations$app$tray$context_menu$es
+    extends Translations$app$tray$context_menu$en {
+  _Translations$app$tray$context_menu$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -1142,8 +1157,8 @@ class _TranslationsAppTrayContextMenuEs
   @override
   String get show_window => 'Mostrar ventana';
   @override
-  late final _TranslationsAppTrayContextMenuDevToolsEs dev_tools =
-      _TranslationsAppTrayContextMenuDevToolsEs._(_root);
+  late final _Translations$app$tray$context_menu$dev_tools$es dev_tools =
+      _Translations$app$tray$context_menu$dev_tools$es._(_root);
   @override
   String get check_for_updates => 'Buscar actualizaciones';
   @override
@@ -1153,10 +1168,11 @@ class _TranslationsAppTrayContextMenuEs
 }
 
 // Path: mini_translator.limited_banner.permission
-class _TranslationsMiniTranslatorLimitedBannerPermissionEs
-    extends TranslationsMiniTranslatorLimitedBannerPermissionEn {
-  _TranslationsMiniTranslatorLimitedBannerPermissionEs._(TranslationsEs root)
-    : this._root = root,
+class _Translations$mini_translator$limited_banner$permission$es
+    extends Translations$mini_translator$limited_banner$permission$en {
+  _Translations$mini_translator$limited_banner$permission$es._(
+    TranslationsEs root,
+  ) : this._root = root,
       super.internal(root);
 
   final TranslationsEs _root; // ignore: unused_field
@@ -1174,10 +1190,11 @@ class _TranslationsMiniTranslatorLimitedBannerPermissionEs
 }
 
 // Path: mini_translator.limited_banner.instruction
-class _TranslationsMiniTranslatorLimitedBannerInstructionEs
-    extends TranslationsMiniTranslatorLimitedBannerInstructionEn {
-  _TranslationsMiniTranslatorLimitedBannerInstructionEs._(TranslationsEs root)
-    : this._root = root,
+class _Translations$mini_translator$limited_banner$instruction$es
+    extends Translations$mini_translator$limited_banner$instruction$en {
+  _Translations$mini_translator$limited_banner$instruction$es._(
+    TranslationsEs root,
+  ) : this._root = root,
       super.internal(root);
 
   final TranslationsEs _root; // ignore: unused_field
@@ -1192,9 +1209,9 @@ class _TranslationsMiniTranslatorLimitedBannerInstructionEs
 }
 
 // Path: mini_translator.limited_banner.action
-class _TranslationsMiniTranslatorLimitedBannerActionEs
-    extends TranslationsMiniTranslatorLimitedBannerActionEn {
-  _TranslationsMiniTranslatorLimitedBannerActionEs._(TranslationsEs root)
+class _Translations$mini_translator$limited_banner$action$es
+    extends Translations$mini_translator$limited_banner$action$en {
+  _Translations$mini_translator$limited_banner$action$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -1208,10 +1225,11 @@ class _TranslationsMiniTranslatorLimitedBannerActionEs
 }
 
 // Path: mini_translator.limited_banner.feedback
-class _TranslationsMiniTranslatorLimitedBannerFeedbackEs
-    extends TranslationsMiniTranslatorLimitedBannerFeedbackEn {
-  _TranslationsMiniTranslatorLimitedBannerFeedbackEs._(TranslationsEs root)
-    : this._root = root,
+class _Translations$mini_translator$limited_banner$feedback$es
+    extends Translations$mini_translator$limited_banner$feedback$en {
+  _Translations$mini_translator$limited_banner$feedback$es._(
+    TranslationsEs root,
+  ) : this._root = root,
       super.internal(root);
 
   final TranslationsEs _root; // ignore: unused_field
@@ -1225,9 +1243,9 @@ class _TranslationsMiniTranslatorLimitedBannerFeedbackEs
 }
 
 // Path: mini_translator.limited_banner.tooltip
-class _TranslationsMiniTranslatorLimitedBannerTooltipEs
-    extends TranslationsMiniTranslatorLimitedBannerTooltipEn {
-  _TranslationsMiniTranslatorLimitedBannerTooltipEs._(TranslationsEs root)
+class _Translations$mini_translator$limited_banner$tooltip$es
+    extends Translations$mini_translator$limited_banner$tooltip$en {
+  _Translations$mini_translator$limited_banner$tooltip$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -1239,9 +1257,9 @@ class _TranslationsMiniTranslatorLimitedBannerTooltipEs
 }
 
 // Path: mini_translator.toolbar.tooltip
-class _TranslationsMiniTranslatorToolbarTooltipEs
-    extends TranslationsMiniTranslatorToolbarTooltipEn {
-  _TranslationsMiniTranslatorToolbarTooltipEs._(TranslationsEs root)
+class _Translations$mini_translator$toolbar$tooltip$es
+    extends Translations$mini_translator$toolbar$tooltip$en {
+  _Translations$mini_translator$toolbar$tooltip$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -1260,9 +1278,9 @@ class _TranslationsMiniTranslatorToolbarTooltipEs
 }
 
 // Path: mini_translator.toolbar.menu
-class _TranslationsMiniTranslatorToolbarMenuEs
-    extends TranslationsMiniTranslatorToolbarMenuEn {
-  _TranslationsMiniTranslatorToolbarMenuEs._(TranslationsEs root)
+class _Translations$mini_translator$toolbar$menu$es
+    extends Translations$mini_translator$toolbar$menu$en {
+  _Translations$mini_translator$toolbar$menu$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -1280,9 +1298,9 @@ class _TranslationsMiniTranslatorToolbarMenuEs
 }
 
 // Path: settings.general.section
-class _TranslationsSettingsGeneralSectionEs
-    extends TranslationsSettingsGeneralSectionEn {
-  _TranslationsSettingsGeneralSectionEs._(TranslationsEs root)
+class _Translations$settings$general$section$es
+    extends Translations$settings$general$section$en {
+  _Translations$settings$general$section$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -1312,9 +1330,9 @@ class _TranslationsSettingsGeneralSectionEs
 }
 
 // Path: settings.general.row
-class _TranslationsSettingsGeneralRowEs
-    extends TranslationsSettingsGeneralRowEn {
-  _TranslationsSettingsGeneralRowEs._(TranslationsEs root)
+class _Translations$settings$general$row$es
+    extends Translations$settings$general$row$en {
+  _Translations$settings$general$row$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -1382,9 +1400,9 @@ class _TranslationsSettingsGeneralRowEs
 }
 
 // Path: settings.general.button
-class _TranslationsSettingsGeneralButtonEs
-    extends TranslationsSettingsGeneralButtonEn {
-  _TranslationsSettingsGeneralButtonEs._(TranslationsEs root)
+class _Translations$settings$general$button$es
+    extends Translations$settings$general$button$en {
+  _Translations$settings$general$button$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -1404,9 +1422,9 @@ class _TranslationsSettingsGeneralButtonEs
 }
 
 // Path: settings.general.option
-class _TranslationsSettingsGeneralOptionEs
-    extends TranslationsSettingsGeneralOptionEn {
-  _TranslationsSettingsGeneralOptionEs._(TranslationsEs root)
+class _Translations$settings$general$option$es
+    extends Translations$settings$general$option$en {
+  _Translations$settings$general$option$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -1428,9 +1446,9 @@ class _TranslationsSettingsGeneralOptionEs
 }
 
 // Path: settings.general.editor
-class _TranslationsSettingsGeneralEditorEs
-    extends TranslationsSettingsGeneralEditorEn {
-  _TranslationsSettingsGeneralEditorEs._(TranslationsEs root)
+class _Translations$settings$general$editor$es
+    extends Translations$settings$general$editor$en {
+  _Translations$settings$general$editor$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -1442,8 +1460,8 @@ class _TranslationsSettingsGeneralEditorEs
   @override
   String get edit_target_title => 'Editar destino de traducción';
   @override
-  late final _TranslationsSettingsGeneralEditorRowEs row =
-      _TranslationsSettingsGeneralEditorRowEs._(_root);
+  late final _Translations$settings$general$editor$row$es row =
+      _Translations$settings$general$editor$row$es._(_root);
   @override
   String get title_edit => 'Editar destino de traducción';
   @override
@@ -1461,9 +1479,9 @@ class _TranslationsSettingsGeneralEditorEs
 }
 
 // Path: settings.appearance.section
-class _TranslationsSettingsAppearanceSectionEs
-    extends TranslationsSettingsAppearanceSectionEn {
-  _TranslationsSettingsAppearanceSectionEs._(TranslationsEs root)
+class _Translations$settings$appearance$section$es
+    extends Translations$settings$appearance$section$en {
+  _Translations$settings$appearance$section$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -1479,9 +1497,9 @@ class _TranslationsSettingsAppearanceSectionEs
 }
 
 // Path: settings.shortcuts.section
-class _TranslationsSettingsShortcutsSectionEs
-    extends TranslationsSettingsShortcutsSectionEn {
-  _TranslationsSettingsShortcutsSectionEs._(TranslationsEs root)
+class _Translations$settings$shortcuts$section$es
+    extends Translations$settings$shortcuts$section$en {
+  _Translations$settings$shortcuts$section$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -1497,9 +1515,9 @@ class _TranslationsSettingsShortcutsSectionEs
 }
 
 // Path: settings.shortcuts.row
-class _TranslationsSettingsShortcutsRowEs
-    extends TranslationsSettingsShortcutsRowEn {
-  _TranslationsSettingsShortcutsRowEs._(TranslationsEs root)
+class _Translations$settings$shortcuts$row$es
+    extends Translations$settings$shortcuts$row$en {
+  _Translations$settings$shortcuts$row$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -1521,9 +1539,9 @@ class _TranslationsSettingsShortcutsRowEs
 }
 
 // Path: settings.shortcuts.reset_dialog
-class _TranslationsSettingsShortcutsResetDialogEs
-    extends TranslationsSettingsShortcutsResetDialogEn {
-  _TranslationsSettingsShortcutsResetDialogEs._(TranslationsEs root)
+class _Translations$settings$shortcuts$reset_dialog$es
+    extends Translations$settings$shortcuts$reset_dialog$en {
+  _Translations$settings$shortcuts$reset_dialog$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -1542,9 +1560,9 @@ class _TranslationsSettingsShortcutsResetDialogEs
 }
 
 // Path: settings.shortcuts.group
-class _TranslationsSettingsShortcutsGroupEs
-    extends TranslationsSettingsShortcutsGroupEn {
-  _TranslationsSettingsShortcutsGroupEs._(TranslationsEs root)
+class _Translations$settings$shortcuts$group$es
+    extends Translations$settings$shortcuts$group$en {
+  _Translations$settings$shortcuts$group$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -1552,17 +1570,17 @@ class _TranslationsSettingsShortcutsGroupEs
 
   // Translations
   @override
-  late final _TranslationsSettingsShortcutsGroupGlobalEs global =
-      _TranslationsSettingsShortcutsGroupGlobalEs._(_root);
+  late final _Translations$settings$shortcuts$group$global$es global =
+      _Translations$settings$shortcuts$group$global$es._(_root);
   @override
-  late final _TranslationsSettingsShortcutsGroupInAppEs in_app =
-      _TranslationsSettingsShortcutsGroupInAppEs._(_root);
+  late final _Translations$settings$shortcuts$group$in_app$es in_app =
+      _Translations$settings$shortcuts$group$in_app$es._(_root);
 }
 
 // Path: settings.services.button
-class _TranslationsSettingsServicesButtonEs
-    extends TranslationsSettingsServicesButtonEn {
-  _TranslationsSettingsServicesButtonEs._(TranslationsEs root)
+class _Translations$settings$services$button$es
+    extends Translations$settings$services$button$en {
+  _Translations$settings$services$button$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -1574,9 +1592,9 @@ class _TranslationsSettingsServicesButtonEs
 }
 
 // Path: settings.services.section
-class _TranslationsSettingsServicesSectionEs
-    extends TranslationsSettingsServicesSectionEn {
-  _TranslationsSettingsServicesSectionEs._(TranslationsEs root)
+class _Translations$settings$services$section$es
+    extends Translations$settings$services$section$en {
+  _Translations$settings$services$section$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -1588,9 +1606,9 @@ class _TranslationsSettingsServicesSectionEs
 }
 
 // Path: settings.services.editor
-class _TranslationsSettingsServicesEditorEs
-    extends TranslationsSettingsServicesEditorEn {
-  _TranslationsSettingsServicesEditorEs._(TranslationsEs root)
+class _Translations$settings$services$editor$es
+    extends Translations$settings$services$editor$en {
+  _Translations$settings$services$editor$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -1602,8 +1620,8 @@ class _TranslationsSettingsServicesEditorEs
   @override
   String get subtitle => 'Agrega un servicio más a un proveedor configurado';
   @override
-  late final _TranslationsSettingsServicesEditorRowEs row =
-      _TranslationsSettingsServicesEditorRowEs._(_root);
+  late final _Translations$settings$services$editor$row$es row =
+      _Translations$settings$services$editor$row$es._(_root);
   @override
   String get prompt_placeholder =>
       'Déjalo vacío para usar el prompt predeterminado de este tipo';
@@ -1616,9 +1634,9 @@ class _TranslationsSettingsServicesEditorEs
 }
 
 // Path: settings.services.detail
-class _TranslationsSettingsServicesDetailEs
-    extends TranslationsSettingsServicesDetailEn {
-  _TranslationsSettingsServicesDetailEs._(TranslationsEs root)
+class _Translations$settings$services$detail$es
+    extends Translations$settings$services$detail$en {
+  _Translations$settings$services$detail$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -1626,20 +1644,22 @@ class _TranslationsSettingsServicesDetailEs
 
   // Translations
   @override
-  late final _TranslationsSettingsServicesDetailRowEs row =
-      _TranslationsSettingsServicesDetailRowEs._(_root);
+  late final _Translations$settings$services$detail$row$es row =
+      _Translations$settings$services$detail$row$es._(_root);
   @override
-  late final _TranslationsSettingsServicesDetailDeleteDialogEs delete_dialog =
-      _TranslationsSettingsServicesDetailDeleteDialogEs._(_root);
+  late final _Translations$settings$services$detail$delete_dialog$es
+  delete_dialog = _Translations$settings$services$detail$delete_dialog$es._(
+    _root,
+  );
   @override
   String get prompt_variables =>
       'Variables disponibles: {{sourceLanguage}}, {{targetLanguage}}, {{text}}';
 }
 
 // Path: settings.services.item
-class _TranslationsSettingsServicesItemEs
-    extends TranslationsSettingsServicesItemEn {
-  _TranslationsSettingsServicesItemEs._(TranslationsEs root)
+class _Translations$settings$services$item$es
+    extends Translations$settings$services$item$en {
+  _Translations$settings$services$item$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -1651,9 +1671,9 @@ class _TranslationsSettingsServicesItemEs
 }
 
 // Path: settings.providers.section
-class _TranslationsSettingsProvidersSectionEs
-    extends TranslationsSettingsProvidersSectionEn {
-  _TranslationsSettingsProvidersSectionEs._(TranslationsEs root)
+class _Translations$settings$providers$section$es
+    extends Translations$settings$providers$section$en {
+  _Translations$settings$providers$section$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -1668,9 +1688,9 @@ class _TranslationsSettingsProvidersSectionEs
 }
 
 // Path: settings.providers.item
-class _TranslationsSettingsProvidersItemEs
-    extends TranslationsSettingsProvidersItemEn {
-  _TranslationsSettingsProvidersItemEs._(TranslationsEs root)
+class _Translations$settings$providers$item$es
+    extends Translations$settings$providers$item$en {
+  _Translations$settings$providers$item$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -1687,9 +1707,9 @@ class _TranslationsSettingsProvidersItemEs
 }
 
 // Path: settings.providers.button
-class _TranslationsSettingsProvidersButtonEs
-    extends TranslationsSettingsProvidersButtonEn {
-  _TranslationsSettingsProvidersButtonEs._(TranslationsEs root)
+class _Translations$settings$providers$button$es
+    extends Translations$settings$providers$button$en {
+  _Translations$settings$providers$button$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -1701,9 +1721,9 @@ class _TranslationsSettingsProvidersButtonEs
 }
 
 // Path: settings.providers.alert
-class _TranslationsSettingsProvidersAlertEs
-    extends TranslationsSettingsProvidersAlertEn {
-  _TranslationsSettingsProvidersAlertEs._(TranslationsEs root)
+class _Translations$settings$providers$alert$es
+    extends Translations$settings$providers$alert$en {
+  _Translations$settings$providers$alert$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -1715,9 +1735,9 @@ class _TranslationsSettingsProvidersAlertEs
 }
 
 // Path: settings.providers.intro
-class _TranslationsSettingsProvidersIntroEs
-    extends TranslationsSettingsProvidersIntroEn {
-  _TranslationsSettingsProvidersIntroEs._(TranslationsEs root)
+class _Translations$settings$providers$intro$es
+    extends Translations$settings$providers$intro$en {
+  _Translations$settings$providers$intro$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -1732,9 +1752,9 @@ class _TranslationsSettingsProvidersIntroEs
 }
 
 // Path: settings.providers.editor
-class _TranslationsSettingsProvidersEditorEs
-    extends TranslationsSettingsProvidersEditorEn {
-  _TranslationsSettingsProvidersEditorEs._(TranslationsEs root)
+class _Translations$settings$providers$editor$es
+    extends Translations$settings$providers$editor$en {
+  _Translations$settings$providers$editor$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -1742,36 +1762,35 @@ class _TranslationsSettingsProvidersEditorEs
 
   // Translations
   @override
-  late final _TranslationsSettingsProvidersEditorRowEs row =
-      _TranslationsSettingsProvidersEditorRowEs._(_root);
+  late final _Translations$settings$providers$editor$row$es row =
+      _Translations$settings$providers$editor$row$es._(_root);
   @override
-  late final _TranslationsSettingsProvidersEditorPlaceholderEs placeholder =
-      _TranslationsSettingsProvidersEditorPlaceholderEs._(_root);
+  late final _Translations$settings$providers$editor$placeholder$es
+  placeholder = _Translations$settings$providers$editor$placeholder$es._(_root);
   @override
-  late final _TranslationsSettingsProvidersEditorTypePickerEs type_picker =
-      _TranslationsSettingsProvidersEditorTypePickerEs._(_root);
+  late final _Translations$settings$providers$editor$type_picker$es
+  type_picker = _Translations$settings$providers$editor$type_picker$es._(_root);
   @override
-  late final _TranslationsSettingsProvidersEditorTooltipEs tooltip =
-      _TranslationsSettingsProvidersEditorTooltipEs._(_root);
+  late final _Translations$settings$providers$editor$tooltip$es tooltip =
+      _Translations$settings$providers$editor$tooltip$es._(_root);
   @override
-  late final _TranslationsSettingsProvidersEditorStepEs step =
-      _TranslationsSettingsProvidersEditorStepEs._(_root);
+  late final _Translations$settings$providers$editor$step$es step =
+      _Translations$settings$providers$editor$step$es._(_root);
   @override
   String get add_title => 'Agregar {}';
   @override
-  late final _TranslationsSettingsProvidersEditorCapabilityNoteEs
-  capability_note = _TranslationsSettingsProvidersEditorCapabilityNoteEs._(
-    _root,
-  );
+  late final _Translations$settings$providers$editor$capability_note$es
+  capability_note =
+      _Translations$settings$providers$editor$capability_note$es._(_root);
   @override
-  late final _TranslationsSettingsProvidersEditorTestEs test =
-      _TranslationsSettingsProvidersEditorTestEs._(_root);
+  late final _Translations$settings$providers$editor$test$es test =
+      _Translations$settings$providers$editor$test$es._(_root);
 }
 
 // Path: settings.providers.detail
-class _TranslationsSettingsProvidersDetailEs
-    extends TranslationsSettingsProvidersDetailEn {
-  _TranslationsSettingsProvidersDetailEs._(TranslationsEs root)
+class _Translations$settings$providers$detail$es
+    extends Translations$settings$providers$detail$en {
+  _Translations$settings$providers$detail$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -1779,23 +1798,23 @@ class _TranslationsSettingsProvidersDetailEs
 
   // Translations
   @override
-  late final _TranslationsSettingsProvidersDetailTooltipEs tooltip =
-      _TranslationsSettingsProvidersDetailTooltipEs._(_root);
+  late final _Translations$settings$providers$detail$tooltip$es tooltip =
+      _Translations$settings$providers$detail$tooltip$es._(_root);
   @override
-  late final _TranslationsSettingsProvidersDetailRowEs row =
-      _TranslationsSettingsProvidersDetailRowEs._(_root);
+  late final _Translations$settings$providers$detail$row$es row =
+      _Translations$settings$providers$detail$row$es._(_root);
   @override
-  late final _TranslationsSettingsProvidersDetailSectionEs section =
-      _TranslationsSettingsProvidersDetailSectionEs._(_root);
+  late final _Translations$settings$providers$detail$section$es section =
+      _Translations$settings$providers$detail$section$es._(_root);
   @override
-  late final _TranslationsSettingsProvidersDetailModelsEs models =
-      _TranslationsSettingsProvidersDetailModelsEs._(_root);
+  late final _Translations$settings$providers$detail$models$es models =
+      _Translations$settings$providers$detail$models$es._(_root);
 }
 
 // Path: settings.providers.capability
-class _TranslationsSettingsProvidersCapabilityEs
-    extends TranslationsSettingsProvidersCapabilityEn {
-  _TranslationsSettingsProvidersCapabilityEs._(TranslationsEs root)
+class _Translations$settings$providers$capability$es
+    extends Translations$settings$providers$capability$en {
+  _Translations$settings$providers$capability$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -1813,9 +1832,9 @@ class _TranslationsSettingsProvidersCapabilityEs
 }
 
 // Path: settings.providers.description
-class _TranslationsSettingsProvidersDescriptionEs
-    extends TranslationsSettingsProvidersDescriptionEn {
-  _TranslationsSettingsProvidersDescriptionEs._(TranslationsEs root)
+class _Translations$settings$providers$description$es
+    extends Translations$settings$providers$description$en {
+  _Translations$settings$providers$description$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -1834,9 +1853,9 @@ class _TranslationsSettingsProvidersDescriptionEs
 }
 
 // Path: settings.providers.delete_dialog
-class _TranslationsSettingsProvidersDeleteDialogEs
-    extends TranslationsSettingsProvidersDeleteDialogEn {
-  _TranslationsSettingsProvidersDeleteDialogEs._(TranslationsEs root)
+class _Translations$settings$providers$delete_dialog$es
+    extends Translations$settings$providers$delete_dialog$en {
+  _Translations$settings$providers$delete_dialog$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -1850,9 +1869,9 @@ class _TranslationsSettingsProvidersDeleteDialogEs
 }
 
 // Path: settings.layout.empty
-class _TranslationsSettingsLayoutEmptyEs
-    extends TranslationsSettingsLayoutEmptyEn {
-  _TranslationsSettingsLayoutEmptyEs._(TranslationsEs root)
+class _Translations$settings$layout$empty$es
+    extends Translations$settings$layout$empty$en {
+  _Translations$settings$layout$empty$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -1867,9 +1886,9 @@ class _TranslationsSettingsLayoutEmptyEs
 }
 
 // Path: app.tray.context_menu.dev_tools
-class _TranslationsAppTrayContextMenuDevToolsEs
-    extends TranslationsAppTrayContextMenuDevToolsEn {
-  _TranslationsAppTrayContextMenuDevToolsEs._(TranslationsEs root)
+class _Translations$app$tray$context_menu$dev_tools$es
+    extends Translations$app$tray$context_menu$dev_tools$en {
+  _Translations$app$tray$context_menu$dev_tools$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -1883,9 +1902,9 @@ class _TranslationsAppTrayContextMenuDevToolsEs
 }
 
 // Path: settings.general.editor.row
-class _TranslationsSettingsGeneralEditorRowEs
-    extends TranslationsSettingsGeneralEditorRowEn {
-  _TranslationsSettingsGeneralEditorRowEs._(TranslationsEs root)
+class _Translations$settings$general$editor$row$es
+    extends Translations$settings$general$editor$row$en {
+  _Translations$settings$general$editor$row$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -1899,9 +1918,9 @@ class _TranslationsSettingsGeneralEditorRowEs
 }
 
 // Path: settings.shortcuts.group.global
-class _TranslationsSettingsShortcutsGroupGlobalEs
-    extends TranslationsSettingsShortcutsGroupGlobalEn {
-  _TranslationsSettingsShortcutsGroupGlobalEs._(TranslationsEs root)
+class _Translations$settings$shortcuts$group$global$es
+    extends Translations$settings$shortcuts$group$global$en {
+  _Translations$settings$shortcuts$group$global$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -1915,9 +1934,9 @@ class _TranslationsSettingsShortcutsGroupGlobalEs
 }
 
 // Path: settings.shortcuts.group.in_app
-class _TranslationsSettingsShortcutsGroupInAppEs
-    extends TranslationsSettingsShortcutsGroupInAppEn {
-  _TranslationsSettingsShortcutsGroupInAppEs._(TranslationsEs root)
+class _Translations$settings$shortcuts$group$in_app$es
+    extends Translations$settings$shortcuts$group$in_app$en {
+  _Translations$settings$shortcuts$group$in_app$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -1932,9 +1951,9 @@ class _TranslationsSettingsShortcutsGroupInAppEs
 }
 
 // Path: settings.services.editor.row
-class _TranslationsSettingsServicesEditorRowEs
-    extends TranslationsSettingsServicesEditorRowEn {
-  _TranslationsSettingsServicesEditorRowEs._(TranslationsEs root)
+class _Translations$settings$services$editor$row$es
+    extends Translations$settings$services$editor$row$en {
+  _Translations$settings$services$editor$row$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -1948,9 +1967,9 @@ class _TranslationsSettingsServicesEditorRowEs
 }
 
 // Path: settings.services.detail.row
-class _TranslationsSettingsServicesDetailRowEs
-    extends TranslationsSettingsServicesDetailRowEn {
-  _TranslationsSettingsServicesDetailRowEs._(TranslationsEs root)
+class _Translations$settings$services$detail$row$es
+    extends Translations$settings$services$detail$row$en {
+  _Translations$settings$services$detail$row$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -1968,9 +1987,9 @@ class _TranslationsSettingsServicesDetailRowEs
 }
 
 // Path: settings.services.detail.delete_dialog
-class _TranslationsSettingsServicesDetailDeleteDialogEs
-    extends TranslationsSettingsServicesDetailDeleteDialogEn {
-  _TranslationsSettingsServicesDetailDeleteDialogEs._(TranslationsEs root)
+class _Translations$settings$services$detail$delete_dialog$es
+    extends Translations$settings$services$detail$delete_dialog$en {
+  _Translations$settings$services$detail$delete_dialog$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -1984,9 +2003,9 @@ class _TranslationsSettingsServicesDetailDeleteDialogEs
 }
 
 // Path: settings.providers.editor.row
-class _TranslationsSettingsProvidersEditorRowEs
-    extends TranslationsSettingsProvidersEditorRowEn {
-  _TranslationsSettingsProvidersEditorRowEs._(TranslationsEs root)
+class _Translations$settings$providers$editor$row$es
+    extends Translations$settings$providers$editor$row$en {
+  _Translations$settings$providers$editor$row$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -2002,9 +2021,9 @@ class _TranslationsSettingsProvidersEditorRowEs
 }
 
 // Path: settings.providers.editor.placeholder
-class _TranslationsSettingsProvidersEditorPlaceholderEs
-    extends TranslationsSettingsProvidersEditorPlaceholderEn {
-  _TranslationsSettingsProvidersEditorPlaceholderEs._(TranslationsEs root)
+class _Translations$settings$providers$editor$placeholder$es
+    extends Translations$settings$providers$editor$placeholder$en {
+  _Translations$settings$providers$editor$placeholder$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -2016,9 +2035,9 @@ class _TranslationsSettingsProvidersEditorPlaceholderEs
 }
 
 // Path: settings.providers.editor.type_picker
-class _TranslationsSettingsProvidersEditorTypePickerEs
-    extends TranslationsSettingsProvidersEditorTypePickerEn {
-  _TranslationsSettingsProvidersEditorTypePickerEs._(TranslationsEs root)
+class _Translations$settings$providers$editor$type_picker$es
+    extends Translations$settings$providers$editor$type_picker$en {
+  _Translations$settings$providers$editor$type_picker$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -2034,9 +2053,9 @@ class _TranslationsSettingsProvidersEditorTypePickerEs
 }
 
 // Path: settings.providers.editor.tooltip
-class _TranslationsSettingsProvidersEditorTooltipEs
-    extends TranslationsSettingsProvidersEditorTooltipEn {
-  _TranslationsSettingsProvidersEditorTooltipEs._(TranslationsEs root)
+class _Translations$settings$providers$editor$tooltip$es
+    extends Translations$settings$providers$editor$tooltip$en {
+  _Translations$settings$providers$editor$tooltip$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -2048,9 +2067,9 @@ class _TranslationsSettingsProvidersEditorTooltipEs
 }
 
 // Path: settings.providers.editor.step
-class _TranslationsSettingsProvidersEditorStepEs
-    extends TranslationsSettingsProvidersEditorStepEn {
-  _TranslationsSettingsProvidersEditorStepEs._(TranslationsEs root)
+class _Translations$settings$providers$editor$step$es
+    extends Translations$settings$providers$editor$step$en {
+  _Translations$settings$providers$editor$step$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -2064,10 +2083,11 @@ class _TranslationsSettingsProvidersEditorStepEs
 }
 
 // Path: settings.providers.editor.capability_note
-class _TranslationsSettingsProvidersEditorCapabilityNoteEs
-    extends TranslationsSettingsProvidersEditorCapabilityNoteEn {
-  _TranslationsSettingsProvidersEditorCapabilityNoteEs._(TranslationsEs root)
-    : this._root = root,
+class _Translations$settings$providers$editor$capability_note$es
+    extends Translations$settings$providers$editor$capability_note$en {
+  _Translations$settings$providers$editor$capability_note$es._(
+    TranslationsEs root,
+  ) : this._root = root,
       super.internal(root);
 
   final TranslationsEs _root; // ignore: unused_field
@@ -2082,9 +2102,9 @@ class _TranslationsSettingsProvidersEditorCapabilityNoteEs
 }
 
 // Path: settings.providers.editor.test
-class _TranslationsSettingsProvidersEditorTestEs
-    extends TranslationsSettingsProvidersEditorTestEn {
-  _TranslationsSettingsProvidersEditorTestEs._(TranslationsEs root)
+class _Translations$settings$providers$editor$test$es
+    extends Translations$settings$providers$editor$test$en {
+  _Translations$settings$providers$editor$test$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -2118,9 +2138,9 @@ class _TranslationsSettingsProvidersEditorTestEs
 }
 
 // Path: settings.providers.detail.tooltip
-class _TranslationsSettingsProvidersDetailTooltipEs
-    extends TranslationsSettingsProvidersDetailTooltipEn {
-  _TranslationsSettingsProvidersDetailTooltipEs._(TranslationsEs root)
+class _Translations$settings$providers$detail$tooltip$es
+    extends Translations$settings$providers$detail$tooltip$en {
+  _Translations$settings$providers$detail$tooltip$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -2132,9 +2152,9 @@ class _TranslationsSettingsProvidersDetailTooltipEs
 }
 
 // Path: settings.providers.detail.row
-class _TranslationsSettingsProvidersDetailRowEs
-    extends TranslationsSettingsProvidersDetailRowEn {
-  _TranslationsSettingsProvidersDetailRowEs._(TranslationsEs root)
+class _Translations$settings$providers$detail$row$es
+    extends Translations$settings$providers$detail$row$en {
+  _Translations$settings$providers$detail$row$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -2146,9 +2166,9 @@ class _TranslationsSettingsProvidersDetailRowEs
 }
 
 // Path: settings.providers.detail.section
-class _TranslationsSettingsProvidersDetailSectionEs
-    extends TranslationsSettingsProvidersDetailSectionEn {
-  _TranslationsSettingsProvidersDetailSectionEs._(TranslationsEs root)
+class _Translations$settings$providers$detail$section$es
+    extends Translations$settings$providers$detail$section$en {
+  _Translations$settings$providers$detail$section$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
@@ -2162,9 +2182,9 @@ class _TranslationsSettingsProvidersDetailSectionEs
 }
 
 // Path: settings.providers.detail.models
-class _TranslationsSettingsProvidersDetailModelsEs
-    extends TranslationsSettingsProvidersDetailModelsEn {
-  _TranslationsSettingsProvidersDetailModelsEs._(TranslationsEs root)
+class _Translations$settings$providers$detail$models$es
+    extends Translations$settings$providers$detail$models$en {
+  _Translations$settings$providers$detail$models$es._(TranslationsEs root)
     : this._root = root,
       super.internal(root);
 
