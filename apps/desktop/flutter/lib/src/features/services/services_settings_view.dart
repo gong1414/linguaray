@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:linguaray_application/linguaray_application.dart';
 
+import '../../i18n/i18n.dart';
 import '../../shared/settings_labels.dart';
 import '../../shared/settings_page.dart';
 import '../../shared/status_message.dart';
@@ -46,7 +47,7 @@ class ServicesSettingsView extends StatelessWidget {
     final dictionaries = serviceKind == 'translation'
         ? services.where((service) => service.kind == 'dictionary').toList()
         : const <ServiceRecord>[];
-    final cardColor = theme.colorScheme.surfaceContainerLowest;
+    final cardColor = theme.colorScheme.surfaceContainerLow;
     final cardShape = theme.cardTheme.shape;
 
     return SettingsPage(
@@ -221,7 +222,7 @@ class _ServiceTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 5, 10, 5),
+      padding: const EdgeInsets.fromLTRB(12, 14, 16, 14),
       child: Row(
         children: [
           if (reorderIndex != null)
@@ -273,6 +274,102 @@ class _ServiceTile extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// The production service form, shared with Widgetbook without runtime access.
+class ServiceEditorView extends StatefulWidget {
+  const ServiceEditorView({
+    required this.providers,
+    required this.serviceKind,
+    required this.onSave,
+    required this.onCancel,
+    super.key,
+  }) : assert(providers.length > 0);
+
+  final List<ProviderRecord> providers;
+  final String serviceKind;
+  final ValueChanged<ServiceDraft> onSave;
+  final VoidCallback onCancel;
+
+  @override
+  State<ServiceEditorView> createState() => _ServiceEditorViewState();
+}
+
+class _ServiceEditorViewState extends State<ServiceEditorView> {
+  late String _providerId = widget.providers.first.id;
+  final _name = TextEditingController();
+
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final labels = t.settings.services;
+    return AlertDialog(
+      scrollable: true,
+      title: Text(labels.editor.title),
+      content: SizedBox(
+        width: 440,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              labels.editor.subtitle,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 24),
+            DropdownButtonFormField<String>(
+              initialValue: _providerId,
+              isExpanded: true,
+              decoration: InputDecoration(
+                labelText: labels.detail.row.provider,
+              ),
+              items: [
+                for (final provider in widget.providers)
+                  DropdownMenuItem(
+                    value: provider.id,
+                    child: Text(
+                      provider.displayName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+              ],
+              onChanged: (value) {
+                if (value != null) setState(() => _providerId = value);
+              },
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _name,
+              decoration: InputDecoration(labelText: labels.detail.row.name),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: widget.onCancel,
+          child: Text(t.common.ui.button.cancel),
+        ),
+        FilledButton(
+          onPressed: () => widget.onSave(
+            ServiceDraft(
+              providerId: _providerId,
+              kind: widget.serviceKind,
+              name: _name.text.trim().isEmpty
+                  ? '$_providerId ${widget.serviceKind}'
+                  : _name.text.trim(),
+            ),
+          ),
+          child: Text(t.common.ui.button.save),
+        ),
+      ],
     );
   }
 }

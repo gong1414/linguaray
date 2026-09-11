@@ -168,7 +168,7 @@ class _DictionaryEntryBody extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: Text(entry.word, style: theme.textTheme.headlineSmall),
+                child: Text(entry.word, style: theme.textTheme.headlineMedium),
               ),
               if (onSpeak != null)
                 IconButton(
@@ -193,7 +193,7 @@ class _DictionaryEntryBody extends StatelessWidget {
             ),
           ],
           if (entry.pronunciations.isNotEmpty) ...[
-            const SizedBox(height: 18),
+            const SizedBox(height: 24),
             Text(labels.pronunciation, style: theme.textTheme.titleSmall),
             const SizedBox(height: 6),
             for (final pronunciation in entry.pronunciations)
@@ -206,7 +206,7 @@ class _DictionaryEntryBody extends StatelessWidget {
               ),
           ],
           if (entry.translations.isNotEmpty) ...[
-            const SizedBox(height: 18),
+            const SizedBox(height: 24),
             for (final translation in entry.translations)
               Padding(
                 padding: const EdgeInsets.only(bottom: 6),
@@ -214,7 +214,9 @@ class _DictionaryEntryBody extends StatelessWidget {
               ),
           ],
           if (entry.definitions.isNotEmpty) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: 20),
+            const Divider(),
+            const SizedBox(height: 20),
             Text(labels.definitions, style: theme.textTheme.titleSmall),
             const SizedBox(height: 6),
             for (final definition in entry.definitions)

@@ -77,7 +77,7 @@ class QuickTranslateInput extends StatelessWidget {
           minLines: 2,
           maxLines: 6,
           style: theme.textTheme.bodyLarge?.copyWith(
-            fontSize: 16,
+            fontSize: 17,
             height: 1.65,
           ),
           textInputAction: submitWithModifier
@@ -92,7 +92,7 @@ class QuickTranslateInput extends StatelessWidget {
             focusedBorder: InputBorder.none,
             contentPadding: const EdgeInsets.symmetric(vertical: 8),
             hintStyle: theme.textTheme.bodyLarge?.copyWith(
-              fontSize: 16,
+              fontSize: 17,
               height: 1.65,
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -125,7 +125,7 @@ class QuickTranslateInput extends StatelessWidget {
                   ? onStop
                   : (canTranslate ? onTranslate : null),
               style: FilledButton.styleFrom(
-                minimumSize: const Size(0, 30),
+                minimumSize: const Size(0, 34),
                 padding: const EdgeInsets.symmetric(horizontal: 12),
               ),
               child: Row(

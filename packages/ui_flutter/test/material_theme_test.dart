@@ -17,14 +17,14 @@ void main() {
     }
   });
 
-  test('material theme uses the light workbench action palette', () {
+  test('material theme uses the neutral desktop action palette', () {
     final light = LinguaRayMaterialTheme.light();
     final dark = LinguaRayMaterialTheme.dark();
 
-    expect(light.colorScheme.primary, LinguaRayPalette.actionOrange);
+    expect(light.colorScheme.primary, LinguaRayPalette.actionInk);
     expect(light.scaffoldBackgroundColor, LinguaRayPalette.paper);
     expect(light.colorScheme.onSurface, LinguaRayPalette.graphite);
-    expect(dark.colorScheme.inversePrimary, LinguaRayPalette.actionOrange);
+    expect(dark.colorScheme.inversePrimary, LinguaRayPalette.actionInk);
   });
 
   test('core foreground pairs meet desktop contrast requirements', () {

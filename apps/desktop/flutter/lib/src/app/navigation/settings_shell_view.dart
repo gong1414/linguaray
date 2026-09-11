@@ -3,7 +3,7 @@ import 'package:linguaray_ui/linguaray_ui.dart' show BrandLogo;
 
 import '../../shared/settings_labels.dart';
 
-/// Four work areas keep the rail short. Their pages stay in a horizontal bar.
+/// One grouped directory exposes every settings destination directly.
 class SettingsShellView extends StatelessWidget {
   const SettingsShellView({
     required this.labels,
@@ -23,13 +23,12 @@ class SettingsShellView extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final groups = <_WorkArea>[
-      _WorkArea(labels.translationGroup, Icons.translate_rounded, [
+      _WorkArea(labels.translationGroup, [
         (SettingsSection.translation, labels.translationSettings),
         (SettingsSection.translationServices, labels.translationServices),
       ]),
       _WorkArea(
         labels.libraryGroup.isEmpty ? labels.history : labels.libraryGroup,
-        Icons.auto_stories_outlined,
         [
           (SettingsSection.history, labels.history),
           (SettingsSection.favorites, labels.favorites),
@@ -39,11 +38,11 @@ class SettingsShellView extends StatelessWidget {
             (SettingsSection.vocabulary, labels.vocabulary),
         ],
       ),
-      _WorkArea(labels.ocrGroup, Icons.document_scanner_outlined, [
+      _WorkArea(labels.ocrGroup, [
         (SettingsSection.ocr, labels.ocrSettings),
         (SettingsSection.ocrServices, labels.ocrServices),
       ]),
-      _WorkArea(labels.generalGroup, Icons.tune_rounded, [
+      _WorkArea(labels.generalGroup, [
         (SettingsSection.general, labels.general),
         (SettingsSection.permissions, labels.permissions),
         if (labels.dataTransfer.isNotEmpty)
@@ -55,149 +54,124 @@ class SettingsShellView extends StatelessWidget {
         (SettingsSection.about, labels.about),
       ]),
     ];
-    final active = groups.firstWhere(
-      (group) => group.pages.any((page) => page.$1 == section),
-      orElse: () => groups.last,
-    );
     return Material(
       color: colors.surfaceContainerLowest,
-      child: Row(
-        children: [
-          Container(
-            width: 80,
-            decoration: BoxDecoration(
+      child: LayoutBuilder(
+        builder: (context, constraints) => Row(
+          children: [
+            Container(
+              width: constraints.maxWidth < 900 ? 184 : 208,
               color: colors.surface,
-              border: Border(right: BorderSide(color: colors.outlineVariant)),
-            ),
-            child: Column(
-              children: [
-                const SizedBox(height: 26),
-                const Tooltip(message: 'LinguaRay', child: BrandLogo(size: 32)),
-                const SizedBox(height: 28),
-                Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    children: [
-                      for (final group in groups)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: Semantics(
-                            selected: group == active,
-                            child: Material(
-                              color: group == active
-                                  ? colors.primaryContainer
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(8),
-                              child: InkWell(
-                                key: ValueKey(
-                                  'work-area-${group.pages.first.$1.name}',
-                                ),
-                                borderRadius: BorderRadius.circular(8),
-                                onTap: () =>
-                                    onSectionSelected(group.pages.first.$1),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 13,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 28, 16, 24),
+                    child: Row(
+                      children: [
+                        const BrandLogo(size: 28),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'LinguaRay',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.titleMedium,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: ListView(
+                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 20),
+                      children: [
+                        for (final group in groups) ...[
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(10, 12, 8, 6),
+                            child: Text(
+                              group.label,
+                              style: theme.textTheme.labelSmall,
+                            ),
+                          ),
+                          for (final (destination, label) in group.pages)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 2),
+                              child: Semantics(
+                                selected: destination == section,
+                                child: TextButton(
+                                  key: ValueKey(
+                                    'settings-page-${destination.name}',
                                   ),
-                                  child: Column(
+                                  onPressed: () =>
+                                      onSectionSelected(destination),
+                                  style: TextButton.styleFrom(
+                                    alignment: Alignment.centerLeft,
+                                    minimumSize: const Size(0, 36),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 8,
+                                    ),
+                                    backgroundColor: destination == section
+                                        ? colors.primary
+                                        : null,
+                                    foregroundColor: destination == section
+                                        ? colors.onPrimary
+                                        : colors.onSurfaceVariant,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                  ),
+                                  child: Row(
                                     children: [
-                                      Icon(
-                                        group.icon,
-                                        size: 23,
-                                        color: group == active
-                                            ? colors.primary
-                                            : colors.onSurfaceVariant,
-                                      ),
-                                      const SizedBox(height: 6),
-                                      Text(
-                                        group.label,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: theme.textTheme.labelSmall
-                                            ?.copyWith(
-                                              color: group == active
-                                                  ? colors.primary
-                                                  : colors.onSurfaceVariant,
-                                              fontWeight: group == active
-                                                  ? FontWeight.w600
-                                                  : FontWeight.w400,
-                                            ),
+                                      Icon(_icon(destination), size: 17),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text(
+                                          label,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
                                       ),
                                     ],
                                   ),
                                 ),
                               ),
                             ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Container(
-                  height: 66,
-                  decoration: BoxDecoration(
-                    border: Border(
-                      bottom: BorderSide(color: colors.outlineVariant),
-                    ),
-                  ),
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: Row(
-                      children: [
-                        for (final (destination, label) in active.pages)
-                          Padding(
-                            padding: const EdgeInsets.only(right: 6),
-                            child: Semantics(
-                              selected: destination == section,
-                              child: TextButton(
-                                key: ValueKey(
-                                  'settings-page-${destination.name}',
-                                ),
-                                onPressed: () => onSectionSelected(destination),
-                                style: TextButton.styleFrom(
-                                  backgroundColor: destination == section
-                                      ? colors.surface
-                                      : null,
-                                  foregroundColor: destination == section
-                                      ? colors.onSurface
-                                      : colors.onSurfaceVariant,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 12,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                ),
-                                child: Text(label),
-                              ),
-                            ),
-                          ),
+                        ],
                       ],
                     ),
                   ),
-                ),
-                Expanded(child: child),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+            Expanded(child: child),
+          ],
+        ),
       ),
     );
   }
+
+  static IconData _icon(SettingsSection section) => switch (section) {
+    SettingsSection.translation => Icons.translate_rounded,
+    SettingsSection.translationServices => Icons.view_list_outlined,
+    SettingsSection.history => Icons.history_rounded,
+    SettingsSection.favorites => Icons.star_outline_rounded,
+    SettingsSection.glossary => Icons.menu_book_outlined,
+    SettingsSection.vocabulary => Icons.bookmark_border_rounded,
+    SettingsSection.ocr => Icons.document_scanner_outlined,
+    SettingsSection.ocrServices => Icons.layers_outlined,
+    SettingsSection.general => Icons.tune_rounded,
+    SettingsSection.permissions => Icons.lock_outline_rounded,
+    SettingsSection.dataTransfer => Icons.import_export_rounded,
+    SettingsSection.integration => Icons.extension_outlined,
+    SettingsSection.updates => Icons.system_update_alt_rounded,
+    SettingsSection.about => Icons.info_outline_rounded,
+  };
 }
 
 class _WorkArea {
-  const _WorkArea(this.label, this.icon, this.pages);
+  const _WorkArea(this.label, this.pages);
   final String label;
-  final IconData icon;
   final List<(SettingsSection, String)> pages;
 }

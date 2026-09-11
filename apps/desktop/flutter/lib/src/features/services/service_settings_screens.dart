@@ -96,64 +96,15 @@ Future<void> _addService(
         .listProviders();
   }
   if (providers.isEmpty || !context.mounted) return;
-  var providerId = providers.first.id;
-  final name = TextEditingController();
-  final saved = await showDialog<bool>(
+  final draft = await showDialog<ServiceDraft>(
     context: context,
-    builder: (context) {
-      return StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: Text(t.settings.services.button.add_service),
-          content: SizedBox(
-            width: 360,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                DropdownButton<String>(
-                  value: providerId,
-                  isExpanded: true,
-                  items: [
-                    for (final provider in providers)
-                      DropdownMenuItem(
-                        value: provider.id,
-                        child: Text(provider.displayName),
-                      ),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) setState(() => providerId = value);
-                  },
-                ),
-                TextField(
-                  controller: name,
-                  decoration: const InputDecoration(),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: Text(t.common.ui.button.cancel),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: Text(t.common.ui.button.save),
-            ),
-          ],
-        ),
-      );
-    },
+    builder: (context) => ServiceEditorView(
+      providers: providers,
+      serviceKind: serviceKind,
+      onSave: (draft) => Navigator.pop(context, draft),
+      onCancel: () => Navigator.pop(context),
+    ),
   );
-  if (saved != true) return;
-  await ref
-      .read(servicesSettingsViewModelProvider.notifier)
-      .addService(
-        ServiceDraft(
-          providerId: providerId,
-          kind: serviceKind,
-          name: name.text.trim().isEmpty
-              ? '$providerId $serviceKind'
-              : name.text.trim(),
-        ),
-      );
+  if (draft == null) return;
+  await ref.read(servicesSettingsViewModelProvider.notifier).addService(draft);
 }

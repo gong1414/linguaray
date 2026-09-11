@@ -60,12 +60,14 @@ Future<void> _editNote(
   final note = await showDialog<String>(
     context: context,
     builder: (context) => AlertDialog(
+      scrollable: true,
       title: Text(t.ui.vocabulary.note),
       content: TextField(
         controller: controller,
         autofocus: true,
         minLines: 2,
         maxLines: 5,
+        decoration: InputDecoration(labelText: t.ui.vocabulary.note),
       ),
       actions: [
         TextButton(

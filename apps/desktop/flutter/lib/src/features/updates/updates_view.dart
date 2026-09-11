@@ -59,11 +59,11 @@ class UpdatesView extends StatelessWidget {
     return SettingsPage(
       title: labels.title,
       children: [
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          title: Text(labels.current),
-          subtitle: Text(state.currentVersion),
-          trailing: FilledButton(
+        SettingsActionRow(
+          title: labels.current,
+          description: state.currentVersion,
+          leading: const Icon(Icons.system_update_alt_rounded, size: 28),
+          action: FilledButton(
             onPressed:
                 (state.status == UpdateStatus.checking ||
                     state.status == UpdateStatus.downloading)
@@ -76,7 +76,8 @@ class UpdatesView extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 12),
+        const Divider(),
+        const SizedBox(height: 24),
         ..._status(context),
       ],
     );

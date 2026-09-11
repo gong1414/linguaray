@@ -95,15 +95,6 @@ class _QuickTranslateResultPanelState extends State<QuickTranslateResultPanel> {
             height: 32,
             child: Row(
               children: [
-                Container(
-                  width: 3,
-                  height: 12,
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primary,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const SizedBox(width: 7),
                 Text(
                   widget.labels.resultLabel,
                   style: Theme.of(context).textTheme.labelMedium,
@@ -132,7 +123,7 @@ class _QuickTranslateResultPanelState extends State<QuickTranslateResultPanel> {
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
-                textAlign: TextAlign.center,
+                textAlign: TextAlign.start,
               ),
             ),
           if (widget.selectedResult?.status ==
@@ -150,7 +141,7 @@ class _QuickTranslateResultPanelState extends State<QuickTranslateResultPanel> {
                     resultText,
                     key: const ValueKey('quick-result'),
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      fontSize: 17,
+                      fontSize: 18,
                       height: 1.65,
                       letterSpacing: 0,
                     ),
@@ -261,7 +252,7 @@ class _QuickTranslateResultPanelState extends State<QuickTranslateResultPanel> {
                         size: 18,
                       ),
                     ),
-                  TextButton.icon(
+                  FilledButton.tonalIcon(
                     onPressed: () => widget.onCopy(resultText),
                     icon: Icon(
                       widget.copied ? Icons.check_rounded : Icons.copy_rounded,

@@ -1,12 +1,12 @@
 import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 
-/// Canonical LinguaRay brand colors. These are the only named product hues
+/// Canonical LinguaRay interface colors. These are the only named product hues
 /// used by the production Material 3 theme.
 abstract final class LinguaRayPalette {
-  static const Color actionOrange = Color(0xFFB94D30);
-  static const Color graphite = Color(0xFF302D2B);
-  static const Color paper = Color(0xFFF6F5F3);
+  static const Color actionInk = Color(0xFF30343B);
+  static const Color graphite = Color(0xFF22252B);
+  static const Color paper = Color(0xFFF3F4F6);
 }
 
 abstract final class LinguaRayMaterialTheme {
@@ -26,18 +26,18 @@ abstract final class LinguaRayMaterialTheme {
   static ColorScheme _lightScheme() {
     return const ColorScheme(
       brightness: Brightness.light,
-      primary: LinguaRayPalette.actionOrange,
+      primary: LinguaRayPalette.actionInk,
       onPrimary: Color(0xFFFFFFFF),
-      primaryContainer: Color(0xFFFFF0E9),
-      onPrimaryContainer: Color(0xFF82351E),
-      secondary: Color(0xFF7A6557),
+      primaryContainer: Color(0xFFE9EBEF),
+      onPrimaryContainer: Color(0xFF30343B),
+      secondary: Color(0xFF626872),
       onSecondary: Color(0xFFFFFFFF),
-      secondaryContainer: Color(0xFFF1ECE7),
-      onSecondaryContainer: Color(0xFF504238),
-      tertiary: Color(0xFF8A644B),
+      secondaryContainer: Color(0xFFECEEF2),
+      onSecondaryContainer: Color(0xFF3E444E),
+      tertiary: Color(0xFF805B24),
       onTertiary: Color(0xFFFFFFFF),
-      tertiaryContainer: Color(0xFFF4E8DD),
-      onTertiaryContainer: Color(0xFF4E3626),
+      tertiaryContainer: Color(0xFFFFF0D2),
+      onTertiaryContainer: Color(0xFF563B12),
       error: Color(0xFFBA1A1A),
       onError: Color(0xFFFFFFFF),
       errorContainer: Color(0xFFFFDAD6),
@@ -45,16 +45,16 @@ abstract final class LinguaRayMaterialTheme {
       surface: LinguaRayPalette.paper,
       onSurface: LinguaRayPalette.graphite,
       surfaceContainerLowest: Color(0xFFFFFFFF),
-      surfaceContainerLow: Color(0xFFF6F5F3),
-      surfaceContainer: Color(0xFFEEECE9),
-      surfaceContainerHigh: Color(0xFFE8E4DF),
-      surfaceContainerHighest: Color(0xFFDCD6D0),
-      onSurfaceVariant: Color(0xFF766F69),
-      outline: Color(0xFF9D948B),
-      outlineVariant: Color(0xFFE7E2DC),
+      surfaceContainerLow: Color(0xFFF3F4F6),
+      surfaceContainer: Color(0xFFECEEF2),
+      surfaceContainerHigh: Color(0xFFE4E7EC),
+      surfaceContainerHighest: Color(0xFFD8DCE3),
+      onSurfaceVariant: Color(0xFF626872),
+      outline: Color(0xFF858D99),
+      outlineVariant: Color(0xFFDEE1E6),
       inverseSurface: LinguaRayPalette.graphite,
       onInverseSurface: LinguaRayPalette.paper,
-      inversePrimary: Color(0xFFFFBEA5),
+      inversePrimary: Color(0xFFE4E7EC),
       scrim: Color(0xFF000000),
       shadow: Color(0xFF000000),
       surfaceTint: Colors.transparent,
@@ -64,35 +64,35 @@ abstract final class LinguaRayMaterialTheme {
   static ColorScheme _darkScheme() {
     return const ColorScheme(
       brightness: Brightness.dark,
-      primary: Color(0xFFFFB695),
-      onPrimary: Color(0xFF54200E),
-      primaryContainer: Color(0xFF71321D),
-      onPrimaryContainer: Color(0xFFFFDACA),
-      secondary: Color(0xFFC6B4A9),
-      onSecondary: Color(0xFF36291F),
-      secondaryContainer: Color(0xFF453C35),
-      onSecondaryContainer: Color(0xFFF1E4D9),
-      tertiary: Color(0xFFDFC0A9),
-      onTertiary: Color(0xFF403126),
-      tertiaryContainer: Color(0xFF594435),
-      onTertiaryContainer: Color(0xFFFBE8D8),
+      primary: Color(0xFFE4E7EC),
+      onPrimary: Color(0xFF252930),
+      primaryContainer: Color(0xFF3D434D),
+      onPrimaryContainer: Color(0xFFF2F3F5),
+      secondary: Color(0xFFB3B9C3),
+      onSecondary: Color(0xFF252930),
+      secondaryContainer: Color(0xFF383E47),
+      onSecondaryContainer: Color(0xFFE3E6EC),
+      tertiary: Color(0xFFE3C17D),
+      onTertiary: Color(0xFF3B2C10),
+      tertiaryContainer: Color(0xFF59451D),
+      onTertiaryContainer: Color(0xFFFFE7B3),
       error: Color(0xFFFFB4AB),
       onError: Color(0xFF690005),
       errorContainer: Color(0xFF93000A),
       onErrorContainer: Color(0xFFFFDAD6),
-      surface: Color(0xFF24211F),
-      onSurface: Color(0xFFF5EDE7),
-      surfaceContainerLowest: Color(0xFF2E2925),
-      surfaceContainerLow: Color(0xFF282420),
-      surfaceContainer: Color(0xFF352F29),
-      surfaceContainerHigh: Color(0xFF3C352E),
-      surfaceContainerHighest: Color(0xFF453C34),
-      onSurfaceVariant: Color(0xFFC2B4A8),
-      outline: Color(0xFF9E8D7E),
-      outlineVariant: Color(0xFF4E443A),
-      inverseSurface: Color(0xFFF3ECE6),
+      surface: Color(0xFF17191D),
+      onSurface: Color(0xFFF2F3F5),
+      surfaceContainerLowest: Color(0xFF202328),
+      surfaceContainerLow: Color(0xFF24272D),
+      surfaceContainer: Color(0xFF2A2E35),
+      surfaceContainerHigh: Color(0xFF323740),
+      surfaceContainerHighest: Color(0xFF3B414B),
+      onSurfaceVariant: Color(0xFFB3B9C3),
+      outline: Color(0xFF89929F),
+      outlineVariant: Color(0xFF3B4049),
+      inverseSurface: Color(0xFFF2F3F5),
       onInverseSurface: LinguaRayPalette.graphite,
-      inversePrimary: LinguaRayPalette.actionOrange,
+      inversePrimary: LinguaRayPalette.actionInk,
       scrim: Color(0xFF000000),
       shadow: Color(0xFF000000),
       surfaceTint: Colors.transparent,
@@ -129,23 +129,23 @@ abstract final class LinguaRayMaterialTheme {
         fontFamily: displayFamily,
         fontSize: 28,
         height: 1.25,
-        fontWeight: FontWeight.w500,
+        fontWeight: FontWeight.w600,
         letterSpacing: -0.3,
         color: scheme.onSurface,
       ),
       titleLarge: base.textTheme.titleLarge?.copyWith(
         fontFamily: displayFamily,
-        fontSize: 26,
+        fontSize: 28,
         height: 1.3,
         letterSpacing: -0.45,
-        fontWeight: FontWeight.w500,
+        fontWeight: FontWeight.w600,
         color: scheme.onSurface,
       ),
       titleMedium: base.textTheme.titleMedium?.copyWith(
-        fontSize: 13,
+        fontSize: 15,
         height: 1.4,
         letterSpacing: 0,
-        fontWeight: FontWeight.w500,
+        fontWeight: FontWeight.w600,
         color: scheme.onSurface,
       ),
       bodyLarge: base.textTheme.bodyLarge?.copyWith(
@@ -180,7 +180,7 @@ abstract final class LinguaRayMaterialTheme {
       ),
       labelLarge: base.textTheme.labelLarge?.copyWith(
         letterSpacing: 0,
-        fontWeight: FontWeight.w500,
+        fontWeight: FontWeight.w600,
         fontSize: 13,
       ),
     );
@@ -201,10 +201,10 @@ abstract final class LinguaRayMaterialTheme {
       cardTheme: CardThemeData(
         elevation: 0,
         margin: EdgeInsets.zero,
-        color: scheme.surfaceContainerLowest,
+        color: scheme.surfaceContainerLow,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(radius),
+          borderRadius: BorderRadius.circular(12),
           side: BorderSide(color: scheme.outlineVariant),
         ),
       ),
@@ -254,7 +254,7 @@ abstract final class LinguaRayMaterialTheme {
         filled: true,
         fillColor: isDark
             ? scheme.surfaceContainerLow
-            : const Color(0xFFFAF9F7),
+            : const Color(0xFFF7F8FA),
         floatingLabelBehavior: FloatingLabelBehavior.always,
         labelStyle: textTheme.bodySmall,
         border: outline,
@@ -341,7 +341,8 @@ abstract final class LinguaRayMaterialTheme {
         ),
       ),
       listTileTheme: ListTileThemeData(
-        minVerticalPadding: 8,
+        minVerticalPadding: 14,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         iconColor: scheme.onSurfaceVariant,
         selectedTileColor: scheme.primaryContainer.withValues(alpha: 0.55),
         selectedColor: scheme.primary,
@@ -357,7 +358,9 @@ abstract final class LinguaRayMaterialTheme {
         thumbColor: WidgetStateProperty.resolveWith(
           (states) => states.contains(WidgetState.disabled)
               ? scheme.onSurface.withValues(alpha: 0.25)
-              : Colors.white,
+              : states.contains(WidgetState.selected)
+              ? scheme.onPrimary
+              : scheme.surfaceContainerLowest,
         ),
         trackColor: WidgetStateProperty.resolveWith(
           (states) => states.contains(WidgetState.selected)
@@ -374,7 +377,7 @@ abstract final class LinguaRayMaterialTheme {
         titleTextStyle: textTheme.titleLarge?.copyWith(fontSize: 20),
         contentTextStyle: textTheme.bodyMedium,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(16),
           side: BorderSide(color: scheme.outlineVariant),
         ),
       ),
@@ -393,7 +396,9 @@ abstract final class LinguaRayMaterialTheme {
         backgroundColor: isDark
             ? scheme.surfaceContainerHighest
             : LinguaRayPalette.graphite,
-        contentTextStyle: textTheme.bodyMedium?.copyWith(color: Colors.white),
+        contentTextStyle: textTheme.bodyMedium?.copyWith(
+          color: isDark ? scheme.onSurface : scheme.onPrimary,
+        ),
       ),
       tooltipTheme: const TooltipThemeData(
         waitDuration: Duration(milliseconds: 400),

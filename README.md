@@ -63,6 +63,44 @@ selected source text are intentionally outside the current scope. Half-finished
 entry points stay hidden until they meet the same test and platform requirements
 as the core workflows.
 
+## Interface preview
+
+A neutral white and graphite interface with grouped settings navigation, focused translation panels, and matching light and dark themes. These Widgetbook snapshots use sample content and are rendered on each named operating system.
+
+### macOS
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="apps/desktop/flutter/test/goldens/catalog/quick_success_dark_macos.png">
+  <img alt="macOS · Quick translation" src="apps/desktop/flutter/test/goldens/catalog/quick_success_light_macos.png" width="880">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="apps/desktop/flutter/test/goldens/catalog/settings_general_dark_macos.png">
+  <img alt="macOS · Preferences" src="apps/desktop/flutter/test/goldens/catalog/settings_general_light_macos.png" width="880">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="apps/desktop/flutter/test/goldens/catalog/ocr_success_dark_macos.png">
+  <img alt="macOS · OCR" src="apps/desktop/flutter/test/goldens/catalog/ocr_success_light_macos.png" width="880">
+</picture>
+
+### Windows
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="apps/desktop/flutter/test/goldens/catalog/quick_success_dark_windows.png">
+  <img alt="Windows · Quick translation" src="apps/desktop/flutter/test/goldens/catalog/quick_success_light_windows.png" width="880">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="apps/desktop/flutter/test/goldens/catalog/settings_general_dark_windows.png">
+  <img alt="Windows · Preferences" src="apps/desktop/flutter/test/goldens/catalog/settings_general_light_windows.png" width="880">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="apps/desktop/flutter/test/goldens/catalog/ocr_success_dark_windows.png">
+  <img alt="Windows · OCR" src="apps/desktop/flutter/test/goldens/catalog/ocr_success_light_windows.png" width="880">
+</picture>
+
 ## Platform support
 
 | Platform | Minimum version | Build status |

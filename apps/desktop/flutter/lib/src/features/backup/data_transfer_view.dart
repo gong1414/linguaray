@@ -56,31 +56,31 @@ class DataTransferView extends StatelessWidget {
     return SettingsPage(
       title: labels.title,
       children: [
-        Text(labels.description),
+        Text(labels.description, style: Theme.of(context).textTheme.bodyMedium),
         const SizedBox(height: 20),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          title: Text(labels.exportTitle),
-          subtitle: Text(labels.exportDescription),
-          trailing: FilledButton.tonalIcon(
+        SettingsActionRow(
+          title: labels.exportTitle,
+          description: labels.exportDescription,
+          leading: const Icon(Icons.upload_file_outlined),
+          action: FilledButton.tonalIcon(
             onPressed: busy ? null : onExport,
             icon: const Icon(Icons.file_upload_outlined),
             label: Text(labels.exportAction),
           ),
         ),
         const Divider(),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          title: Text(labels.restoreTitle),
-          subtitle: Text(labels.restoreDescription),
-          trailing: OutlinedButton.icon(
+        SettingsActionRow(
+          title: labels.restoreTitle,
+          description: labels.restoreDescription,
+          leading: const Icon(Icons.restore_page_outlined),
+          action: OutlinedButton.icon(
             onPressed: busy ? null : onRestore,
             icon: const Icon(Icons.file_download_outlined),
             label: Text(labels.restoreAction),
           ),
         ),
         const SizedBox(height: 16),
-        Text(labels.secretsNotice),
+        StatusMessage(title: labels.secretsNotice),
         if (state.operation == DataTransferOperation.exporting ||
             state.operation == DataTransferOperation.restoring) ...[
           const SizedBox(height: 16),

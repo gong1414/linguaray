@@ -158,7 +158,7 @@ Future<TranslationTargetRule?> _showAddTranslationTargetDialog(
                 onChanged: (value) =>
                     setDialogState(() => source = value ?? source),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               DropdownButtonFormField<String>(
                 initialValue: target,
                 decoration: InputDecoration(

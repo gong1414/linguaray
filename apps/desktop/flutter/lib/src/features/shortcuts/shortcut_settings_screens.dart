@@ -341,11 +341,8 @@ class _PreferenceCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Material(
-      color: theme.colorScheme.surfaceContainerLowest,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: theme.colorScheme.outlineVariant),
-      ),
+      color: theme.colorScheme.surfaceContainerLow,
+      shape: theme.cardTheme.shape,
       clipBehavior: Clip.antiAlias,
       child: Column(
         children: [

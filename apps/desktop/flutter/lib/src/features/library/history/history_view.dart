@@ -177,49 +177,97 @@ class HistoryView extends StatelessWidget {
       separatorBuilder: (_, _) => const Divider(height: 1),
       itemBuilder: (context, index) {
         final entry = snapshot.entries[index];
-        return ListTile(
-          selected: selectedIds.contains(entry.id),
-          leading: selectedIds.isEmpty
-              ? null
-              : Checkbox(
-                  value: selectedIds.contains(entry.id),
-                  onChanged: (_) => onToggleSelected(entry.id),
-                ),
-          title: Text(
-            entry.source,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          subtitle: Text(
-            entry.translation,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-          trailing: Wrap(
-            spacing: 0,
-            children: [
-              IconButton(
-                tooltip: labels.edit,
-                onPressed: () => onEdit(entry),
-                icon: Icon(
-                  entry.edited ? Icons.edit_rounded : Icons.edit_outlined,
-                ),
+        final theme = Theme.of(context);
+        return Material(
+          color: selectedIds.contains(entry.id)
+              ? theme.colorScheme.primaryContainer
+              : Colors.transparent,
+          child: InkWell(
+            onTap: selectedIds.isEmpty
+                ? () => onOpen(entry)
+                : () => onToggleSelected(entry.id),
+            onLongPress: () => onToggleSelected(entry.id),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (selectedIds.isNotEmpty)
+                    Checkbox(
+                      value: selectedIds.contains(entry.id),
+                      onChanged: (_) => onToggleSelected(entry.id),
+                    ),
+                  Expanded(
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final source = Text(
+                          entry.source,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        );
+                        final result = Text(
+                          entry.translation,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            fontWeight: FontWeight.w500,
+                          ),
+                        );
+                        if (constraints.maxWidth < 480) {
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              source,
+                              const SizedBox(height: 8),
+                              result,
+                            ],
+                          );
+                        }
+                        return Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(child: source),
+                            const SizedBox(width: 24),
+                            Expanded(child: result),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Column(
+                    children: [
+                      IconButton(
+                        tooltip: labels.edit,
+                        onPressed: () => onEdit(entry),
+                        icon: Icon(
+                          entry.edited
+                              ? Icons.edit_rounded
+                              : Icons.edit_outlined,
+                          size: 18,
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: entry.favorite
+                            ? labels.unfavorite
+                            : labels.favorite,
+                        onPressed: () => onFavorite(entry, !entry.favorite),
+                        icon: Icon(
+                          entry.favorite
+                              ? Icons.star_rounded
+                              : Icons.star_outline_rounded,
+                          size: 18,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-              IconButton(
-                tooltip: entry.favorite ? labels.unfavorite : labels.favorite,
-                onPressed: () => onFavorite(entry, !entry.favorite),
-                icon: Icon(
-                  entry.favorite
-                      ? Icons.star_rounded
-                      : Icons.star_outline_rounded,
-                ),
-              ),
-            ],
+            ),
           ),
-          onTap: selectedIds.isEmpty
-              ? () => onOpen(entry)
-              : () => onToggleSelected(entry.id),
-          onLongPress: () => onToggleSelected(entry.id),
         );
       },
     );

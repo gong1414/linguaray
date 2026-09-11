@@ -7,57 +7,56 @@ import 'package:linguaray_desktop/src/shared/settings_labels.dart';
 import 'package:linguaray_ui/linguaray_ui.dart' show LinguaRayMaterialTheme;
 
 void main() {
-  testWidgets('work areas keep every settings destination reachable', (
-    tester,
-  ) async {
-    var selected = SettingsSection.translation;
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: LinguaRayMaterialTheme.light(),
-        home: StatefulBuilder(
-          builder: (context, setState) => SettingsShellView(
-            labels: settingsShellLabels(),
-            section: selected,
-            onSectionSelected: (value) => setState(() => selected = value),
-            child: Text('page:${selected.name}'),
+  testWidgets(
+    'grouped directory keeps every settings destination directly reachable',
+    (tester) async {
+      var selected = SettingsSection.translation;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: LinguaRayMaterialTheme.light(),
+          home: StatefulBuilder(
+            builder: (context, setState) => SettingsShellView(
+              labels: settingsShellLabels(),
+              section: selected,
+              onSectionSelected: (value) => setState(() => selected = value),
+              child: Text('page:${selected.name}'),
+            ),
           ),
         ),
-      ),
-    );
-    const areas = {
-      SettingsSection.translation: [
-        SettingsSection.translation,
-        SettingsSection.translationServices,
-      ],
-      SettingsSection.history: [
-        SettingsSection.history,
-        SettingsSection.favorites,
-        SettingsSection.glossary,
-        SettingsSection.vocabulary,
-      ],
-      SettingsSection.ocr: [SettingsSection.ocr, SettingsSection.ocrServices],
-      SettingsSection.general: [
-        SettingsSection.general,
-        SettingsSection.permissions,
-        SettingsSection.dataTransfer,
-        SettingsSection.integration,
-        SettingsSection.updates,
-        SettingsSection.about,
-      ],
-    };
-    for (final entry in areas.entries) {
-      await tester.tap(find.byKey(ValueKey('work-area-${entry.key.name}')));
-      await tester.pumpAndSettle();
-      for (final page in entry.value) {
-        final tab = find.byKey(ValueKey('settings-page-${page.name}'));
-        await tester.ensureVisible(tab);
-        await tester.tap(tab);
-        await tester.pumpAndSettle();
-        expect(find.text('page:${page.name}'), findsOneWidget);
+      );
+      const areas = {
+        SettingsSection.translation: [
+          SettingsSection.translation,
+          SettingsSection.translationServices,
+        ],
+        SettingsSection.history: [
+          SettingsSection.history,
+          SettingsSection.favorites,
+          SettingsSection.glossary,
+          SettingsSection.vocabulary,
+        ],
+        SettingsSection.ocr: [SettingsSection.ocr, SettingsSection.ocrServices],
+        SettingsSection.general: [
+          SettingsSection.general,
+          SettingsSection.permissions,
+          SettingsSection.dataTransfer,
+          SettingsSection.integration,
+          SettingsSection.updates,
+          SettingsSection.about,
+        ],
+      };
+      for (final entry in areas.entries) {
+        for (final page in entry.value) {
+          final tab = find.byKey(ValueKey('settings-page-${page.name}'));
+          await tester.ensureVisible(tab);
+          await tester.tap(tab);
+          await tester.pumpAndSettle();
+          expect(find.text('page:${page.name}'), findsOneWidget);
+        }
       }
-    }
-    expect(tester.takeException(), isNull);
-  });
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   for (final width in [720.0, 396.0]) {
     testWidgets('translation reading layout adapts at $width', (tester) async {

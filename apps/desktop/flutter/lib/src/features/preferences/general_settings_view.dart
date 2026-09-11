@@ -112,18 +112,9 @@ class GeneralSettingsView extends StatelessWidget {
                 ],
               ],
             );
-            if (constraints.maxWidth < 650) {
-              return Column(
-                children: [appearance, const SizedBox(height: 20), startup],
-              );
-            }
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(flex: 6, child: appearance),
-                const SizedBox(width: 20),
-                Expanded(flex: 5, child: startup),
-              ],
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [appearance, const SizedBox(height: 32), startup],
             );
           },
         ),
@@ -160,12 +151,8 @@ class _SettingsBlock extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
-      ),
+      padding: const EdgeInsets.all(0),
+
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -176,7 +163,7 @@ class _SettingsBlock extends StatelessWidget {
               Expanded(child: Text(title, style: theme.textTheme.titleMedium)),
             ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
           ...children,
         ],
       ),
@@ -232,7 +219,7 @@ class _ThemeChoice extends StatelessWidget {
         child: Column(
           children: [
             Container(
-              height: 82,
+              height: 104,
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(10),
@@ -286,12 +273,12 @@ class _ThemePreview extends CustomPainter {
         paint..color = scheme.surfaceContainerLowest,
       );
       canvas.drawRect(
-        Rect.fromLTWH(0, 0, size.width * .19, size.height),
+        Rect.fromLTWH(0, 0, size.width * .27, size.height),
         paint..color = scheme.surface,
       );
       canvas.drawRRect(
         RRect.fromRectAndRadius(
-          Rect.fromLTWH(4, 10, size.width * .19 - 8, 12),
+          Rect.fromLTWH(4, 10, size.width * .27 - 8, 12),
           const Radius.circular(2),
         ),
         paint..color = scheme.primary,
@@ -300,7 +287,7 @@ class _ThemePreview extends CustomPainter {
         canvas.drawRRect(
           RRect.fromRectAndRadius(
             Rect.fromLTWH(
-              size.width * .29,
+              size.width * .36,
               16 + i * 9,
               size.width * (i == 0 ? .49 : .37),
               3,

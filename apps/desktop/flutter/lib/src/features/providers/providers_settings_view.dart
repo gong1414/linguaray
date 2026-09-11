@@ -67,17 +67,17 @@ class ProvidersSettingsView extends StatelessWidget {
                     vertical: 8,
                   ),
                   leading: Container(
-                    width: 36,
-                    height: 36,
+                    width: 40,
+                    height: 40,
                     decoration: BoxDecoration(
                       color: colors.surfaceContainerLow,
-                      borderRadius: BorderRadius.circular(9),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                     alignment: Alignment.center,
                     child: Icon(
                       model == null
                           ? Icons.translate_rounded
-                          : Icons.auto_awesome_outlined,
+                          : Icons.memory_outlined,
                       size: 18,
                       color: colors.onSurfaceVariant,
                     ),
@@ -265,7 +265,7 @@ class _ProviderEditorViewState extends State<ProviderEditorView> {
         widget.idReadOnly ? '${labels.edit} · ${selected.label}' : labels.add,
       ),
       content: SizedBox(
-        width: 460,
+        width: 520,
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -284,10 +284,10 @@ class _ProviderEditorViewState extends State<ProviderEditorView> {
                           if (value != null) widget.onTypeChanged(value);
                         },
                 ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               for (final field in normalFields) ...[
                 _field(field, labels),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
               ],
               ...[
                 Align(
@@ -311,10 +311,10 @@ class _ProviderEditorViewState extends State<ProviderEditorView> {
                     decoration: InputDecoration(labelText: labels.idLabel),
                     onChanged: widget.onIdChanged,
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 16),
                   for (final field in advancedFields) ...[
                     _field(field, labels),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 16),
                   ],
                 ],
               ],
@@ -345,7 +345,7 @@ class _ProviderEditorViewState extends State<ProviderEditorView> {
                           : null),
                 ),
               if (widget.operationError != null) ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
                 StatusMessage(
                   kind: StatusKind.error,
                   title: widget.operationError!,
@@ -551,7 +551,7 @@ class _ProviderEditorViewState extends State<ProviderEditorView> {
               ),
               onChanged: (value) => setState(() => _query = value),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             Expanded(
               child: ListView(
                 children: [

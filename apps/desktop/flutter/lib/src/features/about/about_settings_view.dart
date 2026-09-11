@@ -33,35 +33,40 @@ class AboutSettingsView extends StatelessWidget {
     return SettingsPage(
       title: labels.title,
       children: [
-        const Center(child: BrandLogo(size: 48)),
-        const SizedBox(height: 16),
-        Text(
-          info.appName,
-          textAlign: TextAlign.center,
-          style: theme.textTheme.headlineMedium,
-        ),
-        const SizedBox(height: 6),
-        Text(
-          'v${info.version} (${info.buildNumber}) · ${info.platformLabel}',
-          textAlign: TextAlign.center,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 24),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const BrandLogo(size: 64),
+              const SizedBox(width: 24),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(info.appName, style: theme.textTheme.headlineMedium),
+                    const SizedBox(height: 8),
+                    Text(
+                      'v${info.version} (${info.buildNumber}) · ${info.platformLabel}',
+                      style: theme.textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 16),
+                    OutlinedButton.icon(
+                      onPressed: onCopyVersion,
+                      icon: Icon(
+                        copied ? Icons.check_rounded : Icons.copy_rounded,
+                        size: 16,
+                      ),
+                      label: Text(copied ? labels.copied : labels.copyVersion),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
-        const SizedBox(height: 8),
-        Text(
-          labels.copyright,
-          textAlign: TextAlign.center,
-          style: theme.textTheme.bodyMedium,
-        ),
-        const SizedBox(height: 16),
-        Center(
-          child: OutlinedButton(
-            onPressed: onCopyVersion,
-            child: Text(copied ? labels.copied : labels.copyVersion),
-          ),
-        ),
-        const SizedBox(height: 24),
+        const Divider(),
+        const SizedBox(height: 12),
         ListTile(
           title: Text(labels.website),
           trailing: const Icon(Icons.open_in_new_rounded),
@@ -83,6 +88,8 @@ class AboutSettingsView extends StatelessWidget {
           trailing: const Icon(Icons.open_in_new_rounded),
           onTap: onOpenLicense,
         ),
+        const SizedBox(height: 24),
+        Text(labels.copyright, style: theme.textTheme.bodySmall),
       ],
     );
   }

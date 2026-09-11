@@ -42,9 +42,9 @@ Future<void> main() async {
             platform: TargetPlatform.windows,
           ),
           ViewportData(
-            name: 'Settings min · 840×560',
-            width: 840,
-            height: 560,
+            name: 'Settings min · 780×520',
+            width: 780,
+            height: 520,
             pixelRatio: 1,
             platform: TargetPlatform.macOS,
           ),
@@ -85,6 +85,15 @@ Future<void> main() async {
 final _catalog = WidgetbookCategory(
   name: 'LinguaRay',
   children: [
+    WidgetbookComponent(
+      name: 'Dialogs',
+      useCases: [
+        for (final entry in buildCatalogGoldenStates().entries.where(
+          (entry) => entry.key.endsWith('_dialog'),
+        ))
+          WidgetbookUseCase(name: entry.key, builder: (_) => entry.value),
+      ],
+    ),
     WidgetbookComponent(
       name: 'History and updates',
       useCases: [

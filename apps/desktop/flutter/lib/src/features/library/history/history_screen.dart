@@ -106,6 +106,7 @@ Future<void> _editHistory(
   final result = await showDialog<(String, String)>(
     context: context,
     builder: (context) => AlertDialog(
+      scrollable: true,
       title: Text(t.workbench.history_page.edit_history_hint),
       content: SizedBox(
         width: 480,
@@ -120,7 +121,7 @@ Future<void> _editHistory(
                 labelText: t.workbench.glossary_page.term,
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             TextField(
               controller: translation,
               minLines: 2,

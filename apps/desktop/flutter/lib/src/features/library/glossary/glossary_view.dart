@@ -144,7 +144,7 @@ class GlossaryView extends StatelessWidget {
                 : Row(
                     children: [
                       SizedBox(
-                        width: 190,
+                        width: 160,
                         child: ListView(
                           padding: const EdgeInsets.only(right: 12),
                           children: [
@@ -152,7 +152,11 @@ class GlossaryView extends StatelessWidget {
                               ListTile(
                                 dense: true,
                                 selected: book.id == state.selectedBookId,
-                                title: Text(book.name),
+                                title: Text(
+                                  book.name,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                                 subtitle: Text('${book.entryCount}'),
                                 onTap: () => onSelectBook(book.id),
                                 trailing: PopupMenuButton<String>(
@@ -242,7 +246,14 @@ class GlossaryView extends StatelessWidget {
       itemBuilder: (context, index) {
         final entry = state.entries[index];
         return ListTile(
-          title: Text(entry.term),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 12,
+          ),
+          title: Text(
+            entry.term,
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
           subtitle: Text(entry.translation),
           onTap: () => onEditEntry(entry),
           trailing: Row(
