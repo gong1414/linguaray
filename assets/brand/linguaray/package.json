@@ -7,6 +7,6 @@
     "generate": "node tools/generate_brand_assets.js"
   },
   "devDependencies": {
-    "sharp": "0.35.3"
+    "sharp": "0.35.4"
   }
 }
