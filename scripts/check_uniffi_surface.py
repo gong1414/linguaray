@@ -9,7 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 BINDINGS = ROOT / "packages/runtime/lib/src/generated/linguaray_runtime.dart"
-BASELINE = ROOT / "docs/refactor/UNIFFI_SURFACE.txt"
+BASELINE = ROOT / "scripts/uniffi_surface_baseline.txt"
 
 
 def current_surface() -> str:

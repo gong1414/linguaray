@@ -74,18 +74,12 @@ See `docs/ARCHITECTURE.md` for the full data flow.
 
 ## Development
 
-### Project-local design skills
+### Interface work
 
-Use `.agents/skills/hallmark/SKILL.md` for structural redesign and
-`.agents/skills/impeccable/SKILL.md` for design craft and review. These skills
-are installed only in this repository. Read `PRODUCT.md` and `DESIGN.md` first.
-Use `sh scripts/impeccable.sh <command>` so its engine cache stays local.
-Native Flutter, Material 3, localization, canonical branding and the desktop
-window contract take precedence over web-specific recipes. Do not install
-global skills, hooks or npm dependencies for design work. Native UI is verified
-through Widgetbook, widget tests and host-specific goldens; the web detector
-does not validate Dart layouts. Complete redesign requests authorize replacing
-the visual system throughout the existing feature boundaries.
+Keep native Flutter and Material 3, localization, canonical branding and the
+desktop window contract. Native UI is verified through Widgetbook, widget tests
+and host-specific goldens. Complete redesign requests authorize replacing the
+visual system throughout the existing feature boundaries.
 
 ```bash
 cd apps/desktop/flutter

@@ -1,3 +1,5 @@
+// ignore_for_file: unused_import
+
 library linguaray_runtime;
 
 import "dart:async";
@@ -8,6 +10,9 @@ import "dart:isolate";
 import "dart:typed_data";
 
 import "package:ffi/ffi.dart";
+
+import "uniffi_runtime.dart";
+export "uniffi_runtime.dart";
 
 class ApiServerInfo {
   final String host;
@@ -6821,31 +6826,11 @@ class RuntimeApiServer implements RuntimeApiServerInterface {
   factory RuntimeApiServer.lift(Pointer<Void> ptr) {
     return RuntimeApiServer._(ptr);
   }
-  static Pointer<Void> lower(RuntimeApiServer value) {
-    return value.uniffiClonePointer();
-  }
-
   Pointer<Void> uniffiClonePointer() {
     return rustCall(
       (status) =>
           uniffi_linguaray_runtime_fn_clone_runtimeapiserver(_ptr, status),
     );
-  }
-
-  static int allocationSize(RuntimeApiServer value) {
-    return 8;
-  }
-
-  static LiftRetVal<RuntimeApiServer> read(Uint8List buf) {
-    final handle = buf.buffer.asByteData(buf.offsetInBytes).getInt64(0);
-    final pointer = Pointer<Void>.fromAddress(handle);
-    return LiftRetVal(RuntimeApiServer.lift(pointer), 8);
-  }
-
-  static int write(RuntimeApiServer value, Uint8List buf) {
-    final handle = lower(value);
-    buf.buffer.asByteData(buf.offsetInBytes).setInt64(0, handle.address);
-    return 8;
   }
 
   void dispose() {
@@ -6877,6 +6862,32 @@ class RuntimeApiServer implements RuntimeApiServerInterface {
   }
 }
 
+class FfiConverterRuntimeApiServer {
+  static RuntimeApiServer lift(Pointer<Void> ptr) {
+    return RuntimeApiServer.lift(ptr);
+  }
+
+  static Pointer<Void> lower(RuntimeApiServer value) {
+    return value.uniffiClonePointer();
+  }
+
+  static int allocationSize(RuntimeApiServer value) {
+    return 8;
+  }
+
+  static LiftRetVal<RuntimeApiServer> read(Uint8List buf) {
+    final handle = buf.buffer.asByteData(buf.offsetInBytes).getInt64(0);
+    final pointer = Pointer<Void>.fromAddress(handle);
+    return LiftRetVal(RuntimeApiServer.lift(pointer), 8);
+  }
+
+  static int write(RuntimeApiServer value, Uint8List buf) {
+    final handle = lower(value);
+    buf.buffer.asByteData(buf.offsetInBytes).setInt64(0, handle.address);
+    return 8;
+  }
+}
+
 abstract class ExternalActionSubscriptionInterface {
   Future<ExternalActionRequest?> next();
 }
@@ -6899,10 +6910,6 @@ class ExternalActionSubscription
   factory ExternalActionSubscription.lift(Pointer<Void> ptr) {
     return ExternalActionSubscription._(ptr);
   }
-  static Pointer<Void> lower(ExternalActionSubscription value) {
-    return value.uniffiClonePointer();
-  }
-
   Pointer<Void> uniffiClonePointer() {
     return rustCall(
       (status) => uniffi_linguaray_runtime_fn_clone_externalactionsubscription(
@@ -6910,22 +6917,6 @@ class ExternalActionSubscription
         status,
       ),
     );
-  }
-
-  static int allocationSize(ExternalActionSubscription value) {
-    return 8;
-  }
-
-  static LiftRetVal<ExternalActionSubscription> read(Uint8List buf) {
-    final handle = buf.buffer.asByteData(buf.offsetInBytes).getInt64(0);
-    final pointer = Pointer<Void>.fromAddress(handle);
-    return LiftRetVal(ExternalActionSubscription.lift(pointer), 8);
-  }
-
-  static int write(ExternalActionSubscription value, Uint8List buf) {
-    final handle = lower(value);
-    buf.buffer.asByteData(buf.offsetInBytes).setInt64(0, handle.address);
-    return 8;
   }
 
   void dispose() {
@@ -6949,6 +6940,32 @@ class ExternalActionSubscription
       FfiConverterOptionalExternalActionRequest.lift,
       runtimeExceptionErrorHandler,
     );
+  }
+}
+
+class FfiConverterExternalActionSubscription {
+  static ExternalActionSubscription lift(Pointer<Void> ptr) {
+    return ExternalActionSubscription.lift(ptr);
+  }
+
+  static Pointer<Void> lower(ExternalActionSubscription value) {
+    return value.uniffiClonePointer();
+  }
+
+  static int allocationSize(ExternalActionSubscription value) {
+    return 8;
+  }
+
+  static LiftRetVal<ExternalActionSubscription> read(Uint8List buf) {
+    final handle = buf.buffer.asByteData(buf.offsetInBytes).getInt64(0);
+    final pointer = Pointer<Void>.fromAddress(handle);
+    return LiftRetVal(ExternalActionSubscription.lift(pointer), 8);
+  }
+
+  static int write(ExternalActionSubscription value, Uint8List buf) {
+    final handle = lower(value);
+    buf.buffer.asByteData(buf.offsetInBytes).setInt64(0, handle.address);
+    return 8;
   }
 }
 
@@ -6992,30 +7009,10 @@ class Runtime implements RuntimeInterface {
   factory Runtime.lift(Pointer<Void> ptr) {
     return Runtime._(ptr);
   }
-  static Pointer<Void> lower(Runtime value) {
-    return value.uniffiClonePointer();
-  }
-
   Pointer<Void> uniffiClonePointer() {
     return rustCall(
       (status) => uniffi_linguaray_runtime_fn_clone_runtime(_ptr, status),
     );
-  }
-
-  static int allocationSize(Runtime value) {
-    return 8;
-  }
-
-  static LiftRetVal<Runtime> read(Uint8List buf) {
-    final handle = buf.buffer.asByteData(buf.offsetInBytes).getInt64(0);
-    final pointer = Pointer<Void>.fromAddress(handle);
-    return LiftRetVal(Runtime.lift(pointer), 8);
-  }
-
-  static int write(Runtime value, Uint8List buf) {
-    final handle = lower(value);
-    buf.buffer.asByteData(buf.offsetInBytes).setInt64(0, handle.address);
-    return 8;
   }
 
   void dispose() {
@@ -7031,7 +7028,7 @@ class Runtime implements RuntimeInterface {
         uniffiClonePointer(),
         status,
       ),
-      RuntimeBackup.lift,
+      FfiConverterRuntimeBackup.lift,
       null,
     );
   }
@@ -7043,7 +7040,7 @@ class Runtime implements RuntimeInterface {
         FfiConverterString.lower(providerId),
         status,
       ),
-      RuntimeDictionary.lift,
+      FfiConverterRuntimeDictionary.lift,
       runtimeExceptionErrorHandler,
     );
   }
@@ -7054,7 +7051,7 @@ class Runtime implements RuntimeInterface {
         uniffiClonePointer(),
         status,
       ),
-      RuntimeGlossary.lift,
+      FfiConverterRuntimeGlossary.lift,
       null,
     );
   }
@@ -7065,7 +7062,7 @@ class Runtime implements RuntimeInterface {
         uniffiClonePointer(),
         status,
       ),
-      RuntimeHistory.lift,
+      FfiConverterRuntimeHistory.lift,
       null,
     );
   }
@@ -7099,7 +7096,7 @@ class Runtime implements RuntimeInterface {
         FfiConverterString.lower(providerId),
         status,
       ),
-      RuntimeLlm.lift,
+      FfiConverterRuntimeLlm.lift,
       runtimeExceptionErrorHandler,
     );
   }
@@ -7111,7 +7108,7 @@ class Runtime implements RuntimeInterface {
         FfiConverterString.lower(providerId),
         status,
       ),
-      RuntimeOcr.lift,
+      FfiConverterRuntimeOcr.lift,
       runtimeExceptionErrorHandler,
     );
   }
@@ -7122,7 +7119,7 @@ class Runtime implements RuntimeInterface {
         uniffiClonePointer(),
         status,
       ),
-      RuntimePermission.lift,
+      FfiConverterRuntimePermission.lift,
       null,
     );
   }
@@ -7133,7 +7130,7 @@ class Runtime implements RuntimeInterface {
         uniffiClonePointer(),
         status,
       ),
-      RuntimeSettings.lift,
+      FfiConverterRuntimeSettings.lift,
       null,
     );
   }
@@ -7146,7 +7143,7 @@ class Runtime implements RuntimeInterface {
         FfiConverterUInt16.lower(port),
         status,
       ),
-      RuntimeApiServer.lift,
+      FfiConverterRuntimeApiServer.lift,
       runtimeExceptionErrorHandler,
     );
   }
@@ -7157,7 +7154,7 @@ class Runtime implements RuntimeInterface {
         uniffiClonePointer(),
         status,
       ),
-      ExternalActionSubscription.lift,
+      FfiConverterExternalActionSubscription.lift,
       null,
     );
   }
@@ -7168,7 +7165,7 @@ class Runtime implements RuntimeInterface {
         uniffiClonePointer(),
         status,
       ),
-      RuntimeTextExtractor.lift,
+      FfiConverterRuntimeTextExtractor.lift,
       null,
     );
   }
@@ -7180,7 +7177,7 @@ class Runtime implements RuntimeInterface {
         FfiConverterString.lower(providerId),
         status,
       ),
-      RuntimeTranslation.lift,
+      FfiConverterRuntimeTranslation.lift,
       runtimeExceptionErrorHandler,
     );
   }
@@ -7191,9 +7188,35 @@ class Runtime implements RuntimeInterface {
         uniffiClonePointer(),
         status,
       ),
-      RuntimeVocabulary.lift,
+      FfiConverterRuntimeVocabulary.lift,
       null,
     );
+  }
+}
+
+class FfiConverterRuntime {
+  static Runtime lift(Pointer<Void> ptr) {
+    return Runtime.lift(ptr);
+  }
+
+  static Pointer<Void> lower(Runtime value) {
+    return value.uniffiClonePointer();
+  }
+
+  static int allocationSize(Runtime value) {
+    return 8;
+  }
+
+  static LiftRetVal<Runtime> read(Uint8List buf) {
+    final handle = buf.buffer.asByteData(buf.offsetInBytes).getInt64(0);
+    final pointer = Pointer<Void>.fromAddress(handle);
+    return LiftRetVal(Runtime.lift(pointer), 8);
+  }
+
+  static int write(Runtime value, Uint8List buf) {
+    final handle = lower(value);
+    buf.buffer.asByteData(buf.offsetInBytes).setInt64(0, handle.address);
+    return 8;
   }
 }
 
@@ -7216,30 +7239,10 @@ class RuntimeBackup implements RuntimeBackupInterface {
   factory RuntimeBackup.lift(Pointer<Void> ptr) {
     return RuntimeBackup._(ptr);
   }
-  static Pointer<Void> lower(RuntimeBackup value) {
-    return value.uniffiClonePointer();
-  }
-
   Pointer<Void> uniffiClonePointer() {
     return rustCall(
       (status) => uniffi_linguaray_runtime_fn_clone_runtimebackup(_ptr, status),
     );
-  }
-
-  static int allocationSize(RuntimeBackup value) {
-    return 8;
-  }
-
-  static LiftRetVal<RuntimeBackup> read(Uint8List buf) {
-    final handle = buf.buffer.asByteData(buf.offsetInBytes).getInt64(0);
-    final pointer = Pointer<Void>.fromAddress(handle);
-    return LiftRetVal(RuntimeBackup.lift(pointer), 8);
-  }
-
-  static int write(RuntimeBackup value, Uint8List buf) {
-    final handle = lower(value);
-    buf.buffer.asByteData(buf.offsetInBytes).setInt64(0, handle.address);
-    return 8;
   }
 
   void dispose() {
@@ -7278,6 +7281,32 @@ class RuntimeBackup implements RuntimeBackupInterface {
   }
 }
 
+class FfiConverterRuntimeBackup {
+  static RuntimeBackup lift(Pointer<Void> ptr) {
+    return RuntimeBackup.lift(ptr);
+  }
+
+  static Pointer<Void> lower(RuntimeBackup value) {
+    return value.uniffiClonePointer();
+  }
+
+  static int allocationSize(RuntimeBackup value) {
+    return 8;
+  }
+
+  static LiftRetVal<RuntimeBackup> read(Uint8List buf) {
+    final handle = buf.buffer.asByteData(buf.offsetInBytes).getInt64(0);
+    final pointer = Pointer<Void>.fromAddress(handle);
+    return LiftRetVal(RuntimeBackup.lift(pointer), 8);
+  }
+
+  static int write(RuntimeBackup value, Uint8List buf) {
+    final handle = lower(value);
+    buf.buffer.asByteData(buf.offsetInBytes).setInt64(0, handle.address);
+    return 8;
+  }
+}
+
 abstract class RuntimeDictionaryInterface {
   Future<LookUpResponse> lookup({required LookUpRequest request});
 }
@@ -7296,31 +7325,11 @@ class RuntimeDictionary implements RuntimeDictionaryInterface {
   factory RuntimeDictionary.lift(Pointer<Void> ptr) {
     return RuntimeDictionary._(ptr);
   }
-  static Pointer<Void> lower(RuntimeDictionary value) {
-    return value.uniffiClonePointer();
-  }
-
   Pointer<Void> uniffiClonePointer() {
     return rustCall(
       (status) =>
           uniffi_linguaray_runtime_fn_clone_runtimedictionary(_ptr, status),
     );
-  }
-
-  static int allocationSize(RuntimeDictionary value) {
-    return 8;
-  }
-
-  static LiftRetVal<RuntimeDictionary> read(Uint8List buf) {
-    final handle = buf.buffer.asByteData(buf.offsetInBytes).getInt64(0);
-    final pointer = Pointer<Void>.fromAddress(handle);
-    return LiftRetVal(RuntimeDictionary.lift(pointer), 8);
-  }
-
-  static int write(RuntimeDictionary value, Uint8List buf) {
-    final handle = lower(value);
-    buf.buffer.asByteData(buf.offsetInBytes).setInt64(0, handle.address);
-    return 8;
   }
 
   void dispose() {
@@ -7343,6 +7352,32 @@ class RuntimeDictionary implements RuntimeDictionaryInterface {
       FfiConverterLookUpResponse.lift,
       runtimeExceptionErrorHandler,
     );
+  }
+}
+
+class FfiConverterRuntimeDictionary {
+  static RuntimeDictionary lift(Pointer<Void> ptr) {
+    return RuntimeDictionary.lift(ptr);
+  }
+
+  static Pointer<Void> lower(RuntimeDictionary value) {
+    return value.uniffiClonePointer();
+  }
+
+  static int allocationSize(RuntimeDictionary value) {
+    return 8;
+  }
+
+  static LiftRetVal<RuntimeDictionary> read(Uint8List buf) {
+    final handle = buf.buffer.asByteData(buf.offsetInBytes).getInt64(0);
+    final pointer = Pointer<Void>.fromAddress(handle);
+    return LiftRetVal(RuntimeDictionary.lift(pointer), 8);
+  }
+
+  static int write(RuntimeDictionary value, Uint8List buf) {
+    final handle = lower(value);
+    buf.buffer.asByteData(buf.offsetInBytes).setInt64(0, handle.address);
+    return 8;
   }
 }
 
@@ -7400,31 +7435,11 @@ class RuntimeGlossary implements RuntimeGlossaryInterface {
   factory RuntimeGlossary.lift(Pointer<Void> ptr) {
     return RuntimeGlossary._(ptr);
   }
-  static Pointer<Void> lower(RuntimeGlossary value) {
-    return value.uniffiClonePointer();
-  }
-
   Pointer<Void> uniffiClonePointer() {
     return rustCall(
       (status) =>
           uniffi_linguaray_runtime_fn_clone_runtimeglossary(_ptr, status),
     );
-  }
-
-  static int allocationSize(RuntimeGlossary value) {
-    return 8;
-  }
-
-  static LiftRetVal<RuntimeGlossary> read(Uint8List buf) {
-    final handle = buf.buffer.asByteData(buf.offsetInBytes).getInt64(0);
-    final pointer = Pointer<Void>.fromAddress(handle);
-    return LiftRetVal(RuntimeGlossary.lift(pointer), 8);
-  }
-
-  static int write(RuntimeGlossary value, Uint8List buf) {
-    final handle = lower(value);
-    buf.buffer.asByteData(buf.offsetInBytes).setInt64(0, handle.address);
-    return 8;
   }
 
   void dispose() {
@@ -7654,6 +7669,32 @@ class RuntimeGlossary implements RuntimeGlossaryInterface {
   }
 }
 
+class FfiConverterRuntimeGlossary {
+  static RuntimeGlossary lift(Pointer<Void> ptr) {
+    return RuntimeGlossary.lift(ptr);
+  }
+
+  static Pointer<Void> lower(RuntimeGlossary value) {
+    return value.uniffiClonePointer();
+  }
+
+  static int allocationSize(RuntimeGlossary value) {
+    return 8;
+  }
+
+  static LiftRetVal<RuntimeGlossary> read(Uint8List buf) {
+    final handle = buf.buffer.asByteData(buf.offsetInBytes).getInt64(0);
+    final pointer = Pointer<Void>.fromAddress(handle);
+    return LiftRetVal(RuntimeGlossary.lift(pointer), 8);
+  }
+
+  static int write(RuntimeGlossary value, Uint8List buf) {
+    final handle = lower(value);
+    buf.buffer.asByteData(buf.offsetInBytes).setInt64(0, handle.address);
+    return 8;
+  }
+}
+
 abstract class RuntimeHistoryInterface {
   Future<int> clear();
   Future<HistoryCounts> counts();
@@ -7683,31 +7724,11 @@ class RuntimeHistory implements RuntimeHistoryInterface {
   factory RuntimeHistory.lift(Pointer<Void> ptr) {
     return RuntimeHistory._(ptr);
   }
-  static Pointer<Void> lower(RuntimeHistory value) {
-    return value.uniffiClonePointer();
-  }
-
   Pointer<Void> uniffiClonePointer() {
     return rustCall(
       (status) =>
           uniffi_linguaray_runtime_fn_clone_runtimehistory(_ptr, status),
     );
-  }
-
-  static int allocationSize(RuntimeHistory value) {
-    return 8;
-  }
-
-  static LiftRetVal<RuntimeHistory> read(Uint8List buf) {
-    final handle = buf.buffer.asByteData(buf.offsetInBytes).getInt64(0);
-    final pointer = Pointer<Void>.fromAddress(handle);
-    return LiftRetVal(RuntimeHistory.lift(pointer), 8);
-  }
-
-  static int write(RuntimeHistory value, Uint8List buf) {
-    final handle = lower(value);
-    buf.buffer.asByteData(buf.offsetInBytes).setInt64(0, handle.address);
-    return 8;
   }
 
   void dispose() {
@@ -7808,6 +7829,32 @@ class RuntimeHistory implements RuntimeHistoryInterface {
   }
 }
 
+class FfiConverterRuntimeHistory {
+  static RuntimeHistory lift(Pointer<Void> ptr) {
+    return RuntimeHistory.lift(ptr);
+  }
+
+  static Pointer<Void> lower(RuntimeHistory value) {
+    return value.uniffiClonePointer();
+  }
+
+  static int allocationSize(RuntimeHistory value) {
+    return 8;
+  }
+
+  static LiftRetVal<RuntimeHistory> read(Uint8List buf) {
+    final handle = buf.buffer.asByteData(buf.offsetInBytes).getInt64(0);
+    final pointer = Pointer<Void>.fromAddress(handle);
+    return LiftRetVal(RuntimeHistory.lift(pointer), 8);
+  }
+
+  static int write(RuntimeHistory value, Uint8List buf) {
+    final handle = lower(value);
+    buf.buffer.asByteData(buf.offsetInBytes).setInt64(0, handle.address);
+    return 8;
+  }
+}
+
 abstract class RuntimeLlmInterface {
   Future<List<String>> alternatives({
     required String text,
@@ -7849,30 +7896,10 @@ class RuntimeLlm implements RuntimeLlmInterface {
   factory RuntimeLlm.lift(Pointer<Void> ptr) {
     return RuntimeLlm._(ptr);
   }
-  static Pointer<Void> lower(RuntimeLlm value) {
-    return value.uniffiClonePointer();
-  }
-
   Pointer<Void> uniffiClonePointer() {
     return rustCall(
       (status) => uniffi_linguaray_runtime_fn_clone_runtimellm(_ptr, status),
     );
-  }
-
-  static int allocationSize(RuntimeLlm value) {
-    return 8;
-  }
-
-  static LiftRetVal<RuntimeLlm> read(Uint8List buf) {
-    final handle = buf.buffer.asByteData(buf.offsetInBytes).getInt64(0);
-    final pointer = Pointer<Void>.fromAddress(handle);
-    return LiftRetVal(RuntimeLlm.lift(pointer), 8);
-  }
-
-  static int write(RuntimeLlm value, Uint8List buf) {
-    final handle = lower(value);
-    buf.buffer.asByteData(buf.offsetInBytes).setInt64(0, handle.address);
-    return 8;
   }
 
   void dispose() {
@@ -7971,7 +7998,7 @@ class RuntimeLlm implements RuntimeLlmInterface {
             FfiConverterString.lower(text),
             status,
           ),
-      TranslationTask.lift,
+      FfiConverterTranslationTask.lift,
       null,
     );
   }
@@ -7992,6 +8019,32 @@ class RuntimeLlm implements RuntimeLlmInterface {
         status,
       );
     }, null);
+  }
+}
+
+class FfiConverterRuntimeLlm {
+  static RuntimeLlm lift(Pointer<Void> ptr) {
+    return RuntimeLlm.lift(ptr);
+  }
+
+  static Pointer<Void> lower(RuntimeLlm value) {
+    return value.uniffiClonePointer();
+  }
+
+  static int allocationSize(RuntimeLlm value) {
+    return 8;
+  }
+
+  static LiftRetVal<RuntimeLlm> read(Uint8List buf) {
+    final handle = buf.buffer.asByteData(buf.offsetInBytes).getInt64(0);
+    final pointer = Pointer<Void>.fromAddress(handle);
+    return LiftRetVal(RuntimeLlm.lift(pointer), 8);
+  }
+
+  static int write(RuntimeLlm value, Uint8List buf) {
+    final handle = lower(value);
+    buf.buffer.asByteData(buf.offsetInBytes).setInt64(0, handle.address);
+    return 8;
   }
 }
 
@@ -8016,30 +8069,10 @@ class RuntimeOcr implements RuntimeOcrInterface {
   factory RuntimeOcr.lift(Pointer<Void> ptr) {
     return RuntimeOcr._(ptr);
   }
-  static Pointer<Void> lower(RuntimeOcr value) {
-    return value.uniffiClonePointer();
-  }
-
   Pointer<Void> uniffiClonePointer() {
     return rustCall(
       (status) => uniffi_linguaray_runtime_fn_clone_runtimeocr(_ptr, status),
     );
-  }
-
-  static int allocationSize(RuntimeOcr value) {
-    return 8;
-  }
-
-  static LiftRetVal<RuntimeOcr> read(Uint8List buf) {
-    final handle = buf.buffer.asByteData(buf.offsetInBytes).getInt64(0);
-    final pointer = Pointer<Void>.fromAddress(handle);
-    return LiftRetVal(RuntimeOcr.lift(pointer), 8);
-  }
-
-  static int write(RuntimeOcr value, Uint8List buf) {
-    final handle = lower(value);
-    buf.buffer.asByteData(buf.offsetInBytes).setInt64(0, handle.address);
-    return 8;
   }
 
   void dispose() {
@@ -8080,6 +8113,32 @@ class RuntimeOcr implements RuntimeOcrInterface {
   }
 }
 
+class FfiConverterRuntimeOcr {
+  static RuntimeOcr lift(Pointer<Void> ptr) {
+    return RuntimeOcr.lift(ptr);
+  }
+
+  static Pointer<Void> lower(RuntimeOcr value) {
+    return value.uniffiClonePointer();
+  }
+
+  static int allocationSize(RuntimeOcr value) {
+    return 8;
+  }
+
+  static LiftRetVal<RuntimeOcr> read(Uint8List buf) {
+    final handle = buf.buffer.asByteData(buf.offsetInBytes).getInt64(0);
+    final pointer = Pointer<Void>.fromAddress(handle);
+    return LiftRetVal(RuntimeOcr.lift(pointer), 8);
+  }
+
+  static int write(RuntimeOcr value, Uint8List buf) {
+    final handle = lower(value);
+    buf.buffer.asByteData(buf.offsetInBytes).setInt64(0, handle.address);
+    return 8;
+  }
+}
+
 abstract class RuntimePermissionInterface {
   Future<bool> isAccessibilityPermissionGranted();
   Future<bool> isScreenRecordingPermissionGranted();
@@ -8105,31 +8164,11 @@ class RuntimePermission implements RuntimePermissionInterface {
   factory RuntimePermission.lift(Pointer<Void> ptr) {
     return RuntimePermission._(ptr);
   }
-  static Pointer<Void> lower(RuntimePermission value) {
-    return value.uniffiClonePointer();
-  }
-
   Pointer<Void> uniffiClonePointer() {
     return rustCall(
       (status) =>
           uniffi_linguaray_runtime_fn_clone_runtimepermission(_ptr, status),
     );
-  }
-
-  static int allocationSize(RuntimePermission value) {
-    return 8;
-  }
-
-  static LiftRetVal<RuntimePermission> read(Uint8List buf) {
-    final handle = buf.buffer.asByteData(buf.offsetInBytes).getInt64(0);
-    final pointer = Pointer<Void>.fromAddress(handle);
-    return LiftRetVal(RuntimePermission.lift(pointer), 8);
-  }
-
-  static int write(RuntimePermission value, Uint8List buf) {
-    final handle = lower(value);
-    buf.buffer.asByteData(buf.offsetInBytes).setInt64(0, handle.address);
-    return 8;
   }
 
   void dispose() {
@@ -8200,6 +8239,32 @@ class RuntimePermission implements RuntimePermissionInterface {
       (_) {},
       null,
     );
+  }
+}
+
+class FfiConverterRuntimePermission {
+  static RuntimePermission lift(Pointer<Void> ptr) {
+    return RuntimePermission.lift(ptr);
+  }
+
+  static Pointer<Void> lower(RuntimePermission value) {
+    return value.uniffiClonePointer();
+  }
+
+  static int allocationSize(RuntimePermission value) {
+    return 8;
+  }
+
+  static LiftRetVal<RuntimePermission> read(Uint8List buf) {
+    final handle = buf.buffer.asByteData(buf.offsetInBytes).getInt64(0);
+    final pointer = Pointer<Void>.fromAddress(handle);
+    return LiftRetVal(RuntimePermission.lift(pointer), 8);
+  }
+
+  static int write(RuntimePermission value, Uint8List buf) {
+    final handle = lower(value);
+    buf.buffer.asByteData(buf.offsetInBytes).setInt64(0, handle.address);
+    return 8;
   }
 }
 
@@ -8279,31 +8344,11 @@ class RuntimeSettings implements RuntimeSettingsInterface {
   factory RuntimeSettings.lift(Pointer<Void> ptr) {
     return RuntimeSettings._(ptr);
   }
-  static Pointer<Void> lower(RuntimeSettings value) {
-    return value.uniffiClonePointer();
-  }
-
   Pointer<Void> uniffiClonePointer() {
     return rustCall(
       (status) =>
           uniffi_linguaray_runtime_fn_clone_runtimesettings(_ptr, status),
     );
-  }
-
-  static int allocationSize(RuntimeSettings value) {
-    return 8;
-  }
-
-  static LiftRetVal<RuntimeSettings> read(Uint8List buf) {
-    final handle = buf.buffer.asByteData(buf.offsetInBytes).getInt64(0);
-    final pointer = Pointer<Void>.fromAddress(handle);
-    return LiftRetVal(RuntimeSettings.lift(pointer), 8);
-  }
-
-  static int write(RuntimeSettings value, Uint8List buf) {
-    final handle = lower(value);
-    buf.buffer.asByteData(buf.offsetInBytes).setInt64(0, handle.address);
-    return 8;
   }
 
   void dispose() {
@@ -8585,7 +8630,7 @@ class RuntimeSettings implements RuntimeSettingsInterface {
         uniffiClonePointer(),
         status,
       ),
-      SettingsSubscription.lift,
+      FfiConverterSettingsSubscription.lift,
       null,
     );
   }
@@ -8720,6 +8765,32 @@ class RuntimeSettings implements RuntimeSettingsInterface {
   }
 }
 
+class FfiConverterRuntimeSettings {
+  static RuntimeSettings lift(Pointer<Void> ptr) {
+    return RuntimeSettings.lift(ptr);
+  }
+
+  static Pointer<Void> lower(RuntimeSettings value) {
+    return value.uniffiClonePointer();
+  }
+
+  static int allocationSize(RuntimeSettings value) {
+    return 8;
+  }
+
+  static LiftRetVal<RuntimeSettings> read(Uint8List buf) {
+    final handle = buf.buffer.asByteData(buf.offsetInBytes).getInt64(0);
+    final pointer = Pointer<Void>.fromAddress(handle);
+    return LiftRetVal(RuntimeSettings.lift(pointer), 8);
+  }
+
+  static int write(RuntimeSettings value, Uint8List buf) {
+    final handle = lower(value);
+    buf.buffer.asByteData(buf.offsetInBytes).setInt64(0, handle.address);
+    return 8;
+  }
+}
+
 abstract class RuntimeTextExtractorInterface {
   Future<String> extractFromClipboard();
   Future<String> extractFromScreenSelection();
@@ -8741,31 +8812,11 @@ class RuntimeTextExtractor implements RuntimeTextExtractorInterface {
   factory RuntimeTextExtractor.lift(Pointer<Void> ptr) {
     return RuntimeTextExtractor._(ptr);
   }
-  static Pointer<Void> lower(RuntimeTextExtractor value) {
-    return value.uniffiClonePointer();
-  }
-
   Pointer<Void> uniffiClonePointer() {
     return rustCall(
       (status) =>
           uniffi_linguaray_runtime_fn_clone_runtimetextextractor(_ptr, status),
     );
-  }
-
-  static int allocationSize(RuntimeTextExtractor value) {
-    return 8;
-  }
-
-  static LiftRetVal<RuntimeTextExtractor> read(Uint8List buf) {
-    final handle = buf.buffer.asByteData(buf.offsetInBytes).getInt64(0);
-    final pointer = Pointer<Void>.fromAddress(handle);
-    return LiftRetVal(RuntimeTextExtractor.lift(pointer), 8);
-  }
-
-  static int write(RuntimeTextExtractor value, Uint8List buf) {
-    final handle = lower(value);
-    buf.buffer.asByteData(buf.offsetInBytes).setInt64(0, handle.address);
-    return 8;
   }
 
   void dispose() {
@@ -8819,6 +8870,32 @@ class RuntimeTextExtractor implements RuntimeTextExtractorInterface {
   }
 }
 
+class FfiConverterRuntimeTextExtractor {
+  static RuntimeTextExtractor lift(Pointer<Void> ptr) {
+    return RuntimeTextExtractor.lift(ptr);
+  }
+
+  static Pointer<Void> lower(RuntimeTextExtractor value) {
+    return value.uniffiClonePointer();
+  }
+
+  static int allocationSize(RuntimeTextExtractor value) {
+    return 8;
+  }
+
+  static LiftRetVal<RuntimeTextExtractor> read(Uint8List buf) {
+    final handle = buf.buffer.asByteData(buf.offsetInBytes).getInt64(0);
+    final pointer = Pointer<Void>.fromAddress(handle);
+    return LiftRetVal(RuntimeTextExtractor.lift(pointer), 8);
+  }
+
+  static int write(RuntimeTextExtractor value, Uint8List buf) {
+    final handle = lower(value);
+    buf.buffer.asByteData(buf.offsetInBytes).setInt64(0, handle.address);
+    return 8;
+  }
+}
+
 abstract class RuntimeTranslationInterface {
   Future<DetectLanguageResponse> detectLanguage({
     required DetectLanguageRequest request,
@@ -8841,31 +8918,11 @@ class RuntimeTranslation implements RuntimeTranslationInterface {
   factory RuntimeTranslation.lift(Pointer<Void> ptr) {
     return RuntimeTranslation._(ptr);
   }
-  static Pointer<Void> lower(RuntimeTranslation value) {
-    return value.uniffiClonePointer();
-  }
-
   Pointer<Void> uniffiClonePointer() {
     return rustCall(
       (status) =>
           uniffi_linguaray_runtime_fn_clone_runtimetranslation(_ptr, status),
     );
-  }
-
-  static int allocationSize(RuntimeTranslation value) {
-    return 8;
-  }
-
-  static LiftRetVal<RuntimeTranslation> read(Uint8List buf) {
-    final handle = buf.buffer.asByteData(buf.offsetInBytes).getInt64(0);
-    final pointer = Pointer<Void>.fromAddress(handle);
-    return LiftRetVal(RuntimeTranslation.lift(pointer), 8);
-  }
-
-  static int write(RuntimeTranslation value, Uint8List buf) {
-    final handle = lower(value);
-    buf.buffer.asByteData(buf.offsetInBytes).setInt64(0, handle.address);
-    return 8;
   }
 
   void dispose() {
@@ -8908,6 +8965,32 @@ class RuntimeTranslation implements RuntimeTranslationInterface {
   }
 }
 
+class FfiConverterRuntimeTranslation {
+  static RuntimeTranslation lift(Pointer<Void> ptr) {
+    return RuntimeTranslation.lift(ptr);
+  }
+
+  static Pointer<Void> lower(RuntimeTranslation value) {
+    return value.uniffiClonePointer();
+  }
+
+  static int allocationSize(RuntimeTranslation value) {
+    return 8;
+  }
+
+  static LiftRetVal<RuntimeTranslation> read(Uint8List buf) {
+    final handle = buf.buffer.asByteData(buf.offsetInBytes).getInt64(0);
+    final pointer = Pointer<Void>.fromAddress(handle);
+    return LiftRetVal(RuntimeTranslation.lift(pointer), 8);
+  }
+
+  static int write(RuntimeTranslation value, Uint8List buf) {
+    final handle = lower(value);
+    buf.buffer.asByteData(buf.offsetInBytes).setInt64(0, handle.address);
+    return 8;
+  }
+}
+
 abstract class RuntimeVocabularyInterface {
   Future<int> deleteEntries({required List<String> entryIds});
   Future<List<VocabularyEntry>> listEntries({
@@ -8939,31 +9022,11 @@ class RuntimeVocabulary implements RuntimeVocabularyInterface {
   factory RuntimeVocabulary.lift(Pointer<Void> ptr) {
     return RuntimeVocabulary._(ptr);
   }
-  static Pointer<Void> lower(RuntimeVocabulary value) {
-    return value.uniffiClonePointer();
-  }
-
   Pointer<Void> uniffiClonePointer() {
     return rustCall(
       (status) =>
           uniffi_linguaray_runtime_fn_clone_runtimevocabulary(_ptr, status),
     );
-  }
-
-  static int allocationSize(RuntimeVocabulary value) {
-    return 8;
-  }
-
-  static LiftRetVal<RuntimeVocabulary> read(Uint8List buf) {
-    final handle = buf.buffer.asByteData(buf.offsetInBytes).getInt64(0);
-    final pointer = Pointer<Void>.fromAddress(handle);
-    return LiftRetVal(RuntimeVocabulary.lift(pointer), 8);
-  }
-
-  static int write(RuntimeVocabulary value, Uint8List buf) {
-    final handle = lower(value);
-    buf.buffer.asByteData(buf.offsetInBytes).setInt64(0, handle.address);
-    return 8;
   }
 
   void dispose() {
@@ -9057,6 +9120,32 @@ class RuntimeVocabulary implements RuntimeVocabularyInterface {
   }
 }
 
+class FfiConverterRuntimeVocabulary {
+  static RuntimeVocabulary lift(Pointer<Void> ptr) {
+    return RuntimeVocabulary.lift(ptr);
+  }
+
+  static Pointer<Void> lower(RuntimeVocabulary value) {
+    return value.uniffiClonePointer();
+  }
+
+  static int allocationSize(RuntimeVocabulary value) {
+    return 8;
+  }
+
+  static LiftRetVal<RuntimeVocabulary> read(Uint8List buf) {
+    final handle = buf.buffer.asByteData(buf.offsetInBytes).getInt64(0);
+    final pointer = Pointer<Void>.fromAddress(handle);
+    return LiftRetVal(RuntimeVocabulary.lift(pointer), 8);
+  }
+
+  static int write(RuntimeVocabulary value, Uint8List buf) {
+    final handle = lower(value);
+    buf.buffer.asByteData(buf.offsetInBytes).setInt64(0, handle.address);
+    return 8;
+  }
+}
+
 abstract class SettingsSubscriptionInterface {
   Future<SettingsChange?> next();
 }
@@ -9076,31 +9165,11 @@ class SettingsSubscription implements SettingsSubscriptionInterface {
   factory SettingsSubscription.lift(Pointer<Void> ptr) {
     return SettingsSubscription._(ptr);
   }
-  static Pointer<Void> lower(SettingsSubscription value) {
-    return value.uniffiClonePointer();
-  }
-
   Pointer<Void> uniffiClonePointer() {
     return rustCall(
       (status) =>
           uniffi_linguaray_runtime_fn_clone_settingssubscription(_ptr, status),
     );
-  }
-
-  static int allocationSize(SettingsSubscription value) {
-    return 8;
-  }
-
-  static LiftRetVal<SettingsSubscription> read(Uint8List buf) {
-    final handle = buf.buffer.asByteData(buf.offsetInBytes).getInt64(0);
-    final pointer = Pointer<Void>.fromAddress(handle);
-    return LiftRetVal(SettingsSubscription.lift(pointer), 8);
-  }
-
-  static int write(SettingsSubscription value, Uint8List buf) {
-    final handle = lower(value);
-    buf.buffer.asByteData(buf.offsetInBytes).setInt64(0, handle.address);
-    return 8;
   }
 
   void dispose() {
@@ -9125,6 +9194,32 @@ class SettingsSubscription implements SettingsSubscriptionInterface {
   }
 }
 
+class FfiConverterSettingsSubscription {
+  static SettingsSubscription lift(Pointer<Void> ptr) {
+    return SettingsSubscription.lift(ptr);
+  }
+
+  static Pointer<Void> lower(SettingsSubscription value) {
+    return value.uniffiClonePointer();
+  }
+
+  static int allocationSize(SettingsSubscription value) {
+    return 8;
+  }
+
+  static LiftRetVal<SettingsSubscription> read(Uint8List buf) {
+    final handle = buf.buffer.asByteData(buf.offsetInBytes).getInt64(0);
+    final pointer = Pointer<Void>.fromAddress(handle);
+    return LiftRetVal(SettingsSubscription.lift(pointer), 8);
+  }
+
+  static int write(SettingsSubscription value, Uint8List buf) {
+    final handle = lower(value);
+    buf.buffer.asByteData(buf.offsetInBytes).setInt64(0, handle.address);
+    return 8;
+  }
+}
+
 abstract class TranslationTaskInterface {
   void cancel();
   Future<TranslationEvent?> next();
@@ -9144,31 +9239,11 @@ class TranslationTask implements TranslationTaskInterface {
   factory TranslationTask.lift(Pointer<Void> ptr) {
     return TranslationTask._(ptr);
   }
-  static Pointer<Void> lower(TranslationTask value) {
-    return value.uniffiClonePointer();
-  }
-
   Pointer<Void> uniffiClonePointer() {
     return rustCall(
       (status) =>
           uniffi_linguaray_runtime_fn_clone_translationtask(_ptr, status),
     );
-  }
-
-  static int allocationSize(TranslationTask value) {
-    return 8;
-  }
-
-  static LiftRetVal<TranslationTask> read(Uint8List buf) {
-    final handle = buf.buffer.asByteData(buf.offsetInBytes).getInt64(0);
-    final pointer = Pointer<Void>.fromAddress(handle);
-    return LiftRetVal(TranslationTask.lift(pointer), 8);
-  }
-
-  static int write(TranslationTask value, Uint8List buf) {
-    final handle = lower(value);
-    buf.buffer.asByteData(buf.offsetInBytes).setInt64(0, handle.address);
-    return 8;
   }
 
   void dispose() {
@@ -9202,224 +9277,30 @@ class TranslationTask implements TranslationTaskInterface {
   }
 }
 
-class UniffiInternalError implements Exception {
-  static const int bufferOverflow = 0;
-  static const int incompleteData = 1;
-  static const int unexpectedOptionalTag = 2;
-  static const int unexpectedEnumCase = 3;
-  static const int unexpectedNullPointer = 4;
-  static const int unexpectedRustCallStatusCode = 5;
-  static const int unexpectedRustCallError = 6;
-  static const int unexpectedStaleHandle = 7;
-  static const int rustPanic = 8;
-  final int errorCode;
-  final String? panicMessage;
-  const UniffiInternalError(this.errorCode, this.panicMessage);
-  static UniffiInternalError panicked(String message) {
-    return UniffiInternalError(rustPanic, message);
+class FfiConverterTranslationTask {
+  static TranslationTask lift(Pointer<Void> ptr) {
+    return TranslationTask.lift(ptr);
   }
 
-  @override
-  String toString() {
-    switch (errorCode) {
-      case bufferOverflow:
-        return "UniFfi::BufferOverflow";
-      case incompleteData:
-        return "UniFfi::IncompleteData";
-      case unexpectedOptionalTag:
-        return "UniFfi::UnexpectedOptionalTag";
-      case unexpectedEnumCase:
-        return "UniFfi::UnexpectedEnumCase";
-      case unexpectedNullPointer:
-        return "UniFfi::UnexpectedNullPointer";
-      case unexpectedRustCallStatusCode:
-        return "UniFfi::UnexpectedRustCallStatusCode";
-      case unexpectedRustCallError:
-        return "UniFfi::UnexpectedRustCallError";
-      case unexpectedStaleHandle:
-        return "UniFfi::UnexpectedStaleHandle";
-      case rustPanic:
-        return "UniFfi::rustPanic: $panicMessage";
-      default:
-        return "UniFfi::UnknownError: $errorCode";
-    }
-  }
-}
-
-const int CALL_SUCCESS = 0;
-const int CALL_ERROR = 1;
-const int CALL_UNEXPECTED_ERROR = 2;
-
-final class RustCallStatus extends Struct {
-  @Int8()
-  external int code;
-  external RustBuffer errorBuf;
-}
-
-void checkCallStatus(
-  UniffiRustCallStatusErrorHandler errorHandler,
-  Pointer<RustCallStatus> status,
-) {
-  if (status.ref.code == CALL_SUCCESS) {
-    return;
-  } else if (status.ref.code == CALL_ERROR) {
-    throw errorHandler.lift(status.ref.errorBuf);
-  } else if (status.ref.code == CALL_UNEXPECTED_ERROR) {
-    if (status.ref.errorBuf.len > 0) {
-      throw UniffiInternalError.panicked(
-        FfiConverterString.lift(status.ref.errorBuf),
-      );
-    } else {
-      throw UniffiInternalError.panicked("Rust panic");
-    }
-  } else {
-    throw UniffiInternalError.panicked(
-      "Unexpected RustCallStatus code: \${status.ref.code}",
-    );
-  }
-}
-
-T rustCall<T>(
-  T Function(Pointer<RustCallStatus>) callback, [
-  UniffiRustCallStatusErrorHandler? errorHandler,
-]) {
-  final status = calloc<RustCallStatus>();
-  try {
-    final result = callback(status);
-    checkCallStatus(errorHandler ?? NullRustCallStatusErrorHandler(), status);
-    return result;
-  } finally {
-    calloc.free(status);
-  }
-}
-
-T rustCallWithLifter<T, F>(
-  F Function(Pointer<RustCallStatus>) ffiCall,
-  T Function(F) lifter, [
-  UniffiRustCallStatusErrorHandler? errorHandler,
-]) {
-  final status = calloc<RustCallStatus>();
-  try {
-    final rawResult = ffiCall(status);
-    checkCallStatus(errorHandler ?? NullRustCallStatusErrorHandler(), status);
-    return lifter(rawResult);
-  } finally {
-    calloc.free(status);
-  }
-}
-
-class NullRustCallStatusErrorHandler extends UniffiRustCallStatusErrorHandler {
-  @override
-  Exception lift(RustBuffer errorBuf) {
-    errorBuf.free();
-    return UniffiInternalError.panicked("Unexpected CALL_ERROR");
-  }
-}
-
-abstract class UniffiRustCallStatusErrorHandler {
-  Exception lift(RustBuffer errorBuf);
-}
-
-final class RustBuffer extends Struct {
-  @Uint64()
-  external int capacity;
-  @Uint64()
-  external int len;
-  external Pointer<Uint8> data;
-  static RustBuffer alloc(int size) {
-    return rustCall(
-      (status) => ffi_linguaray_runtime_rustbuffer_alloc(size, status),
-    );
+  static Pointer<Void> lower(TranslationTask value) {
+    return value.uniffiClonePointer();
   }
 
-  static RustBuffer fromBytes(ForeignBytes bytes) {
-    return rustCall(
-      (status) => ffi_linguaray_runtime_rustbuffer_from_bytes(bytes, status),
-    );
+  static int allocationSize(TranslationTask value) {
+    return 8;
   }
 
-  void free() {
-    rustCall((status) => ffi_linguaray_runtime_rustbuffer_free(this, status));
+  static LiftRetVal<TranslationTask> read(Uint8List buf) {
+    final handle = buf.buffer.asByteData(buf.offsetInBytes).getInt64(0);
+    final pointer = Pointer<Void>.fromAddress(handle);
+    return LiftRetVal(TranslationTask.lift(pointer), 8);
   }
 
-  RustBuffer reserve(int additionalCapacity) {
-    return rustCall(
-      (status) => ffi_linguaray_runtime_rustbuffer_reserve(
-        this,
-        additionalCapacity,
-        status,
-      ),
-    );
+  static int write(TranslationTask value, Uint8List buf) {
+    final handle = lower(value);
+    buf.buffer.asByteData(buf.offsetInBytes).setInt64(0, handle.address);
+    return 8;
   }
-
-  Uint8List asUint8List() {
-    final dataList = data.asTypedList(len);
-    final byteData = ByteData.sublistView(dataList);
-    return Uint8List.view(byteData.buffer);
-  }
-
-  @override
-  String toString() {
-    return "RustBuffer{capacity: \$capacity, len: \$len, data: \$data}";
-  }
-}
-
-RustBuffer toRustBuffer(Uint8List data) {
-  final length = data.length;
-  final Pointer<Uint8> frameData = calloc<Uint8>(length);
-  final pointerList = frameData.asTypedList(length);
-  pointerList.setAll(0, data);
-  final bytes = calloc<ForeignBytes>();
-  bytes.ref.len = length;
-  bytes.ref.data = frameData;
-  return RustBuffer.fromBytes(bytes.ref);
-}
-
-final class ForeignBytes extends Struct {
-  @Int32()
-  external int len;
-  external Pointer<Uint8> data;
-  void free() {
-    calloc.free(data);
-  }
-}
-
-class LiftRetVal<T> {
-  final T value;
-  final int bytesRead;
-  const LiftRetVal(this.value, this.bytesRead);
-  LiftRetVal<T> copyWithOffset(int offset) {
-    return LiftRetVal(value, bytesRead + offset);
-  }
-}
-
-abstract class FfiConverter<D, F> {
-  const FfiConverter();
-  D lift(F value);
-  F lower(D value);
-  D read(ByteData buffer, int offset);
-  void write(D value, ByteData buffer, int offset);
-  int size(D value);
-}
-
-mixin FfiConverterPrimitive<T> on FfiConverter<T, T> {
-  @override
-  T lift(T value) => value;
-  @override
-  T lower(T value) => value;
-}
-
-Uint8List createUint8ListFromInt(int value) {
-  int length = value.bitLength ~/ 8 + 1;
-  if (length != 4 && length != 8) {
-    length = (value < 0x100000000) ? 4 : 8;
-  }
-  Uint8List uint8List = Uint8List(length);
-  for (int i = length - 1; i >= 0; i--) {
-    uint8List[i] = value & 0xFF;
-    value >>= 8;
-  }
-  return uint8List;
 }
 
 class FfiConverterBool {
@@ -12505,32 +12386,6 @@ class FfiConverterSequenceWordTense {
   }
 }
 
-class FfiConverterString {
-  static String lift(RustBuffer buf) {
-    return utf8.decoder.convert(buf.asUint8List());
-  }
-
-  static RustBuffer lower(String value) {
-    return toRustBuffer(Utf8Encoder().convert(value));
-  }
-
-  static LiftRetVal<String> read(Uint8List buf) {
-    final end = buf.buffer.asByteData(buf.offsetInBytes).getInt32(0) + 4;
-    return LiftRetVal(utf8.decoder.convert(buf, 4, end), end);
-  }
-
-  static int allocationSize([String value = ""]) {
-    return utf8.encoder.convert(value).length + 4;
-  }
-
-  static int write(String value, Uint8List buf) {
-    final list = utf8.encoder.convert(value);
-    buf.buffer.asByteData(buf.offsetInBytes).setInt32(0, list.length);
-    buf.setAll(4, list);
-    return list.length + 4;
-  }
-}
-
 class FfiConverterUInt16 {
   static int lift(int value) => value;
   static LiftRetVal<int> read(Uint8List buf) {
@@ -12597,141 +12452,6 @@ class FfiConverterUInt64 {
   static int write(int value, Uint8List buf) {
     buf.buffer.asByteData(buf.offsetInBytes).setUint64(0, lower(value));
     return 8;
-  }
-}
-
-const int UNIFFI_RUST_FUTURE_POLL_READY = 0;
-const int UNIFFI_RUST_FUTURE_POLL_MAYBE_READY = 1;
-typedef UniffiRustFutureContinuationCallback = Void Function(Uint64, Int8);
-final _uniffiRustFutureContinuationHandles = UniffiHandleMap<Completer<int>>();
-Future<T> uniffiRustCallAsync<T, F>(
-  Pointer<Void> Function() rustFutureFunc,
-  void Function(
-    Pointer<Void>,
-    Pointer<NativeFunction<UniffiRustFutureContinuationCallback>>,
-    Pointer<Void>,
-  )
-  pollFunc,
-  F Function(Pointer<Void>, Pointer<RustCallStatus>) completeFunc,
-  void Function(Pointer<Void>) freeFunc,
-  T Function(F) liftFunc, [
-  UniffiRustCallStatusErrorHandler? errorHandler,
-]) async {
-  final rustFuture = rustFutureFunc();
-  final completer = Completer<int>();
-  final handle = _uniffiRustFutureContinuationHandles.insert(completer);
-  final callbackData = Pointer<Void>.fromAddress(handle);
-  late final NativeCallable<UniffiRustFutureContinuationCallback> callback;
-  void repoll() {
-    pollFunc(rustFuture, callback.nativeFunction, callbackData);
-  }
-
-  void onResponse(int data, int pollResult) {
-    if (pollResult == UNIFFI_RUST_FUTURE_POLL_READY) {
-      final readyCompleter = _uniffiRustFutureContinuationHandles.maybeRemove(
-        data,
-      );
-      if (readyCompleter != null && !readyCompleter.isCompleted) {
-        readyCompleter.complete(pollResult);
-      }
-    } else if (pollResult == UNIFFI_RUST_FUTURE_POLL_MAYBE_READY) {
-      repoll();
-    } else {
-      final errorCompleter = _uniffiRustFutureContinuationHandles.maybeRemove(
-        data,
-      );
-      if (errorCompleter != null && !errorCompleter.isCompleted) {
-        errorCompleter.completeError(
-          UniffiInternalError.panicked(
-            "Unexpected poll result from Rust future: \$pollResult",
-          ),
-        );
-      }
-    }
-  }
-
-  callback = NativeCallable<UniffiRustFutureContinuationCallback>.listener(
-    onResponse,
-  );
-  try {
-    repoll();
-    await completer.future;
-    final status = calloc<RustCallStatus>();
-    try {
-      final result = completeFunc(rustFuture, status);
-      checkCallStatus(errorHandler ?? NullRustCallStatusErrorHandler(), status);
-      return liftFunc(result);
-    } finally {
-      calloc.free(status);
-    }
-  } finally {
-    callback.close();
-    _uniffiRustFutureContinuationHandles.maybeRemove(handle);
-    freeFunc(rustFuture);
-  }
-}
-
-typedef UniffiForeignFutureFree = Void Function(Uint64);
-typedef UniffiForeignFutureFreeDart = void Function(int);
-
-class _UniffiForeignFutureState {
-  bool cancelled = false;
-}
-
-final _uniffiForeignFutureHandleMap =
-    UniffiHandleMap<_UniffiForeignFutureState>();
-void _uniffiForeignFutureFree(int handle) {
-  final state = _uniffiForeignFutureHandleMap.maybeRemove(handle);
-  if (state != null) {
-    state.cancelled = true;
-  }
-}
-
-final Pointer<NativeFunction<UniffiForeignFutureFree>>
-_uniffiForeignFutureFreePointer = Pointer.fromFunction<UniffiForeignFutureFree>(
-  _uniffiForeignFutureFree,
-);
-
-final class UniffiForeignFuture extends Struct {
-  @Uint64()
-  external int handle;
-  external Pointer<NativeFunction<UniffiForeignFutureFree>> free;
-}
-
-class UniffiHandleMap<T> {
-  final Map<int, T> _map = {};
-  int _counter = 1;
-  int insert(T obj) {
-    final handle = _counter;
-    _counter += 2;
-    _map[handle] = obj;
-    return handle;
-  }
-
-  T get(int handle) {
-    final obj = _map[handle];
-    if (obj == null) {
-      throw UniffiInternalError(
-        UniffiInternalError.unexpectedStaleHandle,
-        "Handle not found",
-      );
-    }
-    return obj;
-  }
-
-  T remove(int handle) {
-    final obj = maybeRemove(handle);
-    if (obj == null) {
-      throw UniffiInternalError(
-        UniffiInternalError.unexpectedStaleHandle,
-        "Handle not found",
-      );
-    }
-    return obj;
-  }
-
-  T? maybeRemove(int handle) {
-    return _map.remove(handle);
   }
 }
 
@@ -14294,39 +14014,6 @@ uniffi_linguaray_runtime_fn_func_list_catalog_snapshot_models(
 
 @Native<RustBuffer Function(Pointer<RustCallStatus>)>(assetId: _uniffiAssetId)
 external RustBuffer uniffi_linguaray_runtime_fn_func_list_provider_catalog(
-  Pointer<RustCallStatus> uniffiStatus,
-);
-
-@Native<RustBuffer Function(Uint64, Pointer<RustCallStatus>)>(
-  assetId: _uniffiAssetId,
-)
-external RustBuffer ffi_linguaray_runtime_rustbuffer_alloc(
-  int size,
-  Pointer<RustCallStatus> uniffiStatus,
-);
-
-@Native<RustBuffer Function(ForeignBytes, Pointer<RustCallStatus>)>(
-  assetId: _uniffiAssetId,
-)
-external RustBuffer ffi_linguaray_runtime_rustbuffer_from_bytes(
-  ForeignBytes bytes,
-  Pointer<RustCallStatus> uniffiStatus,
-);
-
-@Native<Void Function(RustBuffer, Pointer<RustCallStatus>)>(
-  assetId: _uniffiAssetId,
-)
-external void ffi_linguaray_runtime_rustbuffer_free(
-  RustBuffer buf,
-  Pointer<RustCallStatus> uniffiStatus,
-);
-
-@Native<RustBuffer Function(RustBuffer, Uint64, Pointer<RustCallStatus>)>(
-  assetId: _uniffiAssetId,
-)
-external RustBuffer ffi_linguaray_runtime_rustbuffer_reserve(
-  RustBuffer buf,
-  int additional,
   Pointer<RustCallStatus> uniffiStatus,
 );
 

@@ -28,7 +28,7 @@ class Translations with BaseTranslations<AppLocale, Translations> {
          overrides == null,
          'Set "translation_overrides: true" in order to enable this feature.',
        ),
-       $meta =
+       _meta =
            meta ??
            TranslationMetadata(
              locale: AppLocale.en,
@@ -36,15 +36,16 @@ class Translations with BaseTranslations<AppLocale, Translations> {
              cardinalResolver: cardinalResolver,
              ordinalResolver: ordinalResolver,
            ) {
-    $meta.setFlatMapFunction(_flatMapFunction);
+    _meta.setFlatMapFunction(_flatMapFunction);
   }
 
   /// Metadata for the translations of <en>.
+  final TranslationMetadata<AppLocale, Translations> _meta;
   @override
-  final TranslationMetadata<AppLocale, Translations> $meta;
+  TranslationMetadata<AppLocale, Translations> get $meta => _meta;
 
   /// Access flat map
-  dynamic operator [](String key) => $meta.getTranslation(key);
+  dynamic operator [](String key) => _meta.getTranslation(key);
 
   late final Translations _root = this; // ignore: unused_field
 
@@ -53,72 +54,77 @@ class Translations with BaseTranslations<AppLocale, Translations> {
   }) => Translations(meta: meta ?? this.$meta);
 
   // Translations
-  late final TranslationsCommonEn common = TranslationsCommonEn.internal(_root);
-  late final TranslationsAppEn app = TranslationsAppEn.internal(_root);
-  late final TranslationsMiniTranslatorEn mini_translator =
-      TranslationsMiniTranslatorEn.internal(_root);
-  late final TranslationsWorkbenchEn workbench =
-      TranslationsWorkbenchEn.internal(_root);
-  late final TranslationsSettingsEn settings = TranslationsSettingsEn.internal(
+  late final Translations$common$en common = Translations$common$en.internal(
     _root,
   );
-  late final TranslationsUiEn ui = TranslationsUiEn.internal(_root);
+  late final Translations$app$en app = Translations$app$en.internal(_root);
+  late final Translations$mini_translator$en mini_translator =
+      Translations$mini_translator$en.internal(_root);
+  late final Translations$workbench$en workbench =
+      Translations$workbench$en.internal(_root);
+  late final Translations$settings$en settings =
+      Translations$settings$en.internal(_root);
+  late final Translations$ui$en ui = Translations$ui$en.internal(_root);
 }
 
 // Path: common
-class TranslationsCommonEn {
-  TranslationsCommonEn.internal(this._root);
+class Translations$common$en {
+  Translations$common$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
   // Translations
-  late final TranslationsCommonUiEn ui = TranslationsCommonUiEn.internal(_root);
-  late final TranslationsCommonLanguageEn language =
-      TranslationsCommonLanguageEn.internal(_root);
-  late final TranslationsCommonThemeModeEn theme_mode =
-      TranslationsCommonThemeModeEn.internal(_root);
-  late final TranslationsCommonThemeStyleEn theme_style =
-      TranslationsCommonThemeStyleEn.internal(_root);
-  late final TranslationsCommonProviderEn provider =
-      TranslationsCommonProviderEn.internal(_root);
+  late final Translations$common$ui$en ui = Translations$common$ui$en.internal(
+    _root,
+  );
+  late final Translations$common$language$en language =
+      Translations$common$language$en.internal(_root);
+  late final Translations$common$theme_mode$en theme_mode =
+      Translations$common$theme_mode$en.internal(_root);
+  late final Translations$common$theme_style$en theme_style =
+      Translations$common$theme_style$en.internal(_root);
+  late final Translations$common$provider$en provider =
+      Translations$common$provider$en.internal(_root);
 }
 
 // Path: app
-class TranslationsAppEn {
-  TranslationsAppEn.internal(this._root);
+class Translations$app$en {
+  Translations$app$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
   // Translations
-  late final TranslationsAppTrayEn tray = TranslationsAppTrayEn.internal(_root);
+  late final Translations$app$tray$en tray = Translations$app$tray$en.internal(
+    _root,
+  );
 }
 
 // Path: mini_translator
-class TranslationsMiniTranslatorEn {
-  TranslationsMiniTranslatorEn.internal(this._root);
+class Translations$mini_translator$en {
+  Translations$mini_translator$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
   // Translations
-  late final TranslationsMiniTranslatorLimitedBannerEn limited_banner =
-      TranslationsMiniTranslatorLimitedBannerEn.internal(_root);
-  late final TranslationsMiniTranslatorInputEn input =
-      TranslationsMiniTranslatorInputEn.internal(_root);
-  late final TranslationsMiniTranslatorToolbarEn toolbar =
-      TranslationsMiniTranslatorToolbarEn.internal(_root);
-  late final TranslationsMiniTranslatorButtonEn button =
-      TranslationsMiniTranslatorButtonEn.internal(_root);
-  late final TranslationsMiniTranslatorLanguageEn language =
-      TranslationsMiniTranslatorLanguageEn.internal(_root);
-  late final TranslationsMiniTranslatorMessageEn message =
-      TranslationsMiniTranslatorMessageEn.internal(_root);
-  late final TranslationsMiniTranslatorResultEn result =
-      TranslationsMiniTranslatorResultEn.internal(_root);
+  late final Translations$mini_translator$limited_banner$en limited_banner =
+      Translations$mini_translator$limited_banner$en.internal(_root);
+  late final Translations$mini_translator$input$en input =
+      Translations$mini_translator$input$en.internal(_root);
+  late final Translations$mini_translator$toolbar$en toolbar =
+      Translations$mini_translator$toolbar$en.internal(_root);
+  late final Translations$mini_translator$button$en button =
+      Translations$mini_translator$button$en.internal(_root);
+  late final Translations$mini_translator$language$en language =
+      Translations$mini_translator$language$en.internal(_root);
+  late final Translations$mini_translator$message$en message =
+      Translations$mini_translator$message$en.internal(_root);
+  late final Translations$mini_translator$result$en result =
+      Translations$mini_translator$result$en.internal(_root);
 }
 
 // Path: workbench
-class TranslationsWorkbenchEn {
-  TranslationsWorkbenchEn.internal(this._root);
+class Translations$workbench$en {
+  Translations$workbench$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -133,8 +139,8 @@ class TranslationsWorkbenchEn {
   /// en: 'History'
   String get history => 'History';
 
-  late final TranslationsWorkbenchHistoryPageEn history_page =
-      TranslationsWorkbenchHistoryPageEn.internal(_root);
+  late final Translations$workbench$history_page$en history_page =
+      Translations$workbench$history_page$en.internal(_root);
 
   /// en: 'Glossary'
   String get glossary => 'Glossary';
@@ -145,16 +151,16 @@ class TranslationsWorkbenchEn {
   /// en: 'Not configured'
   String get not_configured => 'Not configured';
 
-  late final TranslationsWorkbenchSubtitleEn subtitle =
-      TranslationsWorkbenchSubtitleEn.internal(_root);
-  late final TranslationsWorkbenchPlaceholderEn placeholder =
-      TranslationsWorkbenchPlaceholderEn.internal(_root);
-  late final TranslationsWorkbenchGlossaryPageEn glossary_page =
-      TranslationsWorkbenchGlossaryPageEn.internal(_root);
-  late final TranslationsWorkbenchTranslationEn translation =
-      TranslationsWorkbenchTranslationEn.internal(_root);
-  late final TranslationsWorkbenchStatusEn status =
-      TranslationsWorkbenchStatusEn.internal(_root);
+  late final Translations$workbench$subtitle$en subtitle =
+      Translations$workbench$subtitle$en.internal(_root);
+  late final Translations$workbench$placeholder$en placeholder =
+      Translations$workbench$placeholder$en.internal(_root);
+  late final Translations$workbench$glossary_page$en glossary_page =
+      Translations$workbench$glossary_page$en.internal(_root);
+  late final Translations$workbench$translation$en translation =
+      Translations$workbench$translation$en.internal(_root);
+  late final Translations$workbench$status$en status =
+      Translations$workbench$status$en.internal(_root);
 
   /// en: 'Up to date'
   String get version_latest => 'Up to date';
@@ -167,8 +173,8 @@ class TranslationsWorkbenchEn {
 }
 
 // Path: settings
-class TranslationsSettingsEn {
-  TranslationsSettingsEn.internal(this._root);
+class Translations$settings$en {
+  Translations$settings$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -177,81 +183,80 @@ class TranslationsSettingsEn {
   /// en: 'v{} (Build {})'
   String get version => 'v{} (Build {})';
 
-  late final TranslationsSettingsNavigationEn navigation =
-      TranslationsSettingsNavigationEn.internal(_root);
-  late final TranslationsSettingsGeneralEn general =
-      TranslationsSettingsGeneralEn.internal(_root);
-  late final TranslationsSettingsAppearanceEn appearance =
-      TranslationsSettingsAppearanceEn.internal(_root);
-  late final TranslationsSettingsShortcutsEn shortcuts =
-      TranslationsSettingsShortcutsEn.internal(_root);
-  late final TranslationsSettingsAdvancedEn advanced =
-      TranslationsSettingsAdvancedEn.internal(_root);
-  late final TranslationsSettingsDataTransferEn data_transfer =
-      TranslationsSettingsDataTransferEn.internal(_root);
-  late final TranslationsSettingsServicesEn services =
-      TranslationsSettingsServicesEn.internal(_root);
-  late final TranslationsSettingsProvidersEn providers =
-      TranslationsSettingsProvidersEn.internal(_root);
-  late final TranslationsSettingsLayoutEn layout =
-      TranslationsSettingsLayoutEn.internal(_root);
-  late final TranslationsSettingsAboutEn about =
-      TranslationsSettingsAboutEn.internal(_root);
-  late final TranslationsSettingsPermissionsEn permissions =
-      TranslationsSettingsPermissionsEn.internal(_root);
+  late final Translations$settings$navigation$en navigation =
+      Translations$settings$navigation$en.internal(_root);
+  late final Translations$settings$general$en general =
+      Translations$settings$general$en.internal(_root);
+  late final Translations$settings$appearance$en appearance =
+      Translations$settings$appearance$en.internal(_root);
+  late final Translations$settings$shortcuts$en shortcuts =
+      Translations$settings$shortcuts$en.internal(_root);
+  late final Translations$settings$advanced$en advanced =
+      Translations$settings$advanced$en.internal(_root);
+  late final Translations$settings$data_transfer$en data_transfer =
+      Translations$settings$data_transfer$en.internal(_root);
+  late final Translations$settings$services$en services =
+      Translations$settings$services$en.internal(_root);
+  late final Translations$settings$providers$en providers =
+      Translations$settings$providers$en.internal(_root);
+  late final Translations$settings$layout$en layout =
+      Translations$settings$layout$en.internal(_root);
+  late final Translations$settings$about$en about =
+      Translations$settings$about$en.internal(_root);
+  late final Translations$settings$permissions$en permissions =
+      Translations$settings$permissions$en.internal(_root);
 }
 
 // Path: ui
-class TranslationsUiEn {
-  TranslationsUiEn.internal(this._root);
+class Translations$ui$en {
+  Translations$ui$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
   // Translations
-  late final TranslationsUiShellEn shell = TranslationsUiShellEn.internal(
+  late final Translations$ui$shell$en shell = Translations$ui$shell$en.internal(
     _root,
   );
-  late final TranslationsUiFirstRunEn first_run =
-      TranslationsUiFirstRunEn.internal(_root);
-  late final TranslationsUiQuickEn quick = TranslationsUiQuickEn.internal(
+  late final Translations$ui$first_run$en first_run =
+      Translations$ui$first_run$en.internal(_root);
+  late final Translations$ui$quick$en quick = Translations$ui$quick$en.internal(
     _root,
   );
-  late final TranslationsUiOcrEn ocr = TranslationsUiOcrEn.internal(_root);
-  late final TranslationsUiErrorsEn errors = TranslationsUiErrorsEn.internal(
+  late final Translations$ui$ocr$en ocr = Translations$ui$ocr$en.internal(
     _root,
   );
-  late final TranslationsUiRecoveryEn recovery =
-      TranslationsUiRecoveryEn.internal(_root);
-  late final TranslationsUiVocabularyEn vocabulary =
-      TranslationsUiVocabularyEn.internal(_root);
-  late final TranslationsUiDictionaryEn dictionary =
-      TranslationsUiDictionaryEn.internal(_root);
-  late final TranslationsUiUpdatesEn updates = TranslationsUiUpdatesEn.internal(
-    _root,
-  );
-  late final TranslationsUiSpeechEn speech = TranslationsUiSpeechEn.internal(
-    _root,
-  );
-  late final TranslationsUiProvidersEn providers =
-      TranslationsUiProvidersEn.internal(_root);
+  late final Translations$ui$errors$en errors =
+      Translations$ui$errors$en.internal(_root);
+  late final Translations$ui$recovery$en recovery =
+      Translations$ui$recovery$en.internal(_root);
+  late final Translations$ui$vocabulary$en vocabulary =
+      Translations$ui$vocabulary$en.internal(_root);
+  late final Translations$ui$dictionary$en dictionary =
+      Translations$ui$dictionary$en.internal(_root);
+  late final Translations$ui$updates$en updates =
+      Translations$ui$updates$en.internal(_root);
+  late final Translations$ui$speech$en speech =
+      Translations$ui$speech$en.internal(_root);
+  late final Translations$ui$providers$en providers =
+      Translations$ui$providers$en.internal(_root);
 }
 
 // Path: common.ui
-class TranslationsCommonUiEn {
-  TranslationsCommonUiEn.internal(this._root);
+class Translations$common$ui$en {
+  Translations$common$ui$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
   // Translations
-  late final TranslationsCommonUiButtonEn button =
-      TranslationsCommonUiButtonEn.internal(_root);
-  late final TranslationsCommonUiFeedbackEn feedback =
-      TranslationsCommonUiFeedbackEn.internal(_root);
+  late final Translations$common$ui$button$en button =
+      Translations$common$ui$button$en.internal(_root);
+  late final Translations$common$ui$feedback$en feedback =
+      Translations$common$ui$feedback$en.internal(_root);
 }
 
 // Path: common.language
-class TranslationsCommonLanguageEn {
-  TranslationsCommonLanguageEn.internal(this._root);
+class Translations$common$language$en {
+  Translations$common$language$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -364,8 +369,8 @@ class TranslationsCommonLanguageEn {
 }
 
 // Path: common.theme_mode
-class TranslationsCommonThemeModeEn {
-  TranslationsCommonThemeModeEn.internal(this._root);
+class Translations$common$theme_mode$en {
+  Translations$common$theme_mode$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -382,8 +387,8 @@ class TranslationsCommonThemeModeEn {
 }
 
 // Path: common.theme_style
-class TranslationsCommonThemeStyleEn {
-  TranslationsCommonThemeStyleEn.internal(this._root);
+class Translations$common$theme_style$en {
+  Translations$common$theme_style$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -397,8 +402,8 @@ class TranslationsCommonThemeStyleEn {
 }
 
 // Path: common.provider
-class TranslationsCommonProviderEn {
-  TranslationsCommonProviderEn.internal(this._root);
+class Translations$common$provider$en {
+  Translations$common$provider$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -442,38 +447,42 @@ class TranslationsCommonProviderEn {
 }
 
 // Path: app.tray
-class TranslationsAppTrayEn {
-  TranslationsAppTrayEn.internal(this._root);
+class Translations$app$tray$en {
+  Translations$app$tray$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
   // Translations
-  late final TranslationsAppTrayContextMenuEn context_menu =
-      TranslationsAppTrayContextMenuEn.internal(_root);
+  late final Translations$app$tray$context_menu$en context_menu =
+      Translations$app$tray$context_menu$en.internal(_root);
 }
 
 // Path: mini_translator.limited_banner
-class TranslationsMiniTranslatorLimitedBannerEn {
-  TranslationsMiniTranslatorLimitedBannerEn.internal(this._root);
+class Translations$mini_translator$limited_banner$en {
+  Translations$mini_translator$limited_banner$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
   // Translations
-  late final TranslationsMiniTranslatorLimitedBannerPermissionEn permission =
-      TranslationsMiniTranslatorLimitedBannerPermissionEn.internal(_root);
-  late final TranslationsMiniTranslatorLimitedBannerInstructionEn instruction =
-      TranslationsMiniTranslatorLimitedBannerInstructionEn.internal(_root);
-  late final TranslationsMiniTranslatorLimitedBannerActionEn action =
-      TranslationsMiniTranslatorLimitedBannerActionEn.internal(_root);
-  late final TranslationsMiniTranslatorLimitedBannerFeedbackEn feedback =
-      TranslationsMiniTranslatorLimitedBannerFeedbackEn.internal(_root);
-  late final TranslationsMiniTranslatorLimitedBannerTooltipEn tooltip =
-      TranslationsMiniTranslatorLimitedBannerTooltipEn.internal(_root);
+  late final Translations$mini_translator$limited_banner$permission$en
+  permission =
+      Translations$mini_translator$limited_banner$permission$en.internal(_root);
+  late final Translations$mini_translator$limited_banner$instruction$en
+  instruction =
+      Translations$mini_translator$limited_banner$instruction$en.internal(
+        _root,
+      );
+  late final Translations$mini_translator$limited_banner$action$en action =
+      Translations$mini_translator$limited_banner$action$en.internal(_root);
+  late final Translations$mini_translator$limited_banner$feedback$en feedback =
+      Translations$mini_translator$limited_banner$feedback$en.internal(_root);
+  late final Translations$mini_translator$limited_banner$tooltip$en tooltip =
+      Translations$mini_translator$limited_banner$tooltip$en.internal(_root);
 }
 
 // Path: mini_translator.input
-class TranslationsMiniTranslatorInputEn {
-  TranslationsMiniTranslatorInputEn.internal(this._root);
+class Translations$mini_translator$input$en {
+  Translations$mini_translator$input$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -491,21 +500,21 @@ class TranslationsMiniTranslatorInputEn {
 }
 
 // Path: mini_translator.toolbar
-class TranslationsMiniTranslatorToolbarEn {
-  TranslationsMiniTranslatorToolbarEn.internal(this._root);
+class Translations$mini_translator$toolbar$en {
+  Translations$mini_translator$toolbar$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
   // Translations
-  late final TranslationsMiniTranslatorToolbarTooltipEn tooltip =
-      TranslationsMiniTranslatorToolbarTooltipEn.internal(_root);
-  late final TranslationsMiniTranslatorToolbarMenuEn menu =
-      TranslationsMiniTranslatorToolbarMenuEn.internal(_root);
+  late final Translations$mini_translator$toolbar$tooltip$en tooltip =
+      Translations$mini_translator$toolbar$tooltip$en.internal(_root);
+  late final Translations$mini_translator$toolbar$menu$en menu =
+      Translations$mini_translator$toolbar$menu$en.internal(_root);
 }
 
 // Path: mini_translator.button
-class TranslationsMiniTranslatorButtonEn {
-  TranslationsMiniTranslatorButtonEn.internal(this._root);
+class Translations$mini_translator$button$en {
+  Translations$mini_translator$button$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -531,8 +540,8 @@ class TranslationsMiniTranslatorButtonEn {
 }
 
 // Path: mini_translator.language
-class TranslationsMiniTranslatorLanguageEn {
-  TranslationsMiniTranslatorLanguageEn.internal(this._root);
+class Translations$mini_translator$language$en {
+  Translations$mini_translator$language$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -561,8 +570,8 @@ class TranslationsMiniTranslatorLanguageEn {
 }
 
 // Path: mini_translator.message
-class TranslationsMiniTranslatorMessageEn {
-  TranslationsMiniTranslatorMessageEn.internal(this._root);
+class Translations$mini_translator$message$en {
+  Translations$mini_translator$message$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -585,8 +594,8 @@ class TranslationsMiniTranslatorMessageEn {
 }
 
 // Path: mini_translator.result
-class TranslationsMiniTranslatorResultEn {
-  TranslationsMiniTranslatorResultEn.internal(this._root);
+class Translations$mini_translator$result$en {
+  Translations$mini_translator$result$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -646,8 +655,8 @@ class TranslationsMiniTranslatorResultEn {
 }
 
 // Path: workbench.history_page
-class TranslationsWorkbenchHistoryPageEn {
-  TranslationsWorkbenchHistoryPageEn.internal(this._root);
+class Translations$workbench$history_page$en {
+  Translations$workbench$history_page$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -761,8 +770,8 @@ class TranslationsWorkbenchHistoryPageEn {
 }
 
 // Path: workbench.subtitle
-class TranslationsWorkbenchSubtitleEn {
-  TranslationsWorkbenchSubtitleEn.internal(this._root);
+class Translations$workbench$subtitle$en {
+  Translations$workbench$subtitle$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -776,8 +785,8 @@ class TranslationsWorkbenchSubtitleEn {
 }
 
 // Path: workbench.placeholder
-class TranslationsWorkbenchPlaceholderEn {
-  TranslationsWorkbenchPlaceholderEn.internal(this._root);
+class Translations$workbench$placeholder$en {
+  Translations$workbench$placeholder$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -792,8 +801,8 @@ class TranslationsWorkbenchPlaceholderEn {
 }
 
 // Path: workbench.glossary_page
-class TranslationsWorkbenchGlossaryPageEn {
-  TranslationsWorkbenchGlossaryPageEn.internal(this._root);
+class Translations$workbench$glossary_page$en {
+  Translations$workbench$glossary_page$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -1003,8 +1012,8 @@ class TranslationsWorkbenchGlossaryPageEn {
 }
 
 // Path: workbench.translation
-class TranslationsWorkbenchTranslationEn {
-  TranslationsWorkbenchTranslationEn.internal(this._root);
+class Translations$workbench$translation$en {
+  Translations$workbench$translation$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -1147,8 +1156,8 @@ class TranslationsWorkbenchTranslationEn {
 }
 
 // Path: workbench.status
-class TranslationsWorkbenchStatusEn {
-  TranslationsWorkbenchStatusEn.internal(this._root);
+class Translations$workbench$status$en {
+  Translations$workbench$status$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -1165,8 +1174,8 @@ class TranslationsWorkbenchStatusEn {
 }
 
 // Path: settings.navigation
-class TranslationsSettingsNavigationEn {
-  TranslationsSettingsNavigationEn.internal(this._root);
+class Translations$settings$navigation$en {
+  Translations$settings$navigation$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -1207,8 +1216,8 @@ class TranslationsSettingsNavigationEn {
 }
 
 // Path: settings.general
-class TranslationsSettingsGeneralEn {
-  TranslationsSettingsGeneralEn.internal(this._root);
+class Translations$settings$general$en {
+  Translations$settings$general$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -1217,21 +1226,21 @@ class TranslationsSettingsGeneralEn {
   /// en: 'General'
   String get title => 'General';
 
-  late final TranslationsSettingsGeneralSectionEn section =
-      TranslationsSettingsGeneralSectionEn.internal(_root);
-  late final TranslationsSettingsGeneralRowEn row =
-      TranslationsSettingsGeneralRowEn.internal(_root);
-  late final TranslationsSettingsGeneralButtonEn button =
-      TranslationsSettingsGeneralButtonEn.internal(_root);
-  late final TranslationsSettingsGeneralOptionEn option =
-      TranslationsSettingsGeneralOptionEn.internal(_root);
-  late final TranslationsSettingsGeneralEditorEn editor =
-      TranslationsSettingsGeneralEditorEn.internal(_root);
+  late final Translations$settings$general$section$en section =
+      Translations$settings$general$section$en.internal(_root);
+  late final Translations$settings$general$row$en row =
+      Translations$settings$general$row$en.internal(_root);
+  late final Translations$settings$general$button$en button =
+      Translations$settings$general$button$en.internal(_root);
+  late final Translations$settings$general$option$en option =
+      Translations$settings$general$option$en.internal(_root);
+  late final Translations$settings$general$editor$en editor =
+      Translations$settings$general$editor$en.internal(_root);
 }
 
 // Path: settings.appearance
-class TranslationsSettingsAppearanceEn {
-  TranslationsSettingsAppearanceEn.internal(this._root);
+class Translations$settings$appearance$en {
+  Translations$settings$appearance$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -1240,16 +1249,16 @@ class TranslationsSettingsAppearanceEn {
   /// en: 'Appearance'
   String get title => 'Appearance';
 
-  late final TranslationsSettingsAppearanceSectionEn section =
-      TranslationsSettingsAppearanceSectionEn.internal(_root);
+  late final Translations$settings$appearance$section$en section =
+      Translations$settings$appearance$section$en.internal(_root);
 
   /// en: 'Changes apply to the whole window immediately.'
   String get footer => 'Changes apply to the whole window immediately.';
 }
 
 // Path: settings.shortcuts
-class TranslationsSettingsShortcutsEn {
-  TranslationsSettingsShortcutsEn.internal(this._root);
+class Translations$settings$shortcuts$en {
+  Translations$settings$shortcuts$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -1258,16 +1267,16 @@ class TranslationsSettingsShortcutsEn {
   /// en: 'Shortcuts'
   String get title => 'Shortcuts';
 
-  late final TranslationsSettingsShortcutsSectionEn section =
-      TranslationsSettingsShortcutsSectionEn.internal(_root);
-  late final TranslationsSettingsShortcutsRowEn row =
-      TranslationsSettingsShortcutsRowEn.internal(_root);
-  late final TranslationsSettingsShortcutsDescriptionEn description =
-      TranslationsSettingsShortcutsDescriptionEn.internal(_root);
-  late final TranslationsSettingsShortcutsResetDialogEn reset_dialog =
-      TranslationsSettingsShortcutsResetDialogEn.internal(_root);
-  late final TranslationsSettingsShortcutsGroupEn group =
-      TranslationsSettingsShortcutsGroupEn.internal(_root);
+  late final Translations$settings$shortcuts$section$en section =
+      Translations$settings$shortcuts$section$en.internal(_root);
+  late final Translations$settings$shortcuts$row$en row =
+      Translations$settings$shortcuts$row$en.internal(_root);
+  late final Translations$settings$shortcuts$description$en description =
+      Translations$settings$shortcuts$description$en.internal(_root);
+  late final Translations$settings$shortcuts$reset_dialog$en reset_dialog =
+      Translations$settings$shortcuts$reset_dialog$en.internal(_root);
+  late final Translations$settings$shortcuts$group$en group =
+      Translations$settings$shortcuts$group$en.internal(_root);
 
   /// en: 'Restore Defaults...'
   String get reset => 'Restore Defaults...';
@@ -1286,8 +1295,8 @@ class TranslationsSettingsShortcutsEn {
 }
 
 // Path: settings.advanced
-class TranslationsSettingsAdvancedEn {
-  TranslationsSettingsAdvancedEn.internal(this._root);
+class Translations$settings$advanced$en {
+  Translations$settings$advanced$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -1351,8 +1360,8 @@ class TranslationsSettingsAdvancedEn {
 }
 
 // Path: settings.data_transfer
-class TranslationsSettingsDataTransferEn {
-  TranslationsSettingsDataTransferEn.internal(this._root);
+class Translations$settings$data_transfer$en {
+  Translations$settings$data_transfer$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -1410,8 +1419,8 @@ class TranslationsSettingsDataTransferEn {
 }
 
 // Path: settings.services
-class TranslationsSettingsServicesEn {
-  TranslationsSettingsServicesEn.internal(this._root);
+class Translations$settings$services$en {
+  Translations$settings$services$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -1420,25 +1429,25 @@ class TranslationsSettingsServicesEn {
   /// en: 'Services'
   String get title => 'Services';
 
-  late final TranslationsSettingsServicesButtonEn button =
-      TranslationsSettingsServicesButtonEn.internal(_root);
-  late final TranslationsSettingsServicesSectionEn section =
-      TranslationsSettingsServicesSectionEn.internal(_root);
-  late final TranslationsSettingsServicesEditorEn editor =
-      TranslationsSettingsServicesEditorEn.internal(_root);
-  late final TranslationsSettingsServicesDetailEn detail =
-      TranslationsSettingsServicesDetailEn.internal(_root);
+  late final Translations$settings$services$button$en button =
+      Translations$settings$services$button$en.internal(_root);
+  late final Translations$settings$services$section$en section =
+      Translations$settings$services$section$en.internal(_root);
+  late final Translations$settings$services$editor$en editor =
+      Translations$settings$services$editor$en.internal(_root);
+  late final Translations$settings$services$detail$en detail =
+      Translations$settings$services$detail$en.internal(_root);
 
   /// en: 'Make Default'
   String get make_default => 'Make Default';
 
-  late final TranslationsSettingsServicesItemEn item =
-      TranslationsSettingsServicesItemEn.internal(_root);
+  late final Translations$settings$services$item$en item =
+      Translations$settings$services$item$en.internal(_root);
 }
 
 // Path: settings.providers
-class TranslationsSettingsProvidersEn {
-  TranslationsSettingsProvidersEn.internal(this._root);
+class Translations$settings$providers$en {
+  Translations$settings$providers$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -1447,16 +1456,16 @@ class TranslationsSettingsProvidersEn {
   /// en: 'Providers'
   String get title => 'Providers';
 
-  late final TranslationsSettingsProvidersSectionEn section =
-      TranslationsSettingsProvidersSectionEn.internal(_root);
+  late final Translations$settings$providers$section$en section =
+      Translations$settings$providers$section$en.internal(_root);
 
   /// en: 'Search providers'
   String get search => 'Search providers';
 
-  late final TranslationsSettingsProvidersNetworkEn network =
-      TranslationsSettingsProvidersNetworkEn.internal(_root);
-  late final TranslationsSettingsProvidersStabilityEn stability =
-      TranslationsSettingsProvidersStabilityEn.internal(_root);
+  late final Translations$settings$providers$network$en network =
+      Translations$settings$providers$network$en.internal(_root);
+  late final Translations$settings$providers$stability$en stability =
+      Translations$settings$providers$stability$en.internal(_root);
 
   /// en: 'This uses an unofficial web interface. Text is sent over the network when you translate. It is not an official free API.'
   String get unofficial_notice =>
@@ -1494,28 +1503,28 @@ class TranslationsSettingsProvidersEn {
   /// en: 'Switch to Google Web'
   String get switch_to_google_web => 'Switch to Google Web';
 
-  late final TranslationsSettingsProvidersFieldsEn fields =
-      TranslationsSettingsProvidersFieldsEn.internal(_root);
-  late final TranslationsSettingsProvidersCatalogEn catalog =
-      TranslationsSettingsProvidersCatalogEn.internal(_root);
-  late final TranslationsSettingsProvidersItemEn item =
-      TranslationsSettingsProvidersItemEn.internal(_root);
-  late final TranslationsSettingsProvidersButtonEn button =
-      TranslationsSettingsProvidersButtonEn.internal(_root);
-  late final TranslationsSettingsProvidersAlertEn alert =
-      TranslationsSettingsProvidersAlertEn.internal(_root);
-  late final TranslationsSettingsProvidersIntroEn intro =
-      TranslationsSettingsProvidersIntroEn.internal(_root);
-  late final TranslationsSettingsProvidersEditorEn editor =
-      TranslationsSettingsProvidersEditorEn.internal(_root);
-  late final TranslationsSettingsProvidersDetailEn detail =
-      TranslationsSettingsProvidersDetailEn.internal(_root);
-  late final TranslationsSettingsProvidersCapabilityEn capability =
-      TranslationsSettingsProvidersCapabilityEn.internal(_root);
-  late final TranslationsSettingsProvidersDescriptionEn description =
-      TranslationsSettingsProvidersDescriptionEn.internal(_root);
-  late final TranslationsSettingsProvidersDeleteDialogEn delete_dialog =
-      TranslationsSettingsProvidersDeleteDialogEn.internal(_root);
+  late final Translations$settings$providers$fields$en fields =
+      Translations$settings$providers$fields$en.internal(_root);
+  late final Translations$settings$providers$catalog$en catalog =
+      Translations$settings$providers$catalog$en.internal(_root);
+  late final Translations$settings$providers$item$en item =
+      Translations$settings$providers$item$en.internal(_root);
+  late final Translations$settings$providers$button$en button =
+      Translations$settings$providers$button$en.internal(_root);
+  late final Translations$settings$providers$alert$en alert =
+      Translations$settings$providers$alert$en.internal(_root);
+  late final Translations$settings$providers$intro$en intro =
+      Translations$settings$providers$intro$en.internal(_root);
+  late final Translations$settings$providers$editor$en editor =
+      Translations$settings$providers$editor$en.internal(_root);
+  late final Translations$settings$providers$detail$en detail =
+      Translations$settings$providers$detail$en.internal(_root);
+  late final Translations$settings$providers$capability$en capability =
+      Translations$settings$providers$capability$en.internal(_root);
+  late final Translations$settings$providers$description$en description =
+      Translations$settings$providers$description$en.internal(_root);
+  late final Translations$settings$providers$delete_dialog$en delete_dialog =
+      Translations$settings$providers$delete_dialog$en.internal(_root);
 
   /// en: 'Models are fetched automatically when credentials are ready. You can also enter a model ID. Listing does not verify translation access.'
   String get model_auto_hint =>
@@ -1568,8 +1577,8 @@ class TranslationsSettingsProvidersEn {
 }
 
 // Path: settings.layout
-class TranslationsSettingsLayoutEn {
-  TranslationsSettingsLayoutEn.internal(this._root);
+class Translations$settings$layout$en {
+  Translations$settings$layout$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -1578,8 +1587,8 @@ class TranslationsSettingsLayoutEn {
   /// en: 'Settings'
   String get title => 'Settings';
 
-  late final TranslationsSettingsLayoutEmptyEn empty =
-      TranslationsSettingsLayoutEmptyEn.internal(_root);
+  late final Translations$settings$layout$empty$en empty =
+      Translations$settings$layout$empty$en.internal(_root);
 
   /// en: 'Groups'
   String get groups => 'Groups';
@@ -1595,8 +1604,8 @@ class TranslationsSettingsLayoutEn {
 }
 
 // Path: settings.about
-class TranslationsSettingsAboutEn {
-  TranslationsSettingsAboutEn.internal(this._root);
+class Translations$settings$about$en {
+  Translations$settings$about$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -1637,8 +1646,8 @@ class TranslationsSettingsAboutEn {
 }
 
 // Path: settings.permissions
-class TranslationsSettingsPermissionsEn {
-  TranslationsSettingsPermissionsEn.internal(this._root);
+class Translations$settings$permissions$en {
+  Translations$settings$permissions$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -1656,8 +1665,8 @@ class TranslationsSettingsPermissionsEn {
 }
 
 // Path: ui.shell
-class TranslationsUiShellEn {
-  TranslationsUiShellEn.internal(this._root);
+class Translations$ui$shell$en {
+  Translations$ui$shell$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -1692,8 +1701,8 @@ class TranslationsUiShellEn {
 }
 
 // Path: ui.first_run
-class TranslationsUiFirstRunEn {
-  TranslationsUiFirstRunEn.internal(this._root);
+class Translations$ui$first_run$en {
+  Translations$ui$first_run$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -1773,8 +1782,8 @@ class TranslationsUiFirstRunEn {
 }
 
 // Path: ui.quick
-class TranslationsUiQuickEn {
-  TranslationsUiQuickEn.internal(this._root);
+class Translations$ui$quick$en {
+  Translations$ui$quick$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -1880,8 +1889,8 @@ class TranslationsUiQuickEn {
 }
 
 // Path: ui.ocr
-class TranslationsUiOcrEn {
-  TranslationsUiOcrEn.internal(this._root);
+class Translations$ui$ocr$en {
+  Translations$ui$ocr$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -1914,8 +1923,8 @@ class TranslationsUiOcrEn {
 }
 
 // Path: ui.errors
-class TranslationsUiErrorsEn {
-  TranslationsUiErrorsEn.internal(this._root);
+class Translations$ui$errors$en {
+  Translations$ui$errors$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -2059,8 +2068,8 @@ class TranslationsUiErrorsEn {
 }
 
 // Path: ui.recovery
-class TranslationsUiRecoveryEn {
-  TranslationsUiRecoveryEn.internal(this._root);
+class Translations$ui$recovery$en {
+  Translations$ui$recovery$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -2093,8 +2102,8 @@ class TranslationsUiRecoveryEn {
 }
 
 // Path: ui.vocabulary
-class TranslationsUiVocabularyEn {
-  TranslationsUiVocabularyEn.internal(this._root);
+class Translations$ui$vocabulary$en {
+  Translations$ui$vocabulary$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -2148,8 +2157,8 @@ class TranslationsUiVocabularyEn {
 }
 
 // Path: ui.dictionary
-class TranslationsUiDictionaryEn {
-  TranslationsUiDictionaryEn.internal(this._root);
+class Translations$ui$dictionary$en {
+  Translations$ui$dictionary$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -2178,8 +2187,8 @@ class TranslationsUiDictionaryEn {
 }
 
 // Path: ui.updates
-class TranslationsUiUpdatesEn {
-  TranslationsUiUpdatesEn.internal(this._root);
+class Translations$ui$updates$en {
+  Translations$ui$updates$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -2225,8 +2234,8 @@ class TranslationsUiUpdatesEn {
 }
 
 // Path: ui.speech
-class TranslationsUiSpeechEn {
-  TranslationsUiSpeechEn.internal(this._root);
+class Translations$ui$speech$en {
+  Translations$ui$speech$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -2243,8 +2252,8 @@ class TranslationsUiSpeechEn {
 }
 
 // Path: ui.providers
-class TranslationsUiProvidersEn {
-  TranslationsUiProvidersEn.internal(this._root);
+class Translations$ui$providers$en {
+  Translations$ui$providers$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -2265,8 +2274,8 @@ class TranslationsUiProvidersEn {
 }
 
 // Path: common.ui.button
-class TranslationsCommonUiButtonEn {
-  TranslationsCommonUiButtonEn.internal(this._root);
+class Translations$common$ui$button$en {
+  Translations$common$ui$button$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -2298,8 +2307,8 @@ class TranslationsCommonUiButtonEn {
 }
 
 // Path: common.ui.feedback
-class TranslationsCommonUiFeedbackEn {
-  TranslationsCommonUiFeedbackEn.internal(this._root);
+class Translations$common$ui$feedback$en {
+  Translations$common$ui$feedback$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -2310,8 +2319,8 @@ class TranslationsCommonUiFeedbackEn {
 }
 
 // Path: app.tray.context_menu
-class TranslationsAppTrayContextMenuEn {
-  TranslationsAppTrayContextMenuEn.internal(this._root);
+class Translations$app$tray$context_menu$en {
+  Translations$app$tray$context_menu$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -2356,8 +2365,8 @@ class TranslationsAppTrayContextMenuEn {
   /// en: 'About LinguaRay'
   String get about => 'About LinguaRay';
 
-  late final TranslationsAppTrayContextMenuDevToolsEn dev_tools =
-      TranslationsAppTrayContextMenuDevToolsEn.internal(_root);
+  late final Translations$app$tray$context_menu$dev_tools$en dev_tools =
+      Translations$app$tray$context_menu$dev_tools$en.internal(_root);
 
   /// en: 'Check for Updates'
   String get check_for_updates => 'Check for Updates';
@@ -2370,8 +2379,10 @@ class TranslationsAppTrayContextMenuEn {
 }
 
 // Path: mini_translator.limited_banner.permission
-class TranslationsMiniTranslatorLimitedBannerPermissionEn {
-  TranslationsMiniTranslatorLimitedBannerPermissionEn.internal(this._root);
+class Translations$mini_translator$limited_banner$permission$en {
+  Translations$mini_translator$limited_banner$permission$en.internal(
+    this._root,
+  );
 
   final Translations _root; // ignore: unused_field
 
@@ -2391,8 +2402,10 @@ class TranslationsMiniTranslatorLimitedBannerPermissionEn {
 }
 
 // Path: mini_translator.limited_banner.instruction
-class TranslationsMiniTranslatorLimitedBannerInstructionEn {
-  TranslationsMiniTranslatorLimitedBannerInstructionEn.internal(this._root);
+class Translations$mini_translator$limited_banner$instruction$en {
+  Translations$mini_translator$limited_banner$instruction$en.internal(
+    this._root,
+  );
 
   final Translations _root; // ignore: unused_field
 
@@ -2409,8 +2422,8 @@ class TranslationsMiniTranslatorLimitedBannerInstructionEn {
 }
 
 // Path: mini_translator.limited_banner.action
-class TranslationsMiniTranslatorLimitedBannerActionEn {
-  TranslationsMiniTranslatorLimitedBannerActionEn.internal(this._root);
+class Translations$mini_translator$limited_banner$action$en {
+  Translations$mini_translator$limited_banner$action$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -2424,8 +2437,8 @@ class TranslationsMiniTranslatorLimitedBannerActionEn {
 }
 
 // Path: mini_translator.limited_banner.feedback
-class TranslationsMiniTranslatorLimitedBannerFeedbackEn {
-  TranslationsMiniTranslatorLimitedBannerFeedbackEn.internal(this._root);
+class Translations$mini_translator$limited_banner$feedback$en {
+  Translations$mini_translator$limited_banner$feedback$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -2440,8 +2453,8 @@ class TranslationsMiniTranslatorLimitedBannerFeedbackEn {
 }
 
 // Path: mini_translator.limited_banner.tooltip
-class TranslationsMiniTranslatorLimitedBannerTooltipEn {
-  TranslationsMiniTranslatorLimitedBannerTooltipEn.internal(this._root);
+class Translations$mini_translator$limited_banner$tooltip$en {
+  Translations$mini_translator$limited_banner$tooltip$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -2452,8 +2465,8 @@ class TranslationsMiniTranslatorLimitedBannerTooltipEn {
 }
 
 // Path: mini_translator.toolbar.tooltip
-class TranslationsMiniTranslatorToolbarTooltipEn {
-  TranslationsMiniTranslatorToolbarTooltipEn.internal(this._root);
+class Translations$mini_translator$toolbar$tooltip$en {
+  Translations$mini_translator$toolbar$tooltip$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -2474,8 +2487,8 @@ class TranslationsMiniTranslatorToolbarTooltipEn {
 }
 
 // Path: mini_translator.toolbar.menu
-class TranslationsMiniTranslatorToolbarMenuEn {
-  TranslationsMiniTranslatorToolbarMenuEn.internal(this._root);
+class Translations$mini_translator$toolbar$menu$en {
+  Translations$mini_translator$toolbar$menu$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -2495,8 +2508,8 @@ class TranslationsMiniTranslatorToolbarMenuEn {
 }
 
 // Path: settings.general.section
-class TranslationsSettingsGeneralSectionEn {
-  TranslationsSettingsGeneralSectionEn.internal(this._root);
+class Translations$settings$general$section$en {
+  Translations$settings$general$section$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -2534,8 +2547,8 @@ class TranslationsSettingsGeneralSectionEn {
 }
 
 // Path: settings.general.row
-class TranslationsSettingsGeneralRowEn {
-  TranslationsSettingsGeneralRowEn.internal(this._root);
+class Translations$settings$general$row$en {
+  Translations$settings$general$row$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -2619,8 +2632,8 @@ class TranslationsSettingsGeneralRowEn {
 }
 
 // Path: settings.general.button
-class TranslationsSettingsGeneralButtonEn {
-  TranslationsSettingsGeneralButtonEn.internal(this._root);
+class Translations$settings$general$button$en {
+  Translations$settings$general$button$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -2643,8 +2656,8 @@ class TranslationsSettingsGeneralButtonEn {
 }
 
 // Path: settings.general.option
-class TranslationsSettingsGeneralOptionEn {
-  TranslationsSettingsGeneralOptionEn.internal(this._root);
+class Translations$settings$general$option$en {
+  Translations$settings$general$option$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -2670,8 +2683,8 @@ class TranslationsSettingsGeneralOptionEn {
 }
 
 // Path: settings.general.editor
-class TranslationsSettingsGeneralEditorEn {
-  TranslationsSettingsGeneralEditorEn.internal(this._root);
+class Translations$settings$general$editor$en {
+  Translations$settings$general$editor$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -2683,8 +2696,8 @@ class TranslationsSettingsGeneralEditorEn {
   /// en: 'Edit Translation Target'
   String get edit_target_title => 'Edit Translation Target';
 
-  late final TranslationsSettingsGeneralEditorRowEn row =
-      TranslationsSettingsGeneralEditorRowEn.internal(_root);
+  late final Translations$settings$general$editor$row$en row =
+      Translations$settings$general$editor$row$en.internal(_root);
 
   /// en: 'Edit Translation Target'
   String get title_edit => 'Edit Translation Target';
@@ -2708,8 +2721,8 @@ class TranslationsSettingsGeneralEditorEn {
 }
 
 // Path: settings.appearance.section
-class TranslationsSettingsAppearanceSectionEn {
-  TranslationsSettingsAppearanceSectionEn.internal(this._root);
+class Translations$settings$appearance$section$en {
+  Translations$settings$appearance$section$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -2726,8 +2739,8 @@ class TranslationsSettingsAppearanceSectionEn {
 }
 
 // Path: settings.shortcuts.section
-class TranslationsSettingsShortcutsSectionEn {
-  TranslationsSettingsShortcutsSectionEn.internal(this._root);
+class Translations$settings$shortcuts$section$en {
+  Translations$settings$shortcuts$section$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -2744,8 +2757,8 @@ class TranslationsSettingsShortcutsSectionEn {
 }
 
 // Path: settings.shortcuts.row
-class TranslationsSettingsShortcutsRowEn {
-  TranslationsSettingsShortcutsRowEn.internal(this._root);
+class Translations$settings$shortcuts$row$en {
+  Translations$settings$shortcuts$row$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -2783,8 +2796,8 @@ class TranslationsSettingsShortcutsRowEn {
 }
 
 // Path: settings.shortcuts.description
-class TranslationsSettingsShortcutsDescriptionEn {
-  TranslationsSettingsShortcutsDescriptionEn.internal(this._root);
+class Translations$settings$shortcuts$description$en {
+  Translations$settings$shortcuts$description$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -2829,8 +2842,8 @@ class TranslationsSettingsShortcutsDescriptionEn {
 }
 
 // Path: settings.shortcuts.reset_dialog
-class TranslationsSettingsShortcutsResetDialogEn {
-  TranslationsSettingsShortcutsResetDialogEn.internal(this._root);
+class Translations$settings$shortcuts$reset_dialog$en {
+  Translations$settings$shortcuts$reset_dialog$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -2851,21 +2864,21 @@ class TranslationsSettingsShortcutsResetDialogEn {
 }
 
 // Path: settings.shortcuts.group
-class TranslationsSettingsShortcutsGroupEn {
-  TranslationsSettingsShortcutsGroupEn.internal(this._root);
+class Translations$settings$shortcuts$group$en {
+  Translations$settings$shortcuts$group$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
   // Translations
-  late final TranslationsSettingsShortcutsGroupGlobalEn global =
-      TranslationsSettingsShortcutsGroupGlobalEn.internal(_root);
-  late final TranslationsSettingsShortcutsGroupInAppEn in_app =
-      TranslationsSettingsShortcutsGroupInAppEn.internal(_root);
+  late final Translations$settings$shortcuts$group$global$en global =
+      Translations$settings$shortcuts$group$global$en.internal(_root);
+  late final Translations$settings$shortcuts$group$in_app$en in_app =
+      Translations$settings$shortcuts$group$in_app$en.internal(_root);
 }
 
 // Path: settings.services.button
-class TranslationsSettingsServicesButtonEn {
-  TranslationsSettingsServicesButtonEn.internal(this._root);
+class Translations$settings$services$button$en {
+  Translations$settings$services$button$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -2879,8 +2892,8 @@ class TranslationsSettingsServicesButtonEn {
 }
 
 // Path: settings.services.section
-class TranslationsSettingsServicesSectionEn {
-  TranslationsSettingsServicesSectionEn.internal(this._root);
+class Translations$settings$services$section$en {
+  Translations$settings$services$section$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -2891,8 +2904,8 @@ class TranslationsSettingsServicesSectionEn {
 }
 
 // Path: settings.services.editor
-class TranslationsSettingsServicesEditorEn {
-  TranslationsSettingsServicesEditorEn.internal(this._root);
+class Translations$settings$services$editor$en {
+  Translations$settings$services$editor$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -2904,8 +2917,8 @@ class TranslationsSettingsServicesEditorEn {
   /// en: 'Add one more service to a configured provider'
   String get subtitle => 'Add one more service to a configured provider';
 
-  late final TranslationsSettingsServicesEditorRowEn row =
-      TranslationsSettingsServicesEditorRowEn.internal(_root);
+  late final Translations$settings$services$editor$row$en row =
+      Translations$settings$services$editor$row$en.internal(_root);
 
   /// en: 'Leave blank to use the default prompt for this kind'
   String get prompt_placeholder =>
@@ -2921,16 +2934,17 @@ class TranslationsSettingsServicesEditorEn {
 }
 
 // Path: settings.services.detail
-class TranslationsSettingsServicesDetailEn {
-  TranslationsSettingsServicesDetailEn.internal(this._root);
+class Translations$settings$services$detail$en {
+  Translations$settings$services$detail$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
   // Translations
-  late final TranslationsSettingsServicesDetailRowEn row =
-      TranslationsSettingsServicesDetailRowEn.internal(_root);
-  late final TranslationsSettingsServicesDetailDeleteDialogEn delete_dialog =
-      TranslationsSettingsServicesDetailDeleteDialogEn.internal(_root);
+  late final Translations$settings$services$detail$row$en row =
+      Translations$settings$services$detail$row$en.internal(_root);
+  late final Translations$settings$services$detail$delete_dialog$en
+  delete_dialog =
+      Translations$settings$services$detail$delete_dialog$en.internal(_root);
 
   /// en: 'Available variables: {{sourceLanguage}}, {{targetLanguage}}, {{text}}'
   String get prompt_variables =>
@@ -2938,8 +2952,8 @@ class TranslationsSettingsServicesDetailEn {
 }
 
 // Path: settings.services.item
-class TranslationsSettingsServicesItemEn {
-  TranslationsSettingsServicesItemEn.internal(this._root);
+class Translations$settings$services$item$en {
+  Translations$settings$services$item$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -2950,8 +2964,8 @@ class TranslationsSettingsServicesItemEn {
 }
 
 // Path: settings.providers.section
-class TranslationsSettingsProvidersSectionEn {
-  TranslationsSettingsProvidersSectionEn.internal(this._root);
+class Translations$settings$providers$section$en {
+  Translations$settings$providers$section$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -2981,8 +2995,8 @@ class TranslationsSettingsProvidersSectionEn {
 }
 
 // Path: settings.providers.network
-class TranslationsSettingsProvidersNetworkEn {
-  TranslationsSettingsProvidersNetworkEn.internal(this._root);
+class Translations$settings$providers$network$en {
+  Translations$settings$providers$network$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -3002,8 +3016,8 @@ class TranslationsSettingsProvidersNetworkEn {
 }
 
 // Path: settings.providers.stability
-class TranslationsSettingsProvidersStabilityEn {
-  TranslationsSettingsProvidersStabilityEn.internal(this._root);
+class Translations$settings$providers$stability$en {
+  Translations$settings$providers$stability$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -3017,8 +3031,8 @@ class TranslationsSettingsProvidersStabilityEn {
 }
 
 // Path: settings.providers.fields
-class TranslationsSettingsProvidersFieldsEn {
-  TranslationsSettingsProvidersFieldsEn.internal(this._root);
+class Translations$settings$providers$fields$en {
+  Translations$settings$providers$fields$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -3065,8 +3079,8 @@ class TranslationsSettingsProvidersFieldsEn {
 }
 
 // Path: settings.providers.catalog
-class TranslationsSettingsProvidersCatalogEn {
-  TranslationsSettingsProvidersCatalogEn.internal(this._root);
+class Translations$settings$providers$catalog$en {
+  Translations$settings$providers$catalog$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -3207,8 +3221,8 @@ class TranslationsSettingsProvidersCatalogEn {
 }
 
 // Path: settings.providers.item
-class TranslationsSettingsProvidersItemEn {
-  TranslationsSettingsProvidersItemEn.internal(this._root);
+class Translations$settings$providers$item$en {
+  Translations$settings$providers$item$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -3226,8 +3240,8 @@ class TranslationsSettingsProvidersItemEn {
 }
 
 // Path: settings.providers.button
-class TranslationsSettingsProvidersButtonEn {
-  TranslationsSettingsProvidersButtonEn.internal(this._root);
+class Translations$settings$providers$button$en {
+  Translations$settings$providers$button$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -3238,8 +3252,8 @@ class TranslationsSettingsProvidersButtonEn {
 }
 
 // Path: settings.providers.alert
-class TranslationsSettingsProvidersAlertEn {
-  TranslationsSettingsProvidersAlertEn.internal(this._root);
+class Translations$settings$providers$alert$en {
+  Translations$settings$providers$alert$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -3250,8 +3264,8 @@ class TranslationsSettingsProvidersAlertEn {
 }
 
 // Path: settings.providers.intro
-class TranslationsSettingsProvidersIntroEn {
-  TranslationsSettingsProvidersIntroEn.internal(this._root);
+class Translations$settings$providers$intro$en {
+  Translations$settings$providers$intro$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -3266,53 +3280,53 @@ class TranslationsSettingsProvidersIntroEn {
 }
 
 // Path: settings.providers.editor
-class TranslationsSettingsProvidersEditorEn {
-  TranslationsSettingsProvidersEditorEn.internal(this._root);
+class Translations$settings$providers$editor$en {
+  Translations$settings$providers$editor$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
   // Translations
-  late final TranslationsSettingsProvidersEditorRowEn row =
-      TranslationsSettingsProvidersEditorRowEn.internal(_root);
-  late final TranslationsSettingsProvidersEditorPlaceholderEn placeholder =
-      TranslationsSettingsProvidersEditorPlaceholderEn.internal(_root);
-  late final TranslationsSettingsProvidersEditorTypePickerEn type_picker =
-      TranslationsSettingsProvidersEditorTypePickerEn.internal(_root);
-  late final TranslationsSettingsProvidersEditorTooltipEn tooltip =
-      TranslationsSettingsProvidersEditorTooltipEn.internal(_root);
-  late final TranslationsSettingsProvidersEditorStepEn step =
-      TranslationsSettingsProvidersEditorStepEn.internal(_root);
+  late final Translations$settings$providers$editor$row$en row =
+      Translations$settings$providers$editor$row$en.internal(_root);
+  late final Translations$settings$providers$editor$placeholder$en placeholder =
+      Translations$settings$providers$editor$placeholder$en.internal(_root);
+  late final Translations$settings$providers$editor$type_picker$en type_picker =
+      Translations$settings$providers$editor$type_picker$en.internal(_root);
+  late final Translations$settings$providers$editor$tooltip$en tooltip =
+      Translations$settings$providers$editor$tooltip$en.internal(_root);
+  late final Translations$settings$providers$editor$step$en step =
+      Translations$settings$providers$editor$step$en.internal(_root);
 
   /// en: 'Add {}'
   String get add_title => 'Add {}';
 
-  late final TranslationsSettingsProvidersEditorCapabilityNoteEn
+  late final Translations$settings$providers$editor$capability_note$en
   capability_note =
-      TranslationsSettingsProvidersEditorCapabilityNoteEn.internal(_root);
-  late final TranslationsSettingsProvidersEditorTestEn test =
-      TranslationsSettingsProvidersEditorTestEn.internal(_root);
+      Translations$settings$providers$editor$capability_note$en.internal(_root);
+  late final Translations$settings$providers$editor$test$en test =
+      Translations$settings$providers$editor$test$en.internal(_root);
 }
 
 // Path: settings.providers.detail
-class TranslationsSettingsProvidersDetailEn {
-  TranslationsSettingsProvidersDetailEn.internal(this._root);
+class Translations$settings$providers$detail$en {
+  Translations$settings$providers$detail$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
   // Translations
-  late final TranslationsSettingsProvidersDetailTooltipEn tooltip =
-      TranslationsSettingsProvidersDetailTooltipEn.internal(_root);
-  late final TranslationsSettingsProvidersDetailRowEn row =
-      TranslationsSettingsProvidersDetailRowEn.internal(_root);
-  late final TranslationsSettingsProvidersDetailSectionEn section =
-      TranslationsSettingsProvidersDetailSectionEn.internal(_root);
-  late final TranslationsSettingsProvidersDetailModelsEn models =
-      TranslationsSettingsProvidersDetailModelsEn.internal(_root);
+  late final Translations$settings$providers$detail$tooltip$en tooltip =
+      Translations$settings$providers$detail$tooltip$en.internal(_root);
+  late final Translations$settings$providers$detail$row$en row =
+      Translations$settings$providers$detail$row$en.internal(_root);
+  late final Translations$settings$providers$detail$section$en section =
+      Translations$settings$providers$detail$section$en.internal(_root);
+  late final Translations$settings$providers$detail$models$en models =
+      Translations$settings$providers$detail$models$en.internal(_root);
 }
 
 // Path: settings.providers.capability
-class TranslationsSettingsProvidersCapabilityEn {
-  TranslationsSettingsProvidersCapabilityEn.internal(this._root);
+class Translations$settings$providers$capability$en {
+  Translations$settings$providers$capability$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -3332,8 +3346,8 @@ class TranslationsSettingsProvidersCapabilityEn {
 }
 
 // Path: settings.providers.description
-class TranslationsSettingsProvidersDescriptionEn {
-  TranslationsSettingsProvidersDescriptionEn.internal(this._root);
+class Translations$settings$providers$description$en {
+  Translations$settings$providers$description$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -3353,8 +3367,8 @@ class TranslationsSettingsProvidersDescriptionEn {
 }
 
 // Path: settings.providers.delete_dialog
-class TranslationsSettingsProvidersDeleteDialogEn {
-  TranslationsSettingsProvidersDeleteDialogEn.internal(this._root);
+class Translations$settings$providers$delete_dialog$en {
+  Translations$settings$providers$delete_dialog$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -3368,8 +3382,8 @@ class TranslationsSettingsProvidersDeleteDialogEn {
 }
 
 // Path: settings.layout.empty
-class TranslationsSettingsLayoutEmptyEn {
-  TranslationsSettingsLayoutEmptyEn.internal(this._root);
+class Translations$settings$layout$empty$en {
+  Translations$settings$layout$empty$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -3383,8 +3397,8 @@ class TranslationsSettingsLayoutEmptyEn {
 }
 
 // Path: app.tray.context_menu.dev_tools
-class TranslationsAppTrayContextMenuDevToolsEn {
-  TranslationsAppTrayContextMenuDevToolsEn.internal(this._root);
+class Translations$app$tray$context_menu$dev_tools$en {
+  Translations$app$tray$context_menu$dev_tools$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -3398,8 +3412,8 @@ class TranslationsAppTrayContextMenuDevToolsEn {
 }
 
 // Path: settings.general.editor.row
-class TranslationsSettingsGeneralEditorRowEn {
-  TranslationsSettingsGeneralEditorRowEn.internal(this._root);
+class Translations$settings$general$editor$row$en {
+  Translations$settings$general$editor$row$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -3413,8 +3427,8 @@ class TranslationsSettingsGeneralEditorRowEn {
 }
 
 // Path: settings.shortcuts.group.global
-class TranslationsSettingsShortcutsGroupGlobalEn {
-  TranslationsSettingsShortcutsGroupGlobalEn.internal(this._root);
+class Translations$settings$shortcuts$group$global$en {
+  Translations$settings$shortcuts$group$global$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -3428,8 +3442,8 @@ class TranslationsSettingsShortcutsGroupGlobalEn {
 }
 
 // Path: settings.shortcuts.group.in_app
-class TranslationsSettingsShortcutsGroupInAppEn {
-  TranslationsSettingsShortcutsGroupInAppEn.internal(this._root);
+class Translations$settings$shortcuts$group$in_app$en {
+  Translations$settings$shortcuts$group$in_app$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -3443,8 +3457,8 @@ class TranslationsSettingsShortcutsGroupInAppEn {
 }
 
 // Path: settings.services.editor.row
-class TranslationsSettingsServicesEditorRowEn {
-  TranslationsSettingsServicesEditorRowEn.internal(this._root);
+class Translations$settings$services$editor$row$en {
+  Translations$settings$services$editor$row$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -3458,8 +3472,8 @@ class TranslationsSettingsServicesEditorRowEn {
 }
 
 // Path: settings.services.detail.row
-class TranslationsSettingsServicesDetailRowEn {
-  TranslationsSettingsServicesDetailRowEn.internal(this._root);
+class Translations$settings$services$detail$row$en {
+  Translations$settings$services$detail$row$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -3479,8 +3493,8 @@ class TranslationsSettingsServicesDetailRowEn {
 }
 
 // Path: settings.services.detail.delete_dialog
-class TranslationsSettingsServicesDetailDeleteDialogEn {
-  TranslationsSettingsServicesDetailDeleteDialogEn.internal(this._root);
+class Translations$settings$services$detail$delete_dialog$en {
+  Translations$settings$services$detail$delete_dialog$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -3494,8 +3508,8 @@ class TranslationsSettingsServicesDetailDeleteDialogEn {
 }
 
 // Path: settings.providers.editor.row
-class TranslationsSettingsProvidersEditorRowEn {
-  TranslationsSettingsProvidersEditorRowEn.internal(this._root);
+class Translations$settings$providers$editor$row$en {
+  Translations$settings$providers$editor$row$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -3512,8 +3526,8 @@ class TranslationsSettingsProvidersEditorRowEn {
 }
 
 // Path: settings.providers.editor.placeholder
-class TranslationsSettingsProvidersEditorPlaceholderEn {
-  TranslationsSettingsProvidersEditorPlaceholderEn.internal(this._root);
+class Translations$settings$providers$editor$placeholder$en {
+  Translations$settings$providers$editor$placeholder$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -3524,8 +3538,8 @@ class TranslationsSettingsProvidersEditorPlaceholderEn {
 }
 
 // Path: settings.providers.editor.type_picker
-class TranslationsSettingsProvidersEditorTypePickerEn {
-  TranslationsSettingsProvidersEditorTypePickerEn.internal(this._root);
+class Translations$settings$providers$editor$type_picker$en {
+  Translations$settings$providers$editor$type_picker$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -3542,8 +3556,8 @@ class TranslationsSettingsProvidersEditorTypePickerEn {
 }
 
 // Path: settings.providers.editor.tooltip
-class TranslationsSettingsProvidersEditorTooltipEn {
-  TranslationsSettingsProvidersEditorTooltipEn.internal(this._root);
+class Translations$settings$providers$editor$tooltip$en {
+  Translations$settings$providers$editor$tooltip$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -3554,8 +3568,8 @@ class TranslationsSettingsProvidersEditorTooltipEn {
 }
 
 // Path: settings.providers.editor.step
-class TranslationsSettingsProvidersEditorStepEn {
-  TranslationsSettingsProvidersEditorStepEn.internal(this._root);
+class Translations$settings$providers$editor$step$en {
+  Translations$settings$providers$editor$step$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -3569,8 +3583,10 @@ class TranslationsSettingsProvidersEditorStepEn {
 }
 
 // Path: settings.providers.editor.capability_note
-class TranslationsSettingsProvidersEditorCapabilityNoteEn {
-  TranslationsSettingsProvidersEditorCapabilityNoteEn.internal(this._root);
+class Translations$settings$providers$editor$capability_note$en {
+  Translations$settings$providers$editor$capability_note$en.internal(
+    this._root,
+  );
 
   final Translations _root; // ignore: unused_field
 
@@ -3587,8 +3603,8 @@ class TranslationsSettingsProvidersEditorCapabilityNoteEn {
 }
 
 // Path: settings.providers.editor.test
-class TranslationsSettingsProvidersEditorTestEn {
-  TranslationsSettingsProvidersEditorTestEn.internal(this._root);
+class Translations$settings$providers$editor$test$en {
+  Translations$settings$providers$editor$test$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -3631,8 +3647,8 @@ class TranslationsSettingsProvidersEditorTestEn {
 }
 
 // Path: settings.providers.detail.tooltip
-class TranslationsSettingsProvidersDetailTooltipEn {
-  TranslationsSettingsProvidersDetailTooltipEn.internal(this._root);
+class Translations$settings$providers$detail$tooltip$en {
+  Translations$settings$providers$detail$tooltip$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -3643,8 +3659,8 @@ class TranslationsSettingsProvidersDetailTooltipEn {
 }
 
 // Path: settings.providers.detail.row
-class TranslationsSettingsProvidersDetailRowEn {
-  TranslationsSettingsProvidersDetailRowEn.internal(this._root);
+class Translations$settings$providers$detail$row$en {
+  Translations$settings$providers$detail$row$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -3655,8 +3671,8 @@ class TranslationsSettingsProvidersDetailRowEn {
 }
 
 // Path: settings.providers.detail.section
-class TranslationsSettingsProvidersDetailSectionEn {
-  TranslationsSettingsProvidersDetailSectionEn.internal(this._root);
+class Translations$settings$providers$detail$section$en {
+  Translations$settings$providers$detail$section$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
@@ -3670,8 +3686,8 @@ class TranslationsSettingsProvidersDetailSectionEn {
 }
 
 // Path: settings.providers.detail.models
-class TranslationsSettingsProvidersDetailModelsEn {
-  TranslationsSettingsProvidersDetailModelsEn.internal(this._root);
+class Translations$settings$providers$detail$models$en {
+  Translations$settings$providers$detail$models$en.internal(this._root);
 
   final Translations _root; // ignore: unused_field
 
