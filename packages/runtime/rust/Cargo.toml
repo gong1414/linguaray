@@ -11,7 +11,7 @@ crate-type = ["lib", "cdylib", "staticlib"]
 linguaray-core = { path = "../../../crates/core" }
 linguaray-api-core = { path = "../../../crates/api-core" }
 linguaray-engine = { path = "../../../crates/engine" }
-uniffi = { version = "=0.31.2", features = ["cli"] }
+uniffi = { version = "=0.32.1", features = ["cli"] }
 # Pinned to an immutable revision: upstream `main` moves, which would make bindings non-reproducible.
 uniffi-dart = { git = "https://github.com/Uniffi-Dart/uniffi-dart.git", rev = "1ded89be15e2d18346df8701df2b9cfcae918316" }
 aho-corasick.workspace = true
@@ -47,7 +47,7 @@ uniffi-dart = { git = "https://github.com/Uniffi-Dart/uniffi-dart.git", rev = "1
 uniffi-dart = { git = "https://github.com/Uniffi-Dart/uniffi-dart.git", rev = "1ded89be15e2d18346df8701df2b9cfcae918316", features = [
   "bindgen-tests",
 ] }
-uniffi = { version = "=0.31.2", features = ["bindgen-tests"] }
+uniffi = { version = "=0.32.1", features = ["bindgen-tests"] }
 uniffi_testing = "=0.31.2"
 anyhow = "1"
 
